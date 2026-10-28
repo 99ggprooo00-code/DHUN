@@ -1,5 +1,23 @@
 # Decisions and changes — DHUN Web (`/app/`)
 
+## Current reconciliation — 2026-10-28
+
+[PRD §1](../PRD.md#1-product-definition-and-source-of-truth) and the latest
+[ADR-010 amendment](../decisions/ADR-010-multi-source-provider-direction.md)
+resolve prior identity ambiguity: DHUN is multi-source, YouTube Music first,
+Spotify planned and deferred subject to **all** feasibility gates. Native uses
+YouTube Music, browser JioSaavn. D1–D6 remain; D5 design is not code. D2/current
+CSP/no-IFrame stand; Watch mode remains proposed and authorisation must precede
+third-party runtime/spike changes. Official IFrame controls include queue/seek;
+that does not imply raw-audio/background/offline parity. Targeted JioSaavn Terms
+clauses were re-read: unofficial access/permission remains an open risk. No
+legal adoption, provider implementation or recurring cost is approved here.
+
+## Historical decisions and changes (original dated records)
+
+Rows below preserve earlier interpretations/owner words and measured outcomes;
+conflicting present-tense next steps/identity readings are superseded above.
+
 The web counterpart of the native decision record. Two lists: decisions that
 shape the browser build, and dated changes to this documentation set. The full
 decision texts are in [`docs/decisions/`](../decisions/); this file is the index

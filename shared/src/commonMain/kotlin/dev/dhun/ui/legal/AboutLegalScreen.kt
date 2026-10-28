@@ -149,9 +149,9 @@ private fun LegalListRow(document: LegalDocument, onClick: () -> Unit) {
         )
         Text(
             text = if (document.isDraft) {
-                "Draft · effective ${document.effectiveDate}"
+                "Draft · updated ${document.effectiveDate}"
             } else {
-                "Effective ${document.effectiveDate}"
+                "Updated ${document.effectiveDate}"
             },
             style = MaterialTheme.typography.bodySmall,
             // A draft page is amber, not the ordinary secondary grey: the reader
@@ -316,7 +316,7 @@ private fun DraftBanner(document: LegalDocument) {
             )
             Text(
                 text = "This page has not been reviewed by a lawyer and no contact " +
-                    "channel has been published. It is effective ${document.effectiveDate}.",
+                    "channel has been published. Last updated ${document.effectiveDate}.",
                 style = MaterialTheme.typography.bodySmall,
                 color = DhunColors.textSecondary,
             )

@@ -77,3 +77,57 @@ test("every page is shipped with the build", () => {
     assert.ok(document.title.length > 2, `${document.id} has no title`);
   }
 });
+
+test("About preserves multi-source intent without claiming native or Spotify parity", () => {
+  const about = webLegalById("about").markdown.replace(/\s+/g, " ");
+  assert.match(about, /free, open-source, cross-platform, \*\*multi-source music client/i);
+  assert.match(about, /YouTube \/ YouTube Music is the first implementation priority/i);
+  assert.match(about, /browser client, currently using JioSaavn/i);
+  assert.match(about, /Spotify is a planned additional source, not implemented/i);
+  assert.match(about, /capabilities can differ by platform/i);
+  assert.match(about, /deployed origin remain unverified/i);
+});
+
+test("browser privacy names every actual failover host and its request semantics", async () => {
+  const { API_SOURCES } = await import("../src/js/api.js");
+  const privacy = webLegalById("privacy").markdown.replace(/\s+/g, " ");
+  for (const source of API_SOURCES) assert.ok(privacy.includes(new URL(source.origin).host));
+  assert.ok(privacy.includes("*.saavncdn.com"));
+  assert.match(privacy, /credentials: "omit"/);
+  assert.match(privacy, /cache: "no-store"/);
+  assert.match(privacy, /several independent operators|multiple wrapper operators/);
+  assert.match(privacy, /GitHub Pages/);
+  assert.match(privacy, /No lyric request, YouTube request or Spotify request is implemented/);
+});
+
+test("stored metadata and settings-preserving erase are not described as nothing stored or erase-all", () => {
+  const privacy = webLegalById("privacy").markdown.replace(/\s+/g, " ");
+  assert.match(privacy, /dhun\.web\.v3/);
+  assert.match(privacy, /metadata snapshots|Track-metadata snapshots/i);
+  assert.match(privacy, /persisted stream URLs are blanked/i);
+  assert.match(privacy, /keeps settings/i);
+  assert.match(privacy, /shell cache/);
+  assert.match(privacy, /None of these deletes third-party logs/i);
+});
+
+test("legal drafts distinguish software licences from provider permission and content rights", () => {
+  const terms = webLegalById("terms").markdown.replace(/\s+/g, " ");
+  const licences = webLegalById("licences").markdown.replace(/\s+/g, " ");
+  assert.match(terms, /DRAFT — not yet in force/);
+  assert.match(terms, /software GPL grants no rights to them/);
+  assert.match(terms, /unofficial or automated interfaces/);
+  assert.match(terms, /not affiliated with, endorsed by, authorised by, or connected to JioSaavn, YouTube, Google or Spotify/);
+  assert.match(licences, /no new grant/);
+  assert.match(licences, /not establish permission/);
+});
+
+test("browser legal render output keeps draft, provider and status distinctions visible", () => {
+  const about = text(legalBody(webLegalById("about")));
+  const terms = text(legalBody(webLegalById("terms")));
+  const privacy = text(legalBody(webLegalById("privacy")));
+  assert.match(about, /multi-source music client/);
+  assert.match(about, /Spotify is a\s*planned additional source, not implemented/);
+  assert.match(terms, /DRAFT/);
+  assert.match(privacy, /keeps settings/);
+  assert.doesNotMatch(about + terms + privacy, /\{\{[a-zA-Z]+\}\}/);
+});

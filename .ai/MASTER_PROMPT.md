@@ -1,5 +1,30 @@
 # DHUN — Master Prompt (v3, Re-baselined 2026-09-16)
 
+## Binding product direction and scope — 2026-10-28
+
+Read [PRD §1](../docs/PRD.md#1-product-definition-and-source-of-truth) first;
+it is the authoritative vision/status vocabulary. DHUN is a free, open-source,
+cross-platform **multi-source music client**. YouTube / YouTube Music first;
+Spotify **Planned**, implementation **Deferred** pending all feasibility and
+permission/account/Premium/policy/legal/playback/privacy/licence/cost gates.
+Other providers require evidence-based evaluation. Native and browser capabilities
+may differ; do not market plans as support or code as audible playback.
+
+Current ledger: [research/05](../docs/research/05-source-capability-matrix.md);
+accepted decisions: [ADR-010 and latest amendment](../docs/decisions/ADR-010-multi-source-provider-direction.md).
+Native KMP/Compose stays; browser is separate JS/JioSaavn today, not YouTube.
+No Spotify code/auth/SDK, new backend, paid hosting or recurring service is authorised.
+No broad rewrite or extraction feature expansion; preserve user data/functionality.
+The initial alignment was intentionally unpublished. In the explicit follow-up,
+the owner authorised verification, commits/pushes on `arena/5ced2dbe-dhun`, a PR,
+and autonomous merge **only after the requested work and applicable PR checks
+are complete**. Fix actual causes, never weaken gates. This is not authority for
+new providers, paid services, public app-release publication or bypassing legal/
+hardware gates. Existing main-branch workflows may deploy the site/update the
+private test draft after merge; that is not a new public app release. Future
+sessions must obey their own explicit permissions, not historical autonomous
+merge prompts. Keep legal drafts DRAFT and report risks.
+
 > **Document status: CURRENT.** This file describes the project **as it
 > exists today and as it should be completed from here forward**. It
 > supersedes the v2 "Feasibility-Corrected" master prompt below — v2's
@@ -42,7 +67,7 @@ This note supersedes older visual wording in this file and historical notes in `
 
 - **Visual target:** DHUN uses an artwork-led, dark-first **translucent frosted-glass** visual identity. Use translucent tinted surfaces, restrained highlights/borders, gradients/scrims, legible type, and cached/lightweight 2D artwork blur. Do not describe Material 3 as the product's visual target. Compose/Material components can remain implementation primitives if styled to DHUN's tokens.
 - **Not a heavyweight renderer:** no continuous full-resolution blur, liquid-distortion renderer, or platform-private glass APIs. Low-end/unsupported devices must receive a legible tint/gradient/opaque fallback. Accessibility and contrast take priority over transparency.
-- **Architecture stays Kotlin Multiplatform/Compose:** this visual correction does not authorize React/Tauri migration or a rewrite of player/provider code. The native app, the static `website/` and the `app-web/` browser client are three codebases but **one product**: the site renders the app's shell and its token sheet is generated from `app-web/src/css/tokens.css` (ADR-008 amendment 2026-10-16). A browser may still be refused by YouTube's origin: no claim that browser playback is proven, and no DHUN-operated backend or proxy (ADR-008 boundary 1).
+- **Architecture stays Kotlin Multiplatform/Compose:** this visual correction does not authorize React/Tauri migration or a rewrite of player/provider code. The native app, the static `website/` and the `app-web/` browser client are three codebases but **one product**: the site renders the app's shell and its token sheet is generated from `app-web/src/css/tokens.css` (ADR-008 amendment 2026-10-16). Current browser JioSaavn requests may be refused by community hosts/CDN or browser policy: no claim that browser playback is proven, and no DHUN-operated backend or proxy (ADR-008 boundary 1).
 - **Destructive actions must report outcomes:** Clear all downloads, clear history/cache, batch delete, and playlist delete must not close confirmation or clear UI state before persistence/filesystem work succeeds. Every action needs pending, success and failure behavior plus retry/cancel semantics.
 - **Website project base:** the canonical site is `https://99ggprooo00-code.github.io/DHUN/`. Templates must generate project-base-aware internal links. The Pages artifact and the root-hosted local-test artifact are separate; success building one does not prove the deployed links are correct.
 - **Status words are not interchangeable:** source present, unit-tested, CI green, verified on Android/Windows hardware, and verified at the canonical deployed origin are separate evidence states.
@@ -53,25 +78,24 @@ When this note conflicts with an older dated session narrative, this note and ac
 
 ## 1. What DHUN Is (today)
 
-DHUN is a working, cross-platform music application streaming from
-YouTube Music — **past feature construction, into verification and
-release hardening.**
+DHUN's direction is defined in PRD §1 above, not limited to today's source.
+Existing native features are in verification/hardening, while additional-source
+architecture and integrations remain planned/design-only work.
 
-- **Platforms:** Android (primary) and Desktop (Windows first;
-  Linux/macOS free via JVM). Production Web remains deferred; accepted ADR-008
-  authorized only the isolated B1 deployed-origin feasibility spike. B1 has now
-  run from the canonical Pages origin and is **BLOCKED** in the only available
-  browser (Brave/Chromium family; Firefox and Safari unavailable). That is not a
-  product target or a stack choice — B2 remains an open user decision and may be
-  “stop”.
+- **Platforms:** native Android and JVM desktop (Windows first; Linux/macOS
+  hardware unverified), plus separate experimental browser `app-web/` published
+  at `/app/`. It uses unofficial JioSaavn wrappers and has shell-only offline
+  support, no audio downloads/EQ/lyrics, and no deployed audible playback proof.
+  Historical B1 YouTube probe was blocked; later ADR-008 amendments authorised
+  the separate browser client. B2 is not an undecided current stack question.
 - **Current surface:** Home, Search, Library (Playlists / Favorites /
   History / Downloads), Artist / Album / Playlist pages, MiniPlayer +
   immersive FullPlayer (Lyrics | Queue | Related), synced lyrics,
   persistent offline downloads, queue engine with shuffle/repeat,
   history-seeded recommendations, Android widgets (Quick Play), Windows
   tray + jump lists + SMTC + single-instance, light/dark themes with
-  accent selector (dev-reachable; wiring open), desktop 10-band EQ
-  (Android EQ open).
+  accent selector, desktop 10-band EQ and Android system AudioEffect binding.
+  These are native code claims, not browser parity or completed hardware acceptance.
 - **UI philosophy:** premium translucent frosted-glass design,
   artwork-driven, dark-first, ViMusic-quality. FullPlayer background is
   real blurred artwork; Home/Search/Library sit on the now-playing
@@ -164,21 +188,18 @@ YouTube pages, cached, fail-open). User reports as of 2026-09-16:
   unverified), jump lists, single-instance guard, close-to-tray,
   keyboard shortcuts, per-user unsigned MSI (test-grade until release
   signing is decided).
-- **Web:** production target still cut. ADR-008 was the narrow exception: one
-  isolated B1 deployed-origin feasibility spike. That spike is now **complete
-  and BLOCKED** — the dependency-free probe in `web-spike/` was deployed at (Superseded 2026-10-10: this URL returned 404 when checked. Pages moved to workflow deploy on 2026-10-08, and the probe is not in the website workflow's artifact.)
-  `https://99ggprooo00-code.github.io/DHUN/web-spike/`, anonymous metadata was
-  readable, and the player request was blocked before a readable response in the
-  available Chromium-family browser; Firefox and Safari were unavailable (see
-  `docs/verification/19-browser-feasibility-spike.md`). Do not restart B1. No
-  shared browser source set, backend/proxy, production player, adopted browser
-  stack, Option-A implementation or Web-support claim is approved; B2 is a
-  separate user decision that may be “stop”.
+- **Web:** separate dependency-free JS client with local library and HTML audio,
+  JioSaavn wrapper failover and explicit errors/silent samples. Current status is
+  in `docs/web-player/IMPLEMENTATION-STATUS.md`; retain CSP/no third-party runtime
+  and no backend/proxy. Historical B1 is not this implementation. YouTube Watch
+  mode remains a proposal requiring approval before third-party runtime/spikes.
 
-### Music source
-- YouTube Music via the revised doctrine above. No paid API. No keys.
-  Guest-first, account-optional (issue #60 is the v2 direction; no
-  login exists or is required).
+### Music sources
+- Follow PRD §1 and the capability matrix: native YouTube Music now, browser
+  JioSaavn now, Spotify planned/deferred on all platforms, further sources
+  evidence-gated. No OAuth currently; future providers may need accounts.
+- D1 retains but does not expand native extraction; no legal compliance or
+  download permission follows from GPL, a disclaimer or first-priority status.
 
 ### UI
 - Glassy translucent surfaces with **real blur** where the platform
@@ -204,7 +225,7 @@ YouTube pages, cached, fail-open). User reports as of 2026-09-16:
 │                  │ fallback only)   │
 ├──────────────────┴──────────────────┤
 │   Playback: Media3 (Android) · vlcj (Desktop)
-│   Data: SQLDelight (schema v3) · Koin DI · Coil 3 · Ktor/CIO
+│   Data: SQLDelight (schema v3) · Koin DI · Coil 3 · Ktor (Android OkHttp / desktop CIO)
 └─────────────────────────────────────┘
 ```
 
@@ -226,7 +247,7 @@ re-opened without a written ADR proving a blocking defect.
 | Recovery watch | **NewPipe Extractor** (pinned, non-fatal) | **(corrected)** was primary; drill-watched |
 | InnerTube metadata | **Own client** (Ktor + kotlinx.serialization) | `WEB_REMIX` + alt identities for `/player` |
 | DB | **SQLDelight 2.x** (schema v3) | Android + JVM drivers |
-| Networking | **Ktor 3.1.3, CIO engine** | **(corrected)** v2 said OkHttp; code uses CIO everywhere |
+| Networking | **Ktor 3.1.3: Android OkHttp / desktop CIO** | Android metadata and download clients explicitly inject OkHttp; common defaults/desktop use CIO. Do not generalise one transport to every build. |
 | DI | **Koin 4.0.2** | KMP-first; `appModule` graph test exists |
 | Navigation | **Shared custom `AppNavState`** (both platforms) | **(corrected)** v2 said Navigation Compose on Android; never adopted — deliberate simplification |
 | Images | **Coil 3.1.0** | Crossfade, tiered sizes (544 list / 1024 player) |
@@ -234,13 +255,11 @@ re-opened without a written ADR proving a blocking defect.
 | Logging | **Platform-native** (`android.util.Log` / JDK logging) | **(corrected)** Kermit was never adopted; do not add a logging framework now |
 | Desktop native | **JNA 5.17** (SMTC, jump lists) | Base JNA only; fail-open off-Windows |
 
-**Still explicitly rejected for product adoption:** Flutter,
-Electron/Tauri, separate backend, Compose for Web / Kotlin-JS, Room, Hilt,
-account sign-in for core playback (guest-first per #60). ADR-008's B1 exception
-used only the minimum disposable browser code needed to measure deployed-origin
-feasibility; it adopted no browser stack and did not relax the no-backend rule.
-B1 is now closed as BLOCKED, so the rejection stands unqualified until a
-separate B2 user decision says otherwise.
+**Still rejected without an explicit decision:** Flutter, Electron/Tauri, a new
+backend/proxy, Kotlin/JS/Compose Web migration, Room/Hilt or mandatory account for
+existing core playback. The separately authorised browser implementation is
+JavaScript, not a KMP web source set. Its source/provider/runtime/verification
+boundaries are in ADR-008/ADR-010 and `docs/web-player/`. No backend is authorised.
 
 ---
 
@@ -257,7 +276,7 @@ DHUN/
 │   ├── PROMPT_SEQUENCE.md      # HISTORICAL: original 30-phase audit (do not rewrite)
 │   └── RISK_REGISTER.md        # extraction rot, drill, kill-switch criteria
 ├── docs/
-│   ├── decisions/              # ADRs 001–006 accepted; 007 proposed on PR #54; 008 B1 closed BLOCKED, B2 undecided
+│   ├── decisions/              # ADRs 001–006; 007 reserved/history; 008 amended for app-web; 010 accepted/amended
 │   ├── research/               # spike findings (short, factual)
 │   └── verification/           # per-phase on-hardware logs (many gates OPEN)
 ├── shared/                     # KMP module (android+jvm)
@@ -472,20 +491,15 @@ twice.
 1. **One agent at a time.** Never assume a parallel session will finish,
    rebase, or review your work. Verify on GitHub, rebase onto current
    `main` yourself, and leave the tree reviewable by a human.
-2. **Ship running code every work unit.** Docs are written *after* the
-   code they describe, from the code. A unit with beautiful docs and
-   nothing on hardware/CI is a failed unit.
-3. **Current code + current tests + accepted ADRs outrank all plans.**
-   If this prompt contradicts the repo, stop, investigate, and update
-   the prompt — never silently rewrite working code to match paper.
+2. **Complete the authorised work unit.** Documentation/audit tasks need actual edits and honest source/test evidence, not invented hardware/CI results. Implementation tasks need working code and the specified verification.
+3. **Owner direction/PRD govern intent; current code/tests and dated runtime evidence govern behaviour.** Accepted ADR amendments govern decisions. Investigate conflicts; do not redefine the vision from a single-provider build or rewrite code to fit stale prose.
 4. Read MASTER_PROMPT.md, ROADMAP.md (CURRENT ACTIVE TASK first), and
    the relevant verification log before starting work.
 5. Tests after implementation, before commit. No test that tests
    nothing. Mutation-prove CI steps that must execute (precedent: PRs
    #68/#71).
 6. Update ROADMAP.md status and KNOWN_LIMITATIONS.md every session.
-7. Commit small and meaningful. Never big-bang. Never merge until the
-   user says so; never force-push; never rewrite history.
+7. Commit/push/merge/publish only when authorised for the session, with small reviewable changes. Never force-push, rewrite history or change the session branch without permission.
 8. No stubs, no TODO-left-in-production, no "compiles = done."
 9. If reality invalidates a locked decision, stop, write the ADR, get
    the user's OK, then proceed. Silent divergence is forbidden.
@@ -498,18 +512,17 @@ twice.
 
 ---
 
-## 9. Source-of-truth hierarchy (set by the 2026-09-16 re-baseline)
+## 9. Authority: direction, decisions and behaviour (clarified 2026-10-28)
 
-1. Current source code on `main`
-2. Current tests + CI verdicts (on GitHub, not local claims)
-3. Accepted ADRs (`docs/decisions/`, statuses as filed)
-4. This master prompt (v3)
-5. `.ai/ROADMAP.md` (live status + S1–S6 plan)
-6. Historical research (incl. open PR #54 — reference, not backlog)
-7. Old plans (v2 text in git history, PROMPT_SEQUENCE, PROBLEMS_AND_FIXES)
+1. Explicit current owner requirements and [PRD §1](../docs/PRD.md#1-product-definition-and-source-of-truth) define intent and status vocabulary.
+2. Accepted ADRs with their latest dated amendments define architecture/risk decisions; they are not provider approval.
+3. Current source, tests, CI and dated hardware/deployed-origin records establish actual behaviour at their stated verification level. Local tests ≠ current GitHub CI ≠ audible playback.
+4. MASTER, ROADMAP current task, matrix and current guides must agree with those, including platform/provider differences.
+5. Dated historical research, releases, incidents and phase prompts are evidence, not current orders. Preserve and label them.
 
-If documentation contradicts code: investigate first. Never implement
-documentation that contradicts verified current behavior.
+Resolve contradictions by investigation and safe correction, never by inventing
+support, approval, credentials or test results. Do not broaden implementation in
+an alignment audit to satisfy aspirational copy.
 
 ---
 

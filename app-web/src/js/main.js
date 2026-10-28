@@ -684,8 +684,8 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       });
     } else if (sheet?.kind === "clear-library") {
       markup = components.sheet({
-        title: "Erase everything in this browser?",
-        subtitle: "Likes, playlists and history are deleted. This cannot be undone.",
+        title: "Erase this browser's library?",
+        subtitle: "Likes, playlists, history, searches and snapshots are deleted. Settings and the offline shell cache remain. This cannot be undone.",
         body: html`<div class="dhun-menu">
           <button type="button" class="dhun-menu-row dhun-menu-row--danger" data-action="confirm-clear-library">${icon("Delete", { size: 20 })}<span>Erase my library</span></button>
           <button type="button" class="dhun-menu-row" data-action="close-sheet">${icon("Close", { size: 20 })}<span>Cancel</span></button>

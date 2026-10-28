@@ -1,5 +1,12 @@
 # Dependency audit log (S5)
 
+> **Applicability note — 2026-10-28:** dated append-only dependency records,
+> not current resolved-artifact/legal approval or new upgrade authority. In
+> particular the old NewPipe “desktop fallback” description is historical;
+> own-client is primary and optional user-installed yt-dlp the desktop fallback,
+> NewPipe a watch. [Current source matrix](../docs/research/05-source-capability-matrix.md);
+> [product direction](../docs/PRD.md#1-product-definition-and-source-of-truth).
+
 Append-only. Each entry: pinned vs latest-known at audit date, decision
 (UPGRADE with the commit, or HOLD with the reason), and the post-v0.1.0
 upgrade order. "Latest-known" comes from web sources available to the

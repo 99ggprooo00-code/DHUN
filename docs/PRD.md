@@ -1,21 +1,94 @@
 # DHUN (धुन) — Product Requirements Document
 
-**Status:** Draft for review; repo-grounded as of 2026-10-09. DHUN remains in development. This document distinguishes implemented code from verified product behavior. A source file or green unit test is not proof that a user-facing flow works on hardware.
+**Status:** Draft for review; product direction clarified and repo-grounded as of 2026-10-28. DHUN remains in development. This document distinguishes implemented code from verified product behavior. A source file or green unit test is not proof that a user-facing flow works on hardware.
 
 ## 1. Product definition and source of truth
 
-DHUN is a GPL-3.0 open-source music player for Android (primary) and desktop JVM (Windows first; Linux/macOS where supported by the JVM build), using YouTube Music as a metadata/stream source. The native application is Kotlin Multiplatform + Compose Multiplatform, with shared domain/presentation code, Android Media3 playback and desktop VLCJ playback. This is the repository's actual architecture; React 19, Tauri, Zustand, and a React-based production web player are **not** the current native-app stack and must not be described as shipped architecture.
+### Binding product direction (authoritative, clarified 2026-10-28)
 
-There are three codebases and one product:
-1. **Native app (Android + desktop):** source of truth for product behavior and visual design, and the supported players.
-2. **Marketing website:** static Eleventy site in `website/`, explaining DHUN and linking to source, features, interface, issues, changelog and the rolling test release. It is not a music player, and it no longer looks like a generic one: since the ADR-008 amendment of 2026-10-16 it renders the application's own shell — glass app bar, bottom navigation/rail, a docked bar into the app — and its stylesheet is **generated** from `app-web/src/css/tokens.css`, so it cannot drift from the application's design system.
-3. **Web app (`app-web/`, published at `/app/`):** the browser client — installable, offline-capable, hash-routed with deep links, keyboard-driven, media-session aware, its library in browser storage, device-only surfaces (offline downloads, the cache budget) removed rather than stubbed. It resolves real streams and surfaces every refusal as a state, with a labelled fictional catalogue as the last resort. No claim that browser playback is proven, no DHUN-operated backend or proxy (ADR-008 boundaries 1 and 4).
+**DHUN (धुन) is a free, open-source, cross-platform, multi-source music client.**
+This section is the authoritative product vision; secondary documents should link
+here, not create competing definitions. A currently single-provider build does not
+make DHUN a single-source product by intent.
 
-Source of truth order when statements conflict: current code + current CI/hardware evidence; accepted ADRs for locked decisions; `.ai/MASTER_PROMPT.md` and `.ai/ROADMAP.md`; verification records; then this document. Historical notes are not active requirements.
+1. **YouTube / YouTube Music is the first implementation priority.** Prioritise
+   maintenance, validation and honest limits of that integration; this does not
+   waive the extraction/download policy risks or ADR-010 D1's no-expansion limit.
+2. **Spotify is a planned additional source, not implemented.** Its execution is
+   **deferred** until technical, account/Premium, policy, legal, playback,
+   privacy, licensing and cost gates are satisfied. Metadata, remote playback
+   control and in-client audio are different capabilities. Buying Premium alone
+   is not permission for a combined multi-source product.
+3. Other sources may be evaluated for user value, feasibility, permissions,
+   maintenance cost, privacy, platform compatibility and licensing. No new source
+   or recurring paid service is adopted merely to make the product look multi-source.
+4. Native and browser builds may have different providers and capabilities while
+   sharing the DHUN experience. Disclose the build-specific differences.
+5. Provider restrictions must not be hidden, bypassed, or replaced by a disclaimer.
+   No claim of affiliation, approval, official access or legal compliance follows
+   from source availability, a licence to software, or a passing test.
+6. A provider/capability is not **Implemented** without code and appropriate
+   verification. Always name the verification level; compilation is not audible
+   playback. Future agents must read this section, the current matrix and latest
+   accepted ADR amendments before acting on historical prompts.
+
+### Current implementations (not the long-term scope)
+
+| Client | Music source now | Evidence and limits |
+| --- | --- | --- |
+| Native Android | YouTube Music catalogue via own InnerTube client; own-client stream resolver; Media3 audio | Implemented paths and tests; historic residential playback evidence exists, not a new hardware acceptance in this audit. No provider account/OAuth. Offline downloads exist but permission/policy issues remain unresolved. |
+| Native desktop JVM | Same YouTube Music path; own-client resolver primary, optional user-installed yt-dlp fallback; VLCJ/system libVLC audio | Windows is the primary desktop test target. Linux/macOS are JVM build possibilities, not hardware-accepted releases. NewPipe is a recovery watch, not the production fallback. |
+| Browser (`app-web/`, `/app/`) | JioSaavn via three unofficial community wrapper instances; HTML audio | Partial integration: code/unit tests exist, live catalogue and audible playback from the deployed origin remain unverified. No YouTube or Spotify playback, audio downloads, equaliser or lyrics. Offline support is the shell and local library display, not offline music. |
+| Spotify (all clients) | No adapter, SDK, OAuth or provider traffic | Planned; execution deferred by ADR-010 D3/D4 and feasibility gates. No platform implementation is promised. |
+
+See [the capability/evidence matrix](research/05-source-capability-matrix.md) for
+the current ledger, [provider research](research/README.md) for permissions and
+unresolved questions, and [ADR-010](decisions/ADR-010-multi-source-provider-direction.md)
+for decisions, including the dated 2026-10-28 clarification.
+
+### Architecture and authority
+
+The native application remains **Kotlin Multiplatform + Compose Multiplatform**
+(`androidTarget()` and `jvm()`), SQLDelight local persistence, Android Media3
+and desktop VLCJ. The browser is a **separate dependency-free JavaScript client**,
+not Kotlin/JS, React or Tauri. The static Eleventy `website/` explains the whole
+product and publishes `/app/`; shared design tokens do not imply identical features.
+No DHUN-operated API, proxy, account backend or mandatory paid hosting is authorised.
+
+`MusicProvider` and `StreamResolver` are existing native seams, not a completed
+multi-provider framework: `SearchFilter`, video/browse IDs, entities, database keys
+and callers still assume YouTube. The browser's `api.js` normalises one catalogue
+family. Provider-scoped IDs, capabilities and authentication/player adapters are
+**design follow-up**, not shipped work (ADR-010 D5).
+
+For **intent**, this owner-directed vision and latest accepted ADR amendments
+control. For **actual behaviour**, inspect current code, tests, CI and dated
+hardware/deployed-origin evidence. Do not change code to imitate stale prose or
+rewrite intent to excuse implementation gaps. Current agent instructions point
+here; historical prompts, research observations and release notes remain dated
+records, not active implementation orders.
+
+### Shared status vocabulary
+
+| Term | Meaning |
+| --- | --- |
+| Product direction | Long-term multi-source DHUN experience; not a supported-provider list. |
+| Implemented | Present in code and verified to the appropriate stated level. |
+| Partial | Some capabilities exist; required capabilities or verification remain missing. |
+| Planned | Intended future work without a completed implementation. |
+| Deferred | Deliberately postponed pending an explicit prerequisite. |
+| Blocked | A known issue or constraint prevents progress in the specified context. |
+| Research required | Evidence is insufficient for a decision. |
+| Unavailable | A verified capability/integration cannot currently be provided in the specified build/context. |
+
+Provider intent (e.g. Spotify **Planned**) and work scheduling (**Deferred**) may
+be recorded in separate columns; they are not synonyms. “Experimental” qualifies
+release maturity, not implementation evidence. Always scope a status to a provider,
+capability and platform. Terms/Privacy marked DRAFT are not adopted agreements.
 
 ## 2. Product goals
 
-- Make discovery and playback understandable, fast, and resilient when YouTube behavior or connectivity changes.
+- Make discovery and playback understandable, fast, and resilient when provider behavior or connectivity changes.
 - Give users a consistent, artwork-led, translucent frosted-glass experience without sacrificing legibility, battery, accessibility, or low-end-device performance.
 - Make every visible control truthful: the label, confirmation, state change, persisted result, and error message must agree.
 - Keep core listening usable without a DHUN account or custom DHUN backend.
@@ -51,7 +124,7 @@ Source of truth order when statements conflict: current code + current CI/hardwa
 - Keep `website/` quality checks isolated from app CI where intended, while ensuring failures in each workstream are visible.
 
 ### Explicitly not a current product commitment
-- A production browser music player, PWA, hosted audio/API proxy, account system, cloud sync, server-side library or user tracking.
+- Release-verified browser playback (the experimental PWA exists), a hosted audio/API proxy, account system, cloud sync, server-side library or user tracking.
 - React/Tauri migration of the existing native app.
 - Any feature not present in the current code or explicitly approved through an ADR and roadmap update.
 
@@ -83,7 +156,7 @@ The same contract applies to clear history, delete selected downloads, remove a 
 - Native app: Home/Search/Library are the only primary tabs; detail pages, settings and FullPlayer are stacked overlays/routes following the shared AppNavState back contract. Back closes FullPlayer, then detail, then returns through tab history, then delegates to the platform.
 - Marketing website: every page renders the app's shell — a glass app bar, and one navigation element that is the app's bottom navigation below 840 px and a rail above it; Home/Features/Interface are linked from each page; the brand returns Home; active page is announced; the appearance control offers the app's two schemes and six accent ramps with CSS only; CTAs go to verified destinations.
 - Internal website links must be generated relative to the configured deployment base path (currently a GitHub Pages project site under `/DHUN/`) rather than hard-coded domain-root paths that escape the project. Validate rendered links from the actual deployed origin.
-- Link the marketing site to `/app/` as what it is — the browser client of the same app — and never as a guarantee that audio plays in a browser. The site's copy and the app's own notices both say that the native builds are the supported players.
+- Link the marketing site to `/app/` as what it is — the browser client of the same app — and never as a guarantee that audio plays in a browser. The site and app must distinguish native YouTube Music from browser JioSaavn, and both from planned Spotify; neither may guarantee playback.
 
 ## 7. Acceptance criteria
 

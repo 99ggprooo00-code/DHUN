@@ -1,16 +1,18 @@
 # Provider integration — DHUN Web (`/app/`)
 
 How the browser build reaches music metadata and audio, which sources it uses,
-how it fails over, and which sources are planned but not built. The native
-multi-source architecture is decided in
+how it fails over, and which sources are planned but not built. The project-level provider direction and design-only capability vocabulary are recorded in
 [ADR-010](../decisions/ADR-010-multi-source-provider-direction.md); this file is
 the browser's own description of what is in `app-web/src/js/api.js`.
 
 ## 1. The one catalogue
 
-The browser build reads a single catalogue family: **JioSaavn**, through public
-community-run wrappers. It is the only source that answers a browser request
-without a key, a sign-in, or a server operated by DHUN.
+The browser build reads a single catalogue family: **JioSaavn**, through
+unofficial community-run wrappers. This is the implemented choice, not proof
+that every other browser source is impossible or unavailable. Live catalogue
+and audible playback from the deployed origin are still unverified.
+[PRD §1](../PRD.md#1-product-definition-and-source-of-truth) defines the broader
+multi-source direction; it prioritises YouTube Music and keeps Spotify planned/deferred.
 
 | Order | Source id | Origin | Label |
 |---|---|---|---|
@@ -23,7 +25,7 @@ along with `https://*.saavncdn.com` for audio and artwork. The list is
 `API_SOURCES` in `api.js`.
 
 **These are not contracted services.** Each is run by a third party, can change
-or stop, and its terms are not reviewed by the project (baseline finding F5 in
+or stop, and independent deployment permissions/retention are not established (baseline finding F5 in
 [`docs/research/02-baseline-audit-2026-10-20.md`](../research/02-baseline-audit-2026-10-20.md)).
 
 ## 2. Endpoints
@@ -56,7 +58,8 @@ A stream URL is read from the song's download list and chosen by
 | Setting | Value |
 |---|---|
 | Method | `GET` |
-| Credentials | `omit` — no cookies are sent |
+| Credentials | `omit` for API fetch — no API credentials/cookies sent; media/image browser policy is separate |
+| API response cache | `no-store`; service worker caches shell only |
 | Request timeout | 15 s (`REQUEST_TIMEOUT_MS`) |
 | Probe timeout (failover) | 8 s (`PROBE_TIMEOUT_MS`) |
 | Page size | 20 (`PAGE_SIZE`) |
@@ -109,7 +112,7 @@ down. They are not a catalogue.
 | Source | Status in the browser | Where it is decided |
 |---|---|---|
 | YouTube / YouTube Music | **Not used.** The web build does not embed the YouTube IFrame player and does not call YouTube's APIs. | Owner decision D2, [ADR-010](../decisions/ADR-010-multi-source-provider-direction.md). The native YouTube path has its own open policy questions in [`docs/research/03-youtube-youtube-music.md`](../research/03-youtube-youtube-music.md). |
-| Spotify | Not used by the browser build, and planned only in the native design. | Owner decision D3: deferred, not removed. The developer account needs a Premium owner, and policy §III.5 is open. Not used here, see `docs/research/04-spotify.md`. |
+| Spotify | Planned project source, execution deferred; not implemented on any platform. | Owner decision D3: deferred, not removed. Premium owner/listener, access/scale, policy §III.5, technical/legal/playback/privacy/licence/cost gates remain. Not used here, see `docs/research/04-spotify.md`. |
 
 No second catalogue is added to the browser build without a research entry, an
 ADR, and a decision on how it will be tested. Until then, the browser build reads
@@ -119,6 +122,10 @@ JioSaavn only.
 
 - Whether the three origins keep answering with the shapes the code expects.
   The contract is checked when a response arrives, not in advance.
-- Whether the community wrappers' terms allow this use. Not reviewed.
+- Wrapper-specific terms/retention and required provider/content permission.
+  [JioSaavn Terms](https://www.jiosaavn.com/corporate/terms/) were re-read on
+  2026-10-28: unofficial/automated interfaces are restricted unless separately
+  permitted. This is a material unresolved risk, not legal approval. A wrapper's
+  software licence and HTTP success do not grant music/API rights.
 - Stream URL lifetime. Whether a URL returned earlier is still valid later has
   not been measured.

@@ -6,6 +6,7 @@ script exists to catch must fail. The live run happens in the `served` job of
 `.github/workflows/website.yml`, after a real deploy.
 """
 
+import json
 import pathlib
 import sys
 import unittest
@@ -19,10 +20,28 @@ DIST = pathlib.Path(__file__).resolve().parent.parent / "website" / "dist"
 
 
 def page(route: str, body: str = "<h1>DHUN</h1>") -> str:
+    direction = (
+        "DHUN is free, open-source, cross-platform and multi-source. "
+        "YouTube Music is first implementation priority; native uses YouTube. "
+        "Browser uses JioSaavn. Spotify is planned, not implemented, pending "
+        "technical, account, policy, legal, playback, privacy and cost checks."
+    )
     return (
         "<!DOCTYPE html><html lang=\"en\"><head>"
         f'<link rel="canonical" href="https://99ggprooo00-code.github.io/DHUN{route}">'
-        "</head><body>" + body + "</body></html>"
+        '<title>DHUN multi-source music client</title>'
+        '<meta name="description" content="DHUN multi-source music client">'
+        '<meta property="og:description" content="DHUN multi-source music client">'
+        '<meta name="twitter:description" content="DHUN multi-source music client">'
+        '<script type="application/ld+json">'
+        + json.dumps({"description": "DHUN multi-source music client"})
+        + '</script></head><body>' + body
+        + '<p data-product-direction>' + direction + '</p>'
+        '<a href="https://example.test/native-terms">Native Terms draft</a>'
+        '<a href="https://example.test/native-privacy">Native Privacy draft</a>'
+        '<a href="https://example.test/browser-terms">Browser Terms draft</a>'
+        '<a href="https://example.test/browser-privacy">Browser Privacy draft</a>'
+        '</body></html>'
     )
 
 
@@ -41,6 +60,7 @@ def served(**overrides: tuple[int, str]) -> dict[str, tuple[int, str]]:
         "/": (200, front_page()),
         "/features/": (200, page("/features/", "<h1>DHUN</h1>")),
         "/ui/": (200, page("/ui/", "<h1>DHUN</h1>")),
+        "/404.html": (200, page("/404.html")),
     }
     pages.update(overrides)
     return pages
@@ -49,6 +69,14 @@ def served(**overrides: tuple[int, str]) -> dict[str, tuple[int, str]]:
 class ResponseRules(unittest.TestCase):
     def test_clean_pages_have_no_problems(self):
         self.assertEqual(smoke.smoke_problems(served()), [])
+
+    def test_served_single_source_regression_is_detected(self):
+        markup = front_page().replace("multi-source", "single-source")
+        self.assertTrue(any("multi-source" in p for p in smoke.smoke_problems(served(**{"/": (200, markup)}))))
+
+    def test_a_stale_404_cannot_escape_the_product_contract(self):
+        markup = page("/404.html").replace("Spotify is planned, not implemented", "Spotify is available now")
+        self.assertTrue(any("/404.html" in p and "Spotify" in p for p in smoke.smoke_problems(served(**{"/404.html": (200, markup)}))))
 
     def test_non_200_fails(self):
         problems = smoke.smoke_problems(served(**{"/ui/": (500, "")}))
@@ -224,13 +252,13 @@ class CommittedBuild(unittest.TestCase):
     """
 
     def test_committed_pages_pass_the_served_site_rules(self):
-        files = {"/": "index.html", "/features/": "features/index.html", "/ui/": "ui/index.html"}
+        files = smoke.PRODUCT_ROUTES
         fetched = {
             route: (200, (DIST / name).read_text(encoding="utf-8"))
             for route, name in files.items()
             if (DIST / name).is_file()
         }
-        self.assertEqual(len(fetched), 3, f"built pages missing under {DIST}")
+        self.assertEqual(len(fetched), 4, f"built pages missing under {DIST}")
         self.assertEqual(smoke.smoke_problems(fetched), [])
 
 

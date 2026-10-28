@@ -1,5 +1,31 @@
 # KNOWN_LIMITATIONS
 
+## Current provider/legal/architecture reconciliation — 2026-10-28
+
+See [PRD §1](../docs/PRD.md#1-product-definition-and-source-of-truth),
+[matrix 05](../docs/research/05-source-capability-matrix.md) and
+[audit 06](../docs/research/06-multi-source-claims-audit.md) for current evidence.
+Native YouTube Music and separate browser JioSaavn have different capabilities;
+Spotify is planned/deferred with no code/auth/SDK. Multi-source intent is not
+multi-provider readiness: IDs, filters, storage/queues, auth and player adapters
+need a bounded design/migration task, not a rewrite here.
+
+Open: unofficial native extraction/download/background/metadata permissions;
+JioSaavn unofficial access restrictions and wrapper/CDN permission/retention;
+Spotify multi-service policy/Premium/dev-mode/scale/licence/cost gates; legal
+controller/private contacts/draft adoption; complete resolved distribution notices;
+current hardware and deployed-origin audible playback. No legal approval claimed.
+Native Settings history/lyrics/audio-cache clear controls exist, but some dismiss
+before completion or lack uniform error feedback; this audit corrects notices,
+not the handlers. Logs may contain paths/IDs/URLs and need redaction review.
+Later paragraphs below are dated records; do not promote historical failures or
+counts to a fresh runtime verdict. No Java toolchain is available in this audit sandbox.
+The owner has now authorised a checked PR/merge; native compile/test evidence
+must come from its new CI, not this toolchain-limited local run. The existing
+scheduled probe run `40483966781` on the starting `main` reports
+`ENVIRONMENT_BLOCKED`; it is not a new PR regression or healthy playback.
+Permission, device and deployed-audio gates remain independent of PR merge.
+
 ## 2026-10-11 — Settings overhaul (PR #158, supersedes older settings notes)
 
 The previously dormant audio quality, country, lyrics-enabled, accent-mode and explicit-content keys now have runtime readers; the Settings page exposes each only with its consumer. The backdrop brightness slider is also available alongside blur on blur-capable platforms. Desktop X now hides to tray only after AWT has successfully registered an icon; Ctrl+Q and tray Quit still exit. New tokenless lyrics sources are LRCLIB search and KuGou.

@@ -1,5 +1,12 @@
 # DHUN Web — architecture
 
+**Product vs implementation:** [PRD §1](../PRD.md#1-product-definition-and-source-of-truth)
+governs multi-source intent. This is a single JioSaavn catalogue family with
+wrapper failover, not an implemented federated provider model. Before a second
+source, design provider-scoped IDs/snapshot migration, capabilities/account
+states, auth/security, playback ownership and source-aware routing. Keep this
+JS client separate from native KMP/Compose; D5 is design-only.
+
 The browser build is a static page that assembles itself at runtime. There is no
 framework, no bundler, no transpiler and no dependency: twenty ES modules loaded
 by `<script type="module">`, two stylesheets, and the browser's own platform for
@@ -50,8 +57,10 @@ index.html          region shells (#dhun-topbar, #main, #dhun-dock, …), CSP, n
         └── js/components.js   cards, rows, rails, states, sheets, notices, badges
 ```
 
-Everything below `main.js` is a pure function of its arguments except `player.js`
-(which owns one `Audio` element) and `main.js` itself. `app-web/tests/` renders
+Screen renderers and queue/normalisation helpers are pure functions. The client
+is not wholly pure: `api.js` performs network I/O, `library.js` wraps storage,
+`pwa.js` registers browser lifecycle hooks, `player.js` owns one audio element,
+and `main.js` coordinates DOM, persistence and actions. `app-web/tests/` renders
 every screen in Node and asserts the markup, which is only possible because the
 screens take a view-model and return a string.
 
@@ -97,7 +106,7 @@ rewrite rules: `#/album/123` is a URL that works on GitHub Pages, and `router.js
 
 ## The catalogue seam
 
-`js/api.js` owns three things and nothing else:
+`js/api.js` owns the catalogue contract, normalisation, failures and failover:
 
 - **The contract.** One `ENDPOINTS` table, with query values encoded in it — a
   search for "Arijit & Pritam" is a realistic query and an unencoded `&` is a
@@ -106,7 +115,7 @@ rewrite rules: `#/album/123` is a URL that works on GitHub Pages, and `router.js
   (`normaliseSong`, `normaliseAlbum`, `normaliseArtist`, `normalisePlaylist`).
   Nothing downstream sees a raw response, so a missing field is handled once.
 - **Failure.** A typed `SourceError` with a kind (`offline`, `timeout`, `http`,
-  `parse`, `blocked`, `missing`), and `describeFailure()`, which writes the
+  `shape`, `network`), and `describeFailure()`, which writes the
   sentence a visitor reads. The interface shows that sentence first and the
   underlying detail after it, labelled "Technical detail".
 
@@ -120,7 +129,7 @@ reads. Every instance must also appear in the CSP, which
 `scripts/test_app_web.py` asserts by reading `api.js`. That is why the failure taxonomy exists: the
 service can rate-limit, change shape or disappear, and the app has to survive
 each of those as a state rather than as a blank screen. The CSP names exactly
-that origin and `*.saavncdn.com`, so a stray request to anywhere else fails
+those three wrapper origins and `*.saavncdn.com`, so a stray request to anywhere else fails
 closed.
 
 `js/demo.js` is the labelled sample catalogue: fixed rows, `demo: true`, an empty
@@ -210,4 +219,6 @@ defines.
 and licences from `js/data/web-legal.js`. They are not the installed app's
 documents: those describe downloads and a SQLite store that a browser tab cannot
 honour, so the web build ships its own text, which says what this build stores
-and what it sends.
+and what it sends. The generated `js/data/legal-content.js` is an excluded
+native-corpus parity fixture, not browser policy. Terms/Privacy remain DRAFT;
+controller, private contact, permission and legal-adoption decisions remain open.

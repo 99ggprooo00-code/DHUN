@@ -1,5 +1,11 @@
 # Installing DHUN 1.00.002
 
+> **Product/build distinction (2026-10-28):** DHUN's [multi-source direction](PRD.md#1-product-definition-and-source-of-truth)
+> prioritises YouTube / YouTube Music; these native packages currently implement that source only.
+> Spotify is planned, not available. The [separate browser client](web-player/USER-GUIDE.md) currently
+> uses JioSaavn and has no offline audio. Native downloads and extraction have unresolved
+> [permissions/policy risks](research/03-youtube-youtube-music.md); installation does not establish approval.
+
 DHUN 1.00.002 is an **experimental public build for testing**, not a stable, store-signed, or hardware-accepted release. GitHub currently marks the published release as a regular release rather than a prerelease; that label is not hardware acceptance. Use it only if you are comfortable with experimental software and possible playback breakage. The release is built from this repository; DHUN is not affiliated with YouTube or Google.
 
 ## Which file to download
@@ -71,7 +77,7 @@ Do not share cookies, credentials, signed stream URLs, or unredacted logs when r
 - YouTube can change or restrict the endpoints DHUN uses; playback may fail or require a future update.
 - Not signed for Google Play or the Microsoft Store. Android uses a public test key, and the Windows MSI is unsigned. Do not treat either as stable or suitable for a daily-use device.
 - CI and emulator tests do not prove real-device playback, audio quality, battery behavior, or every installer path. Hardware acceptance remains in progress.
-- The web app at `/app/` installs from the browser (manifest + service worker) and works offline once loaded. Audio playback depends on YouTube answering a cross-origin request from a static page, which no one controls: when it refuses, the app says so on screen instead of pretending. The Android and Windows builds are the supported players.
+- The separate experimental web app at `/app/` may install as a PWA and open its cached interface offline, **not play offline audio**. It uses unofficial JioSaavn wrappers/CDN, not YouTube. Service/CORS/media failures are surfaced; live catalogue and deployed-origin audible playback remain unverified. Native feature and hardware claims do not transfer to it.
 - Uninstalling the Android app removes its app-private library and downloads. Back up anything you cannot replace.
 
 Report a playback problem with the track title, device/OS, and the app's bounded **Playback details** text. Never include cookies, tokens, signed media URLs, or account credentials.

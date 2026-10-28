@@ -1,26 +1,10 @@
 /**
- * The web build's own legal pages.
- *
- * These are **not** the Android app's documents, and deliberately so. The
- * shared corpus in `legal/*.md` describes an installed app that downloads
- * audio, keeps a SQLite database and talks to YouTube; rendering it inside a
- * browser tab would put sentences on screen that this build cannot make true.
- * The user asked for the web-only material to be rewritten, so this file is
- * written for the browser and checked against the browser's behaviour.
- *
- * Every factual sentence below is traceable to code in `src/js`:
- *
- *   localStorage, the storage key, export/import   → library.js, transfer.js
- *   saavn.dev, saavn.sumit.co, saavnx.vercel.app,
- *   *.saavncdn.com, the API paths                  → api.js (API_SOURCES), index.html (CSP)
- *   shell-only service-worker cache                 → sw.js
- *   the absent lyrics                               → player-ui.js
- *   the sample catalogue's own label                → demo.js
- *
- * `legal.js` renders the Markdown; `main.js` hands the chosen document to the
- * About screen. Tokens (`{{appVersion}}` and friends) are filled at render
- * time from `version.js`, so a release cannot ship a page that names the wrong
- * build.
+ * Browser-specific legal corpus, last reconciled 2026-10-28.
+ * Native drafts live in legal/*.md; data/legal-content.js is a generated native
+ * parity fixture excluded by tools/build.mjs, not this browser's policies.
+ * Evidence: api.js/API_SOURCES + index.html/CSP; library.js + transfer.js;
+ * sw.js shell caching; player-ui.js; version.js render-time tokens.
+ * Provider permissions and published policies are not inferred from code.
  */
 
 export const WEB_LEGAL_DOCUMENTS = Object.freeze([
@@ -29,13 +13,19 @@ export const WEB_LEGAL_DOCUMENTS = Object.freeze([
     title: "About this build",
     markdown: `## What this is
 
-DHUN's web build: the same music player as the Android app, running as a static
-site in your browser. There is no install, no account and no DHUN server. The
-pages, styles and scripts are served from the project's GitHub Pages site and
-everything you save stays in this browser. **[source]**
+DHUN (धुन) is a free, open-source, cross-platform, **multi-source music client**.
+YouTube / YouTube Music is the first implementation priority. Spotify is a
+planned additional source, not implemented; its work is deferred pending
+technical, account/Premium, policy, legal, playback, privacy and cost gates.
+Other sources may be evaluated using the same evidence-based process.
+Capabilities can differ by platform. **[source]**
 
-It is free software under the GNU General Public License v3.0. There is no paid
-tier. **[source]**
+**This is the separate browser client, currently using JioSaavn**, not the native
+YouTube Music app compiled for browsers. It is a static site with no DHUN account
+and no DHUN server: no DHUN-operated server or API/backend, no native installer and no paid DHUN tier. Where a
+browser offers installation it can install the PWA shell, not native features.
+The interface is served from GitHub Pages; the saved library stays in this
+browser, while searches and media requests go to third parties. **[source]**
 
 ## This build
 
@@ -45,276 +35,279 @@ tier. **[source]**
 | Release channel | {{releaseChannel}} |
 | Platform | {{platform}} |
 
-The version is read from the build's own \`version.js\` at run time, so this page
-cannot name a build other than the one you are using. **[source]**
+These values come from this build's \`version.js\`, not a hand-typed release
+number. **[source]**
 
-**Pre-release status.** The web build is experimental and unverified against
-every browser. There is no service-level promise and no support desk. **[source]**
+**Experimental.** Live catalogue access and audible playback from the deployed
+origin remain unverified. Unit tests and silent sample rows are not playback
+proof; there is no availability or support guarantee. **[source]**
 
 ## Where the music comes from
 
-Search, albums, artists and playlists are answered by the public JioSaavn API,
-which this build reads through three community deployments of the same
-open-source wrapper — \`saavn.dev\`, \`saavn.sumit.co\` and
-\`saavnx.vercel.app\` — tried in that order, with the one that answered
-remembered for next time. Audio and artwork are fetched from
-\`*.saavncdn.com\`. DHUN operates none of these services and cannot control
-their availability, their catalogue or their policies. When none answers, the app
-says which host said what and shows a clearly labelled sample catalogue whose
-rows have no audio. **[source]**
+Search, albums, artists, playlists and stream resolution use **unofficial
+community JioSaavn API wrappers** at \`saavn.dev\`, \`saavn.sumit.co\` and
+\`saavnx.vercel.app\`, with the successful instance preferred next time. These
+are three instances for one catalogue family, not three music providers.
+Failover may send the same query/IDs to several operators. Audio and artwork
+come from \`*.saavncdn.com\`. DHUN operates none of these services. **[source]**
 
-## Independence
+Failures show the hosts and their responses and offer a clearly labelled
+sample catalogue with no audio. No YouTube API/IFrame, Spotify adapter, OAuth or
+Spotify playback is implemented here. **[source]**
+
+## Independence and rights
 
 DHUN is **not affiliated with, endorsed by, authorised by, or connected to
-JioSaavn, YouTube or Google.** JioSaavn and YouTube Music are trademarks of
-their respective owners. Song metadata and artwork belong to their owners and
-are fetched at run time; they are never bundled with this build. **[source]**
+JioSaavn, YouTube, Google or Spotify.** Names and trademarks belong to their
+owners. Song metadata and artwork are fetched at runtime, not bundled music.
+**[source]**
+
+DHUN is GNU General Public License v3.0 software; the repository licence and existing notices govern.
+Software licences do not grant rights to music, artwork, lyrics, streams, APIs
+or trademarks. Provider and wrapper permissions remain unresolved; a successful
+request or a disclaimer is not authorisation. See the Terms draft. **[legal]**
 
 ## What this build does not have
 
-No downloads, no offline audio and no saved copies of tracks: signed stream URLs
-expire, and a browser tab cannot honestly promise a file it does not own. The
-service worker caches the app's own interface files only. There are no lyrics:
-the player's lyrics tab says the API returned no lyric text rather than showing
-invented lines. **[source]**
+No audio downloads, offline audio, equaliser or lyric provider. The service
+worker caches the app's own interface files only. The lyrics tab's unavailable
+state does not mean this build sent a lyric request. Native Android/desktop
+features are not promises for this browser client. **[source]**
 `,
   },
   {
     id: "privacy",
     title: "Privacy",
-    markdown: `> **DRAFT — not yet in force.** This page describes what the code in this
-> build actually does. It has not been reviewed by a lawyer, no data controller
-> is named, and no privacy contact has been published. Read it as an accurate
-> technical description, not a legal guarantee.
+    markdown: `> **DRAFT — not yet in force.** Last updated 2026-10-28. Not reviewed by a
+> lawyer; no data controller or privacy contact is published. This is a
+> source-based technical description, not legal approval or a runtime packet audit.
 
-Every factual sentence carries a status tag:
-
-- **[source]** — read from this build's own code.
-- **[runtime]** — observed by running the build.
-- **[third-party]** — taken from the third party's published documentation.
-- **[maintainer]** — awaiting a decision from the project maintainer.
+Evidence labels: **[source]** = repository code; **[runtime]** = specifically
+recorded execution; **[third-party]** = linked provider documentation;
+**[maintainer]** = decision still needed; **[legal]** = legal review needed.
 
 ## 1. Summary
 
-This build has no account system, no DHUN-operated server, no analytics, no
-advertising, no crash reporting and no telemetry endpoint. **[source]**
+The saved library is local, not all activity is private to the device. This
+build has no DHUN account/backend, analytics, advertising, crash reporter or
+telemetry endpoint. It requests catalogue data from unofficial JioSaavn wrappers
+and media/artwork from JioSaavn's CDN. Those operators receive request/network
+data. No account does not mean anonymous or unlinkable requests. **[source]**
 
-Everything it remembers about you is stored in this browser. When you search,
-browse or play, the page talks directly to JioSaavn's public API and CDN from
-your browser, and those requests reveal your IP address to those services as any
-internet request does. **[source]**
+The project prioritises YouTube Music, but the browser has no YouTube integration.
+Spotify is planned and deferred, not implemented: no Spotify OAuth, tokens, SDK
+or requests exist here. Native data flows are described in the native app's own
+drafts, not imported as browser policy. **[source]**
 
 ## 2. Who operates DHUN
 
-DHUN is free software under the GNU General Public License v3.0. The repository
-contains no DHUN-operated server, account system or telemetry endpoint.
-**[source]**
+No legal entity or privacy contact is published. The project must resolve those
+before adopting a final policy; this draft invents neither. **[maintainer]**
 
-No legal entity and no privacy contact have been published. **[maintainer]** —
-until they are, this page states that rather than filling in a placeholder
-address.
+## 3. Local browser data
 
-## 3. Data stored only in your browser
-
-Nothing in this section leaves your browser by the build's own design.
-**[source]**
+The library is not uploaded/synced to DHUN. Individual saved queries, IDs and
+artwork URLs may be reused in third-party requests; “local” is not a promise
+that the same values never leave the device. **[source]**
 
 | Data | Where it lives |
 | --- | --- |
-| Liked songs, playlists and playlist entries | \`localStorage\`, key \`dhun.web.v3\` |
+| Likes, playlists and playlist entries | \`localStorage\`, key \`dhun.web.v3\` |
 | Listening history and recent searches | \`localStorage\`, key \`dhun.web.v3\` |
-| Track metadata you have browsed (cached so a reload does not re-request it) | \`localStorage\`, key \`dhun.web.v3\` |
+| Referenced track-metadata snapshots: titles, artists, albums, duration, IDs and artwork URLs | \`localStorage\`, key \`dhun.web.v3\`; persisted stream URLs are blanked, unreferenced snapshots pruned |
 | Settings: theme, accent, volume, repeat, shuffle | \`localStorage\`, key \`dhun.web.v3\` |
-| The app's own files, for offline opening | the browser's Cache Storage, written by the service worker |
-| Audio and artwork | not stored by DHUN; the browser may cache media under its own policy |
+| Queue/current stream | In memory; no persisted offline audio |
+| Interface files for offline opening | Cache Storage / service worker, same-origin shell only |
+| Media/artwork | No DHUN audio-download store; normal browser caching may occur |
 
-**Exporting** writes the same JSON to a file you keep. **Importing** reads such a
-file only after you choose it. **Erasing the library** deletes the local record
-immediately. Clearing this site's data in the browser does the same and also
-removes the offline copy of the interface. **[source]**
-
-If this browser refuses storage — private mode, or a full quota — the app says
-so and keeps working for the visit instead of pretending the library was saved.
-**[source] [runtime]**
-
-## 4. Data sent to third parties
-
-| Recipient | What the page sends | When |
-| --- | --- | --- |
-| \`saavn.dev\`, \`saavn.sumit.co\`, \`saavnx.vercel.app\` (JioSaavn API deployments) | Search terms; album, artist, playlist and song identifiers — sent only to the deployment being tried | Searching, browsing, resolving a stream |
-| \`*.saavncdn.com\` (JioSaavn CDN) | Media and artwork requests, which include your IP address | Showing artwork and playing a track |
-
-Every request also carries the ordinary headers a browser sends, including your
-IP address and a user-agent string. **[source] [runtime]**
-
-There is no lyric provider: the build sends no lyric request to anyone.
+Export/import use a user-chosen JSON file; the app never uploads it. Storage
+refusal/quota failure leaves a memory-only session and a visible warning.
 **[source]**
 
-**Not verified:** what the JioSaavn API and CDN do with those requests after
-they arrive. Their operators' own policies apply. **[third-party]**
+## 4. Requests to third parties
 
-## 5. Analytics, advertising and crash reporting
+| Recipient | What is sent / purpose |
+| --- | --- |
+| \`saavn.dev\`, \`saavn.sumit.co\`, \`saavnx.vercel.app\` | Search terms and album/artist/playlist/song IDs for catalogue reads and stream resolution; failover may contact multiple wrapper operators |
+| \`*.saavncdn.com\` | Artwork/audio URLs for images and playback; network/request data |
+| GitHub Pages | Requests for the hosted interface, scripts, styles, manifest and updates |
+| GitHub issues, only if you choose to report | Text and files you submit publicly; no automatic diagnostic uploader |
 
-A search of the shipped files finds no analytics, advertising, crash-reporting
-or error-reporting code, and no request to any origin other than the two named
-above. The page's Content-Security-Policy restricts \`connect-src\` and
-\`media-src\` to those origins, so a future edit that tried to add a third one
-would be refused by the browser. **[source]**
+API fetch uses \`credentials: "omit"\` and \`cache: "no-store"\`. Destinations
+can see the network address and browser request headers; browser-managed media,
+images and referrer/cache behaviour are not fully packet-audited here. CSP's
+three wrapper origins and CDN are network restrictions, not proof of permission
+or third-party retention limits. The service worker does not cache cross-origin
+API responses, artwork or audio. **[source]**
 
-## 6. Cookies
+DHUN cannot inspect or delete provider/wrapper/hosting logs. JioSaavn's
+[Privacy Policy](https://www.jiosaavn.com/corporate/privacy/) describes its own
+platform, not a verified retention policy for each independent wrapper.
+Wrapper retention/deletion schedules remain unestablished. **[third-party] [legal]**
 
-This build sets no cookies and reads none. **[source]**
+No lyric request, YouTube request or Spotify request is implemented. **[source]**
 
-## 7. Keeping, exporting and deleting your data
+## 5. Tracking and cookies
 
-- **Export:** Settings → Library data → Export writes \`dhun-library.json\`.
-- **Import:** Settings → Library data → Import reads such a file back.
-- **Erase:** Settings → Library data → Erase, after confirmation.
-- **Browser-wide:** clearing this site's storage removes the library and the
-  offline interface files together.
+DHUN adds no tracking/device identifier, reads or sets no cookies, and has no
+analytics/crash-reporting integration. This is not a guarantee about third-party
+server logs or every browser/provider cookie, cache or transport header.
+**[source]**
 
-Clearing your local record does not delete anything JioSaavn or its API may hold.
-This build cannot ask them to, and does not claim to. **[source] [third-party]**
+## 6. Export, import and deletion
 
-## 8. The project site
+- **Export:** Settings → This browser → Export library writes \`dhun-library.json\` locally.
+- **Import:** Settings → This browser → Import library validates a chosen file.
+- **Erase library:** after confirmation, clears likes, playlists, history,
+  recent searches and snapshots but **keeps settings** and the shell cache.
+- **Remove all local site data:** use the browser's controls for this origin to
+  remove settings, storage, caches and service-worker registration too.
 
-The site at \`/DHUN/\` is static and ships no client-side JavaScript. GitHub, as
-the host, processes requests under its own policies. **[source]**
+None of these deletes third-party logs or data you voluntarily post on GitHub.
+No DHUN account exists to disconnect; no remote library copy exists for a DHUN
+maintainer to delete. **[source]**
+
+## 7. Hosting and remaining decisions
+
+The \`/DHUN/\` product site is static with no shipped client-side JavaScript;
+\`/app/\` is a separate JavaScript client. GitHub hosting still processes requests
+under its own policies. Controller/contact, applicable-law review, wrapper
+permissions/retention and browser/hardware verification remain open.
+**[source] [maintainer] [legal]**
 `,
   },
   {
     id: "terms",
     title: "Terms of use",
-    markdown: `> **DRAFT — not yet in force.** No lawyer has reviewed this page. It describes
-> the terms the code actually implements, not a negotiated agreement.
+    markdown: `> **DRAFT — not yet in force.** Last updated 2026-10-28. Not lawyer-reviewed,
+> adopted, provider-approved or a negotiated content licence.
 
-## 1. Licence
+## 1. Software and scope
 
-DHUN is free software under the **GNU General Public License, version 3.0 or
-later**. You may run it, study it, change it and share it under that licence.
-The source is in the project's public repository. **[source]**
+DHUN is free software under the GNU General Public License v3.0. The repository licence and existing
+per-file/package notices govern; this page does not change that grant.
+[Read the source and licence](https://github.com/99ggprooo00-code/DHUN).
+**[source]**
+
+Product direction is multi-source: YouTube / YouTube Music first; Spotify
+planned and deferred pending technical, account/Premium, policy, legal,
+playback, privacy and cost gates. This browser build currently uses JioSaavn
+through unofficial community wrappers only. There is no YouTube/Spotify
+playback or sign-in. Native features are not browser promises. **[source]**
 
 ## 2. No warranty
 
-This is an experimental pre-release provided **as is**, without warranty of any
-kind, express or implied, including fitness for a particular purpose. Nothing
-here is a promise that the service will be available, that a track will play, or
-that the catalogue is complete. **[source]**
+Experimental pre-release, **as is**, without warranty or service-level promise.
+Catalogue access and audible playback from the deployed origin remain
+unverified. Provider/browser restrictions and third-party outages can prevent
+playback. A unit test does not establish live music playback. **[source]**
 
-## 3. What the build does not offer
+## 3. Not provided
 
-- No downloads and no offline listening: audio is streamed from signed URLs
-  that expire, and the app never presents a copy you do not have.
-- No lyrics: when the API returns none, the app says so.
-- No account, no sync, no cloud library: the library is this browser's.
-- No support commitment and no response time. See **Help & feedback**. **[source]**
+No audio downloads, offline audio, equaliser, lyric provider, DHUN account,
+cloud library, sync, support commitment or response time. Offline shell opening
+is not offline music. Failures and silent sample rows are labelled. **[source]**
 
-## 4. The catalogue
+## 4. Content and provider restrictions
 
-Metadata, artwork and audio belong to their owners and are supplied by
-JioSaavn's public API and CDN. This build does not host, mirror, redistribute or
-store any of it. Your use of that catalogue is between you and its rights
-holders. **[source] [third-party]**
+Music, artwork, lyrics, streams, APIs and trademarks have their own owners;
+**the software GPL grants no rights to them**. DHUN does not host or mirror the
+music. Referenced metadata snapshots and artwork URLs persist locally; normal
+browser caching can occur. **[source] [legal]**
+
+JioSaavn's [Terms of Use](https://www.jiosaavn.com/corporate/terms/) (last updated
+2026-10-07; accessed 2026-10-28) restrict accessing its services through unofficial
+or automated interfaces unless separately allowed. Application to the wrappers,
+content and this client, and any needed permissions, remain unresolved. Wrapper
+software licences and successful HTTP responses are not provider permission.
+Independent deployment terms/retention are not established here.
+**[third-party] [legal]**
+
+Use must respect applicable provider, account, territorial, content and legal
+restrictions. Do not circumvent access controls, rip or redistribute content.
+A disclaimer, private use or owner acceptance of risk does not make an
+integration compliant. Planned providers require their own feasibility and
+permission review before any implementation. **[legal]**
 
 ## 5. Independence
 
-DHUN is not affiliated with, endorsed by, authorised by, or connected to
-JioSaavn, YouTube or Google. Names and marks belong to their owners and are used
-only to say where the data comes from. **[source]**
+DHUN is **not affiliated with, endorsed by, authorised by, or connected to
+JioSaavn, YouTube, Google or Spotify**. Names/marks belong to their owners;
+mentioning a planned source is not a partnership. **[source]**
 
-## 6. Acceptable use
+## 6. Changes
 
-Do not use this build to redistribute audio, to circumvent a service's access
-controls, or in any way that breaks the law where you are. The project cannot
-grant rights to content it does not own. **[source]**
-
-## 7. Changes
-
-These pages are versioned with the build. If the build's behaviour changes, the
-description on these pages has to change with it, and the repository's history
-shows both. **[source]**
+Drafts are versioned with the build and must change when behaviour changes.
+No legal adoption is implied by an update date. **[source] [maintainer]**
 `,
   },
   {
     id: "licences",
     title: "Licences",
-    markdown: `## DHUN
+    markdown: `## DHUN software
 
-**GNU General Public License v3.0 or later.** The full text ships with the
-project repository in \`LICENSES/\`; the Android and desktop builds distribute
-the same terms. **[source]**
+GNU General Public License v3.0. [LICENSE](https://github.com/99ggprooo00-code/DHUN/blob/main/LICENSE)
+and existing per-file/package notices govern; this page makes no new grant.
+Bundled licence texts live under \`LICENSES/\` in the repository. The GPL covers
+software, not music, artwork, lyrics, streams, APIs or trademarks. **[source] [legal]**
 
-## Third-party services
+## Services, not bundled libraries
 
-| Service | What it is used for | Terms |
+| Service | Use | Limits |
 | --- | --- | --- |
-| JioSaavn public API deployments (\`saavn.dev\`, \`saavn.sumit.co\`, \`saavnx.vercel.app\`) | search, albums, artists, playlists, stream URLs | each deployment's operator's own terms apply; DHUN controls none of them |
-| JioSaavn CDN (\`*.saavncdn.com\`) | audio and artwork delivery | the CDN operator's own terms apply |
+| Unofficial community wrappers: \`saavn.dev\`, \`saavn.sumit.co\`, \`saavnx.vercel.app\` | One JioSaavn catalogue family: search, albums, artists, playlists, stream URLs | Separate operators; deployment terms/retention unestablished |
+| \`*.saavncdn.com\` | Audio and artwork | Provider/content rights and terms apply |
+| GitHub Pages | Static hosting | GitHub's hosting/privacy policies apply |
 
-This build makes no claim that either service permits every use; it asks them
-directly, from your browser, and shows their answers. **[third-party]**
+JioSaavn restricts unofficial access. The wrapper project's open-source code
+licence does not establish permission for the content, API use or this product.
+No provider agreement, endorsement or completed legal review is asserted.
+**[third-party] [legal]**
 
-## Bundled code
+## Bundled code and assets
 
-This build has **no runtime dependency**: no framework, no CDN, no analytics
-package and no webfont file. Every module in \`src/js\` is DHUN's own code.
-**[source]**
+No third-party runtime framework, CDN script, analytics package or webfont is
+shipped. The browser uses its system font stack; icons use Material Design icon
+path data, Apache-2.0. Native libraries have separate notices in the native app
+and \`THIRD_PARTY.md\`. Distribution-notice completeness needs release review.
+**[source] [legal]**
 
-| Asset | Origin | Licence |
-| --- | --- | --- |
-| Interface icons | Material Design Icons, path data copied into \`DhunIcons.kt\` | Apache-2.0 |
-| Typeface | the operating system's own sans-serif stack | none bundled |
-
-## Development tools
-
-The build and test tools are development-only and never reach a browser: Node's
-built-in test runner, a small bundler script, and the repository's Python
-gates. The site's browser checks use Playwright and axe-core in CI only.
-**[source]**
+Node's built-in runner/bundler, Python gates, Playwright and axe-core are
+build/test tooling, not client runtime dependencies. **[source]**
 `,
   },
   {
     id: "support",
     title: "Help & feedback",
-    markdown: `> **DRAFT.** There is no support commitment. This is an experimental
-> pre-release and nothing here promises a reply.
+    markdown: `> **DRAFT.** Experimental pre-release; no support commitment or response promise.
 
 ## Report a problem
 
-Bugs and feature requests go to the project's public issue tracker. **[source]**
+- [Report a bug](https://github.com/99ggprooo00-code/DHUN/issues/new).
+- [Browse issues](https://github.com/99ggprooo00-code/DHUN/issues).
+- [Read source](https://github.com/99ggprooo00-code/DHUN).
 
-- [Report a bug](https://github.com/99ggprooo00-code/DHUN/issues/new) — say what
-  you did, what happened, and what you expected.
-- [Browse open issues](https://github.com/99ggprooo00-code/DHUN/issues).
-- [Read the source](https://github.com/99ggprooo00-code/DHUN) — every claim on
-  these pages can be checked against it.
+Include build version from Settings/About, provider/source badge, browser/OS,
+steps and exact visible error. Wrapper access failures, missing audio and
+browser media refusal are different outcomes. Sample rows are fictional and
+silent. No hidden fallback pretends to play. **[source]**
 
-When reporting a playback problem, include the build version from **Settings**
-and the exact message the app showed. **Never include** signed stream URLs,
-cookies or tokens in an issue. **[source]**
-
-## Why a track will not play
-
-The three usual causes, in the app's own words:
-
-- the API could not be reached — the app offers **Retry**;
-- the API answered but has no audio for that song — the row says so;
-- the browser refused the media request — the player says so instead of showing
-  a progress bar that never moves.
-
-There is no fourth, hidden mode where the app pretends to play. **[source]**
-
-## Privacy requests
-
-There is no DHUN account, so there is no account data to request, correct or
-delete. The library is in your browser: **Settings → Library data** exports or
-erases it. Requests about data held by JioSaavn must go to its operator.
+Public issues are not confidential. **Never post** signed stream URLs, cookies,
+tokens, library exports, private paths or personal information. Inspect and
+redact console/diagnostic text first; nothing uploads automatically.
 **[source]**
 
-## Contact
+## Local data and privacy requests
 
-A direct contact address is **not yet published.** **[maintainer]** Until it is,
-use the public issue tracker and keep technical detail out of it.
+Settings → This browser offers Export library, Import library and Erase library. **Erase
+keeps settings and the shell cache**; browser site-data controls remove those
+too. DHUN has no account or remote library to delete. Provider/wrapper/CDN and
+GitHub hosting/issue requests belong with their respective operators; local
+erase cannot delete their logs. **[source]**
+
+No private support, privacy or security contact is published. Request a private
+channel in a public issue without sensitive information; do not mistake it for
+a confidential inbox. **[maintainer]**
 `,
   },
 ]);

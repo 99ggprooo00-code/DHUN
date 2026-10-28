@@ -3,12 +3,13 @@
 Three things must stay true, and none of them is provable by argument:
 
 1. **The generated files are current.** ``LegalContent.kt`` (Android + Windows)
-   and ``legal-content.js`` (web SPA) are both derived from ``legal/*.md``. A
+   and ``legal-content.js`` (excluded native-corpus parity fixture) are both derived from ``legal/*.md``. A
    hand edit to either, or a hand edit to a canonical page without regenerating,
    is a build failure here rather than a wrong policy text in a release.
-2. **Every target carries the same bytes.** Each document records the SHA-256 of
+2. **Native and its parity fixture carry the same bytes.** Each document records the SHA-256 of
    its rendered Markdown. The Kotlin bundle and the JS bundle are compared
-   document by document on that digest, so "in-app text matches the other copy"
+   document by document on that digest, not against the browser's independent
+   ``web-legal.js`` policy. Thus "native text matches the native source"
    is an assertion rather than a hope.
 3. **The content is honest.** Full licence texts are not truncated, every factual
    sentence carries a status tag, no invented contact address exists, and the
@@ -261,15 +262,15 @@ class PolicyTextIsHonest(unittest.TestCase):
             self.assertIn("DRAFT", page.markdown, f"{page.id} is draft but never says so")
 
     def test_no_page_claims_compliance_with_law_or_platform_terms(self) -> None:
-        for phrase in (
-            "complies with all laws",
-            "compliant with YouTube",
-            "authorised by YouTube",
-            "authorized by YouTube",
-            "approved by Google",
-            "official YouTube",
+        # Non-affiliation and a warning about "official" APIs are legitimate;
+        # reject affirmative DHUN approval/compliance claims, not provider words.
+        text = norm(self.all_text)
+        for pattern in (
+            r"\bDHUN (?:is |fully )?(?:compliant with|complies with all laws)",
+            r"\bDHUN is (?:approved|authorised|authorized) by (?:Google|YouTube|Spotify|JioSaavn)",
+            r"\bDHUN is (?:an? )?official (?:YouTube|Spotify|JioSaavn) client",
         ):
-            self.assertNotIn(phrase.lower(), norm(self.all_text).lower(), f"forbidden claim: {phrase}")
+            self.assertNotRegex(text, re.compile(pattern, re.I))
 
     def test_independence_is_stated_not_implied(self) -> None:
         for page_id in ("about", "terms"):
@@ -332,14 +333,39 @@ class PolicyTextIsHonest(unittest.TestCase):
         self.assertIn("Security contact request", page, "the interim procedure is missing")
 
     def test_every_documented_privacy_control_is_one_that_exists(self) -> None:
-        """Guards against a policy describing a control the app does not have."""
-        raw = self.pages["support"].markdown
-        support = norm(raw)
+        """Read UI and wiring, not a stale assertion that cache controls are absent."""
+        support = norm(self.pages["support"].markdown)
+        settings = _read(ROOT / "shared/src/commonMain/kotlin/dev/dhun/ui/settings/SettingsScreen.kt")
+        for control in ("Clear audio cache", "Clear lyrics cache", "Clear search history", "Clear play history", "Record listening history", "Reset settings to defaults"):
+            with self.subTest(control=control):
+                self.assertIn(control, support)
+                self.assertIn(control, settings)
         for control in ("Clear downloads", "Clear history", "Clear recent searches"):
-            self.assertIn(control, support, f"{control} is a real control and must be listed")
-        for absent in ("Clear audio cache", "Clear lyrics cache", "Delete your account"):
-            self.assertNotIn(f"| {absent} |", raw, f"{absent} does not exist as a UI control")
-        self.assertIn("Controls that do not exist", support)
+            self.assertIn(control, support)
+        shell = _read(ROOT / "shared/src/commonMain/kotlin/dev/dhun/ui/shell/DhunAppShell.kt")
+        self.assertIn("clearAudioCache", shell)
+        for path in ("app-android/src/main/kotlin/dev/dhun/android/MainActivity.kt", "app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/Main.kt"):
+            self.assertIn("clearAudioCache =", _read(ROOT / path))
+        self.assertIn("Not all Settings clears wait for completion", support)
+        self.assertIn("no general native data export or erase-all control", support)
+        self.assertNotIn("| Delete your account |", self.pages["support"].markdown)
+
+    def test_native_privacy_names_actual_browser_hosts_not_youtube(self) -> None:
+        privacy = self.pages["privacy"].markdown
+        browser = privacy.split("## 8.", 1)[1].split("## 9.", 1)[0]
+        for host in ("saavn.dev", "saavn.sumit.co", "saavnx.vercel.app", "*.saavncdn.com"):
+            self.assertIn(host, browser)
+        self.assertIn("credentials", browser)
+        self.assertIn("keeps settings", browser)
+        self.assertIn("shell", browser)
+        self.assertIn("No YouTube or Spotify", norm(browser))
+
+    def test_draft_dates_do_not_claim_the_policy_is_in_force(self) -> None:
+        ui = _read(ROOT / "shared/src/commonMain/kotlin/dev/dhun/ui/legal/AboutLegalScreen.kt")
+        self.assertIn("Draft — not yet in force", ui)
+        self.assertIn("Last updated", ui)
+        self.assertNotIn("It is effective", ui)
+
     def test_the_status_vocabulary_is_pinned(self) -> None:
         """The exact status of every page, asserted against the front matter.
         The audit document's status table was written from memory and had the

@@ -2,7 +2,7 @@
   "name": "dhun-web",
   "version": "3.0.0",
   "private": true,
-  "description": "DHUN in the browser: a working music player for the web \u2014 JioSaavn search and playback through the public saavn.dev API, no account, no DHUN server, library stored on the device. Ships no runtime dependency.",
+  "description": "DHUN multi-source music client: separate experimental browser build, unofficial JioSaavn wrappers today; YouTube first project priority, Spotify planned, not implemented. No backend or runtime dependency.",
   "license": "GPL-3.0-or-later",
   "type": "module",
   "scripts": {

@@ -1,5 +1,14 @@
 # `app-web/` — the DHUN web app
 
+**Direction (2026-10-28):** DHUN is a free, open-source, cross-platform,
+**multi-source music client**; [PRD §1](../docs/PRD.md#1-product-definition-and-source-of-truth)
+is authoritative. YouTube / YouTube Music is first implementation priority.
+This separate browser client currently uses **JioSaavn via unofficial community
+wrappers**, not the native YouTube path. Spotify is planned, not implemented,
+and deferred pending all technical/account/Premium/policy/legal/playback/privacy/
+licence/cost gates. Other sources require evidence; platform features may differ.
+No new backend, provider or paid service is adopted by documentation alignment.
+
 DHUN in a browser tab: the same shell as the Android and Windows builds — the
 glass app bar, the three destinations, the docked mini player, the full player,
 the sheets — running as a static site with **no DHUN server, no account and no
@@ -19,7 +28,7 @@ to a pretend result, a simulated queue or invented progress.
 
 ```bash
 node tools/serve.mjs 4173     # http://0.0.0.0:4173/ (serves src/)
-npm test                      # 160 tests; no install, no network
+npm test                      # 165 tests; no install, no network
 node tools/build.mjs          # src/ → dist/, then checks every shell entry
 npm run gen:icons             # regenerate js/icons.js from DhunIcons.kt
 ```
@@ -52,7 +61,7 @@ exists.
 `src/css/tokens.css` mirrors `design/DhunAppearance.kt`, `DhunTypography.kt`,
 `DhunShapes.kt`, `DhunSpacing.kt` and `DhunAnimations.kt`; `src/js/icons.js` is
 generated from `design/DhunIcons.kt` and checked against it, not hand-edited.
-`js/data/legal-content.js` is the shared legal corpus, generated from
+`js/data/legal-content.js` is the native-corpus parity fixture, excluded from the shipped web build and generated from
 `legal/*.md`; the web build renders its *own* pages from `data/web-legal.js`,
 because the installed app's documents describe downloads and a SQLite store
 that a browser tab cannot honour.
@@ -84,15 +93,16 @@ that a browser tab cannot honour.
   own files (`tools/build.mjs` checks that the shell list is complete) so the app
   and your library open without a network. Streams are cross-origin and signed;
   they are neither cached nor offered as a download.
-- **This browser is the account.** Everything is local: no login, no sync, no
-  server copy. Settings can export the library to a file, import it back, and
-  erase it. A private window that cannot store anything is told exactly that.
+- **This browser is the account.** Saved library data is local, not every request: no login, no sync, no
+  DHUN server copy. Queries/IDs still reach wrapper/CDN operators. Settings can export the library to a file, import it back, and
+  erase the library while keeping settings and shell cache. Browser site-data
+  controls remove those too. A private window that cannot store anything is told exactly that.
 - **Nothing is framed.** `frame-ancestors` cannot be sent by a meta tag, so
   `boot()` refuses to start inside a frame and says why.
 
 ## Gates
 
-- `npm test` — 160 assertions over the pure modules: routing round trips,
+- `npm test` — 165 assertions over the pure modules: routing round trips,
   escaping, the queue and repeat/shuffle rules, stream resolution, the library's
   return shapes, API normalisation, transfer files, every screen's rendered
   output, CSS class coverage, and the keyboard map against the dispatcher.
@@ -100,8 +110,7 @@ that a browser tab cannot honour.
   the HTML before the module runs, no raw hex or px outside `tokens.css`, no
   third-party asset or analytics, `noindex`, no invented lyrics, the sample
   catalogue is labelled, the service-worker shell is complete.
-- `website/tests/browser.mjs` — the real Chromium run against the deployed
-  `/app/`: boot, source badge, one `h1` per screen, dialog focus and Tab traps,
+- `website/tests/browser.mjs` — the real Chromium run against a locally served assembled site in CI (not deployed-origin audio proof): boot, source badge, one `h1` per screen, dialog focus and Tab traps,
   rendered contrast in both themes, axe with zero violations, the local
   playlist round trip across a reload, the player deep link, and the theme
   control switching the *document*, not just the chrome.
@@ -117,5 +126,4 @@ the single owner of the Pages artifact (ADR-008 amendment, 2026-10-09 (2);
 
 `Space` play/pause · `N` / `P` next / previous · `→` / `←` seek five seconds ·
 `↑` / `↓` volume · `M` mute · `S` shuffle · `R` repeat · `/` search · `?` this
-list · `Esc` closes a sheet, then the player. Keys are never taken from a text
-field and never from a combination the browser owns.
+list · `Esc` closes a sheet, then the player. Except Escape, keys are not taken from text fields or browser-owned combinations.

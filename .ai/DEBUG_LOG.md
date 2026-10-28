@@ -1,5 +1,24 @@
 # DEBUG_LOG — incidents, root causes, environment traps
 
+## 2026-10-28 — copy/tests contradicted providers and real privacy controls
+
+**Observed in source, not a new playback incident:** root/native legal and site
+metadata defined a single-source product or described browser YouTube, while
+current browser code uses three unofficial JioSaavn wrapper instances. Legal
+tests required cache controls to be absent even though Settings wires them.
+The generator documentation also called its excluded native JS parity fixture
+the browser policy. Fix: authoritative PRD + platform-specific drafts, corrected
+pipeline, source contracts and semantic/mutation checks; [audit 06](../docs/research/06-multi-source-claims-audit.md)
+contains exact results. Remaining Settings completion/error gaps are recorded,
+not silently fixed by prose. No Java here means no native compile claim; old
+CI, hardware and deployed-origin results below are dated, not today's evidence.
+
+**Local rendering follow-through:** Chromium measured a 42.5 px footer report
+link and sample-notice text overflow; label/wrapping-only fixes retain thresholds.
+The final full run has 144 measurements, zero findings, including five browser
+legal pages and actual synthetic-library erase/settings/shell retention. This
+is not a deployed-origin audio, native compilation or legal acceptance result.
+
 ## 2026-10-19 — a byte-identical palette mirror that failed AA; a playlist the app made and could not open
 
 **1. The web's palette was a *correct* mirror of a token that is not legible at the size it is used.** `tokens.test.mjs` asserts that `tokens.css` carries the same colour literals as `DhunAppearance.kt`; it passes, and it would have passed whatever those literals were. Reading the rendered app instead — every text node, both themes, seven routes, with the translucent backdrop composited — found **15 failing styles in light, 0 in dark**, all of them the light theme's `textTertiary = 0x8C1A1714` at **3.87–3.95:1**: the track duration (11px/600), the bottom-nav labels, the entity sub-meta, the section hint (12px) and the Settings contract body (12px mono). The app's own `DhunThemeContrastTest.kt:49` documents that token at **3.0:1, "AA large text / UI labels"** — and then the app uses it for 11px labels, so the app's own token violates the app's own rule. Measured light alpha ramp: `.949 → 14.41:1`, `.749 → 7.53:1`, `.549 → 3.84:1`. Those five web roles moved to secondary (7.53:1). *Lesson: a provenance test is not a legibility test. Mirroring proves where a colour came from; only a rendered audit proves a person can read it. The gate that can see this is now in the browser job (386 text nodes × 7 routes × 2 themes), and its decision function is unit-tested in `rules.mjs` so it is provable without a browser.*

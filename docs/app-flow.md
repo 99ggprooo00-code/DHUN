@@ -6,7 +6,7 @@
 
 - **Native app:** Home, Search, Library, detail destinations, Settings and FullPlayer.
 - **Marketing website:** Home (`/`), Features (`/features/`), Interface (`/ui/`), 404 and external source/support/release destinations.
-- **Web app (`/app/`):** the browser client — the same shell, tokens, navigation and settings as the native app, installable and offline-capable, published under the project site's base path. It is the destination of the site's primary call to action, not a separate product surface, and not a claim that browser playback is proven (ADR-008 boundary 4).
+- **Web app (`/app/`):** a separate browser client of the same multi-source product, sharing design tokens rather than all native navigation/settings/features. It currently uses unofficial JioSaavn wrappers; native uses YouTube Music. Installability/offline apply to the shell and local library, not offline audio. It is the site's primary CTA under the project base path; deployed-origin audible playback is unverified. [PRD §1](PRD.md#1-product-definition-and-source-of-truth): YouTube first, Spotify planned/deferred, not implemented; platform/provider capability differences remain explicit.
 
 ## 2. Native app global navigation
 

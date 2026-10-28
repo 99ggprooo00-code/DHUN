@@ -4,8 +4,8 @@
  * The text lives in `data/web-legal.js` and describes *this* build — a static
  * page, a browser's storage, one third-party catalogue. It deliberately does
  * not reuse the Android corpus in `legal/*.md`: those pages describe downloads,
- * a SQLite database and YouTube, and every one of those sentences would be
- * false in a browser tab.
+ * a native SQLite/download architecture and YouTube, not this browser build.
+ * The generated native JS parity fixture is excluded from the shipped app.
  *
  * This module is the HTML mirror of the app's `Markdown.kt`, not a general
  * Markdown library: it understands exactly the block kinds the corpus uses, and

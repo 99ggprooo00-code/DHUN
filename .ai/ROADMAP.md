@@ -1,5 +1,51 @@
 # CURRENT ACTIVE TASK
 
+## CURRENT ACTIVE TASK — 2026-10-28: multi-source alignment audit
+
+**Scope:** repository-wide documentation/legal/metadata/instruction/research/test
+alignment, not application rewrite or a new provider. The owner's explicit
+follow-up authorises verification, commit/push to `arena/5ced2dbe-dhun`, PR and
+autonomous merge only after this work and all applicable PR checks are complete.
+No public app release, backend, paid service or Spotify implementation is authorised;
+normal existing main-branch site/private-test-draft workflows are not disabled.
+
+**Direction:** [PRD §1](../docs/PRD.md#1-product-definition-and-source-of-truth)
+is authoritative. YouTube/YouTube Music first, Spotify planned and execution
+deferred; native currently YouTube Music, browser currently JioSaavn via three
+unofficial wrapper instances. Capabilities/evidence differ; don't claim plans
+as supported providers. Latest [ADR-010 amendment](../docs/decisions/ADR-010-multi-source-provider-direction.md)
+preserves D1–D6, current CSP and design-only provider work.
+
+**Work / evidence:** [audit 06](../docs/research/06-multi-source-claims-audit.md)
+records discrepancies, corrections, all file changes, fresh primary research,
+validation and remaining gates. Existing native cache/history controls and
+browser data flows are reflected truthfully; no wholesale source/ID migration.
+
+**Publication follow-up / exact next step:** initial corrections/safeguards and
+local checks are complete; rerun current gates, commit the audited changes, push
+the assigned branch, create the PR, then inspect every applicable check (including
+step outcomes) and fix root causes before merge. No PR/new remote CI is claimed yet.
+GitHub confirms `main` and this starting HEAD are `12498ca`; its existing build/
+site checks passed. The separate scheduled extraction probe run `40483966781`
+reports `ENVIRONMENT_BLOCKED`, not healthy playback. Branch-protection inspection
+is denied to the integration (HTTP 403); do not bypass GitHub merge enforcement.
+
+**Independent follow-up gates:** provider permission/legal and resolved notices,
+current-device and real-origin audio evidence, then bounded deletion/logging and
+provider identity/capability/auth/player/migration design. These remain open;
+merging this alignment does not authorise a provider or public app release.
+Current files: audit 06, this roadmap and handoff; last new failure: none;
+next: commit/push → PR and new CI evidence. Fresh local rerun passes: 493 Python,
+165 JS, 52 site rules, 20 docs, 4-page HTML/claims/build, quality 32, legal
+7 pages / 2 targets, 51 fragment links and whitespace; no gate disabled.
+
+## Historical sessions and earlier active-task snapshots
+
+All dated tasks/results below describe their sessions. They are not live
+instructions to merge, migrate stacks, choose a single-source identity or load
+a YouTube IFrame. The multi-source intent question is now resolved; Watch mode
+remains only a proposal, with permission required before runtime/CSP/spike work.
+
 ## Session `arena/488bcaa0-dhun` — master-prompt foundation: baseline, source research, proposed provider ADR (2026-10-20)
 
 **Uploaded input:** `DHUN MASTER AGENT PROMPT.md` (1,320 lines). Its initial context was verified, not

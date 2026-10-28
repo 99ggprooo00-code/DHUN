@@ -1,5 +1,111 @@
 # 04 — Spotify: source research
 
+## Current recheck — 2026-10-28
+
+**Spotify is Planned; implementation is Deferred.** This is a project-level
+additional-source intention, not “native-only by definition,” and not implemented
+on any platform. The [authoritative vision](../PRD.md#1-product-definition-and-source-of-truth)
+and [ADR-010 D3/D4, amended 2026-10-28](../decisions/ADR-010-multi-source-provider-direction.md)
+control. No adapter, OAuth, SDK, token store, account or Spotify request exists.
+The old “until ADR-010 is decided” and word-ban statements below are historical.
+
+`[P]` = primary text read 2026-10-28; `[R]` = repository inspection;
+`[U]` = unverified. These are feasibility findings, not legal approval or live
+account/dashboard/SDK tests. **Premium is necessary for some paths, not sufficient
+permission to ship DHUN as a combined multi-source Spotify product.**
+
+### Six different capabilities — no DHUN implementation yet
+
+| Capability | Official surface / evidence | What it does NOT establish |
+| --- | --- | --- |
+| Search / catalogue metadata | Web API; [2026 migration guide](https://developer.spotify.com/documentation/web-api/tutorials/february-2026-migration-guide). Dev-mode search max 10/default 5; fields and endpoint set changed. `[P]` | No playable audio URL, general catalogue mirroring permission or unlimited public access. API access still requires an app and appropriate authorisation. |
+| User library / playlist operations | Web API + user OAuth/scopes; migration replaces playlist `tracks` with `items`, restricts playlist content to owned/collaborative contexts in dev mode, removes numerous user/batch/browse endpoints and adds generic library operations. `[P]` | Metadata access is not in-client playback, account sync already in DHUN, or general cross-service data transfer permission. Verify every endpoint/scope at implementation time. |
+| Playback control | Web API Player commands on an eligible Spotify/Connect device; Android App Remote. `[P]` | Control of Spotify playback is not raw audio delivery to DHUN. Developer Terms classify some background-app control as Streaming; metadata-only vs streaming policy must not be guessed. |
+| In-browser playback | [Web Playback SDK](https://developer.spotify.com/documentation/web-playback-sdk) creates a browser Spotify Connect device and streams within the page, subject to eligible Premium, supported browser/DRM/iframe/autoplay constraints. Prior written approval required for commercial projects. `[P]` | Not a Web API stream URL or drop-in `<audio>` source; not compatible with current no-third-party-runtime/CSP without a decision. No guarantee for all browsers/mobile tiers. |
+| Native Android playback | [Android SDK](https://developer.spotify.com/documentation/android): Beta Authorization and **App Remote** libraries; App Remote controls the **installed Spotify app**, which owns playback/cache/network/system integration. `[P]` | Not Media3 PCM/URLs or a native in-DHUN audio SDK. Its “offline” feature is Spotify-owned functionality, not permission to download Spotify into DHUN. Exact installed-app eligibility and current limits need platform tests. |
+| Desktop / offline downloads | No official JVM/libVLC direct-audio route established in this research. [Developer Terms](https://developer.spotify.com/terms) prohibit stream ripping/permanent copying and indefinite content storage, subject to specific temporary metadata/art and conditional Premium exceptions. `[P][U]` | Do not declare all official desktop options impossible, promise libVLC support, invoke an unofficial decryptor, or treat narrow Premium exceptions as authorisation for DHUN audio downloads. |
+
+### Account, quota and recurring-cost gates
+
+Primary sources: [quota modes](https://developer.spotify.com/documentation/web-api/concepts/quota-modes),
+[February 2026 migration](https://developer.spotify.com/documentation/web-api/tutorials/february-2026-migration-guide),
+[July 2026 changelog](https://developer.spotify.com/documentation/web-api/references/changes/july-2026), all read `[P]`.
+
+- Development app owner must maintain **Spotify Premium**; lapse stops the app.
+  Up to **5 allowlisted users**. An unallowlisted user may authenticate but get
+  API 403. Do not use OAuth success as access or playback proof.
+- February limits applied to new apps from 2026-02-11 and existing apps migrated
+  from 2026-03-09; extended-quota apps are treated separately. The migration page
+  is not the last change: **July increased client IDs per developer from 1 to 25**.
+  Development quotas are **shared per developer account**, not independently per
+  client ID. 429 may contain `reason: QUOTA_EXCEEDED`. Specific numeric rate
+  allowances remain unestablished and must not be invented.
+- Extended access is **not an automatic route for a student hobby client**.
+  Since 2025-05-15 only organisations may apply; the published criteria include
+  an established entity, launched service, **at least 250,000 MAUs**, key markets,
+  commercial viability and compliance. Meeting/applying is no guarantee of approval.
+- Owner Premium and eligible listener Premium are separate requirements. No
+  Nepal/local subscription price, developer account readiness, agreement or
+  existing quota approval is verified. No mandatory subscription, new backend,
+  paid API/hosting or other recurring cost is approved by this audit (D4).
+  A page not listing an API fee is not a contractual zero-cost guarantee.
+
+### Policy and licensing gates
+
+Read [Developer Policy](https://developer.spotify.com/policy) (effective
+2025-05-15) and [Developer Terms](https://developer.spotify.com/terms) on 2026-10-28 `[P]`.
+
+- **§III.5:** no product/service integrated with another service's streams or
+  content. This is central to DHUN's multi-source direction; source-separated
+  queues/UI, metadata-only use or no crossfade are **not automatically approved**
+  workarounds. Determine a permitted scope/seek provider clarification before
+  implementing; this audit neither approves nor removes the planned source.
+- **§III.7:** no segue/mix/remix/overlap, including between Spotify tracks.
+  Shared EQ, crossfade, DSP, unified radio, caches and recommendation features
+  need capability-specific evaluation; never reuse native YouTube assumptions.
+- **§III.9** has a narrow personal/playlist-metadata transfer exception, not a
+  blanket cross-service import/sync/content redistribution permission.
+- **§III.11** restricts replicating/replacing core Spotify UX without permission;
+  **§III.13/14** restrict content analysis/profiles and AI/ML ingestion. A generic
+  history-based recommendation layer cannot simply ingest Spotify data.
+- Music Streaming is Premium-only (§IV.1); previews/widgets have separate limited
+  uses and are not full-playback substitutes. Commercial streaming has additional
+  restrictions; “free/open source/noncommercial” does not waive other policies.
+- Attribution/link-back, branding and non-affiliation, enforceable user terms,
+  least scopes, security, disconnect/revocation and deletion must be designed.
+  No Spotify music/SDK/trademark rights follow from DHUN's GPL. SDK licence and
+  resolved dependency compatibility with GPL/native distribution need review.
+
+### Authentication, privacy and platform design — future only
+
+[PKCE flow](https://developer.spotify.com/documentation/web-api/tutorials/code-pkce-flow)
+recommends Authorization Code + PKCE for SPAs/mobile/clients unable to protect a
+secret. [Redirect URI rules](https://developer.spotify.com/documentation/web-api/concepts/redirect_uri)
+require exact registration and HTTPS, except explicit loopback-IP HTTP; `localhost`
+is disallowed and dynamic loopback ports have a specific exception. `[P]`
+Do not commit a secret, collect user cookies, assume any native custom scheme is
+valid across SDKs, or choose a redirect before platform-specific verification.
+
+Proposed work would require scope review, state/PKCE validation, secure platform
+credential storage (not ordinary SQLDelight/localStorage), expiry/refresh/revocation,
+logout/disconnect/delete, account-access/403/Premium/429 errors, licensing, player
+state ownership and truthful UI per capability. Browser third-party SDK/CSP and
+storage risk decisions differ from Android App Remote and desktop research.
+No backend is automatically required by PKCE; no backend is authorised either.
+
+Only **if approved and implemented**, tokens/account/library/playback data would
+flow to Spotify with its own retention and privacy obligations. Those are design
+considerations, **not current DHUN data processing**. Re-read official docs,
+permissions and dashboard rules before any spike. Preserve D3's planned status
+and D4's no-recurring-cost boundary until genuine owner decisions change them.
+
+---
+
+## Historical research record — 2026-10-20
+
+> Retained as dated evidence, not a current implementation order or legal conclusion.
+> The 2026-10-28 recheck above supersedes conflicting present-tense claims below.
+
 **Date of research:** 2026-10-20. **Status:** research only. **No Spotify code exists in
 this repository, and none is proposed for implementation until ADR-010 is decided.**
 

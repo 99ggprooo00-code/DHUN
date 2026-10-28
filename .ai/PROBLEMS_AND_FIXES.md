@@ -1,5 +1,13 @@
 # DHUN — Plan Audit: Problems Identified & Feasible Replacements
 
+> **Applicability note — 2026-10-28:** the 2026-09-01 plan audit below is
+> historical, including its “do not hand-roll”, native/web and NewPipe-primary
+> instructions. It is not a current task order or provider-health/legal verdict.
+> Use [PRD §1](../docs/PRD.md#1-product-definition-and-source-of-truth), current
+> MASTER_PROMPT and [ADR-010 amendment](../docs/decisions/ADR-010-multi-source-provider-direction.md):
+> multi-source direction, YouTube first, own-client native resolver primary,
+> separate JioSaavn browser, Spotify planned/deferred. Preserve the old evidence.
+
 > This document replaces the original plan's assumptions with evidence.
 > Written 2026-09-01. Every "Problem" below was found in the original 30-phase
 > DHUN master plan and in the previous repository

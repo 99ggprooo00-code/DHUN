@@ -253,7 +253,8 @@ test("the settings screen says what this browser is storing, and offers a way ou
   assert.ok(markup.includes("Kept in this browser") || markup.includes("browser only") || markup.includes("this browser"));
   assert.ok(markup.includes("Export library"));
   assert.ok(markup.includes("Import library"));
-  assert.ok(markup.includes("Erase everything"), "there must be a real delete control");
+  assert.ok(markup.includes("Erase library"), "the delete control must name its actual scope");
+  assert.ok(!markup.includes("Erase everything"), "settings and shell cache are kept");
   assert.ok(!markup.includes("Equalizer"), "the browser cannot honour the app's equaliser, so it must not draw one");
 });
 

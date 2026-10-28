@@ -6,23 +6,21 @@ labels: playback, bug
 ---
 
 <!--
-  Read this first. DHUN's web app resolves streams from YouTube's own endpoints
-  in your browser. That request can be refused by YouTube's origin, and when it
-  is, the app shows a refusal instead of pretending to play. That refusal is not
-  a bug — but "it said nothing and nothing happened" always is.
-
-  What makes a playback report actionable: the exact URL, what the app said on
-  screen, and what the browser console said. If you have no console output, say
-  so; "no console output" is itself useful evidence.
+  DHUN is multi-source by direction, not feature-identical across builds.
+  Native Android/desktop currently use YouTube Music. The separate browser
+  client uses unofficial JioSaavn wrappers; failures may be service/CORS/media
+  refusals, not a diagnosis of a native extractor bug. Spotify is planned only.
+  Report the exact visible state and build/provider, not an assumed cause.
+  Never post signed stream URLs, tokens, cookies, library exports or private paths.
 -->
 
 ## What I tried to play
 
 - **What I typed or clicked:**
-- **Where the row came from** (the app shows the source above the list — one of
-  "YouTube Music", "Your endpoint", or "Demo data"):
-- **Was it the demo catalogue?** The demo rows are fictional and have no audio
-  by design; the app labels them. If the source badge said "Demo data", say so.
+- **Client and source/provider** (Android/desktop YouTube Music, or browser
+  JioSaavn; for browser include the source/host badge and exact error):
+- **Was it the demo catalogue?** Browser sample rows are fictional and silent
+  by design; include the label you saw.
 
 ## What happened
 
@@ -35,17 +33,20 @@ labels: playback, bug
 
 ## Environment
 
-- **Browser and version:**
+- **Build version and release channel** (About):
+- **Browser and version** (browser reports only):
 - **Device and OS:**
-- **URL** (the full address, including the `#/…` part):
+- **App page/route** (browser page path/hash only; redact private query values
+  and do not paste CDN stream URLs):
 - **Network** (home, mobile, VPN, corporate proxy — a proxy explains some refusals):
 
 ## Console output
 
 <!--
   Open the browser's developer tools (F12 or Ctrl+Shift+I), choose Console, and
-  reproduce. Paste the errors. The most useful lines mention `googlevideo`,
-  `CORS`, `blocked`, or a status code.
+  reproduce. Inspect/redact errors first. Browser reports may mention the
+  wrapper host, `saavncdn`, `CORS`, `blocked` or a status; native reports may
+  mention YouTube/resolver details. Do not post full media URLs or secrets.
 
   If the console is empty, write "nothing in the console".
 -->

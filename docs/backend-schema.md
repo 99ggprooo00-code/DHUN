@@ -2,6 +2,16 @@
 
 **Status:** Proposed data contract grounded in the current repository. Despite the filename, DHUN has no custom server backend in the current product architecture. This document primarily describes local persistence and runtime state. It must not be used as authorization to add an API, account system or cloud sync.
 
+> **Status clarification — 2026-10-28:** [PRD §1](PRD.md#1-product-definition-and-source-of-truth)
+> defines the multi-source direction (YouTube first, Spotify planned/deferred).
+> The namespaced/provider-scoped entities below are a **proposed contract**,
+> not fields/migrations already implemented. Current native IDs, SQLDelight,
+> queue/download/lyrics references remain YouTube-shaped; browser persistence
+> is separate `dhun.web.v3` metadata/settings, not SQLDelight. Never migrate or
+> discard user data to make a diagram look generic. Metadata retention, audio
+> cache/download rights and future provider storage limits need review; local
+> persistence or an expiry field does not establish provider permission.
+
 ## 1. Storage boundary
 
 | Data class | Purpose | Durability / policy |

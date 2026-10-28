@@ -1,4 +1,30 @@
-# HANDOFF — PR #136 merged; ADR-008 B1 is BLOCKED and closed; B2 is a separate user decision
+# HANDOFF — current multi-source alignment (2026-10-28)
+
+Read [PRD §1](../docs/PRD.md#1-product-definition-and-source-of-truth), ROADMAP's
+current task, [matrix 05](../docs/research/05-source-capability-matrix.md),
+[ADR-010's latest amendment](../docs/decisions/ADR-010-multi-source-provider-direction.md)
+and [audit 06](../docs/research/06-multi-source-claims-audit.md). This audit is
+safe alignment, not a broad rewrite/new provider. The owner subsequently
+authorised commit/push on `arena/5ced2dbe-dhun`, PR and autonomous merge after
+verification and all applicable PR checks. No public app release or recurring
+service is authorised. Follow the current ROADMAP and audit 06 publication
+follow-up; old branch/CI/version snapshots below are not current status.
+
+Remaining work is provider permission/legal review, native and browser real
+playback verification, bounded deletion-feedback/logging fixes, resolved notices,
+and source/capability/auth/player/ID design before a new integration. Spotify
+remains planned/deferred; Premium alone does not clear policy/access gates.
+
+**Local completion evidence (2026-10-28):** 493 Python tests, 165 browser-module
+tests and the full 144-measurement Chromium run pass; legal generation,
+root/project-prefix builds, HTML/claims/links and privacy/erase contracts pass.
+No Java/native compilation, current hardware or deployed-origin live audio was
+verified in that initial local run. Published page text was read and had older
+claims. That was an unpublished snapshot; the newly authorised PR/CI follow-up
+is recorded separately in ROADMAP and audit 06. No later CI or merge is inferred
+from the original local evidence.
+
+## Archived handoff: PR #136 / B1/B2 state
 
 > **Read first (2026-10-16):** the web app is no longer described as a preview or
 > a demo. `/app/` is the DHUN web app (installable, offline shell, real stream

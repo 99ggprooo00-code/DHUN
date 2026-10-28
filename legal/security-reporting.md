@@ -1,7 +1,7 @@
 ---
 id: security-reporting
 title: Security Reporting
-effectiveDate: 2026-10-10
+effectiveDate: 2026-10-28
 status: reference
 ---
 

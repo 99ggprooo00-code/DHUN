@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""Single source → every legal surface.
+"""Native legal source → Kotlin bundle and JavaScript parity fixture.
 
-There is exactly one hand-edited copy of each legal page: a Markdown file in
-``legal/`` with a small front-matter block. Everything else is generated from it:
-
-* ``shared/src/commonMain/kotlin/dev/dhun/legal/LegalContent.kt`` — the bundled
-  copy the Android and Windows (Compose Desktop) UIs render. It is compiled in,
-  so the pages work with no network and no resource plumbing.
-* ``app-web/src/js/data/legal-content.js`` — the bundled copy the web SPA
-  renders. Same documents, same bytes.
+Native canonical copy lives in ``legal/*.md`` (UTF-8 Markdown + front matter).
+Android/Desktop render the generated ``LegalContent.kt`` offline. The generated
+``app-web/src/js/data/legal-content.js`` contains identical text/hashes for tests,
+but ``app-web/tools/build.mjs`` excludes it. The browser renders its own
+platform-accurate corpus, ``app-web/src/js/data/web-legal.js``, through ``legal.js``.
+Native/fixture parity must not be described as browser-policy parity.
 
 Two kinds of substitution happen here:
 
@@ -21,8 +19,8 @@ Two kinds of substitution happen here:
   typed into a document.
 
 Each document carries the SHA-256 of its rendered Markdown. ``legal_sha256`` is
-the one value the app, the web SPA and ``scripts/test_legal_content.py`` all
-compare, which is what stops the three targets from silently diverging.
+the native bundle/fixture hash compared by ``scripts/test_legal_content.py``;
+browser-specific behaviour is checked separately against its own corpus.
 
 Usage::
 
@@ -317,7 +315,7 @@ def render_kotlin(pages: list[LegalPage]) -> str:
 
 
 # --------------------------------------------------------------------------
-# Web target
+# JavaScript native-corpus parity fixture (not shipped browser policy)
 # --------------------------------------------------------------------------
 
 
@@ -350,7 +348,8 @@ def render_web(pages: list[LegalPage]) -> str:
         "// if this file is stale or if its text differs from the app's bundled copy.\n"
         "\n"
         "/**\n"
-        " * Every legal page, bundled into the app. Same documents, same SHA-256 as\n"
+        " * Native-corpus parity fixture — excluded from the shipped browser build.\n"
+        " * Browser policy source: web-legal.js. Same documents, same SHA-256 as\n"
         " * `shared/src/commonMain/kotlin/dev/dhun/legal/LegalContent.kt`.\n"
         " */\n"
         f"export const LEGAL_DOCUMENTS = {body};\n"

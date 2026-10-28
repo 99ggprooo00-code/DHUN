@@ -1,5 +1,13 @@
 # DHUN — data and privacy notes (DRAFT, not a published policy)
 
+> **ARCHIVED predecessor (labelled 2026-10-28).** The body below is the earlier
+> 2026-10-10 / `v1.00.001` draft, retained for historical traceability, not the
+> current displayed policy. Native text now comes from [`legal/privacy.md`](../../legal/privacy.md)
+> through `scripts/gen_legal_content.py`; browser-specific draft text comes from
+> [`web-legal.js`](../../app-web/src/js/data/web-legal.js). Both remain DRAFT,
+> not adopted or lawyer-reviewed. Use the [current audit](../research/06-multi-source-claims-audit.md)
+> for corrections; do not copy the historical facts/placeholders below into a build.
+
 > **Status: DRAFT — requires maintainer decisions and legal review before publication.**
 > This document describes behaviour verified from the repository source as of
 > commit `6ebc45c` (release `v1.00.001`). It is not legal advice, it is not a

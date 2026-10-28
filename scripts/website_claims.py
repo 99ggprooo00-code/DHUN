@@ -6,7 +6,7 @@ loop, so its claims are checked mechanically against the **built** HTML
 (`website/dist/`), in app CI step 1 and in the site's own workflow. The rules
 and their sources are in `.ai/WEBSITE_PLAN.md` Part A §4.
 
-Three checks:
+Claims/status checks plus three original gates:
 
 1. `check_forbidden_claims` — the built pages must not claim a platform or a
    capability DHUN does not ship (iOS, unqualified browser playback, cross-device
@@ -31,6 +31,8 @@ import pathlib
 import re
 import sys
 
+from product_claims import website_direction_problems
+
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 DEFAULT_DIST = REPO_ROOT / "website" / "dist"
 SOURCE_DIR = REPO_ROOT / "website" / "src"
@@ -53,9 +55,8 @@ FORBIDDEN_TERMS: tuple[tuple[str, re.Pattern[str]], ...] = (
         # The browser client now ships (`app-web/src`: a service worker, a
         # manifest, keyboard shortcuts, an endpoint setting), so naming it is no
         # longer a forbidden claim — what stays forbidden is promising more than
-        # a browser can be promised. Playback depends on YouTube's origin
-        # answering a cross-origin request from a static page, which no author
-        # controls; offline audio is Android/Windows-only (ADR-006) and the web
+        # a browser can be promised. The browser now depends on unofficial JioSaavn wrappers/CDN
+        # and browser/CORS/media rules; offline audio is Android/Windows-only (ADR-006) and the web
         # app does not download it. Evidence for what does ship:
         # `scripts/test_app_web.py` (`DoesNotSellWhatABrowserCannotDo`,
         # `IsARealWebAppNotAPreview`).
@@ -65,6 +66,13 @@ FORBIDDEN_TERMS: tuple[tuple[str, re.Pattern[str]], ...] = (
             r"guaranteed playback|offline playback|"
             r"downloads? (songs|tracks|music) in your browser)\b",
             re.I,
+        ),
+    ),
+    (
+        "wrong current browser provider",
+        re.compile(
+            r"\b(?:web|browser) (?:app|client|build|player|version) (?:currently )?"
+            r"(?:uses|reads|talks to|streams from|plays) (?:the )?YouTube(?: Music)?\b", re.I
         ),
     ),
     (
@@ -114,10 +122,14 @@ FORBIDDEN_TERMS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "platform DHUN does not ship",
         re.compile(
-            r"\b(Android Auto|CarPlay|Chromecast|AirPlay|tvOS|watchOS|"
-            r"Apple Music|Spotify|SoundCloud|Deezer)\b",
+            r"\b(Android Auto|CarPlay|Chromecast|AirPlay|tvOS|watchOS)\b",
             re.I,
         ),
+    ),
+    (
+        "unimplemented music provider",
+        # Exclude source paths/domains, not legitimate provider names in prose.
+        re.compile(r"(?<![\w/.-])(?:Spotify|Apple Music|SoundCloud|Deezer)(?![\w/-]|\.[a-z])", re.I),
     ),
     (
         "account / sign-in",
@@ -197,6 +209,39 @@ OWN_FILE_CUES = re.compile(r"\b(file|JSON|exported|export)\b", re.I)
 NAMED_THIRD_PARTY_IMPORT = re.compile(r"\bfrom (Spotify|Apple Music|YouTube Music)\b", re.I)
 
 
+PLANNING_CUES = re.compile(
+    r"\b(planned|deferred|research required|under evaluation|candidate|proposed|proposal)\b", re.I
+)
+_PROVIDER_NAME = r"(?:Spotify|Apple Music|SoundCloud|Deezer)"
+_PRESENT_PROVIDER_CLAIMS = re.compile(
+    # A plan or unrelated "no ads" must not excuse an affirmative support claim.
+    rf"\b(?:plays?|streams?|supports?|integrates?|downloads?)\b(?:\s+\w+){{0,4}}\s+{_PROVIDER_NAME}\b"
+    rf"|\b{_PROVIDER_NAME}\b(?:[ ,]+\w+){{0,6}}[ ,]+"
+    r"(?:works|streams|plays|supported|implemented|available|enabled|included)\b", re.I
+)
+_NOT_ASSERTED = re.compile(r"\b(?:not|never|cannot|can't|doesn't|don't)\b", re.I)
+
+
+def _statement_at(text: str, start: int, end: int) -> str:
+    """Planning can follow an em dash/colon; it cannot borrow another sentence."""
+    left = max((m.end() for m in re.finditer(r"[.!?;\n]", text[:start])), default=0)
+    right = re.search(r"[.!?;\n]", text[end:])
+    return text[left:end + right.start() if right else len(text)]
+
+
+def _present_provider_claims(text: str) -> list[tuple[str, str]]:
+    found = []
+    for match in _PRESENT_PROVIDER_CLAIMS.finditer(text):
+        before = text[max(0, match.start() - 24):match.start()]
+        if _NOT_ASSERTED.search(match.group(0)) or re.search(
+            r"\b(?:not|never|cannot|can't|doesn't|don't|no)\s+(?:currently\s+|yet\s+)?$"
+            r"|\bno\s+[^,.!?;]{1,60}\s+(?:or|and)\s+$", before, re.I
+        ):
+            continue
+        found.append(("claims implemented additional-provider capability", match.group(0)))
+    return found
+
+
 def forbidden_claims_in(text: str) -> list[tuple[str, str]]:
     """Every forbidden claim in `text`, as (label, matched text) pairs.
 
@@ -207,7 +252,10 @@ def forbidden_claims_in(text: str) -> list[tuple[str, str]]:
     served copy is the one that would have caught a stale denial on the live
     site if it had carried the rule.
     """
-    found: list[tuple[str, str]] = []
+    # Markdown soft wraps and rendered HTML whitespace have the same meaning.
+    # A line break between "Spotify" and "planned" must not create a word ban.
+    text = re.sub(r"\s+", " ", text).strip()
+    found: list[tuple[str, str]] = _present_provider_claims(text)
     clauses = _clauses(text)
     for label, pattern in FORBIDDEN_TERMS:
         for match in pattern.finditer(text):
@@ -215,6 +263,10 @@ def forbidden_claims_in(text: str) -> list[tuple[str, str]]:
             # "DHUN has no accounts. Sync across devices is coming" is a claim
             # about sync, and the earlier "no" does not excuse it.
             clause = clauses[_clause_index_of(clauses, match.start())]
+            if label == "unimplemented music provider":
+                statement = _statement_at(text, match.start(), match.end())
+                if PLANNING_CUES.search(statement) or NEGATION_CUES.search(statement):
+                    continue
             if NEGATION_CUES.search(clause):
                 continue
             if (
@@ -457,6 +509,7 @@ def main(argv: list[str] | None = None) -> int:
     problems = []
     problems += forbidden_claim_violations(pages)
     problems += required_caveat_violations(pages)
+    problems += website_direction_problems(pages)
     problems += digest_violations({**pages, **load_site_sources()})
     problems += telemetry_claim_violations(pages)
 

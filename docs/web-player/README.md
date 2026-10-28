@@ -1,5 +1,14 @@
 # DHUN Web (`/app/`) — the browser build
 
+**Direction (2026-10-28):** DHUN is a free, open-source, cross-platform,
+**multi-source music client**; [PRD §1](../PRD.md#1-product-definition-and-source-of-truth)
+is authoritative. YouTube / YouTube Music is first implementation priority.
+This separate browser client currently uses **JioSaavn via unofficial community
+wrappers**, not the native YouTube path. Spotify is planned, not implemented,
+and deferred pending all technical/account/Premium/policy/legal/playback/privacy/
+licence/cost gates. Other sources require evidence; platform features may differ.
+No new backend, provider or paid service is adopted by documentation alignment.
+
 This directory describes **DHUN in a browser**: the application at
 [`/app/`](https://99ggprooo00-code.github.io/DHUN/app/) and the static site that
 publishes it.
@@ -24,7 +33,8 @@ carries a claim the repository cannot back.
 A static page — one HTML file, two stylesheets, twenty ES modules, a manifest
 and a service worker — with **no runtime dependency, no build step that needs an
 install, no DHUN-operated server and no account**. The catalogue is JioSaavn,
-read through the public [`saavn.dev`](https://saavn.dev) wrapper with ordinary
+read through unofficial community wrappers at `saavn.dev`, `saavn.sumit.co` and
+`saavnx.vercel.app` with ordinary
 `fetch` from the visitor's own browser. Likes, playlists, history and settings
 are `localStorage`, under one key (`dhun.web.v3`). When the catalogue does not
 answer, the app says so in the network's own words, keeps whatever it has, and
@@ -50,7 +60,7 @@ A rule that nothing checks is a rule that lasts until the next busy session.
 
 | Rule | Enforced by |
 |---|---|
-| **No running cost, no DHUN backend.** The only origins the page may reach are the catalogue and its CDN. | `app-web/src/index.html`'s CSP (`connect-src https://saavn.dev https://*.saavncdn.com`); `scripts/test_app_web.py::ShipsNoThirdPartyRuntimeAsset`; `docs/decisions/ADR-008-browser-web-player-target.md` boundary 1 |
+| **No running cost, no DHUN backend.** The only origins the page may reach are the catalogue and its CDN. | `app-web/src/index.html`'s CSP (`connect-src https://saavn.dev https://saavn.sumit.co https://saavnx.vercel.app https://*.saavncdn.com`); `scripts/test_app_web.py::ShipsNoThirdPartyRuntimeAsset`; `docs/decisions/ADR-008-browser-web-player-target.md` boundary 1 |
 | **No fake playback.** Progress is drawn from the media element's own clock; a "playing" state implies a media element that is actually playing. | `app-web/src/js/player.js` (queue and transport), `app-web/src/js/player-ui.js` (the clock), `app-web/tests/player.test.mjs` |
 | **No simulated catalogue.** Sample rows are labelled at the source *and* on screen, and carry no stream. | `app-web/src/js/demo.js`, `app-web/src/js/components.js` (`sourceBadge`, `notice`), `scripts/test_app_web.py::DoesNotSellWhatABrowserCannotDo` |
 | **Honest failures.** Timeout, offline, HTTP error and a row with no stream are distinct states that name what happened. | `app-web/src/js/api.js` (`SourceError`, `describeFailure`), `app-web/src/js/components.js` (`errorState`), `app-web/tests/api.test.mjs` |

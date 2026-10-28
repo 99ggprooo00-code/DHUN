@@ -548,7 +548,7 @@ export function settingsScreen(vm) {
           <button type="button" class="dhun-button dhun-button--outlined" data-action="export-library">Export library</button>
           <label class="dhun-button dhun-button--outlined dhun-file">Import library<input type="file" accept="application/json,.json" data-action="import-library" /></label>
         </div>
-        <button type="button" class="dhun-text-button dhun-text-button--danger" data-action="clear-library">Erase everything in this browser</button>
+        <button type="button" class="dhun-text-button dhun-text-button--danger" data-action="clear-library">Erase library</button>
       </div>
     </section>
 

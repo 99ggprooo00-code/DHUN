@@ -1,5 +1,12 @@
 # DHUN — Implementation and Verification Plan
 
+> **Current direction / scope (2026-10-28):** read [PRD §1](PRD.md#1-product-definition-and-source-of-truth)
+> and [ADR-010](decisions/ADR-010-multi-source-provider-direction.md) first. The native KMP/Compose
+> and separate browser clients stay intact. YouTube Music is first priority; Spotify is planned,
+> with execution deferred until all feasibility gates pass. Provider IDs/capabilities/auth/playback
+> boundaries need a separate implementation task before any new adapter. This audit does not build one.
+> Current findings and validation: [multi-source audit](research/06-multi-source-claims-audit.md).
+
 **Status:** Proposed execution order based on repository inspection at 2026-10-09. This plan does not reopen completed build phases or replace the current `.ai/ROADMAP.md` S1–S6 release-hardening sequence. Reconcile task status with current code, CI and hardware evidence before marking work done.
 
 ## 0. Rules of execution

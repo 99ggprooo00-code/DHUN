@@ -2460,6 +2460,83 @@ async function captureScreenshots(browser) {
   record("screenshots", "full-page captures written to tests/screenshots (CI artifact, never committed)");
 }
 
+/** The five browser-owned legal pages, not the generated native fixture.
+ * A local render/erase test with synthetic data and external requests blocked.
+ * This is deliberately not live catalogue, audible playback or legal approval.
+ */
+async function checkWebLegal(browser) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: "dark" });
+  const page = await context.newPage();
+  const external = [];
+  await context.route("**/*", (route) => {
+    if (new URL(route.request().url()).origin !== new URL(BASE).origin) {
+      external.push(route.request().url().split("?")[0]);
+      return route.abort();
+    }
+    return route.continue();
+  });
+  try {
+    const cases = [
+      ["about", [/multi-source music client/, /Spotify is a planned additional source, not implemented/, /browser client, currently using JioSaavn/]],
+      ["privacy", [/DRAFT/, /credentials: "omit"/, /keeps settings/, /No lyric request, YouTube request or Spotify request is implemented/]],
+      ["terms", [/DRAFT/, /software GPL grants no rights/, /unofficial or automated interfaces/]],
+      ["licences", [/no new grant/, /not establish permission/]],
+      ["support", [/DRAFT/, /keeps settings and the shell cache/]],
+    ];
+    for (const [id, patterns] of cases) {
+      await page.goto(`${BASE}/app/#/about/${id}`, { waitUntil: "networkidle" });
+      await page.waitForFunction((id) => document.querySelector('.dhun-about-nav [aria-current="page"]')?.getAttribute("href") === `#/about/${id}`, id);
+      const body = (await page.locator(".dhun-prose").innerText()).replace(/\s+/g, " ");
+      const missing = patterns.filter((pattern) => !pattern.test(body));
+      if (missing.length || /\{\{[a-zA-Z][a-zA-Z0-9]*\}\}/.test(body)) {
+        fail(`/app/ legal ${id}`, `missing scoped text or unresolved token: ${missing.join(", ")}`);
+      } else {
+        record(`/app/ legal ${id}`, "browser-owned scope/status/rights text renders, no unresolved tokens");
+      }
+      if (id === "about") {
+        const { WEB_VERSION } = await import("../../app-web/src/js/version.js");
+        if (!body.includes(WEB_VERSION)) fail("/app/ legal version", "About does not show this build's version");
+        else record("/app/ legal version", `About shows ${WEB_VERSION}; platform/channel remain build-derived`);
+      }
+    }
+    if (external.length) fail("/app/ legal requests", "opening bundled legal pages attempted an external request");
+    else record("/app/ legal requests", "opening the five bundled pages made no external request");
+
+    // Disposable context, fictional metadata only; never touch a user's library.
+    await page.evaluate(async () => {
+      const { emptyLibrary, createStorage, toggleLike, rememberPlay, rememberSearch, createPlaylist, normaliseLibrary } = await import("./js/library.js");
+      const song = { id: "audit-local-only", title: "Synthetic audit row", artist: "Test", stream: "", image: "" };
+      let library = toggleLike(emptyLibrary(), song).library;
+      library = rememberPlay(library, song);
+      library = rememberSearch(library, "synthetic local audit query");
+      library = createPlaylist(library, "Synthetic audit playlist").library;
+      library.settings = { ...library.settings, theme: "light", accent: "amber", volume: 0.25 };
+      createStorage().save(normaliseLibrary(library));
+    });
+    await page.goto(`${BASE}/app/#/settings`);
+    await page.reload({ waitUntil: "networkidle" });
+    await page.locator('[data-action="clear-library"]').waitFor();
+    const before = await page.evaluate(async () => {
+      await navigator.serviceWorker.ready;
+      return { library: JSON.parse(localStorage.getItem("dhun.web.v3")), caches: await caches.keys() };
+    });
+    await page.getByRole("button", { name: "Erase library", exact: true }).click();
+    const dialog = await page.locator('.dhun-sheet[role="dialog"]').innerText();
+    if (!/Settings and the offline shell cache remain/.test(dialog)) fail("/app/ erase disclosure", "confirmation does not state what remains");
+    await page.locator('[data-action="confirm-clear-library"]').click();
+    const after = await page.evaluate(async () => ({ library: JSON.parse(localStorage.getItem("dhun.web.v3")), caches: await caches.keys() }));
+    const settingsRetained = Object.keys(before.library.settings).length === Object.keys(after.library.settings).length && Object.entries(before.library.settings).every(([key, value]) => after.library.settings[key] === value);
+    const scopes = ["likes", "playlists", "history", "recentSearches"];
+    if (!scopes.every((key) => before.library[key].length > 0 && after.library[key].length === 0) || !before.caches.length || Object.keys(after.library.snapshots).length || !settingsRetained || !before.caches.every((key) => after.caches.includes(key))) {
+      fail("/app/ erase scope", `synthetic fixture: likes ${before.library.likes.length}→${after.library.likes.length}, snapshots ${Object.keys(after.library.snapshots).length}, settings same=${settingsRetained}, caches ${before.caches.length}→${after.caches.length}, retained=${before.caches.every((key) => after.caches.includes(key))}`);
+    } else {
+      record("/app/ erase scope", "actual confirmation clears synthetic library/snapshots, retains settings and installed shell cache");
+    }
+  } finally {
+    await context.close();
+  }
+}
+
 // ---------------------------------------------------------------------------
 // run
 // ---------------------------------------------------------------------------
@@ -2503,6 +2580,7 @@ const CHECKS = [
   ["/app/ contrast", () => checkWebAppContrast(browser)],
   ["/app/ axe", () => checkWebAppAxe(browser)],
   ["/app/ dialog focus", () => checkWebAppDialogs(browser)],
+  ["/app/ legal and erase scope", () => checkWebLegal(browser)],
   ["screenshots", () => captureScreenshots(browser)],
 ];
 

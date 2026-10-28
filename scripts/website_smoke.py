@@ -7,7 +7,7 @@ bytes that passed. This script fetches the published URL and runs the *same*
 honesty contract over the response bodies (it imports the rules rather than
 restating them), then resolves every link on the served pages over HTTP.
 
-It is deliberately narrow: the three routes, their required caveats, the
+It is deliberately narrow: all four public routes, product/provider status, the required caveats, the
 forbidden-claim rules, the canonical URL, and link resolution. It is not a
 Lighthouse run and it makes no claim about performance.
 
@@ -40,11 +40,12 @@ import urllib.request
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 import website_claims as claims  # noqa: E402
+from product_claims import ROUTES as PRODUCT_ROUTES  # noqa: E402
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 DEFAULT_BASE = "https://99ggprooo00-code.github.io/DHUN"
 CANONICAL = "https://99ggprooo00-code.github.io/DHUN"
-ROUTES = ("/", "/features/", "/ui/")
+ROUTES = tuple(PRODUCT_ROUTES)
 TIMEOUT = 30
 USER_AGENT = "DHUN-site-smoke/1.0 (+https://github.com/99ggprooo00-code/DHUN)"
 
@@ -154,6 +155,7 @@ def smoke_problems(fetched: dict[str, tuple[int, str]]) -> list[str]:
             pages[route] = markup
     if "/" in pages:
         problems += caveat_problems(pages)
+    problems += [f"served page: {problem}" for problem in claims.website_direction_problems(pages)]
     return problems
 
 
@@ -220,7 +222,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  - {problem}", file=sys.stderr)
         return 1
     print(
-        f"OK: {len(ROUTES)} served route(s) carry the three required caveats, "
+        f"OK: {len(ROUTES)} served route(s) preserve product/provider status, carry the three required caveats, "
         f"trip no forbidden-claim rule, every internal link resolves, "
         f"and the web app at {APP_ROUTE} serves the application shell with its CSP intact."
     )

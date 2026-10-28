@@ -115,6 +115,10 @@ No legal review is available (decision D1 in
 
 ## 8. A request for YouTube or Spotify in the browser is not offered
 
-Not part of the browser build. Owner decisions D2 and D3 in ADR-010 record why.
-Reply with that, and note the request in the research register
+Not currently implemented. The project direction is multi-source with YouTube
+Music first and Spotify planned/deferred; native and browser may differ. Do not
+say the idea is permanently excluded or claim it works now. D2/current CSP stand;
+a Watch-mode proposal needs approval before third-party runtime/spike work.
+Spotify needs all feasibility/account/policy/legal/playback/privacy/licence/cost
+gates, not just Premium. Record a scoped request in the research register
 ([RESEARCH-REGISTER.md](RESEARCH-REGISTER.md)) if the owner wants it tracked.
