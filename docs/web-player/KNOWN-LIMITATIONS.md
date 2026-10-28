@@ -98,3 +98,19 @@ absent rather than stubbed:
 - **Screen readers.** axe passes; nobody has listened.
 - **Slow networks.** The request timeout is 15 seconds; what a 2G connection does
   to the interface has not been measured.
+
+
+## Runtime reliability limits
+
+The local storage-getter crash, hidden readable data after a failed write probe,
+false destructive-save success, stale transport completions, shuffle-index drift,
+wrong seek units, progress-driven history rewrites and repeated FullPlayer DOM
+replacement have bounded fixes/regressions. Shell HTTP/cache-refusal regressions
+also protect offline-shell updates. See [runtime regressions](../../app-web/tests/)
+for executable failure coverage; this is not a blanket “everything works” claim.
+
+When storage cannot acknowledge a write, destructive changes and replacement
+import stay failed rather than pretending to erase/replace durable data. Ordinary
+edits can still work for the visit with warnings. Multi-tab lost updates,
+corrupt-record recovery/backup, real stream lifetime/stalls and non-Chromium/device
+acceptance remain follow-ups. No actual provider audio was heard in this task.

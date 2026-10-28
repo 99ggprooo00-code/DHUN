@@ -3,8 +3,10 @@
  *
  * THE STATE MACHINE IS SMALL ON PURPOSE. There are exactly seven statuses
  * (`idle`, `loading`, `playing`, `paused`, `ended`, `error`, `blocked`) and one
- * rule that matters: the interface draws the status it is given, so a status can
- * never say "playing" before the element has actually produced sound. A rejected
+ * rule that matters: the interface draws the status it is given, so it
+ * reports "playing" only for the current playback intent after the element's
+ * playing event or play-promise acknowledgement. That is transport evidence,
+ * not proof a person heard sound (muting/devices remain outside this module). A rejected
  * `play()` (autoplay policy, a dead URL, a codec the browser refuses) lands in
  * `blocked` or `error` with the reason attached — it does not silently bounce
  * back to `paused` and leave the button looking stuck.
@@ -156,6 +158,7 @@ export function createPlayer({
   let state = emptyPlayerState();
   let listeners = new Set();
   let loadToken = 0;
+  let playbackId = 0; // local selection identity; never persisted or sent
   let playRequested = false;
 
   function emit() {
@@ -177,6 +180,33 @@ export function createPlayer({
     set({ status: STATUS.error, error: { ...described, technical: described.technical, at: now() } });
   }
 
+  function releaseMedia() {
+    audio.pause?.();
+    audio.removeAttribute?.("src");
+    audio.load?.();
+  }
+
+  function canMarkPlaying() {
+    return playRequested && currentTrack(state) && audio.src && !audio.paused;
+  }
+
+  async function requestPlayback(token) {
+    try {
+      await audio.play();
+      if (token !== loadToken || !canMarkPlaying()) return;
+      set({ status: STATUS.playing, error: null });
+    } catch (error) {
+      if (token !== loadToken) return;
+      const rejection = playRejection(error);
+      playRequested = false;
+      if (!rejection) {
+        set({ status: STATUS.paused });
+        return;
+      }
+      set({ status: rejection.status, error: { ...rejection, technical: String(error?.name ?? ""), at: now() } });
+    }
+  }
+
   /**
    * Load and start one queue position.
    *
@@ -185,15 +215,16 @@ export function createPlayer({
    * song they are now listening to.
    */
   async function startAt(index, { autoplay = true } = {}) {
-    if (index < 0 || index >= state.queue.length) {
-      playRequested = false;
+    const token = (loadToken += 1);
+    playRequested = false;
+    // No old stream may continue while new metadata/resolution is on screen.
+    releaseMedia();
+    if (!Number.isInteger(index) || index < 0 || index >= state.queue.length) {
       set({ status: STATUS.idle, index: -1, position: 0, duration: 0 });
-      audio.pause?.();
-      audio.removeAttribute?.("src");
       return;
     }
-    const token = (loadToken += 1);
     const requested = state.queue[index];
+    playbackId += 1;
     playRequested = autoplay;
     set({
       index,
@@ -211,7 +242,8 @@ export function createPlayer({
         if (hydrated?.stream) {
           track = hydrated;
           const queue = state.queue.slice();
-          queue[index] = hydrated;
+          // Removing an earlier queue row can move this still-current request.
+          queue[state.index] = hydrated;
           set({ queue });
         }
       } catch (error) {
@@ -236,40 +268,38 @@ export function createPlayer({
       fail(new SourceError(FAILURE_KIND.network, String(error?.message ?? "could not load the audio URL"), { url: track.stream }));
       return;
     }
-    persist({ track, index });
+    persist({ track, index: state.index });
 
     if (!autoplay) {
       set({ status: STATUS.paused });
       return;
     }
-    try {
-      await audio.play();
-      if (token !== loadToken) return;
-      set({ status: STATUS.playing });
-    } catch (error) {
-      if (token !== loadToken) return;
-      const rejection = playRejection(error);
-      if (!rejection) return;
-      playRequested = false;
-      set({ status: rejection.status, error: { ...rejection, technical: String(error?.name ?? ""), at: now() } });
-    }
+    await requestPlayback(token);
   }
 
   /* ------------------------------------------------------------- element -- */
 
   const onTimeUpdate = () => {
-    if (!audio) return;
+    if (!audio || !currentTrack(state) || !audio.src) return;
     const duration = Number.isFinite(audio.duration) ? audio.duration : state.duration;
     set({ position: audio.currentTime || 0, duration: duration || 0 });
   };
-  const onPlay = () => {
-    if (state.status !== STATUS.playing) set({ status: STATUS.playing });
+  const onPlaying = () => {
+    if (canMarkPlaying() && state.status !== STATUS.playing) set({ status: STATUS.playing });
+  };
+  const onWaiting = () => {
+    if (canMarkPlaying()) set({ status: STATUS.loading });
   };
   const onPause = () => {
     // A pause caused by the track ending is not a user pause; `ended` owns that.
-    if (state.status === STATUS.playing) set({ status: STATUS.paused });
+    if (state.status === STATUS.playing) {
+      if (playRequested) loadToken += 1;
+      playRequested = false;
+      set({ status: STATUS.paused });
+    }
   };
   const onEnded = () => {
+    if (!currentTrack(state) || !audio.src) return;
     const next = nextIndex(state);
     if (state.repeat === "one") {
       startAt(state.index);
@@ -277,22 +307,26 @@ export function createPlayer({
     }
     if (next >= 0) startAt(next);
     else {
+      loadToken += 1;
       playRequested = false;
+      audio.pause?.();
       set({ status: STATUS.ended, position: 0 });
     }
   };
   const onError = () => {
+    if (!currentTrack(state) || !audio?.src) return;
     const code = audio?.error?.code ?? 0;
     const message = audio?.error?.message ?? "";
     fail(new SourceError(FAILURE_KIND.network, message || `the audio element reported error ${code}`, { url: audio?.src ?? "" }));
   };
   const onVolumeChange = () => set({ volume: audio.volume ?? 0, muted: Boolean(audio.muted) });
   const onLoadedMetadata = () => {
-    if (Number.isFinite(audio.duration)) set({ duration: audio.duration });
+    if (currentTrack(state) && audio.src && Number.isFinite(audio.duration)) set({ duration: audio.duration });
   };
 
   audio?.addEventListener?.("timeupdate", onTimeUpdate);
-  audio?.addEventListener?.("play", onPlay);
+  audio?.addEventListener?.("playing", onPlaying);
+  audio?.addEventListener?.("waiting", onWaiting);
   audio?.addEventListener?.("pause", onPause);
   audio?.addEventListener?.("ended", onEnded);
   audio?.addEventListener?.("error", onError);
@@ -317,7 +351,7 @@ export function createPlayer({
       const queue = (songs ?? []).filter(Boolean);
       if (!queue.length) return;
       const order = state.shuffle ? shuffledOrder(queue.length, index) : queue.map((_, position) => position);
-      set({ queue, order, context });
+      set({ queue, order, context, index: -1, status: STATUS.loading, position: 0, duration: 0, error: null });
       startAt(index);
     },
 
@@ -349,33 +383,36 @@ export function createPlayer({
         api.stop();
         return;
       }
-      if (index < state.index) set({ queue, index: state.index - 1 });
+      const order = state.order.filter(position => position !== index).map(position => position > index ? position - 1 : position);
+      if (index < state.index) set({ queue, order, index: state.index - 1 });
       else if (index === state.index) {
-        set({ queue });
+        set({ queue, order });
         startAt(Math.min(index, queue.length - 1));
-      } else set({ queue });
+      } else set({ queue, order });
     },
 
     toggle() {
       if (!state.queue.length) return;
-      if (state.status === STATUS.playing) {
+      if (state.status === STATUS.playing || state.status === STATUS.loading) {
+        loadToken += 1;
+        playRequested = false;
         audio.pause();
         set({ status: STATUS.paused });
         return;
       }
-      if (state.status === STATUS.paused || state.status === STATUS.blocked || state.status === STATUS.ended) {
+      if (state.status === STATUS.ended) {
+        startAt(state.index);
+        return;
+      }
+      if (state.status === STATUS.paused || state.status === STATUS.blocked) {
         if (!audio.src && state.index >= 0) {
           startAt(state.index);
           return;
         }
+        const token = ++loadToken;
         playRequested = true;
-        audio
-          .play()
-          .then(() => set({ status: STATUS.playing, error: null }))
-          .catch((error) => {
-            const rejection = playRejection(error);
-            if (rejection) set({ status: rejection.status, error: { ...rejection, technical: String(error?.name ?? ""), at: now() } });
-          });
+        set({ status: STATUS.loading, error: null });
+        requestPlayback(token);
         return;
       }
       if (state.status === STATUS.idle && state.queue.length) startAt(Math.max(state.index, 0));
@@ -385,6 +422,9 @@ export function createPlayer({
       const index = nextIndex(state);
       if (index >= 0) startAt(index);
       else if (manual) {
+        loadToken += 1;
+        playRequested = false;
+        audio.pause?.();
         set({ status: STATUS.ended, position: 0 });
       }
     },
@@ -442,8 +482,7 @@ export function createPlayer({
     stop() {
       loadToken += 1;
       playRequested = false;
-      audio.pause?.();
-      audio.removeAttribute?.("src");
+      releaseMedia();
       set({ queue: [], index: -1, status: STATUS.idle, position: 0, duration: 0, context: "", error: null });
     },
 
@@ -466,9 +505,16 @@ export function createPlayer({
       return playRequested;
     },
 
+    get playbackId() {
+      return playbackId;
+    },
+
     destroy() {
+      listeners = new Set();
+      api.stop();
       audio?.removeEventListener?.("timeupdate", onTimeUpdate);
-      audio?.removeEventListener?.("play", onPlay);
+      audio?.removeEventListener?.("playing", onPlaying);
+      audio?.removeEventListener?.("waiting", onWaiting);
       audio?.removeEventListener?.("pause", onPause);
       audio?.removeEventListener?.("ended", onEnded);
       audio?.removeEventListener?.("error", onError);
@@ -491,7 +537,18 @@ export function createPlayer({
  * harmless rather than a console full of errors.
  */
 export function attachMediaSession({ track, status, position, duration, handlers, mediaSession = globalThis.navigator?.mediaSession } = {}) {
-  if (!mediaSession || !track) return;
+  if (!mediaSession) return;
+  if (!track) {
+    try {
+      mediaSession.metadata = null;
+      mediaSession.playbackState = "none";
+      try { mediaSession.setPositionState?.(); } catch { /* optional position API */ }
+      for (const name of ["play", "pause", "previoustrack", "nexttrack", "seekbackward", "seekforward", "seekto"]) {
+        try { mediaSession.setActionHandler?.(name, null); } catch { /* optional action */ }
+      }
+    } catch { /* optional platform capability */ }
+    return;
+  }
   try {
     if (typeof MediaMetadata === "function") {
       mediaSession.metadata = new MediaMetadata({

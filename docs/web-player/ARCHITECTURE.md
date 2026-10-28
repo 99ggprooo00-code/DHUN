@@ -104,6 +104,47 @@ A hash route is used because the app is served from a static host with no
 rewrite rules: `#/album/123` is a URL that works on GitHub Pages, and `router.js`
 `format()` is the only thing that writes one.
 
+### Screen-owned catalogue requests
+
+`main.js` owns separate AbortControllers for Home, Search and remote entities.
+Replacing/clearing an intent or leaving its screen cancels that job. Existing
+request-id guards remain, and both result and global badge/fallback publication
+require the current owner. Interrupted data returns to idle and can retry on a
+later visit. Aborting fetch cannot recall data already received upstream.
+
+Initialization uses the route handler once. Hash queries are compared before
+state assignment; form/recent/clear actions synchronize the parsed route when
+replacing history. Player-only routing retains current jobs/data; explicit
+Retry/Refresh can replace them. Player stream resolution remains independent.
+`app-web/tests/navigation-requests.test.mjs` tests production boot/router logic
+with Node doubles, not browser layout, device or sound acceptance.
+
+A focused Search draft and selection survive a result/error rerender only within
+the same request intent. A new explicit submit owns the canonical field value;
+unsubmitted text is neither sent nor persisted. This retains the continued-typing
+focus policy, not a guarantee about a phone's software keyboard or IME composition.
+
+### Component and page lifetime
+
+`boot()` returns an idempotent `destroy()` for explicit unmounting. Non-cached
+`pagehide` disposes the component too: screen requests and that component's player
+lookup are aborted, owned root/document/window/media-query/audio/PWA listeners
+are released, and late callbacks cannot mutate its UI or navigate via its old
+`go`. Another live component/request owner is not disposed. Event helpers return
+cleanup functions; none of this unregisters a persistent service worker or clears
+its caches. Accepted local storage transactions are not catalogue jobs: a pending
+import may finish saving, but its obsolete UI continuation is ignored.
+
+Cached `pagehide` instead suspends only screen jobs. `pageshow` retries interrupted
+current-route work once; player resolution and PWA ownership survive the cached
+page lifetime. A visibility change, progress rerender or player-only route change
+is not teardown. There is no search debounce; searches begin on form/recent/filter/
+route intents. Toast callbacks are guarded and their timer is cleared at teardown;
+blob-URL revocation is resource cleanup, not UI publication.
+
+These lifecycle transitions are tested with Node doubles, not actual browser
+back/forward-cache, focus, offline activation or audio-output acceptance.
+
 ## The catalogue seam
 
 `js/api.js` owns the catalogue contract, normalisation, failures and failover:
@@ -222,3 +263,20 @@ honour, so the web build ships its own text, which says what this build stores
 and what it sends. The generated `js/data/legal-content.js` is an excluded
 native-corpus parity fixture, not browser policy. Terms/Privacy remain DRAFT;
 controller, private contact, permission and legal-adoption decisions remain open.
+
+
+## Runtime reliability boundaries
+
+The existing module boundaries remain. Transport uses a stale-result generation
+and playback intent; a separate ephemeral selection counter deduplicates history
+writes. FullPlayer compares structural view data and patches only scrubber/time
+progress, avoiding repeated animation/control replacement. This is a small render
+path correction, not a virtual-DOM framework or architecture replacement.
+
+Storage read access is independent of write probing. Ordinary failed edits can
+remain in memory, while destructive changes/import require acknowledged writes
+before publishing replacement state. Shell cache updates do not overwrite known-good
+HTML with HTTP errors; cache refusal does not discard usable online responses.
+No audio/API caching, new origin/provider/backend, schema/key or native-runtime
+change is introduced. Executable regressions are in
+[runtime tests](../../app-web/tests/); device/provider/audio limits remain open.

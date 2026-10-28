@@ -385,6 +385,18 @@ class BrowserHarnessSurvivesAndDiagnoses(unittest.TestCase):
         self.assertIn('fail(`web app ${label} console`', app_check)
         self.assertIn('fail(`web app ${label} unhandled`', app_check)
 
+    def test_runtime_regressions_are_wired_without_click_or_security_bypasses(self):
+        for label, function in (("/app/ storage failures", "checkWebStorageFailures"), ("/app/ synthetic media transport", "checkWebSyntheticMedia")):
+            self.assertIn(f'["{label}", () => {function}(browser)]', self.src)
+            body = self.body_of(self.src, function)
+            self.assertIn("newAppContext(browser,", body)
+            self.assertNotIn("force: true", body)
+            self.assertNotIn("bypassCSP", body)
+        fixture = (REPO_ROOT / "website/tests/runtime-fixtures.mjs").read_text(encoding="utf-8")
+        self.assertIn("API_SOURCES", fixture)
+        self.assertIn("Test-only synthetic metadata", fixture)
+        self.assertIn("url.pathname === TONE_PATH", fixture)
+
     def test_the_guard_records_and_the_annotations_always_run(self):
         guard = self.body_of(self.src, "guard")
         self.assertRegex(guard, r"catch\s*\(error\)")

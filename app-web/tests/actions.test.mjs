@@ -91,3 +91,20 @@ test("the app never writes markup into a region that does not exist", () => {
     assert.ok(ids.has(region), `${region} is rendered into but never declared`);
   }
 });
+
+
+test("keyboard seek actions use audio seconds, not native-style milliseconds", () => {
+  const forward = main.split('case "seek-forward":', 2)[1]?.split("break;", 1)[0] ?? "";
+  const backward = main.split('case "seek-back":', 2)[1]?.split("break;", 1)[0] ?? "";
+  assert.match(forward, /player\.seekBy\(5\)/);
+  assert.match(backward, /player\.seekBy\(-5\)/);
+  assert.doesNotMatch(forward + backward, /5000/);
+});
+
+test("media-session play and pause are intent-specific and seek in audio seconds", () => {
+  assert.match(main, /play: \(\) => \{ if \(!player\.requested\) player\.toggle\(\); \}/);
+  assert.match(main, /pause: \(\) => \{ if \(player\.requested\) player\.toggle\(\); \}/);
+  assert.match(main, /seekBackward: \(\) => player\.seekBy\(-10\)/);
+  assert.match(main, /seekForward: \(\) => player\.seekBy\(10\)/);
+  assert.match(main, /recordedPlayback !== player\.playbackId/);
+});

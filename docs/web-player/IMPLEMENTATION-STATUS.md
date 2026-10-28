@@ -1,7 +1,7 @@
 # DHUN Web — status and evidence
 
 > **Status: Partial integration; source/unit evidence, NOT VERIFIED FOR RELEASE.**
-> Reconciled 2026-10-28; exact fresh commands/results in [audit 06](../research/06-multi-source-claims-audit.md).
+> Current behavior is checked by the named source/tests below; earlier product alignment is [audit 06](../research/06-multi-source-claims-audit.md).
 
 DHUN is multi-source by direction ([PRD §1](../PRD.md#1-product-definition-and-source-of-truth)),
 YouTube Music first; native currently uses YouTube Music, this separate browser
@@ -11,8 +11,9 @@ playback remain unverified. Permissions, legal adoption and notice completeness
 are separate release gates, not cured by passing geometry/unit checks.
 
 The table identifies the code/gates that check each behaviour. A gate existing
-is not proof that it ran in this session; use audit 06's exact execution ledger.
-Earlier recorded CI/browser evidence is dated, not a new canonical-origin check.
+is not proof that it ran in a particular environment. Run the commands in
+TESTING.md and read that PR/CI execution's results. Earlier CI/browser evidence
+is dated, not a new canonical-origin or hardware check.
 
 ## What is verified, and by what
 
@@ -23,7 +24,7 @@ table cannot quietly describe a build that has moved on.
 | Claim | Evidence |
 |---|---|
 | The build assembles from the sources, and every module is reachable from `main.js` | `app-web/tools/build.mjs` — it fails on an unreachable module or a shell entry that is not in the build |
-| 165 assertions over the pure modules pass with no install and no network | `app-web/tests/` — routing, escaping, queue, stream selection, library shapes, API normalisation, transfer, screens, CSS coverage, shortcuts |
+| 259 assertions over modules and Node controller fixtures pass with no install and no network | `app-web/tests/` — routing, escaping, queue, stream selection, library shapes, API normalisation, transfer, screens, CSS coverage, shortcuts |
 | The web build is a real app, not a preview: regions before the module runs, a strict CSP, `noindex`, no third-party asset, no downloads surface, a labelled sample catalogue | `scripts/test_app_web.py` |
 | Every screen renders one `h1`, resets focus to it after navigation, and titles the document | `website/tests/browser.mjs` (`entity outline`, `/app/ dialog focus`) |
 | Rendered contrast meets 4.5:1 / 3:1 on every visible line, in both themes | `website/tests/browser.mjs` (`/app/ contrast`) |
@@ -35,13 +36,14 @@ table cannot quietly describe a build that has moved on.
 | The appearance control themes the document, not just the chrome | `website/tests/browser.mjs` (`appearance`), `app-web/src/css/tokens.css` |
 | The catalogue seam turns a timeout, an offline browser and an HTTP error into distinct sentences, with the technical detail labelled | `app-web/src/js/api.js`, `app-web/tests/api.test.mjs` |
 | A dead instance is skipped, the one that answered is remembered, and a total failure names every host | `app-web/src/js/api.js` (`createRacer`, `describeAttempts`), `app-web/tests/api.test.mjs` (six failover tests), `scripts/test_app_web.py` (the CSP must name every instance `api.js` requests) |
+| Screen requests retire quietly; cached pages suspend/resume; explicit destruction removes observers and ignores late continuations without cancelling another live owner | `app-web/src/js/main.js`, `app-web/tests/navigation-requests.test.mjs`, `app-web/tests/pwa.test.mjs` (controlled Node integration, not browser acceptance) |
 | A row with no stream is refused in words rather than played silently | `app-web/src/js/player.js`, `app-web/src/js/player-ui.js` |
 | The site and `/app/` deploy together from one workflow, and the served bytes are re-read after each publish | `.github/workflows/website.yml`, `scripts/website_smoke.py` |
 | These documents describe the build that exists | `scripts/web_player_docs.py` |
 
 ## Not verified
 
-- **Nobody has heard audio from the deployed `/app/`.** The code path is real —
+- **Current records still lack audible acceptance from the deployed `/app/`.** The code path is real —
   a URL from the catalogue's `downloadUrl` list goes into an `<audio>` element —
   but no author of this repository can state from evidence that the deployed page
   produced sound. A browser check on a runner cannot hear it either. Treat this as
@@ -74,9 +76,10 @@ verified and this file names the evidence; an unticked box means it was not.
   site + `/app/`, and `scripts/website_smoke.py` checks served bytes after an
   authorised deployment. No fresh deployment/canonical-origin verification is
   asserted by this audit.
-- [x] **The code is unit-tested** — `cd app-web && npm test` → 165 pass;
+- [x] **The code is unit-tested** — `cd app-web && npm test` → 259 pass;
   baseline Python suite (2026-10-28 before alignment): 466 tests OK. Fresh
-  expanded-suite results are recorded in audit 06, not inferred from this count.
+  current results come from the executable commands and PR/CI output; audit 06
+  retains earlier alignment results, not a new run inferred from a count.
 - [x] **Browser checks are configured** — `website/tests/browser.mjs` runs
   locally/CI against an assembled artifact, not proof of sound at the deployed origin.
 - [x] **No paid infrastructure and no DHUN server** — static GitHub Pages, one
@@ -111,3 +114,12 @@ gates, neither makes the other unnecessary.
    screen.
 3. Only then: the second browser and the phone, the screen-reader pass, and the
    release decision.
+
+
+## Controlled runtime reliability coverage
+
+`app-web/tests/` covers storage acknowledgement/retry, transport intent, shared
+request ownership, teardown, Search drafts and shell-cache refusals. The browser
+harness uses explicit catalogue failures and controlled synthetic media to test
+UI branches without contacting community providers. A passing fixture or CI run
+is not current deployed-provider, hardware, permission or human-audio acceptance.

@@ -178,22 +178,21 @@ test("a resolve failure keeps the source's own taxonomy", async () => {
 
 test("a slow resolve that lands after the visitor skipped is dropped", async () => {
   const audio = fakeAudio();
-  let release;
+  const releases = new Map();
   const player = createPlayer({
     audio,
-    resolve: (song) =>
-      new Promise((resolve) => {
-        release = () => resolve({ ...song, stream: `https://fresh/${song.id}.m4a` });
-      }),
+    resolve: (song) => new Promise((resolve) => {
+      releases.set(song.id, () => resolve({ ...song, stream: `https://fresh/${song.id}.m4a` }));
+    }),
   });
-  player.play([{ id: "a", title: "A", artist: "", duration: 1, stream: "" }, { id: "b", title: "B", artist: "", duration: 1, stream: "" }], 0);
-  await settle();
+  player.play([track("a", { stream: "" }), track("b", { stream: "" })], 0);
   player.next();
-  await settle();
-  release();
-  await settle();
-  assert.equal(player.state.index, 1, "the stale response did not replace the track the visitor chose");
+  releases.get("b")(); await settle();
+  releases.get("a")(); await settle(); // actually complete the stale request, too
+  assert.equal(player.state.index, 1);
   assert.equal(audio.src, "https://fresh/b.m4a");
+  assert.equal(player.track.id, "b");
+  assert.equal(player.state.queue[0].stream, "", "stale hydration must not modify the queue");
 });
 
 test("volume, repeat and shuffle are state, and volume is clamped", () => {
@@ -292,4 +291,163 @@ test("a media session receives the track and the transport handlers", () => {
   assert.ok(actions.has("nexttrack"), "the media session speaks the platform's names, not ours");
   assert.ok(actions.has("play"));
   assert.deepEqual(actions.get("position"), { duration: 200, playbackRate: 1, position: 10 });
+});
+
+// Reproduced against the merged runtime, with controllable media promises.
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+
+test("selecting an unresolved track silences and releases the previous media first", async () => {
+  const audio = fakeAudio(); const pending = deferred();
+  const player = createPlayer({ audio, resolve: () => pending.promise });
+  player.play([track("old")]); await settle();
+  player.play([track("new", { stream: "" })]);
+  assert.equal(player.state.status, STATUS.loading);
+  assert.equal(audio.paused, true); assert.equal(audio.src, "");
+  pending.resolve(track("new")); await settle();
+  assert.equal(player.track.id, "new"); assert.equal(player.state.status, STATUS.playing);
+});
+
+test("an unplayable sample cannot leave previous real media running under its metadata", async () => {
+  const audio = fakeAudio(); const player = createPlayer({ audio });
+  player.play([track("old")]); await settle();
+  player.play([track("demo-tr-1", { stream: "", demo: true })]); await settle();
+  assert.equal(player.state.status, STATUS.error); assert.match(player.state.error.title, /sample/i);
+  assert.equal(audio.paused, true); assert.equal(audio.src, "");
+  assert.equal(player.requested, false);
+});
+
+test("a late resume resolution cannot resurrect a stopped empty player", async () => {
+  const audio = fakeAudio(); const player = createPlayer({ audio });
+  player.play([track("a")]); await settle(); player.toggle();
+  const pending = deferred(); audio.play = () => pending.promise;
+  player.toggle(); player.stop(); pending.resolve(); await settle();
+  assert.equal(player.state.status, STATUS.idle); assert.equal(player.state.index, -1);
+  assert.deepEqual(player.state.queue, []); assert.equal(player.requested, false);
+});
+
+test("a late resume rejection cannot replace Stop with an unrelated error", async () => {
+  const audio = fakeAudio(); const player = createPlayer({ audio });
+  player.play([track("a")]); await settle(); player.toggle();
+  const pending = deferred(); audio.play = () => pending.promise;
+  player.toggle(); player.stop(); pending.reject(Object.assign(new Error("late"), { name: "NotAllowedError" })); await settle();
+  assert.equal(player.state.status, STATUS.idle); assert.equal(player.state.error, null);
+});
+
+test("Pause during stream resolution prevents a later implicit start", async () => {
+  const audio = fakeAudio(); const pending = deferred();
+  const player = createPlayer({ audio, resolve: () => pending.promise });
+  player.play([track("slow", { stream: "" })]); player.toggle();
+  pending.resolve(track("slow")); await settle();
+  assert.equal(player.state.status, STATUS.paused); assert.equal(player.requested, false);
+  assert.equal(audio.paused, true); assert.equal(audio.src, "");
+});
+
+test("Pause during a pending resume wins over that resume's completion", async () => {
+  const audio = fakeAudio(); const player = createPlayer({ audio });
+  player.play([track("a")]); await settle(); player.toggle();
+  const pending = deferred(); audio.play = () => { audio.paused = false; return pending.promise; };
+  player.toggle(); player.toggle(); pending.resolve(); await settle();
+  assert.equal(player.state.status, STATUS.paused); assert.equal(audio.paused, true);
+  assert.equal(player.requested, false);
+});
+
+test("the early play event is not decoded playback evidence", async () => {
+  const audio = fakeAudio(); const pending = deferred();
+  audio.play = () => { audio.paused = false; audio.emit("play"); return pending.promise; };
+  const player = createPlayer({ audio }); player.play([track("a")]);
+  assert.equal(player.state.status, STATUS.loading);
+  audio.emit("playing"); assert.equal(player.state.status, STATUS.playing);
+  pending.resolve(); await settle();
+});
+
+test("buffer starvation returns to loading, and a playing event resumes current intent", async () => {
+  const audio = fakeAudio(); const player = createPlayer({ audio });
+  player.play([track("a")]); await settle(); audio.emit("waiting");
+  assert.equal(player.state.status, STATUS.loading);
+  audio.emit("playing"); assert.equal(player.state.status, STATUS.playing);
+  player.toggle(); audio.emit("playing");
+  assert.equal(player.state.status, STATUS.paused); assert.equal(player.requested, false);
+});
+
+test("shuffle deletion remaps remaining indices rather than skipping into a missing slot", async () => {
+  const audio = fakeAudio(); const player = createPlayer({ audio });
+  player.play([track("a"), track("b"), track("c")]); await settle();
+  player.state.shuffle = true; player.state.order = [0, 2, 1];
+  player.removeAt(2);
+  assert.deepEqual(player.state.order, [0, 1]);
+  assert.equal(nextIndex(player.state), 1);
+  player.next(); await settle(); assert.equal(player.track.id, "b");
+});
+
+test("deleting before a resolving current item hydrates its new position, not another row", async () => {
+  const audio = fakeAudio(); const pending = deferred(); const persisted = [];
+  const player = createPlayer({ audio, resolve: () => pending.promise, persist: value => persisted.push(value) });
+  player.play([track("a"), track("b", { stream: "" }), track("c")], 1);
+  player.removeAt(0); pending.resolve(track("b")); await settle();
+  assert.deepEqual(player.state.queue.map(row => row.id), ["b", "c"]);
+  assert.equal(player.state.index, 0); assert.equal(player.state.queue[0].stream, track("b").stream);
+  assert.deepEqual(player.state.order, [0, 1]); assert.equal(persisted.at(-1).index, 0);
+});
+
+test("manual Next at the last track ends and pauses actual media without clearing the queue", async () => {
+  const audio = fakeAudio(); const player = createPlayer({ audio });
+  player.play([track("a")]); await settle(); player.next();
+  assert.equal(player.state.status, STATUS.ended); assert.equal(audio.paused, true);
+  assert.equal(player.requested, false); assert.equal(player.state.queue.length, 1);
+});
+
+test("manual Next at the end invalidates a still-resolving track", async () => {
+  const audio = fakeAudio(); const pending = deferred();
+  const player = createPlayer({ audio, resolve: () => pending.promise });
+  player.play([track("slow", { stream: "" })]); player.next();
+  pending.resolve(track("slow")); await settle();
+  assert.equal(player.state.status, STATUS.ended); assert.equal(audio.src, "");
+  assert.equal(player.requested, false);
+});
+
+test("destroy invalidates resolution and stops owned media", async () => {
+  const audio = fakeAudio(); const pending = deferred();
+  const player = createPlayer({ audio, resolve: () => pending.promise });
+  player.play([track("slow", { stream: "" })]); player.destroy();
+  pending.resolve(track("slow")); await settle();
+  assert.equal(audio.src, ""); assert.equal(audio.paused, true);
+  assert.equal(player.state.status, STATUS.idle);
+});
+
+test("late media events cannot revive stopped state or restore old metadata", async () => {
+  const audio = fakeAudio(); const player = createPlayer({ audio });
+  player.play([track("a")]); await settle(); player.stop();
+  for (const event of ["play", "playing", "ended", "error", "timeupdate", "loadedmetadata"]) audio.emit(event);
+  assert.equal(player.state.status, STATUS.idle); assert.equal(player.state.error, null);
+  assert.equal(player.state.duration, 0); assert.equal(player.state.position, 0);
+});
+
+test("playback identity changes per selection, not per progress event or pause/resume", async () => {
+  const audio = fakeAudio(); const player = createPlayer({ audio });
+  player.play([track("a"), track("b")]); await settle(); const first = player.playbackId;
+  audio.emit("timeupdate"); player.toggle(); player.toggle(); await settle();
+  assert.equal(player.playbackId, first);
+  player.next(); await settle(); assert.notEqual(player.playbackId, first);
+});
+
+test("stopping clears media-session metadata, playback and stale handlers", () => {
+  const actions = new Map();
+  const session = { metadata: { title: "old" }, playbackState: "playing", setPositionState: () => {}, setActionHandler: (name, action) => actions.set(name, action) };
+  attachMediaSession({ track: null, mediaSession: session });
+  assert.equal(session.metadata, null); assert.equal(session.playbackState, "none");
+  assert.equal(actions.size, 7); assert.ok([...actions.values()].every(action => action === null));
+});
+
+test("queue replacement never emits playing for a different unready selection", async () => {
+  const audio = fakeAudio(); const player = createPlayer({ audio });
+  player.play([track("old")]); await settle();
+  const misleading = [];
+  player.subscribe(state => { if (state.status === STATUS.playing && currentTrack(state)?.id !== "old") misleading.push(state); });
+  player.play([track("demo-tr-1", { stream: "", demo: true })]); await settle();
+  assert.deepEqual(misleading, []);
+  assert.equal(audio.paused, true); assert.equal(player.state.status, STATUS.error);
 });

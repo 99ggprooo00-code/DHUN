@@ -44,6 +44,15 @@ The visitor can:
   from its own screen. The browser's site-data controls for the origin also
   remove the stored record, settings included.
 
+**Storage failure is not successful deletion.** Destructive library changes and
+replacement import now require a confirmed localStorage write before replacing
+in-tab data. Failed confirmations stay open with an announced error and retry;
+ordinary edits may remain visit-only with an explicit warning. Saved copies may
+still exist after refusal. The origin-wide browser controls can affect other
+projects on the same host; no DHUN action deletes wrapper/CDN/GitHub logs.
+History is recorded per selection rather than progress tick, so erase during
+ongoing playback is not immediately undone. Later selections can record history.
+
 ## 3. What the project does not hold
 
 - No **DHUN-operated** server that receives the library, searches or plays; wrapper/CDN/hosting requests are still third-party processing.

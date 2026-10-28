@@ -30,6 +30,7 @@ import {
   pickImage,
   pickStream,
   plainText,
+  requestJson,
   urlOf,
 } from "../src/js/api.js";
 
@@ -463,4 +464,30 @@ test("seven shelves against a dead instance cause one switch, not seven", async 
   // that were waiting for it.
   assert.equal(hits.filter((kind) => kind === "third").length, 1, "seven shelves each raced the whole chain");
   assert.ok(hits.length <= 16, `${hits.length} requests for seven shelves is a thundering herd`);
+});
+
+
+test("an already-cancelled request never contacts a catalogue host", async () => {
+  const controller = new AbortController(); controller.abort(); let calls = 0;
+  await assert.rejects(() => requestJson("/songs/fixture", {
+    signal: controller.signal,
+    fetchImpl: async () => { calls++; return { ok: true, json: async () => ({ success: true, data: [] }) }; },
+  }), error => error instanceof SourceError && error.kind === FAILURE_KIND.timeout);
+  assert.equal(calls, 0);
+});
+
+test("cancellation while reading the response is not labelled malformed provider JSON", async () => {
+  const controller = new AbortController();
+  await assert.rejects(() => requestJson("/songs/fixture", {
+    signal: controller.signal,
+    fetchImpl: async () => ({ ok: true, json: async () => { controller.abort(); throw Object.assign(new Error("cancelled"), { name: "AbortError" }); } }),
+  }), error => error instanceof SourceError && error.kind === FAILURE_KIND.timeout);
+});
+
+test("a body that finishes after cancellation cannot become a successful response", async () => {
+  const controller = new AbortController();
+  await assert.rejects(() => requestJson("/songs/fixture", {
+    signal: controller.signal,
+    fetchImpl: async () => ({ ok: true, json: async () => { controller.abort(); return { success: true, data: [] }; } }),
+  }), error => error instanceof SourceError && error.kind === FAILURE_KIND.timeout);
 });

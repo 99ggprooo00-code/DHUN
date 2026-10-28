@@ -21,6 +21,8 @@
  * silent no-op.
  */
 
+import { listen } from "./dom.js";
+
 export const SW_STATE = Object.freeze({
   UNSUPPORTED: "unsupported",
   REGISTERING: "registering",
@@ -36,6 +38,10 @@ export function createPwa({
   swUrl = "./sw.js",
   scope = "./",
 } = {}) {
+  let destroyed = false;
+  let started = false;
+  const subscriptions = new Set();
+  let stopInstalling = () => {};
   let registration = null;
   let deferredPrompt = null;
   let state = {
@@ -49,26 +55,39 @@ export function createPwa({
   };
 
   function emit(patch) {
+    if (destroyed) return;
     state = { ...state, ...patch };
     onState(state);
   }
 
+  function watch(target, type, handler) {
+    if (destroyed) return () => {};
+    const release = listen(target, type, (event) => { if (!destroyed) handler(event); });
+    const stop = () => { release(); subscriptions.delete(stop); };
+    subscriptions.add(stop);
+    return stop;
+  }
+
   async function register() {
+    if (destroyed) return null;
     if (!navigator?.serviceWorker?.register) {
       emit({ sw: SW_STATE.UNSUPPORTED });
       return null;
     }
     try {
-      registration = await navigator.serviceWorker.register(swUrl, { scope });
+      const result = await navigator.serviceWorker.register(swUrl, { scope });
+      if (destroyed) return null;
+      registration = result;
       if (registration.waiting) {
         emit({ sw: SW_STATE.UPDATE_READY, updateReady: true });
       } else {
         emit({ sw: SW_STATE.READY, offlineReady: true });
       }
-      registration.addEventListener?.("updatefound", () => {
-        const installing = registration.installing;
+      watch(registration, "updatefound", () => {
+        stopInstalling();
+        const installing = registration?.installing;
         if (!installing) return;
-        installing.addEventListener("statechange", () => {
+        stopInstalling = watch(installing, "statechange", () => {
           // `installed` with a controller already present means an update, not a
           // first install: show the notice instead of swapping under the user.
           if (installing.state === "installed" && navigator.serviceWorker.controller) {
@@ -84,21 +103,21 @@ export function createPwa({
   }
 
   function wireInstallPrompt() {
-    win.addEventListener?.("beforeinstallprompt", (event) => {
+    watch(win, "beforeinstallprompt", (event) => {
       // Chrome would show its own mini-infobar; the app shows a button instead.
       event.preventDefault?.();
       deferredPrompt = event;
       emit({ installable: true });
     });
-    win.addEventListener?.("appinstalled", () => {
+    watch(win, "appinstalled", () => {
       deferredPrompt = null;
       emit({ installable: false, installed: true });
     });
   }
 
   function wireConnectivity() {
-    win.addEventListener?.("online", () => emit({ online: true }));
-    win.addEventListener?.("offline", () => emit({ online: false }));
+    watch(win, "online", () => emit({ online: true }));
+    watch(win, "offline", () => emit({ online: false }));
   }
 
   return {
@@ -110,16 +129,24 @@ export function createPwa({
     },
     /** Wire the install prompt and connectivity, then register the worker. */
     start() {
+      if (started || destroyed) return;
+      started = true;
       wireInstallPrompt();
       wireConnectivity();
       register();
     },
     /** The visitor chose to install. Returns whether a prompt was shown. */
     async promptInstall() {
-      if (!deferredPrompt) return false;
+      if (destroyed || !deferredPrompt) return false;
+      const prompt = deferredPrompt;
       try {
-        deferredPrompt.prompt();
-        const choice = await deferredPrompt.userChoice;
+        // Keep prompt() synchronous for user activation, but observe both
+        // native promises before yielding: either may reject on cancellation.
+        const [, choice] = await Promise.all([
+          new Promise((resolve) => resolve(prompt.prompt())),
+          prompt.userChoice,
+        ]);
+        if (destroyed) return false;
         deferredPrompt = null;
         emit({ installable: false });
         return choice?.outcome === "accepted";
@@ -127,8 +154,18 @@ export function createPwa({
         return false;
       }
     },
+    /** Dispose this page's observers, not the persistent worker or its caches. */
+    destroy() {
+      if (destroyed) return;
+      destroyed = true;
+      for (const stop of [...subscriptions]) stop();
+      deferredPrompt = null;
+      registration = null;
+      stopInstalling = () => {};
+    },
     /** Hand the app's own version to the worker so its cache name can move. */
     announceVersion(version) {
+      if (destroyed) return;
       try {
         navigator?.serviceWorker?.controller?.postMessage?.({ type: "version", version });
       } catch {

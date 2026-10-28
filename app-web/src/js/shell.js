@@ -81,8 +81,8 @@ export function miniPlayer(vm) {
       </span>
     </button>
     <span class="dhun-mini__controls">
-      <button type="button" class="dhun-icon-button" data-action="toggle-play" aria-label="${vm.status === "playing" ? "Pause" : "Play"}">
-        ${icon(vm.status === "playing" ? "Pause" : "Play", { size: 22 })}
+      <button type="button" class="dhun-icon-button" data-action="toggle-play" aria-label="${vm.status === "loading" ? "Pause loading" : vm.status === "playing" ? "Pause" : "Play"}">
+        ${icon(["playing", "loading"].includes(vm.status) ? "Pause" : "Play", { size: 22 })}
       </button>
       <button type="button" class="dhun-icon-button" data-action="next-track" aria-label="Next track">${icon("SkipNext", { size: 22 })}</button>
     </span>

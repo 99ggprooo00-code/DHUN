@@ -311,7 +311,12 @@ export function historySongs(library) {
  * accept a `setItem` and forget it, so the flag is set by a write-then-read
  * probe rather than by the existence of the API.
  */
-export function createStorage(backing = globalThis.localStorage, key = STORAGE_KEY) {
+export function createStorage(backing, key = STORAGE_KEY) {
+  // Accessing the property itself can throw under browser storage policies.
+  // A failed write probe is not a reason to discard still-readable saved data.
+  if (backing === undefined) {
+    try { backing = globalThis.localStorage; } catch { backing = null; }
+  }
   let memory = null;
   let persistent = false;
 
@@ -335,26 +340,29 @@ export function createStorage(backing = globalThis.localStorage, key = STORAGE_K
     },
     load() {
       if (memory) return memory;
-      if (!persistent) return emptyLibrary();
       try {
-        memory = normaliseLibrary(JSON.parse(backing.getItem(key) ?? "null"));
+        memory = normaliseLibrary(JSON.parse(backing?.getItem(key) ?? "null"));
       } catch {
         memory = emptyLibrary();
       }
       return memory;
     },
-    save(library) {
+    save(library, { requirePersistence = false } = {}) {
       const kept = pruneSnapshots(library);
-      memory = kept;
-      if (!persistent) return false;
+      // Ordinary edits may remain useful for this visit. Destructive actions
+      // and replacement imports publish new memory only after acknowledgement.
+      if (!requirePersistence) memory = kept;
       try {
-        backing.setItem(key, JSON.stringify(kept));
-        return true;
+        const serialized = JSON.stringify(kept);
+        backing?.setItem(key, serialized);
+        persistent = Boolean(backing) && backing.getItem(key) === serialized;
       } catch {
-        // Quota: keep working in memory and stop claiming persistence.
         persistent = false;
-        return false;
       }
+      // Retry on the next save even after quota/permission failure. An erase
+      // may free space, and storage policy can change while this tab is open.
+      if (persistent) memory = kept;
+      return persistent;
     },
     /** A file the visitor can keep; the app never uploads it. */
     exportAll(library) {
@@ -363,8 +371,9 @@ export function createStorage(backing = globalThis.localStorage, key = STORAGE_K
     importAll(text) {
       const parsed = JSON.parse(text);
       const library = normaliseLibrary(parsed);
-      memory = library;
-      this.save(library);
+      if (!this.save(library, { requirePersistence: true })) {
+        throw new Error("This browser could not confirm saving the imported library. Previous in-tab data was kept. Allow storage or free space, then try again.");
+      }
       return library;
     },
   };

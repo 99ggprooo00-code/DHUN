@@ -121,7 +121,10 @@ that the same values never leave the device. **[source]**
 | Media/artwork | No DHUN audio-download store; normal browser caching may occur |
 
 Export/import use a user-chosen JSON file; the app never uploads it. Storage
-refusal/quota failure leaves a memory-only session and a visible warning.
+refusal/quota failure can leave ordinary edits in memory with a visible warning;
+an older saved copy may still exist. Erase, playlist deletion/removal, recent-search
+clear and replacement import require a confirmed storage write; failure keeps the
+previous in-tab data and offers retry instead of reporting complete success.
 **[source]**
 
 ## 4. Requests to third parties
@@ -157,9 +160,13 @@ server logs or every browser/provider cookie, cache or transport header.
 ## 6. Export, import and deletion
 
 - **Export:** Settings → This browser → Export library writes \`dhun-library.json\` locally.
-- **Import:** Settings → This browser → Import library validates a chosen file.
+- **Import:** Settings → This browser → Import library validates a chosen file and
+  replaces the library only after storage confirms saving it.
 - **Erase library:** after confirmation, clears likes, playlists, history,
   recent searches and snapshots but **keeps settings** and the shell cache.
+  If saving fails, the confirmation stays open with a failure message; saved
+  data may still exist. Clearing is not a switch that disables future history:
+  a later track selection may create new local history.
 - **Remove all local site data:** use the browser's controls for this origin to
   remove settings, storage, caches and service-worker registration too.
 

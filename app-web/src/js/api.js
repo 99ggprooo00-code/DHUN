@@ -227,6 +227,7 @@ function absolute(path, origin = API_ORIGIN) {
  */
 export async function requestJson(path, { fetchImpl = globalThis.fetch, timeoutMs = REQUEST_TIMEOUT_MS, signal, origin = API_ORIGIN } = {}) {
   const url = absolute(path, origin);
+  if (signal?.aborted) throw new SourceError(FAILURE_KIND.timeout, "the request was aborted", { url });
   if (typeof fetchImpl !== "function") {
     throw new SourceError(FAILURE_KIND.network, "This browser has no fetch()", { url });
   }
@@ -246,6 +247,7 @@ export async function requestJson(path, { fetchImpl = globalThis.fetch, timeoutM
       headers: { Accept: "application/json" },
       signal: controller.signal,
     });
+    if (controller.signal.aborted) throw new SourceError(FAILURE_KIND.timeout, "the request was aborted", { url });
     if (!response.ok) {
       throw new SourceError(FAILURE_KIND.http, `HTTP ${response.status}`, { status: response.status, url });
     }
@@ -253,8 +255,10 @@ export async function requestJson(path, { fetchImpl = globalThis.fetch, timeoutM
     try {
       payload = await response.json();
     } catch (error) {
+      if (error?.name === "AbortError") throw error;
       throw new SourceError(FAILURE_KIND.shape, "the body was not JSON", { url, cause: error });
     }
+    if (controller.signal.aborted) throw new SourceError(FAILURE_KIND.timeout, "the request was aborted", { url });
     return unwrap(payload, url);
   } catch (error) {
     if (error instanceof SourceError) throw error;
@@ -521,30 +525,34 @@ function songsFrom(data, url) {
  * answers attached, so the interface can print which host said what instead of
  * "the catalogue could not be reached".
  *
- * CANCELLATION. A race leaves losers in flight. Each attempt gets its own
- * AbortController chained to the caller's signal, and the losers are aborted as
- * soon as a winner is known — a request nobody is waiting for should not keep a
- * community server busy.
+ * CANCELLATION. Individual attempts follow their caller's signal. A shared
+ * failover race counts its waiting consumers: cancelling one wait cannot abort
+ * another caller's probes. Losing probes stop after a winner, and all probes
+ * stop when the last consumer leaves. Cancellation never starts a new race.
  */
 function createRacer({ fetchImpl, timeoutMs, sources, preferredId, onOriginChange }) {
   const list = sources.slice();
   let activeId = list.some((source) => source.id === preferredId) ? preferredId : (list[0]?.id ?? "");
   let attempts = [];
-  // While a failover is running, every other request waits for it rather than
-  // starting a race of its own: Home asks for seven shelves at once, and seven
-  // simultaneous races would mean twenty-one requests to community servers that
-  // are already struggling.
+  // Home can have several requests waiting for one instance-selection race.
+  // Consumers own their wait; no initiating caller owns everyone else's probes.
   let switching = null;
 
   const byId = (id) => list.find((source) => source.id === id) ?? null;
+  const cancelled = (path) => new SourceError(FAILURE_KIND.timeout, "the request was aborted", {
+    url: absolute(path, (byId(activeId) ?? list[0])?.origin ?? API_ORIGIN),
+  });
+  const checkCancellation = (path, signal) => {
+    if (signal?.aborted) throw cancelled(path);
+  };
 
-  function attempt(source, path, options, controller, budget) {
+  function attempt(source, path, options, signal, budget) {
     return requestJson(path, {
       ...options,
       fetchImpl,
       timeoutMs: budget,
       origin: source.origin,
-      signal: controller.signal,
+      signal,
     }).then(
       (data) => ({ ok: true, source, data }),
       (error) => ({
@@ -571,58 +579,90 @@ function createRacer({ fetchImpl, timeoutMs, sources, preferredId, onOriginChang
 
   const okEntry = (source) => ({ id: source.id, label: source.label, origin: source.origin, kind: "ok", status: 200, message: "" });
 
-  /**
-   * Race the other instances, once, for everyone who is waiting.
-   *
-   * Resolves with `{source, path, data}` — the winner's answer to the path this
-   * caller asked for. A caller whose own path was not the one raced re-requests
-   * it from the winner and reuses the result if it was.
-   */
+  /** Stop waiting promptly, but stop shared probes only after the last consumer leaves. */
+  function waitForSwitch(entry, path, signal) {
+    return new Promise((resolve, reject) => {
+      const consumer = {};
+      entry.consumers.add(consumer);
+      let finished = false;
+      const finish = (settle, value) => {
+        if (finished) return;
+        finished = true;
+        signal?.removeEventListener?.("abort", onAbort);
+        entry.consumers.delete(consumer);
+        if (!entry.settled && !entry.consumers.size) {
+          entry.abandoned = true;
+          entry.abort();
+          // A new caller need not join a race that was already abandoned.
+          if (switching === entry) switching = null;
+        }
+        settle(value);
+      };
+      const onAbort = () => finish(reject, cancelled(path));
+      signal?.addEventListener?.("abort", onAbort, { once: true });
+      entry.promise.then(
+        (result) => signal?.aborted ? onAbort() : finish(resolve, result),
+        (error) => finish(reject, error),
+      );
+      if (signal?.aborted) onAbort();
+    });
+  }
+
+  /** One shared origin-selection race; successful data still belongs to its own path. */
   function switchTo(path, options, failedId) {
-    if (switching) return switching;
-    switching = (async () => {
+    checkCancellation(path, options.signal);
+    if (!switching) {
       const rest = list.filter((source) => source.id !== failedId);
       const controllers = rest.map(() => new AbortController());
-      const abortAll = () => controllers.forEach((controller) => controller.abort());
-      options.signal?.addEventListener?.("abort", abortAll, { once: true });
-      try {
-        const winner = await new Promise((resolve, reject) => {
-          const failures = [];
-          if (!rest.length) {
-            reject(failures);
-            return;
-          }
-          let left = rest.length;
-          rest.forEach((source, index) => {
-            attempt(source, path, options, controllers[index], PROBE_TIMEOUT_MS).then((result) => {
-              if (result.ok) {
-                resolve(result);
-                return;
-              }
-              failures.push(result.entry);
-              left -= 1;
-              if (left === 0) reject(failures);
+      const entry = {
+        consumers: new Set(), abandoned: false, settled: false,
+        abort: () => controllers.forEach((controller) => controller.abort()),
+        promise: null,
+      };
+      switching = entry;
+      // Register the first consumer before starting any shared probe.
+      entry.promise = Promise.resolve().then(async () => {
+        if (entry.abandoned) throw cancelled(path);
+        try {
+          const winner = await new Promise((resolve, reject) => {
+            const failures = [];
+            if (!rest.length) {
+              reject(failures);
+              return;
+            }
+            let left = rest.length;
+            rest.forEach((source, index) => {
+              attempt(source, path, options, controllers[index].signal, PROBE_TIMEOUT_MS).then((result) => {
+                if (result.ok) {
+                  resolve(result);
+                  return;
+                }
+                failures.push(result.entry);
+                left -= 1;
+                if (left === 0) reject(failures);
+              });
             });
           });
-        });
-        adopt(winner.source);
-        return { source: winner.source, path, data: winner.data };
-      } catch (failures) {
-        if (!Array.isArray(failures)) throw failures;
-        const worst = failures[0] ?? null;
-        throw new SourceError(worst?.kind ?? FAILURE_KIND.network, worst?.message ?? "every instance failed", {
-          status: worst?.status ?? null,
-          url: `${failedId}/api${path}`,
-          attempts: failures,
-        });
-      } finally {
-        options.signal?.removeEventListener?.("abort", abortAll);
-        abortAll();
-      }
-    })().finally(() => {
-      switching = null;
-    });
-    return switching;
+          if (entry.abandoned) throw cancelled(path);
+          adopt(winner.source);
+          return { source: winner.source, path, data: winner.data };
+        } catch (failures) {
+          if (!Array.isArray(failures)) throw failures;
+          const worst = failures[0] ?? null;
+          throw new SourceError(worst?.kind ?? FAILURE_KIND.network, worst?.message ?? "every instance failed", {
+            status: worst?.status ?? null,
+            url: `${failedId}/api${path}`,
+            attempts: failures,
+          });
+        }
+      }).finally(() => {
+        entry.settled = true;
+        entry.abort();
+        // An abandoned race must not clear a newer caller's replacement race.
+        if (switching === entry) switching = null;
+      });
+    }
+    return waitForSwitch(switching, path, options.signal);
   }
 
   return {
@@ -637,6 +677,7 @@ function createRacer({ fetchImpl, timeoutMs, sources, preferredId, onOriginChang
     },
 
     async get(path, options = {}) {
+      checkCancellation(path, options.signal);
       if (!list.length) {
         throw new SourceError(FAILURE_KIND.network, "no catalogue instance is configured", { url: path });
       }
@@ -644,38 +685,31 @@ function createRacer({ fetchImpl, timeoutMs, sources, preferredId, onOriginChang
       let source = byId(activeId) ?? list[0];
 
       for (let round = 0; round < 3; round += 1) {
-        const controller = new AbortController();
-        const linkOuter = () => controller.abort();
-        options.signal?.addEventListener?.("abort", linkOuter, { once: true });
-        let result;
-        try {
-          result = await attempt(source, path, options, controller, timeoutMs);
-        } finally {
-          options.signal?.removeEventListener?.("abort", linkOuter);
-        }
-
+        checkCancellation(path, options.signal);
+        const result = await attempt(source, path, options, options.signal, timeoutMs);
+        // A caller cancellation is not a host outage. It must not start a race,
+        // overwrite diagnostic attempts or consume a late successful response.
+        checkCancellation(path, options.signal);
         if (result.ok) {
           attempts = [...tried, okEntry(source)];
           return result.data;
         }
-        // Offline is not a per-host problem: racing the others would repeat the
-        // same refusal three times, more slowly.
         if (result.error?.kind === FAILURE_KIND.offline) {
           attempts = [result.entry];
           throw result.error;
         }
         tried.push(result.entry);
 
-        // Another request may already have moved the chain to a live instance —
-        // seven Home shelves fail together, and only one of them should pay for
-        // the switch.
         if (switching) {
           try {
-            await switching;
+            await waitForSwitch(switching, path, options.signal);
           } catch {
-            /* this caller retries below and reports its own result */
+            // Another path may fail although this path is available; retry it
+            // below, but never retry work whose own consumer has cancelled.
+            checkCancellation(path, options.signal);
           }
         }
+        checkCancellation(path, options.signal);
         const moved = byId(activeId);
         if (moved && moved.id !== source.id) {
           source = moved;
@@ -686,6 +720,7 @@ function createRacer({ fetchImpl, timeoutMs, sources, preferredId, onOriginChang
         try {
           switched = await switchTo(path, options, source.id);
         } catch (error) {
+          checkCancellation(path, options.signal);
           attempts = [...tried, ...(error?.attempts ?? [])];
           throw new SourceError(error?.kind ?? result.entry.kind, error?.message ?? result.entry.message, {
             status: error?.status ?? result.entry.status,
@@ -693,6 +728,7 @@ function createRacer({ fetchImpl, timeoutMs, sources, preferredId, onOriginChang
             attempts: attempts.slice(),
           });
         }
+        checkCancellation(path, options.signal);
         if (switched.path === path) {
           attempts = [...tried, okEntry(switched.source)];
           return switched.data;
@@ -700,7 +736,6 @@ function createRacer({ fetchImpl, timeoutMs, sources, preferredId, onOriginChang
         source = switched.source;
       }
 
-      // Every instance was tried and none answered this path.
       const last = tried[tried.length - 1] ?? { kind: FAILURE_KIND.network, status: null, message: "" };
       throw new SourceError(last.kind, last.message, {
         status: last.status,
@@ -773,6 +808,9 @@ export function createSource({
         get(ENDPOINTS.artistSongs(id), options).catch(() => ({ results: [] })),
         get(ENDPOINTS.artistAlbums(id), options).catch(() => []),
       ]);
+      // Optional list failures may degrade a profile, but caller cancellation
+      // must not be disguised as a successful artist with empty lists.
+      if (options.signal?.aborted) throw new SourceError(FAILURE_KIND.timeout, "the request was aborted", { url: ENDPOINTS.artist(id) });
       const artist = normaliseArtist(Array.isArray(profile) ? profile[0] : profile);
       if (!artist) throw new SourceError(FAILURE_KIND.shape, "the artist carried no record", { url: ENDPOINTS.artist(id) });
       return {

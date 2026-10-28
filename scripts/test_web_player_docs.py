@@ -120,13 +120,19 @@ class EvidenceResolves(DocsCopyMixin, unittest.TestCase):
 
     def test_a_row_citing_nothing_is_a_finding(self) -> None:
         root = self.copy_docs()
-        # The claim is addressed by its wording, not by its count: a count in a
-        # fixture turns every honest update of the document into a red test.
+        # Select the unique suite evidence row, independently of honest count
+        # or claim-wording updates; still remove its evidence and require the
+        # same specific validator finding below.
+        rows = [
+            line for line in (root / "IMPLEMENTATION-STATUS.md").read_text(encoding="utf-8").splitlines()
+            if line.startswith("|") and "`app-web/tests/`" in line
+        ]
+        self.assertEqual(len(rows), 1, "the suite evidence row must remain unambiguous")
         self.edit(
             root,
             "IMPLEMENTATION-STATUS.md",
-            "assertions over the pure modules pass with no install and no network | `app-web/tests/`",
-            "assertions over the pure modules pass | the tests, obviously",
+            rows[0],
+            "| Unit checks are claimed | the tests, obviously |",
         )
         problems = docs.check(root)
         self.assertTrue(any("cites no path" in problem for problem in problems), problems)

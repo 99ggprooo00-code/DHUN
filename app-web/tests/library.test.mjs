@@ -285,3 +285,103 @@ test("a stored document that carries unreferenced rows is pruned when it is read
   const loaded = createStorage(backing).load();
   assert.deepEqual(loaded.snapshots, {});
 });
+
+// Runtime reliability follow-up: write permission is not read permission, and
+// a failed destructive save must not become a successful in-memory commit.
+function changingBacking(initial = null) {
+  const map = new Map(initial ? [[STORAGE_KEY, JSON.stringify(initial)]] : []);
+  const control = { deny: false, forget: false };
+  return {
+    map, control,
+    getItem: (key) => map.get(key) ?? null,
+    setItem(key, value) {
+      if (control.deny) throw Object.assign(new Error("synthetic quota"), { name: "QuotaExceededError" });
+      if (!control.forget) map.set(key, String(value));
+    },
+    removeItem: (key) => map.delete(key),
+  };
+}
+
+test("blocked localStorage property access does not crash library startup", () => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, get() { throw new Error("SecurityError: denied"); } });
+  try {
+    const storage = createStorage();
+    assert.equal(storage.persistent, false);
+    assert.deepEqual(storage.load(), emptyLibrary());
+    assert.equal(storage.save(emptyLibrary()), false);
+  } finally {
+    if (previous) Object.defineProperty(globalThis, "localStorage", previous);
+    else delete globalThis.localStorage;
+  }
+});
+
+test("an unsuccessful write probe must not hide an existing readable library", () => {
+  const library = toggleLike(emptyLibrary(), song("kept")).library;
+  const backing = changingBacking(library); backing.control.deny = true;
+  const storage = createStorage(backing);
+  assert.equal(storage.persistent, false);
+  assert.deepEqual(storage.load().likes, ["kept"]);
+  assert.deepEqual(JSON.parse(backing.map.get(STORAGE_KEY)).likes, ["kept"]);
+});
+
+test("ordinary failed writes retain useful visit-only changes without claiming persistence", () => {
+  const backing = changingBacking(); const storage = createStorage(backing);
+  backing.control.deny = true;
+  const library = toggleLike(emptyLibrary(), song("visit-only")).library;
+  assert.equal(storage.save(library), false);
+  assert.deepEqual(storage.load().likes, ["visit-only"]);
+  assert.equal(storage.persistent, false);
+  assert.equal(backing.map.has(STORAGE_KEY), false);
+});
+
+test("saving retries after write access or quota recovers on the same handle", () => {
+  const backing = changingBacking(); const storage = createStorage(backing);
+  backing.control.deny = true; assert.equal(storage.save(emptyLibrary()), false);
+  backing.control.deny = false;
+  const library = toggleLike(emptyLibrary(), song("retry")).library;
+  assert.equal(storage.save(library), true);
+  assert.equal(storage.persistent, true);
+  assert.deepEqual(createStorage(backing).load().likes, ["retry"]);
+});
+
+test("a failed durable-only save preserves previous memory and the saved library", () => {
+  const before = toggleLike(emptyLibrary(), song("kept")).library;
+  const backing = changingBacking(before); const storage = createStorage(backing);
+  const previous = storage.load(); backing.control.deny = true;
+  assert.equal(storage.save(emptyLibrary(), { requirePersistence: true }), false);
+  assert.deepEqual(storage.load(), previous);
+  assert.deepEqual(JSON.parse(backing.map.get(STORAGE_KEY)).likes, ["kept"]);
+});
+
+test("a successful durable erase keeps settings, prunes snapshots and survives a reload", () => {
+  const before = toggleLike(emptyLibrary(), song("kept")).library; before.settings.theme = "light";
+  const backing = changingBacking(before); const storage = createStorage(backing);
+  storage.load();
+  const after = { ...emptyLibrary(), settings: before.settings };
+  assert.equal(storage.save(after, { requirePersistence: true }), true);
+  const loaded = createStorage(backing).load();
+  assert.deepEqual(loaded.likes, []); assert.deepEqual(loaded.snapshots, {});
+  assert.equal(loaded.settings.theme, "light");
+});
+
+test("a backing that silently discards a write cannot acknowledge a durable erase", () => {
+  const before = toggleLike(emptyLibrary(), song("kept")).library;
+  const backing = changingBacking(before); const storage = createStorage(backing); storage.load();
+  backing.control.forget = true;
+  assert.equal(storage.save(emptyLibrary(), { requirePersistence: true }), false);
+  assert.deepEqual(storage.load().likes, ["kept"]);
+  assert.deepEqual(JSON.parse(backing.map.get(STORAGE_KEY)).likes, ["kept"]);
+});
+
+test("a failed import does not replace the previous library and can be retried", () => {
+  const before = toggleLike(emptyLibrary(), song("previous")).library;
+  const next = toggleLike(emptyLibrary(), song("imported")).library;
+  const backing = changingBacking(before); const storage = createStorage(backing); storage.load();
+  const exported = storage.exportAll(next); backing.control.deny = true;
+  assert.throws(() => storage.importAll(exported), /could not.*sav|could not.*confirm/i);
+  assert.deepEqual(storage.load().likes, ["previous"]);
+  assert.deepEqual(JSON.parse(backing.map.get(STORAGE_KEY)).likes, ["previous"]);
+  backing.control.deny = false;
+  assert.deepEqual(storage.importAll(exported).likes, ["imported"]);
+});

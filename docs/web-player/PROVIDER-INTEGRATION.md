@@ -96,6 +96,42 @@ interface branches on.
 Failover changes which community server answers. It does not change the source
 of the music, which is the same catalogue on all three.
 
+### Cancellation ownership
+
+A supplied `AbortSignal` belongs to that caller. An already-aborted request does
+not contact a host, and cancelling a primary request does not start failover.
+A caller waiting for the shared origin-selection race rejects promptly without
+aborting probes still needed by other callers. Probes are aborted when the last
+consumer cancels or when a winner is known. An abandoned race cannot adopt a
+late winner or clear a newer race's ownership.
+
+Cancellation remains `SourceError` kind **`timeout`**, preserving the existing
+five-kind contract. A genuine network deadline may still trigger failover when
+the caller has not cancelled. Artist profile requests can tolerate ordinary
+optional song/album-list failures, but do not report a cancelled aggregate as
+successful partial data. Controlled regressions:
+`app-web/tests/request-cancellation.test.mjs`.
+
+`main.js` now supplies caller-owned signals for Home, Search and entity jobs,
+while preserving stale-response guards. Replacing/clearing an intent or leaving
+its screen cancels the job. Retired jobs cannot publish results, relabel the
+catalogue badge or turn cancellation into samples. Initial loads issue once;
+player-only routing keeps the job; Retry/Refresh can replace it. Player stream
+resolution is independent and is not cancelled by navigation. Controlled Node
+boot/router coverage is `app-web/tests/navigation-requests.test.mjs`, not real
+browser or service acceptance. Aborting fetch cannot recall data already received
+or logged by an operator. No origin, CSP, retry budget or data schema changed.
+
+### Teardown versus independent work
+
+Screen cancellation does not destroy the app or its player. Full component
+`destroy()`/non-cached `pagehide` does abort its own remaining player lookup and
+removes observers; cached pages suspend screen jobs and resume the current route
+on `pageshow`. Closed/suspended components do not start queued route/retry work or
+publish cancellation as samples/errors. PWA registration/prompt completions after
+PWA disposal are ignored; the shared installed worker/caches are not unregistered.
+These are controlled Node lifecycle checks, not real provider/browser acceptance.
+
 ## 6. Sample catalogue
 
 When every origin fails, Home can show a **sample catalogue** built from fixed,

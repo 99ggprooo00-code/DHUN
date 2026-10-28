@@ -27,7 +27,7 @@
  * old cache is deleted rather than accumulating.
  */
 
-const DEFAULT_CACHE = "dhun-web-v3.0.1";
+const DEFAULT_CACHE = "dhun-web-v3.0.2";
 
 /** Everything the interface needs to open offline. Kept as an explicit list so
  *  a forgotten module is a missing-file error in development rather than a
@@ -135,8 +135,14 @@ self.addEventListener("fetch", (event) => {
       (async () => {
         try {
           const response = await fetch(request);
-          const cache = await caches.open(cacheName);
-          cache.put("./index.html", response.clone());
+          if (response.ok) {
+            // A transient 404/503 must not poison the known-good offline shell.
+            // Cache failure must not discard an otherwise usable online page.
+            try {
+              const cache = await caches.open(cacheName);
+              await cache.put("./index.html", response.clone());
+            } catch { /* offline availability is best-effort */ }
+          }
           return response;
         } catch {
           const cache = await caches.open(cacheName);
@@ -149,12 +155,12 @@ self.addEventListener("fetch", (event) => {
 
   event.respondWith(
     (async () => {
-      const cache = await caches.open(cacheName);
-      const cached = await cache.match(request);
+      const cache = await caches.open(cacheName).catch(() => null);
+      const cached = await cache?.match(request).catch(() => undefined);
       if (cached) return cached;
       try {
         const response = await fetch(request);
-        if (response.ok) cache.put(request, response.clone());
+        if (response.ok && cache) await cache.put(request, response.clone()).catch(() => undefined);
         return response;
       } catch (error) {
         throw error;

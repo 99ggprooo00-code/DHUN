@@ -99,3 +99,30 @@ test("a sheet layer is drawn only around real content", async () => {
   assert.ok(layer.includes('data-action="scrim-close"'));
   assert.ok(layer.includes("dhun-sheet"));
 });
+
+test("delegated listeners expose idempotent cleanup without changing dispatch", async (t) => {
+  const { delegate } = await import("../src/js/dom.js");
+  class ElementDouble { closest() { return this; } }
+  const previous = Object.getOwnPropertyDescriptor(globalThis, "Element");
+  Object.defineProperty(globalThis, "Element", { configurable: true, value: ElementDouble });
+  t.after(() => { if (previous) Object.defineProperty(globalThis, "Element", previous); else delete globalThis.Element; });
+  const listeners = new Set(); let calls = 0;
+  const root = { addEventListener(_type, fn) { listeners.add(fn); }, removeEventListener(_type, fn) { listeners.delete(fn); }, contains() { return true; } };
+  const stop = delegate(root, "click", "[data-action]", () => { calls += 1; });
+  assert.equal(typeof stop, "function");
+  for (const fn of listeners) fn({ target: new ElementDouble() });
+  assert.equal(calls, 1);
+  stop(); stop();
+  assert.equal(listeners.size, 0);
+});
+
+test("optional event targets and listener options have safe cleanup", async () => {
+  const { listen } = await import("../src/js/dom.js");
+  assert.equal(typeof listen, "function");
+  assert.doesNotThrow(() => listen(null, "change", () => {})());
+  const fn = () => {}; const options = { capture: true }; const seen = [];
+  const target = { addEventListener(...args) { seen.push(["add", ...args]); }, removeEventListener(...args) { seen.push(["remove", ...args]); } };
+  const stop = listen(target, "change", fn, options);
+  stop(); stop();
+  assert.deepEqual(seen, [["add", "change", fn, options], ["remove", "change", fn, options]]);
+});
