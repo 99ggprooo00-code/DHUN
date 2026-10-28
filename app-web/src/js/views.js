@@ -497,7 +497,7 @@ const ACCENT_LABELS = { brand: "Violet", azure: "Azure", jade: "Jade", amber: "A
 export function settingsScreen(vm) {
   const { settings } = vm;
   return html`<div class="dhun-screen dhun-screen--settings">
-    ${pageHeader({ overline: "Settings", title: "Make it yours", meta: "Saved in this browser. There is no account to sync." })}
+    ${pageHeader({ overline: "Settings", title: "Make it yours", meta: vm.storage?.persistent ? "Saved in this browser. There is no account to sync." : "Storage could not confirm saving. Export a backup; some changes may last only for this visit." })}
 
     <section class="dhun-settings">
       <h2 class="dhun-settings__title">Appearance</h2>

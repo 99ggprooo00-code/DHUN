@@ -8,10 +8,13 @@ transport, no DOM), `app-web/src/js/player-ui.js` (drawing), and
 
 ## 1. The rule this document enforces
 
-**A "playing" state is only shown when an `<audio>` element is playing.** The
-progress bar is drawn from that element's own clock. The build never animates a
-bar or sets a status to playing on its own. This is the main honesty requirement
-for the player; the test file checks the state transitions.
+**A "playing" state requires current, unpaused HTML media acknowledgement**
+(`playing` event or fulfilled `play()` for the current intent). The early `play`
+event is not readiness; `waiting` returns to loading. The clock comes from the
+element. This is transport evidence, **not proof of audible output** through a
+speaker/device. Samples still have no audio, and HTTP failures do not fabricate
+streams. Late resolution, play promises and stopped-media events cannot revive
+an obsolete/stopped request or claim a new row is already playing.
 
 ## 2. Statuses
 
@@ -51,6 +54,14 @@ proxy or store it.
   takes its place, or the new last track if it was last. Removing the only track
   stops playback.
 - `queueView()` returns the queue as the Queue tab draws it.
+- Selecting a different row pauses/releases old media **before** awaiting its
+  resolution. Pause can cancel loading; the controls announce “Pause loading”.
+- Removing rows remaps shuffle indices and any pending hydration follows the
+  current row's new position. Stop/dispose invalidates pending work and clears
+  owned media; Resume has the same stale-result guard as initial playback.
+- FullPlayer retains its controls/queue DOM on ordinary progress updates and
+  patches scrubber/time labels in place, preserving focus and interaction.
+  Metadata, queue, tab, error and other structural changes still render normally.
 
 ### 4.1 Next and previous
 
@@ -74,6 +85,9 @@ Repeat is cycled by the Repeat control and the `R` key through `off`, `all`,
 ### 4.2 Seeking and volume
 
 - `seekBy(±5)` is bound to the arrow keys. Seeking is clamped to the track.
+  HTML audio uses **seconds**, unlike native milliseconds. Media-session skip
+  offsets use ten seconds; play/pause handlers are intent-specific and Stop
+  clears stale media-session metadata/actions.
 - Volume is 0 to 1, with a default of `0.8`. `M` mutes and unmutes without
   changing the stored volume.
 
@@ -87,7 +101,7 @@ pressing play again.
 |---|---|---|---|
 | `NotAllowedError` | `blocked` | The browser blocked playback | Press play once more. |
 | `NotSupportedError` | `error` | This browser cannot play that file | None in this build. The format was refused. |
-| `AbortError` | none | (no message) | None. A track interrupted by the next track is not an error. |
+| `AbortError` | paused for a current aborted attempt; obsolete completion ignored | (no error message) | A deliberate interruption is not a provider/codec failure. |
 | Anything else | `error` | Playback stopped | The browser's message is shown under "Technical detail". |
 
 Two cases are not browser errors:

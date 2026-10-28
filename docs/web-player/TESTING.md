@@ -23,23 +23,29 @@ Run from the repository root unless noted.
 The counts printed by these commands are the source of truth. The docs gate
 reads the number of `test(` declarations in `app-web/tests/*.test.mjs` and fails
 if a document states a different number for the browser suite. At the time of
-writing that number is **165** (`app-web/tests/`, fifteen files including the
-helpers folder).
+writing that number is **259**, including controlled Node boot/controller
+integration. The test-file inventory is separate from helper files.
 
 ## 2. The browser-app suite
 
-`app-web/tests/` holds the tests for the pure modules and the rendered markup:
+`app-web/tests/` holds pure-module, rendered-markup and controlled Node
+boot/controller integration tests (not real browser interaction):
 
 | File | Its own stated purpose (from the file's header comment) |
 |---|---|
 | `actions.test.mjs` | Every control does something, and every handler can be reached. |
 | `api.test.mjs` | The catalogue seam. |
 | `demo.test.mjs` | The sample catalogue. |
-| `dom.test.mjs` | The markup contract. |
+| `dom.test.mjs` | Markup escaping and idempotent delegated/optional listener cleanup. |
 | `format.test.mjs` | Presentation helpers. |
 | `legal.test.mjs` | The legal renderer. |
 | `library.test.mjs` | Likes, playlists, history, settings and the storage handle. |
 | `player.test.mjs` | The queue and the transport. |
+| `player-ui.test.mjs` | Full-player structural keys/progress contracts. |
+| `request-cancellation.test.mjs` | Per-caller API cancellation and shared failover ownership. |
+| `navigation-requests.test.mjs` | Actual boot/router/handlers, disposal, cached-page protocol, queued callbacks and independent owners with controlled document/fetch/audio doubles. |
+| `pwa.test.mjs` | Page-owned observer/prompt/registration cleanup, not actual worker/installation acceptance. |
+| `service-worker.test.mjs` | VM-isolated shell-cache failure and activation contracts. |
 | `router.test.mjs` | Routes, and that every route survives a round trip. |
 | `shell.test.mjs` | The shipping contract: one app, one stylesheet set, one offline shell. |
 | `shortcuts.test.mjs` | The keyboard map, and a refusal to take keys from someone typing. |
@@ -50,7 +56,22 @@ helpers folder).
 The file headers are the authors' statement of purpose. The assertions themselves
 are the authority; read the file before relying on a specific behaviour.
 
-`app-web/tests/helpers/` holds shared fixtures.
+`app-web/tests/helpers/` holds shared fixtures. `boot-fixture.mjs` calls the real
+`boot({win, doc})` with private storage and controlled fetch captured during
+construction; globals are restored immediately. Delegated handlers use minimal
+document doubles. Coverage includes query/filter/hash changes, retirement, Home
+batching, Retry/Refresh, artist fan-out and independent player resolution. This
+is request/state integration, not DOM layout, focus, accessibility, worker
+activation, real media or provider acceptance. Existing API cancellation tests
+are retained unchanged. Disposal cases cover pending multi-step artist/import/
+registration/prompt work, queued toast/route callbacks, listener counts across
+repeated navigation/remount, cached-page suspension/resumption, independent
+shared failover and player lifetimes. No search debounce exists or is invented;
+expected cancellation must remain silent and the Node runner rejects unhandled
+rejections. Full component disposal is distinct from ordinary rerender/visibility
+changes. PWA cleanup never uninstalls the persistent worker or clears caches. Disposable mutants verify that
+stale-badge and finalizer regressions catch missing guards without changing the
+real implementation.
 
 ## 3. The Python checks that cover the web build
 
@@ -128,3 +149,34 @@ history, searches and snapshots must clear while settings and shell cache remain
 This is local/CI rendering and handler evidence, not live catalogue playback,
 third-party deletion, native hardware acceptance or legal approval. Exact local
 execution/results: [audit 06](../research/06-multi-source-claims-audit.md).
+
+
+### Runtime storage and media regressions — 2026-10-28
+
+The dependency-free app suite also runs `player-ui.test.mjs` (stable structural
+keys and loading-control labels) and `service-worker.test.mjs` (VM-isolated cache
+HTTP/quota/refusal/activation contracts). The unit suite includes late transport
+completions, shuffled deletion/hydration, storage getter/read/write/retry/import
+failures, media-session cleanup and cancellation during JSON reads.
+
+The existing browser CHECKS list now includes **storage failures** and
+**synthetic media transport**. A disposable context supplies explicit test-only
+metadata and generated 30-second PCM through `website/tests/runtime-fixtures.mjs`.
+This verifies real HTMLMediaElement decoding/controls, five-second keyboard seek,
+shuffle removal, stable FullPlayer controls and history staying erased on progress.
+It is **not a live JioSaavn response, provider permission, audible-output acceptance
+or a new application fallback**. Demo IDs still receive no synthetic successful
+song from that fixture; production sample and HTTP-refusal checks remain intact.
+Four independent site tests validate fixture PCM/range handling and interception
+scope. No CSP, web-security setting or ordinary failure gate is loosened.
+
+Storage tests use disposable synthetic libraries, not personal data. They check
+blocked-property startup, readable data under write refusal, failed destructive
+confirmation/accessibility, recovery, same-file import retry and honest visit-only
+editing. Execution commands are listed above; actual run output, not a test-file count,
+establishes which checks passed in that environment.
+
+The focused Search cases model field replacement in Node and verify draft/caret
+ownership. The existing Chromium harness also runs a controlled delayed-response
+Search draft/caret check. It checks real DOM focus/values, not visibility of a
+phone's software keyboard or actual provider/audio acceptance.

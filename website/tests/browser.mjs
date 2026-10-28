@@ -50,6 +50,8 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { newAppContext } from "./catalogue-fixture.mjs";
+import { installSyntheticPlayback } from "./runtime-fixtures.mjs";
+import { API_SOURCES } from "../../app-web/src/js/api.js";
 
 import {
   anchorLandingProblem,
@@ -2592,6 +2594,244 @@ async function checkWebLegal(browser) {
 // crash is a finding like any other: it is recorded, annotated, and the run
 // continues to the next check, because a broken tab walk must not hide the
 // contrast measurement behind it.
+/** Fault injection uses disposable synthetic data; no real user library. */
+async function checkWebStorageFailures(browser) {
+  const seed = {
+    likes: ["runtime-kept"], history: [], recentSearches: [],
+    playlists: [{ id: "pl-runtime", name: "Runtime playlist", trackIds: ["runtime-kept"], createdAt: 1, updatedAt: 1 }],
+    snapshots: { "runtime-kept": { id: "runtime-kept", title: "Runtime preserved row", artist: "Synthetic fixture", duration: 1, stream: "", image: "" } },
+    settings: { theme: "light", accent: "amber", volume: 0.25, repeat: "off", shuffle: false, sourceId: "" },
+  };
+  const key = "dhun.web.v3";
+  const problems = [];
+  const watch = page => {
+    page.on("pageerror", error => problems.push(`pageerror: ${error.message}`));
+    page.on("console", message => { if (message.type() === "error" && !NETWORK_NOISE.test(message.text())) problems.push(message.text()); });
+    page.on("response", response => { if (response.status() >= 400 && new URL(response.url()).origin === new URL(BASE).origin) problems.push(`HTTP ${response.status()} ${new URL(response.url()).pathname}`); });
+    return page;
+  };
+  const contexts = [];
+  const fresh = async () => {
+    const context = await newAppContext(browser, { viewport: { width: 390, height: 844 } });
+    contexts.push(context); return context;
+  };
+  const prepare = async (context, denyProbe = false) => context.addInitScript(({ key, seed, denyProbe }) => {
+    if (localStorage.getItem(key) === null) localStorage.setItem(key, JSON.stringify(seed));
+    window.__runtimeDenyWrites = denyProbe;
+    const write = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (name, value) {
+      if (window.__runtimeDenyWrites) throw new DOMException("Controlled test storage refusal", "QuotaExceededError");
+      return write.call(this, name, value);
+    };
+  }, { key, seed, denyProbe });
+  const saved = page => page.evaluate(key => JSON.parse(localStorage.getItem(key)), key);
+  try {
+    let context = await fresh();
+    await context.addInitScript(() => Object.defineProperty(window, "localStorage", { get() { throw new DOMException("Controlled storage policy", "SecurityError"); } }));
+    let page = watch(await context.newPage()); const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await page.goto(url("/app/#/settings"));
+    await page.locator('[data-action="clear-library"]').waitFor();
+    if (errors.length) fail("/app/ storage getter", errors.join(" | "));
+    else record("/app/ storage getter", "blocked localStorage property does not crash Settings startup; no persistence is claimed");
+
+    context = await fresh(); await prepare(context, true); page = watch(await context.newPage());
+    await page.goto(url("/app/#/library/likes"));
+    await page.getByText("Runtime preserved row", { exact: true }).first().waitFor();
+    if ((await saved(page)).likes[0] !== "runtime-kept") fail("/app/ read-only storage", "saved fixture was modified");
+    else record("/app/ read-only storage", "denied write probe still loads existing readable likes and does not wipe the saved copy");
+
+    context = await fresh(); await prepare(context); page = watch(await context.newPage());
+    await page.goto(url("/app/#/settings"));
+    await page.locator('[data-action="clear-library"]').waitFor();
+    await page.evaluate(() => { window.__runtimeDenyWrites = true; });
+    await page.locator('[data-action="clear-library"]').click();
+    await page.locator('[data-action="confirm-clear-library"]').click();
+    const alert = page.locator('[role="dialog"] [role="alert"]');
+    await alert.waitFor();
+    const focusInsideFailure = await page.evaluate(() => document.querySelector('[role="dialog"]')?.contains(document.activeElement));
+    if (!focusInsideFailure || !(await page.locator('[data-action="confirm-clear-library"]').isVisible()) || (await saved(page)).likes[0] !== "runtime-kept" || /Library erased\./.test(await page.locator("#dhun-toast").innerText())) {
+      fail("/app/ failed erase", "confirmation/state/saved copy or failure feedback violated the acknowledgement contract");
+    } else record("/app/ failed erase", "quota failure retains the confirmation and saved library, with an announced inline failure instead of success");
+    const axe = await new AxeBuilder({ page }).include('[role="dialog"]').analyze();
+    const severe = axe.violations.filter(item => ["serious", "critical"].includes(item.impact));
+    if (severe.length) fail("/app/ erase failure accessibility", severe.map(item => item.id).join(", "));
+    else record("/app/ erase failure accessibility", "failed destructive confirmation has no serious/critical axe violation");
+    await page.evaluate(() => { window.__runtimeDenyWrites = false; });
+    await page.locator('[data-action="confirm-clear-library"]').click();
+    await page.reload();
+    await page.locator('[data-action="clear-library"]').waitFor();
+    const erased = await saved(page);
+    if (erased.likes.length || erased.playlists.length || Object.keys(erased.snapshots).length || erased.settings.theme !== "light") fail("/app/ erase retry", "same-handle retry failed or changed retained settings");
+    else record("/app/ erase retry", "restoring write permission allows the same confirmation to finish; reload confirms cleared library and retained settings");
+
+    context = await fresh(); await prepare(context); page = watch(await context.newPage());
+    await page.goto(url("/app/#/collection/pl-runtime"));
+    await page.locator('[data-action="delete-playlist"]').waitFor();
+    await page.evaluate(() => { window.__runtimeDenyWrites = true; });
+    await page.locator('[data-action="delete-playlist"]').click();
+    await page.locator('[data-action="confirm-delete-playlist"]').click();
+    await page.locator('[role="dialog"] [role="alert"]').waitFor();
+    if ((await saved(page)).playlists.length !== 1) fail("/app/ playlist delete refusal", "failed delete changed the saved playlist");
+    await page.evaluate(() => { window.__runtimeDenyWrites = false; });
+    await page.locator('[data-action="confirm-delete-playlist"]').click();
+    if ((await saved(page)).playlists.length || (await saved(page)).likes.length !== 1) fail("/app/ playlist delete retry", "retry failed or deleted unrelated likes");
+    else record("/app/ playlist delete retry", "failed deletion retains the playlist/dialog; successful retry removes only that playlist");
+    await page.goto(url("/app/#/settings"));
+    await page.locator('[data-action="import-library"]').waitFor({ state: "attached" });
+    const replacement = { ...seed, app: "DHUN web", version: 3, likes: [], playlists: [], snapshots: {} };
+    const file = { name: "controlled-library.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(replacement)) };
+    await page.evaluate(() => { window.__runtimeDenyWrites = true; });
+    await page.locator('[data-action="import-library"]').setInputFiles(file);
+    await page.waitForFunction(() => document.querySelector("#dhun-toast")?.textContent.includes("Import failed"));
+    if ((await saved(page)).likes[0] !== "runtime-kept") fail("/app/ import refusal", "failed import replaced the old saved library");
+    await page.evaluate(() => { window.__runtimeDenyWrites = false; });
+    await page.locator('[data-action="import-library"]').setInputFiles(file);
+    await page.waitForFunction(() => document.querySelector("#dhun-toast")?.textContent.includes("Library imported"));
+    if ((await saved(page)).likes.length) fail("/app/ import retry", "same-file retry did not persist the replacement");
+    else record("/app/ import retry", "failed import preserves old data, resets the file input and allows the same file to succeed after storage recovers");
+    context = await fresh(); await prepare(context); page = watch(await context.newPage());
+    await page.goto(url("/app/#/library/playlists"));
+    await page.evaluate(() => { window.__runtimeDenyWrites = true; });
+    await page.locator('[data-action="new-playlist"]').first().click();
+    await page.locator('[role="dialog"] input[name="name"]').fill("Visit-only runtime playlist");
+    await page.locator('[role="dialog"] button[type="submit"]').click();
+    await page.waitForFunction(() => document.querySelector("#dhun-toast")?.textContent.includes("not saved to browser storage"));
+    await page.getByText("Visit-only runtime playlist", { exact: true }).waitFor();
+    if ((await saved(page)).playlists.some(playlist => playlist.name === "Visit-only runtime playlist")) fail("/app/ visit-only edits", "fault-injected write unexpectedly reached storage");
+    else record("/app/ visit-only edits", "ordinary edits remain useful in memory but explicitly say they were not saved to browser storage");
+    if (problems.length) fail("/app/ storage runtime errors", problems.join(" | "));
+    else record("/app/ storage runtime errors", "fault-injected real workflows have no unexpected console/page errors or same-origin HTTP failure");
+  } finally {
+    await Promise.all(contexts.map(context => context.close()));
+  }
+}
+
+/** Real HTMLMediaElement decoding of generated PCM, NOT provider/human audio. */
+async function checkWebSyntheticMedia(browser) {
+  const context = await newAppContext(browser, { viewport: { width: 390, height: 844 } });
+  await installSyntheticPlayback(context);
+  await context.addInitScript(() => { Math.random = () => 0; }); // deterministic shuffle only in this disposable test
+  const page = await context.newPage();
+  const problems = [];
+  page.on("pageerror", error => problems.push(`pageerror: ${error.message}`));
+  page.on("console", message => { if (message.type() === "error" && !NETWORK_NOISE.test(message.text())) problems.push(message.text()); });
+  page.on("response", response => { if (response.status() >= 400 && new URL(response.url()).origin === new URL(BASE).origin) problems.push(`HTTP ${response.status()} ${new URL(response.url()).pathname}`); });
+  try {
+    await page.goto(url("/app/#/search?q=controlled"));
+    const row = page.locator('[data-action="play-row"][data-context="search"]').first();
+    await row.waitFor();
+    await row.click();
+    await page.waitForFunction(() => { const audio = document.querySelector("#dhun-audio"); return audio && !audio.paused && audio.readyState >= 2 && audio.duration > 20; });
+    const before = await page.locator("#dhun-dock").innerText();
+    if (!before.includes("Controlled tone A")) fail("/app/ synthetic media startup", "mini-player metadata does not match the controlled decoded item");
+    else record("/app/ synthetic media startup", "generated 30-second PCM decodes after a real click; fixture metadata matches mini-player (not live JioSaavn or audible acceptance)");
+    await page.evaluate(() => { document.querySelector("#dhun-audio").currentTime = 3; });
+    await page.locator("body").press("ArrowRight");
+    const forward = await page.evaluate(() => document.querySelector("#dhun-audio").currentTime);
+    await page.locator("body").press("ArrowLeft");
+    const back = await page.evaluate(() => document.querySelector("#dhun-audio").currentTime);
+    if (forward < 7.5 || forward > 9 || back < 2.5 || back > 4) fail("/app/ keyboard seconds", `expected +5/-5 seconds, observed ${forward.toFixed(2)} / ${back.toFixed(2)}`);
+    else record("/app/ keyboard seconds", `ArrowRight/Left move five seconds, not 5000 (${forward.toFixed(2)} / ${back.toFixed(2)})`);
+    await page.locator('#dhun-dock [data-action="toggle-play"]').click();
+    await page.waitForFunction(() => document.querySelector("#dhun-audio").paused);
+    await page.locator('#dhun-dock [data-action="toggle-play"]').click();
+    await page.waitForFunction(() => !document.querySelector("#dhun-audio").paused);
+    record("/app/ synthetic pause/resume", "real media element pauses/resumes under the existing UI, without claiming a person heard audio");
+    await page.goto(url("/app/#/settings"));
+    await page.locator('[data-action="clear-library"]').click();
+    await page.locator('[data-action="confirm-clear-library"]').click();
+    const from = await page.evaluate(() => document.querySelector("#dhun-audio").currentTime);
+    await page.waitForFunction(from => document.querySelector("#dhun-audio").currentTime > from + 0.4, from);
+    const clearStayed = await page.evaluate(() => JSON.parse(localStorage.getItem("dhun.web.v3")).history.length === 0);
+    if (!clearStayed) fail("/app/ history after erase", "progress ticks recreated just-erased history without a new selection");
+    else record("/app/ history after erase", "active media keeps playing, but progress ticks do not rewrite/recreate erased history");
+    await page.locator('[data-action="open-player"]').first().click();
+    await page.locator(".dhun-full__title").waitFor();
+    const stable = await page.locator(".dhun-full").evaluate(element => new Promise(resolve => setTimeout(() => resolve(element.isConnected), 550)));
+    if (!stable) fail("/app/ stable full-player controls", "ordinary media progress replaced the full-player controls");
+    else record("/app/ stable full-player controls", "the same full-player node survives progress ticks; normal unforced clicks remain usable");
+    if (await page.locator(".dhun-queue__title").count() !== 3) throw new Error("controlled Search must start exactly three queue rows; Home shelves are not a deduplicated queue fixture");
+    await page.locator('.dhun-full [data-action="toggle-shuffle"]').click();
+    await page.locator('.dhun-full [data-action="remove-queue-row"][data-index="2"]').click();
+    await page.locator('.dhun-full [data-action="next-track"]').click();
+    await page.waitForFunction(() => document.querySelector("#dhun-dock")?.textContent.includes("Controlled tone B"));
+    if (!(await page.locator(".dhun-full").innerText()).includes("Controlled tone B")) fail("/app/ shuffled removal", "full/mini-player disagree after removal and Next");
+    else record("/app/ shuffled removal", "three-row controlled queue [0,2,1] loses row 2; Next reaches remaining B with coherent mini/full state");
+    await page.locator('.dhun-full [data-action="remove-queue-row"][data-index="1"]').click();
+    await page.locator('.dhun-full [data-action="remove-queue-row"][data-index="0"]').click();
+    const stopped = await page.evaluate(() => { const audio = document.querySelector("#dhun-audio"); return audio.paused && !audio.getAttribute("src") && (!navigator.mediaSession || (navigator.mediaSession.metadata === null && navigator.mediaSession.playbackState === "none")); });
+    if (!stopped) fail("/app/ remove last playing row", "owned media did not stop/release after the last queue row was removed");
+    else record("/app/ remove last playing row", "removing the last playing row pauses and releases real test media; no empty queue claims playback");
+    if (problems.length) fail("/app/ synthetic runtime errors", problems.join(" | "));
+    else record("/app/ synthetic runtime errors", "controlled decoded-media workflow has no unexpected console/page errors or same-origin HTTP failure");
+  } finally { await context.close(); }
+}
+
+/** Controlled catalogue replies exercise actual DOM focus/drafts, not a phone IME. */
+async function checkWebSearchDraft(browser) {
+  const context = await newAppContext(browser, { viewport: { width: 390, height: 844 }, colorScheme: "dark", serviceWorkers: "block" });
+  const origins = new Set(API_SOURCES.map(source => source.origin));
+  const pending = new Map(); const waiters = new Map(); const handlers = new Set();
+  const problems = [];
+  const next = query => pending.has(query) ? Promise.resolve(pending.get(query)) : new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { waiters.delete(query); reject(new Error(`Search did not issue the controlled query ${query}`)); }, 10000);
+    waiters.set(query, entry => { clearTimeout(timer); resolve(entry); });
+  });
+  await context.route(address => origins.has(address.origin) && address.pathname.startsWith("/api/"), route => {
+    const address = new URL(route.request().url()); const query = address.searchParams.get("query") || "";
+    let release; const gate = new Promise(resolve => { release = resolve; });
+    const entry = { query, release }; pending.set(query, entry); waiters.get(query)?.(entry);
+    const work = (async () => {
+      await gate;
+      const row = { id: `focus-${query}`, name: `Controlled Search ${query}`, duration: 10,
+        artists: { primary: [] }, image: [], downloadUrl: [] };
+      await route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" },
+        body: JSON.stringify({ success: true, data: { results: [row], total: 1 } }) });
+    })();
+    handlers.add(work); return work;
+  });
+  const page = await context.newPage();
+  page.on("pageerror", error => problems.push(error.message));
+  page.on("console", message => { if (message.type() === "error" && !NETWORK_NOISE.test(message.text())) problems.push(message.text()); });
+  page.on("response", response => { if (response.status() >= 400 && new URL(response.url()).origin === new URL(BASE).origin) problems.push(`HTTP ${response.status()} ${new URL(response.url()).pathname}`); });
+  try {
+    await page.goto(url("/app/#/search"), { waitUntil: "load" });
+    const field = page.locator("#search-input");
+    await field.fill("focus-original"); await field.press("Enter");
+    const original = await next("focus-original");
+    const focusedAfterSubmit = await field.evaluate(element => document.activeElement === element);
+    if (!focusedAfterSubmit) throw new Error("explicit Search submission lost the existing continued-typing focus contract");
+    const draft = 'new draft & धुन "quoted"';
+    await field.fill(draft); await field.evaluate(element => element.setSelectionRange(4, 9));
+    original.release();
+    await page.getByText("Controlled Search focus-original", { exact: true }).waitFor();
+    const after = await field.evaluate(element => ({ value: element.value, focused: document.activeElement === element, start: element.selectionStart, end: element.selectionEnd }));
+    if (after.value !== draft || !after.focused || after.start !== 4 || after.end !== 9) {
+      fail("/app/ Search draft", `async results replaced an unsubmitted draft/caret: ${JSON.stringify(after)}`);
+    } else record("/app/ Search draft", "actual Chromium keeps focused unsubmitted text and selection after a controlled async reply; no mobile-IME claim");
+    if (pending.size !== 1) throw new Error("unsubmitted text started an unexpected catalogue request");
+
+    await field.fill("focus-fresh"); await field.press("Enter");
+    const fresh = await next("focus-fresh");
+    const committed = await field.inputValue();
+    fresh.release(); await page.getByText("Controlled Search focus-fresh", { exact: true }).waitFor();
+    if (committed !== "focus-fresh" || await field.inputValue() !== "focus-fresh") fail("/app/ Search new intent", "an old draft overwrote a newly submitted query");
+    else record("/app/ Search new intent", "a new explicit submit owns its query and is not overwritten by the previous draft");
+
+    await field.evaluate(element => element.blur());
+    await page.evaluate(() => { location.hash = "#/search?q=focus-fresh&player=open"; });
+    await page.waitForFunction(() => document.querySelector("#app").dataset.player === "open");
+    if (await field.evaluate(element => document.activeElement === element)) fail("/app/ Search focus ownership", "an unrelated route rerender stole input focus back after blur");
+    else record("/app/ Search focus ownership", "an unrelated rerender does not refocus a field the user left");
+    if (problems.length) fail("/app/ Search unexpected errors", problems.join(" | "));
+  } finally {
+    for (const entry of pending.values()) entry.release();
+    await Promise.allSettled(handlers);
+    await context.close();
+  }
+}
+
 async function guard(name, run) {
   try {
     await run();
@@ -2627,6 +2867,9 @@ const CHECKS = [
   ["/app/ axe", () => checkWebAppAxe(browser)],
   ["/app/ dialog focus", () => checkWebAppDialogs(browser)],
   ["/app/ legal and erase scope", () => checkWebLegal(browser)],
+  ["/app/ storage failures", () => checkWebStorageFailures(browser)],
+  ["/app/ synthetic media transport", () => checkWebSyntheticMedia(browser)],
+  ["/app/ Search draft and caret", () => checkWebSearchDraft(browser)],
   ["screenshots", () => captureScreenshots(browser)],
 ];
 

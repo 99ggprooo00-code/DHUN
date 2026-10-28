@@ -22,6 +22,24 @@ import { html } from "./dom.js";
 import { artwork, errorState, icon, progressBar } from "./components.js";
 import { formatDuration } from "./format.js";
 
+/** Only progress changes can reuse the current controls/queue DOM. */
+export function fullPlayerRenderKey(vm) {
+  const { position, duration, percent, ...content } = vm;
+  return JSON.stringify(content);
+}
+
+export function updateFullPlayerProgress(root, vm) {
+  const seek = root.querySelector('[data-action="seek"]');
+  if (seek) {
+    seek.max = String(Math.max(1, Math.round(vm.duration)));
+    if (root.ownerDocument.activeElement !== seek) seek.value = String(Math.round(vm.position));
+    seek.setAttribute("aria-valuetext", `${formatDuration(vm.position)} of ${formatDuration(vm.duration)}`);
+  }
+  const times = root.querySelectorAll(".dhun-full__times span");
+  if (times[0]) times[0].textContent = formatDuration(vm.position);
+  if (times[1]) times[1].textContent = formatDuration(vm.duration);
+}
+
 export function fullPlayer(vm) {
   if (!vm.track) return html``;
   const track = vm.track;
@@ -73,8 +91,8 @@ export function fullPlayer(vm) {
         <button type="button" class="dhun-icon-button${vm.shuffle ? " is-active" : ""}" data-action="toggle-shuffle"
           aria-pressed="${vm.shuffle ? "true" : "false"}" aria-label="Shuffle">${icon("Shuffle", { size: 22 })}</button>
         <button type="button" class="dhun-icon-button dhun-full__transport" data-action="previous-track" aria-label="Previous track">${icon("SkipPrevious", { size: 30 })}</button>
-        <button type="button" class="dhun-full__play" data-action="toggle-play" aria-label="${vm.playing ? "Pause" : "Play"}">
-          ${icon(vm.playing ? "Pause" : "Play", { size: 34 })}
+        <button type="button" class="dhun-full__play" data-action="toggle-play" aria-label="${vm.status === "loading" ? "Pause loading" : vm.playing ? "Pause" : "Play"}">
+          ${icon(vm.playing || vm.status === "loading" ? "Pause" : "Play", { size: 34 })}
         </button>
         <button type="button" class="dhun-icon-button dhun-full__transport" data-action="next-track" aria-label="Next track">${icon("SkipNext", { size: 30 })}</button>
         <button type="button" class="dhun-icon-button${vm.repeat !== "off" ? " is-active" : ""}" data-action="cycle-repeat"

@@ -17,11 +17,25 @@ and the export file. The code is in `app-web/src/js/library.js`.
 | Read by | `createStorage().load()`, once at boot |
 | Other keys | None. The build does not read keys written by earlier builds. |
 
-At start-up the build probes whether storage accepts a write (`persistent`). If a
-later save is refused (private mode, or storage full), the library stays in
-memory for the rest of the visit and the save is not retried. Settings then says
-the browser is "not saving data … and is lost when the tab closes". Whether every
-browser reports a full store in the same way is not verified.
+At startup, accessing the storage property and probing writes are guarded.
+A failed write probe does **not** discard an existing readable library. Each
+save retries and confirms a write by reading it back; quota/permission recovery
+can therefore work in the same tab. Ordinary failed edits remain useful in
+memory, with a visit-only warning rather than a durable-success claim. An older
+saved copy may still exist; export before closing when persistence is uncertain.
+
+Erase, playlist deletion/removal, recent-search clear and replacement import use
+`save(..., { requirePersistence: true })`: previous in-tab data is published over
+only after storage acknowledges the candidate. Failure retains that data and,
+for confirmations, an inline announced error with retry/cancel. This is a
+single-key browser acknowledgement, not a cross-tab transaction, indefinite
+retention promise or deletion of provider logs. Browser site-data controls clear
+the **origin**, potentially affecting other projects on the same host.
+
+History is recorded once per playback selection, not every progress event.
+Clearing while a track continues does not immediately recreate its history;
+a later selection can create new history. Storage key and export format remain
+**v3**; no existing library is migrated or discarded by this change.
 
 ## 2. Document shape
 
@@ -120,8 +134,9 @@ uploaded.
 2. It must be valid JSON.
 3. Its `app` field must be exactly `DHUN web`. Any other file is refused with the
    reason.
-4. The document is normalised (§5) and **replaces** the library on this device,
-   then is saved.
+4. The document is normalised (§5) and saved with acknowledgement **before**
+   replacing the in-tab library. If saving fails, the old in-tab data remains,
+   an import failure is displayed, and the same file can be selected for retry.
 
 The file's `version` must be `3` (`FORMAT_VERSION`). Any other version, or none, is
 refused with the version named, and the library is not touched. A future format

@@ -66,10 +66,21 @@ export function setHtml(element, markup) {
 /** Delegated listener: one handler per container, not one per row. Rows come
  *  and go on every render; rebinding them each time is how handlers leak. */
 export function delegate(root, eventName, selector, handler) {
-  root.addEventListener(eventName, (event) => {
+  return listen(root, eventName, (event) => {
     const target = event.target instanceof Element ? event.target.closest(selector) : null;
     if (target && root.contains(target)) handler(event, target);
   });
+}
+
+/** Own one listener without requiring newer AbortSignal listener options. */
+export function listen(target, eventName, handler, options) {
+  target?.addEventListener?.(eventName, handler, options);
+  let listening = true;
+  return () => {
+    if (!listening) return;
+    listening = false;
+    target?.removeEventListener?.(eventName, handler, options);
+  };
 }
 
 /**

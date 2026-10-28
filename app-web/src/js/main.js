@@ -18,12 +18,12 @@
  * focus on `<body>`, so the second half of a query could not be typed.
  */
 
-import { html, delegate, focusWithoutScroll } from "./dom.js";
+import { html, delegate, listen, focusWithoutScroll } from "./dom.js";
 import { icon, notice } from "./components.js";
 import * as views from "./views.js";
 import * as components from "./components.js";
 import { appBar, bottomNav, miniError, miniPlayer, navRail } from "./shell.js";
-import { fullPlayer } from "./player-ui.js";
+import { fullPlayer, fullPlayerRenderKey, updateFullPlayerProgress } from "./player-ui.js";
 import { API_ORIGIN, HOME_RAILS, createSource, describeAttempts, describeFailure, SourceError, FAILURE_KIND } from "./api.js";
 import { demoEntity, demoHome, searchDemo } from "./demo.js";
 import {
@@ -75,8 +75,16 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   // not put a second player in a page DHUN does not control.
   if (isFramed(win)) {
     root.innerHTML = html`${views.framedRefusal()}`;
-    return { state: null, player: null, go: () => {} };
+    return { state: null, player: null, go: () => {}, destroy: () => {} };
   }
+  let disposed = false;
+  let suspended = false;
+  let pwa = null;
+  const componentLifetime = new AbortController();
+  const cleanups = new Set();
+  const isActive = () => !disposed && !suspended;
+  const own = (stop) => { cleanups.add(stop); return stop; };
+  const whileActive = (fn) => (...args) => { if (isActive()) return fn(...args); };
   const audio = doc.querySelector("#dhun-audio");
   const storage = createStorage();
   // Which of the catalogue's instances answered last time is remembered, so a
@@ -85,6 +93,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   const source = createSource({
     preferred: storage.load().settings.sourceId ?? "",
     onOriginChange: (origin) => {
+      if (disposed) return;
       state.library = { ...state.library, settings: { ...state.library.settings, sourceId: origin.id } };
       save();
     },
@@ -113,7 +122,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
     audio,
     resolve: async (song) => {
       if (song?.demo) return song; // no stream; the player reports it plainly
-      const fresh = await source.song(song.id);
+      const fresh = await source.song(song.id, { signal: componentLifetime.signal });
       return { ...song, stream: fresh.stream, streamQuality: fresh.streamQuality, image: song.image || fresh.image };
     },
     onError: () => {},
@@ -128,20 +137,47 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   /* ------------------------------------------------------------ helpers -- */
 
   function save() {
-    storage.save(state.library);
+    const saved = storage.save(state.library);
+    state.library = storage.load(); // including the existing snapshot-pruning rule
+    return saved;
+  }
+
+  function showSaveToast(message, saved) {
+    showToast(saved ? message : "Changed for this visit only — not saved to browser storage. Export a backup before closing.", saved ? "info" : "warn");
+  }
+
+  function commitLibrary(next) {
+    if (!storage.save(next, { requirePersistence: true })) {
+      const error = "Not saved. This browser could not confirm the change. Your in-tab library was kept. Allow storage or free space and try again; saved data may still exist. Browser site-data controls can clear the origin separately.";
+      if (state.sheet) {
+        state.sheet = { ...state.sheet, error };
+        renderSheet();
+      }
+      renderView();
+      // Rebuilding a failed confirmation must not strand keyboard focus on body.
+      const dialog = state.sheet ? dialogRoot() : null;
+      if (dialog && !dialog.contains(doc.activeElement)) focusWithoutScroll(focusablesIn(dialog)[0] ?? dialog);
+      showToast("Not saved. The library in this tab was kept; allow storage or free space and retry.", "warn");
+      return false;
+    }
+    state.library = storage.load();
+    return true;
   }
 
   function showToast(message, tone = "info") {
+    if (!isActive()) return;
     state.toast = { message, tone };
     renderToast();
     if (state.toastTimer) win.clearTimeout(state.toastTimer);
     state.toastTimer = win.setTimeout(() => {
+      if (!isActive()) return;
       state.toast = null;
       renderToast();
     }, 3200);
   }
 
   function go(route, { replace = false } = {}) {
+    if (!isActive()) return;
     const href = formatRoute(route);
     if (replace) win.history.replaceState(null, "", href);
     else win.location.hash = href;
@@ -150,6 +186,15 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
 
   function routeFor(name, extra = {}) {
     return { ...state.route, name, id: null, query: "", libTab: null, doc: null, ...extra, player: state.route.player, playerTab: state.route.playerTab };
+  }
+
+  function replaceSearchRoute(query) {
+    const href = formatRoute({ ...state.route, name: "search", query });
+    if (win.location.hash !== href) win.history.replaceState(null, "", href);
+    state.route = parseRoute(href);
+    state.tab = tabFor(state.route, state.tab) ?? state.tab;
+    retireCatalogueRequest("home");
+    retireCatalogueRequest("entity");
   }
 
   /** The link a card points at. One place, so a card cannot point somewhere else. */
@@ -245,20 +290,49 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
 
   /* -------------------------------------------------------------- source -- */
 
+  // Only screen-owned catalogue requests live here. Player resolution is
+  // independent, so navigation never cancels its stream lookup.
+  const catalogueRequests = { home: null, search: null, entity: null };
+
+  function beginCatalogueRequest(kind) {
+    catalogueRequests[kind]?.abort();
+    const controller = new AbortController();
+    catalogueRequests[kind] = controller;
+    return {
+      signal: controller.signal,
+      isCurrent: () => isActive() && catalogueRequests[kind] === controller && !controller.signal.aborted,
+      finish: () => {
+        if (catalogueRequests[kind] === controller) catalogueRequests[kind] = null;
+      },
+    };
+  }
+
+  function retireCatalogueRequest(kind) {
+    const controller = catalogueRequests[kind];
+    catalogueRequests[kind] = null;
+    controller?.abort();
+    if (state[kind].status === "loading") {
+      state[kind] = { ...state[kind], status: "idle", error: null,
+        ...(kind === "home" ? {} : { requestId: state[kind].requestId + 1 }) };
+    }
+  }
+
   /**
    * Run a live request, and fall back to the sample catalogue when the network
    * itself is the problem — not when the API says 404. A missing album is a fact
    * about the catalogue; an unreachable API is a fact about the network, and
    * those deserve different screens.
    */
-  async function withFallback(run, fallback) {
+  async function withFallback(run, fallback, isCurrent = () => true) {
     try {
       const value = await run();
+      if (!isCurrent()) return;
       state.source.mode = "live";
       state.source.error = null;
       state.source.attempts = [];
       return value;
     } catch (error) {
+      if (!isCurrent()) throw error;
       if (error instanceof SourceError && NETWORK_KINDS.has(error.kind)) {
         noteFailure(error);
         return fallback(error);
@@ -268,37 +342,47 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   }
 
   async function loadHome() {
-    state.home = { status: "loading", rails: [], error: null };
-    if (state.route.name === "home") renderView();
-    const settled = await Promise.allSettled(
-      HOME_RAILS.map(async (rail) => ({
-        ...rail,
-        items: await source.search(rail.kind, rail.query, 0),
-      })),
-    );
-    const rails = settled.filter((result) => result.status === "fulfilled" && result.value.items.length > 0).map((result) => result.value);
-    const failures = settled.filter((result) => result.status === "rejected").map((result) => result.reason);
-    if (rails.length) {
-      state.source.mode = "live";
-      state.source.error = null;
-      state.home = { status: "ready", rails, error: null };
-    } else {
-      const error = failures[0] ?? new SourceError(FAILURE_KIND.shape, "every shelf came back empty", { url: API_ORIGIN });
-      // Every row below is fictional, including after HTTP/shape failures.
-      // Always label that fallback; this does not turn an HTTP detail/search
-      // error into a successful response (withFallback keeps that distinction).
-      noteFailure(error);
-      state.home = { status: "sample", rails: demoHome(), error };
+    if (!isActive()) return;
+    const request = beginCatalogueRequest("home");
+    try {
+      state.home = { status: "loading", rails: [], error: null };
+      if (state.route.name === "home") renderView();
+      const settled = await Promise.allSettled(
+        HOME_RAILS.map(async (rail) => ({
+          ...rail,
+          items: await source.search(rail.kind, rail.query, 0, { signal: request.signal }),
+        })),
+      );
+      if (!request.isCurrent()) return;
+      const rails = settled.filter((result) => result.status === "fulfilled" && result.value.items.length > 0).map((result) => result.value);
+      const failures = settled.filter((result) => result.status === "rejected").map((result) => result.reason);
+      if (rails.length) {
+        state.source.mode = "live";
+        state.source.error = null;
+        state.home = { status: "ready", rails, error: null };
+      } else {
+        const error = failures[0] ?? new SourceError(FAILURE_KIND.shape, "every shelf came back empty", { url: API_ORIGIN });
+        // Every row below is fictional, including after HTTP/shape failures.
+        // Always label that fallback; this does not turn an HTTP detail/search
+        // error into a successful response (withFallback keeps that distinction).
+        noteFailure(error);
+        state.home = { status: "sample", rails: demoHome(), error };
+      }
+      if (state.route.name === "home") renderView();
+    } finally {
+      request.finish();
     }
-    if (state.route.name === "home") renderView();
   }
 
   async function runSearch(query, filter = state.search.filter) {
+    if (!isActive()) return;
+    const request = beginCatalogueRequest("search");
     const trimmed = String(query ?? "").trim();
     state.search = { ...state.search, query: trimmed, filter, requestId: state.search.requestId + 1 };
     const requestId = state.search.requestId;
     if (!trimmed) {
       state.search = { ...state.search, status: "idle", results: [], error: null };
+      request.finish();
       renderView();
       return;
     }
@@ -306,20 +390,27 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
     renderView();
     try {
       const results = await withFallback(
-        () => source.search(filter, trimmed, 0),
+        () => source.search(filter, trimmed, 0, { signal: request.signal }),
         () => searchDemo(filter, trimmed),
+        request.isCurrent,
       );
       if (requestId !== state.search.requestId) return;
+      if (!request.isCurrent()) return;
       state.search = { ...state.search, status: "ready", results, error: state.source.mode === "sample" ? state.source.error : null };
     } catch (error) {
       if (requestId !== state.search.requestId) return;
+      if (!request.isCurrent()) return;
       state.search = { ...state.search, status: "error", results: [], error: describeFailure(error) };
+    } finally {
+      request.finish();
     }
     renderView();
   }
 
   async function loadEntity() {
+    if (!isActive()) return;
     const { name, id } = state.route;
+    if (!["album", "artist", "playlist"].includes(name) || !id) retireCatalogueRequest("entity");
     if (!DETAIL_ROUTES.includes(name) || name === "settings" || name === "about") return;
     if (name === "collection") {
       state.entity = { status: "ready", kind: "collection", id, data: null, error: null, requestId: state.entity.requestId + 1 };
@@ -338,6 +429,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       renderView();
       return;
     }
+    const request = beginCatalogueRequest("entity");
     const requestId = state.entity.requestId + 1;
     state.entity = { status: "loading", kind: name, id, data: null, error: null, requestId };
     renderView();
@@ -345,21 +437,26 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       const data = await withFallback(
         () =>
           name === "album"
-            ? source.album(id).then((album) => ({ album }))
+            ? source.album(id, { signal: request.signal }).then((album) => ({ album }))
             : name === "playlist"
-              ? source.playlist(id).then((playlist) => ({ playlist }))
-              : source.artist(id),
+              ? source.playlist(id, { signal: request.signal }).then((playlist) => ({ playlist }))
+              : source.artist(id, { signal: request.signal }),
         () => {
           const demo = demoEntity(name, id);
           if (!demo) throw new SourceError(FAILURE_KIND.http, "not in the sample catalogue", { status: 404, url: id });
           return name === "album" ? { album: demo } : name === "playlist" ? { playlist: demo } : demo;
         },
+        request.isCurrent,
       );
       if (requestId !== state.entity.requestId) return;
+      if (!request.isCurrent()) return;
       state.entity = { status: "ready", kind: name, id, data, error: null, requestId };
     } catch (error) {
       if (requestId !== state.entity.requestId) return;
+      if (!request.isCurrent()) return;
       state.entity = { status: "error", kind: name, id, data: null, error: describeFailure(error), requestId };
+    } finally {
+      request.finish();
     }
     renderView();
     // The heading a lost visitor lands on is also the announcement of the screen.
@@ -387,6 +484,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   }
 
   function renderChrome() {
+    if (!isActive()) return;
     const route = state.route;
     const back = DETAIL_ROUTES.includes(route.name);
     const title =
@@ -448,7 +546,11 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
     root.dataset.hasTrack = currentTrack(player.state) ? "true" : "false";
   }
 
+  // A focused draft belongs to the currently rendered Search intent, not a new submit.
+  let renderedSearchRequestId = null;
+
   function renderView() {
+    if (!isActive()) return;
     const route = state.route;
     const likes = state.library.likes;
     const current = currentTrack(player.state);
@@ -578,6 +680,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
     }
     state.pendingFieldFocus = capturedCaret;
     setRegion("dhun-view", markup);
+    renderedSearchRequestId = route.name === "search" ? state.search.requestId : null;
     updateDocumentTitle();
     renderChrome();
     restoreCaret(capturedCaret);
@@ -587,12 +690,21 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
     renderOverlay();
   }
 
+  let overlayKey = null;
   function renderOverlay() {
+    if (!isActive()) return;
     const open = state.route.player === "open";
     const vm = playerVm();
-    // The overlay is rebuilt on every player tick, so its scroll position has
-    // to survive the rebuild: a queue scrolled to the fifth row used to jump
-    // back to the top four times a second.
+    const key = `${open}:${fullPlayerRenderKey(vm)}`;
+    const existing = doc.querySelector(".dhun-full");
+    if (key === overlayKey && (!open || existing)) {
+      if (existing) updateFullPlayerProgress(existing, vm);
+      return;
+    }
+    overlayKey = key;
+    // Structural changes still render normally. Progress ticks only patch the
+    // scrubber/times: replacing the controls restarted entrance animation and
+    // detached focused/clicked buttons four times a second during real media.
     const previous = doc.querySelector(".dhun-full__inner");
     const scroll = previous?.scrollTop ?? 0;
     const previousTab = root.dataset.playerTab ?? "";
@@ -615,6 +727,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   }
 
   function renderSheet() {
+    if (!isActive()) return;
     const sheet = state.sheet;
     // `null`, not an empty fragment: `sheetLayer` decides whether a scrim is
     // drawn, and a fragment would be truthy even with nothing in it.
@@ -662,7 +775,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       markup = components.sheet({
         title: sheet.title,
         subtitle: sheet.body,
-        body: html`<div class="dhun-menu">
+        body: html`${sheet.error ? html`<div role="alert">${components.notice({ tone: "warn", title: "Change not saved", body: sheet.error })}</div>` : html``}<div class="dhun-menu">
           <button type="button" class="dhun-menu-row dhun-menu-row--danger" data-action="${sheet.action}"${sheet.id ? html` data-id="${sheet.id}"` : html``}>${icon("Delete", { size: 20 })}<span>${sheet.confirmLabel}</span></button>
           <button type="button" class="dhun-menu-row" data-action="close-sheet">${icon("Close", { size: 20 })}<span>Cancel</span></button>
         </div>`,
@@ -689,7 +802,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       markup = components.sheet({
         title: "Erase this browser's library?",
         subtitle: "Likes, playlists, history, searches and snapshots are deleted. Settings and the offline shell cache remain. This cannot be undone.",
-        body: html`<div class="dhun-menu">
+        body: html`${sheet.error ? html`<div role="alert">${components.notice({ tone: "warn", title: "Library not erased", body: sheet.error })}</div>` : html``}<div class="dhun-menu">
           <button type="button" class="dhun-menu-row dhun-menu-row--danger" data-action="confirm-clear-library">${icon("Delete", { size: 20 })}<span>Erase my library</span></button>
           <button type="button" class="dhun-menu-row" data-action="close-sheet">${icon("Close", { size: 20 })}<span>Cancel</span></button>
         </div>`,
@@ -700,6 +813,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   }
 
   function renderToast() {
+    if (!isActive()) return;
     setRegion("dhun-toast", state.toast ? components.toast({ message: state.toast.message, tone: state.toast.tone }) : html``);
   }
 
@@ -709,13 +823,19 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
     const active = doc.activeElement;
     if (!active || !["INPUT", "TEXTAREA"].includes(active.tagName)) return null;
     if (!active.id) return null;
-    return { id: active.id, start: active.selectionStart, end: active.selectionEnd };
+    const sameSearchIntent = active.id === "search-input" && state.route.name === "search"
+      && renderedSearchRequestId === state.search.requestId;
+    return { id: active.id, start: active.selectionStart, end: active.selectionEnd,
+      ...(sameSearchIntent ? { value: active.value } : {}) };
   }
 
   function restoreCaret(captured) {
     if (!captured) return;
     const field = doc.getElementById(captured.id);
-    if (!field || field === doc.activeElement) {
+    if (!field) return;
+    // Assign a value, never HTML; unsubmitted text must not be sent or persisted.
+    if (typeof captured.value === "string") field.value = captured.value;
+    if (field === doc.activeElement) {
       if (field === doc.activeElement && captured.start !== null) setCaret(field, captured);
       return;
     }
@@ -840,18 +960,27 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   /* --------------------------------------------------------------- routes -- */
 
   function onRoute() {
+    if (!isActive()) return;
     const previous = state.route;
     const route = parseRoute(win.location.hash);
     state.route = route;
     state.tab = tabFor(route, state.tab) ?? state.tab;
     if (route.player !== "open") closeOverlayOnly();
 
-    if (route.name === "home" && state.home.status !== "ready" && state.home.status !== "sample") loadHome();
+    if (route.name !== "home") retireCatalogueRequest("home");
+    if (route.name !== "search") retireCatalogueRequest("search");
+    if (!["album", "artist", "playlist"].includes(route.name) || !route.id) retireCatalogueRequest("entity");
+
+    if (route.name === "home" && state.home.status === "idle") loadHome();
     if (route.name === "search") {
-      state.search = { ...state.search, query: route.query, status: route.query ? state.search.status : "idle", results: route.query ? state.search.results : [] };
-      if (route.query && route.query !== state.search.query) runSearch(route.query);
+      // Compare before assigning so hash-driven query changes actually load.
+      if (route.query !== state.search.query || (route.query && state.search.status === "idle")) runSearch(route.query);
     }
-    if (DETAIL_ROUTES.includes(route.name)) loadEntity();
+    if (DETAIL_ROUTES.includes(route.name)) {
+      const sameEntity = previous.name === route.name && previous.id === route.id;
+      // Player/tab-only changes retain current work/data; Retry stays explicit.
+      if (!sameEntity || state.entity.status === "idle") loadEntity();
+    }
 
     const changed = ["name", "id", "libTab", "doc"].some((key) => (previous[key] ?? null) !== (route[key] ?? null));
     if (changed && route.name !== "search") {
@@ -928,15 +1057,12 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       if (!query) return;
       state.library = rememberSearch(state.library, query);
       save();
-      const route = { ...state.route, name: "search", query, player: state.route.player, playerTab: state.route.playerTab };
-      if (win.location.hash !== formatRoute(route)) win.history.replaceState(null, "", formatRoute(route));
+      replaceSearchRoute(query);
       runSearch(query);
     },
     "clear-search": () => {
-      state.search = { ...state.search, query: "", status: "idle", results: [] };
-      const route = { ...state.route, name: "search", query: "" };
-      win.history.replaceState(null, "", formatRoute(route));
-      renderView();
+      replaceSearchRoute("");
+      runSearch("");
       focusWithoutScroll(doc.querySelector("#search-input"));
     },
     "set-search-filter": (target) => {
@@ -946,13 +1072,11 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
     },
     "use-recent": (target) => {
       const query = target.dataset.value;
-      const route = { ...state.route, name: "search", query };
-      win.history.replaceState(null, "", formatRoute(route));
+      replaceSearchRoute(query);
       runSearch(query);
     },
     "clear-recent": () => {
-      state.library = { ...state.library, recentSearches: [] };
-      save();
+      if (!commitLibrary({ ...state.library, recentSearches: [] })) return;
       renderView();
     },
 
@@ -1028,8 +1152,8 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       if (!song) return;
       const result = toggleLike(state.library, song);
       state.library = result.library;
-      save();
-      showToast(result.liked ? "Saved to Liked songs." : "Removed from Liked songs.");
+      const saved = save();
+      showSaveToast(result.liked ? "Saved to Liked songs." : "Removed from Liked songs.", saved);
       renderView();
       renderSheet();
       return result;
@@ -1068,8 +1192,8 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
         const song = pressedSong({ dataset: { id: target.dataset.value } });
         if (song) state.library = addToPlaylist(state.library, result.playlist.id, song).library;
       }
-      save();
-      showToast(`Created “${result.playlist.name}”.`);
+      const saved = save();
+      showSaveToast(`Created “${result.playlist.name}”.`, saved);
       closeSheet();
       renderView();
     },
@@ -1085,8 +1209,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       openSheet({ kind: "confirm", title: `Delete “${playlist.name}”?`, body: "The playlist is removed from this browser. The songs themselves are not affected.", confirmLabel: "Delete playlist", action: "confirm-delete-playlist", id: playlist.id });
     },
     "confirm-delete-playlist": (target) => {
-      state.library = deletePlaylist(state.library, target.dataset.id);
-      save();
+      if (!commitLibrary(deletePlaylist(state.library, target.dataset.id))) return;
       closeSheet();
       showToast("Playlist deleted.");
       go(routeFor("library", { libTab: "playlists" }));
@@ -1097,14 +1220,13 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       if (!song) return;
       const result = addToPlaylist(state.library, playlistId, song);
       state.library = result.library;
-      save();
-      showToast(result.added ? "Added to the playlist." : "Already in that playlist.");
+      const saved = save();
+      showSaveToast(result.added ? "Added to the playlist." : "Already in that playlist.", saved);
       closeSheet();
       renderView();
     },
     "remove-from-playlist": (target) => {
-      state.library = removeFromPlaylist(state.library, state.route.id, target.dataset.id);
-      save();
+      if (!commitLibrary(removeFromPlaylist(state.library, state.route.id, target.dataset.id))) return;
       renderView();
     },
     "set-library-tab": (target) => go(routeFor("library", { libTab: target.dataset.value })),
@@ -1139,6 +1261,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
     refresh: () => {
       state.source = { mode: "unknown", error: null, attempts: [] };
       if (state.route.name === "home") loadHome();
+      else if (state.route.name === "search") runSearch(state.search.query);
       else loadEntity();
     },
 
@@ -1157,18 +1280,24 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       const file = target.files?.[0];
       if (!file) return;
       try {
-        state.library = await handleFileImport(file, storage);
+        const imported = await handleFileImport(file, storage);
+        if (disposed) return;
+        state.library = imported;
         applyAppearance();
         renderView();
         showToast("Library imported.");
       } catch (error) {
+        if (disposed) return;
+        renderView();
         showToast(`Import failed: ${error?.message ?? "the file could not be read"}`, "warn");
+      } finally {
+        if (!disposed) target.value = ""; // selecting the same file again must allow a retry
       }
     },
     "clear-library": () => openSheet({ kind: "clear-library" }),
     "confirm-clear-library": () => {
-      state.library = { ...state.library, likes: [], playlists: [], history: [], snapshots: {}, recentSearches: [] };
-      save();
+      const next = { ...state.library, likes: [], playlists: [], history: [], snapshots: {}, recentSearches: [] };
+      if (!commitLibrary(next)) return;
       closeSheet();
       renderView();
       showToast("Library erased.");
@@ -1177,7 +1306,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
 
   /* ------------------------------------------------------------- dispatch -- */
 
-  delegate(root, "click", "[data-action]", (event, target) => {
+  own(delegate(root, "click", "[data-action]", whileActive((event, target) => {
     // A `<form data-action>` names what its *submit* does. The click that a
     // submit button dispatches (and the one Enter dispatches before it) also
     // bubbles to this handler, and `closest` finds the enclosing form — so
@@ -1192,18 +1321,18 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       // Hash links are the router's; let the default happen.
     }
     handler(target, event);
-  });
+  })));
 
   // The file input is change, not click.
-  root.addEventListener("change", (event) => {
+  own(listen(root, "change", whileActive((event) => {
     const input = event.target.closest?.("[data-action='import-library']");
     if (input) actions["import-library"](input);
-  });
+  })));
 
-  delegate(root, "input", "[data-action='seek']", (event, target) => actions.seek(target));
-  delegate(root, "input", "[data-action='set-volume']", (event, target) => actions["set-volume"](target));
+  own(delegate(root, "input", "[data-action='seek']", whileActive((event, target) => actions.seek(target))));
+  own(delegate(root, "input", "[data-action='set-volume']", whileActive((event, target) => actions["set-volume"](target))));
 
-  delegate(root, "submit", "form[data-action]", (event, target) => {
+  own(delegate(root, "submit", "form[data-action]", whileActive((event, target) => {
     const action = target.dataset.action;
     if (action === "search-submit") actions["search-submit"](target, event);
     else if (action === "create-playlist" || action === "rename-playlist") {
@@ -1213,15 +1342,15 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
         const name = target.querySelector("input[name='name']")?.value ?? "";
         const id = target.dataset.id;
         state.library = renamePlaylist(state.library, id, name);
-        save();
+        const saved = save();
         closeSheet();
-        showToast("Playlist renamed.");
+        showSaveToast("Playlist renamed.", saved);
         renderView();
       }
     }
-  });
+  })));
 
-  doc.addEventListener("keydown", (event) => {
+  own(listen(doc, "keydown", whileActive((event) => {
     if (event.key === "Tab" && trapDialogTab(event)) return;
     const match = matchShortcut(event, { inDialog: Boolean(dialogRoot()) });
     if (!match) return;
@@ -1238,10 +1367,10 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
         player.previous();
         break;
       case "seek-forward":
-        player.seekBy(5000);
+        player.seekBy(5);
         break;
       case "seek-back":
-        player.seekBy(-5000);
+        player.seekBy(-5);
         break;
       case "volume-up":
         player.setVolume(Math.min(1, player.state.volume + 0.05));
@@ -1272,13 +1401,16 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       default:
         break;
     }
-  });
+  })));
 
   /* ------------------------------------------------------------- player -- */
 
-  player.subscribe((playerState) => {
+  let recordedPlayback = 0;
+  own(player.subscribe((playerState) => {
+    if (disposed) return;
     const track = currentTrack(playerState);
-    if (track && playerState.status === STATUS.playing) {
+    if (track && playerState.status === STATUS.playing && recordedPlayback !== player.playbackId) {
+      recordedPlayback = player.playbackId;
       state.library = rememberPlay(state.library, track);
       save();
     }
@@ -1291,17 +1423,19 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
         position: playerState.position,
         duration: playerState.duration,
         handlers: {
-          play: () => player.toggle(),
-          pause: () => player.toggle(),
+          play: () => { if (!player.requested) player.toggle(); },
+          pause: () => { if (player.requested) player.toggle(); },
           previous: () => player.previous(),
           next: () => player.next(),
-          seekBackward: () => player.seekBy(-10_000),
-          seekForward: () => player.seekBy(10_000),
+          seekBackward: () => player.seekBy(-10),
+          seekForward: () => player.seekBy(10),
           seekTo: (details) => player.seek(details.seekTime),
         },
       });
+    } else {
+      attachMediaSession({ track: null, status: STATUS.idle });
     }
-  });
+  }));
 
   /* ----------------------------------------------------------- appearance -- */
 
@@ -1312,6 +1446,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   }
 
   function applyAppearance() {
+    if (!isActive()) return;
     doc.documentElement.dataset.dhunTheme = resolvedTheme();
     doc.documentElement.dataset.dhunAccent = settings().accent;
   }
@@ -1321,7 +1456,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       persistent: storage.persistent,
       note: storage.persistent
         ? "Likes, playlists and history are stored in this browser's localStorage. Exporting writes a JSON file you keep; nothing is uploaded."
-        : "This browser is not saving data — private mode, or storage is full. The library works for this visit and is lost when the tab closes.",
+        : "Storage could not confirm saving. Changes may last only for this visit; an older saved library may still exist. Export a backup, allow storage or free space, then retry.",
     };
   }
 
@@ -1385,10 +1520,20 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   applyAppearance();
   state.tab = tabFor(state.route, "HOME") ?? "HOME";
 
-  win.addEventListener("hashchange", onRoute);
-  win.matchMedia?.("(prefers-color-scheme: light)")?.addEventListener?.("change", () => {
+  own(listen(win, "hashchange", whileActive(onRoute)));
+  own(listen(win.matchMedia?.("(prefers-color-scheme: light)"), "change", whileActive(() => {
     if (settings().theme === "system") applyAppearance();
-  });
+  })));
+  own(listen(win, "pagehide", (event) => {
+    if (event.persisted) suspend(); else destroy();
+  }));
+  own(listen(win, "pageshow", () => {
+    if (disposed || !suspended) return;
+    suspended = false;
+    applyAppearance();
+    onRoute();
+    renderToast();
+  }));
 
   // The service worker is what makes the shell open offline. `createPwa`
   // exposes `start()` — it wires the install prompt and connectivity, then
@@ -1396,10 +1541,11 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   // does not exist, so the worker was never registered and the app's offline
   // promise was a file in the build with nothing pointing at it.
   let announcedUpdate = false;
-  const pwa = createPwa({
+  pwa = createPwa({
     win,
     doc,
     onState: (pwaState) => {
+      if (!isActive()) return;
       if (pwaState.updateReady && !announcedUpdate) {
         announcedUpdate = true;
         showToast("A new version is ready. Close this tab and open DHUN again to use it.", "info");
@@ -1407,17 +1553,40 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
     },
   });
   pwa.start();
-  if (state.route.name === "home") loadHome();
+  // Initialization has one catalogue owner, just like subsequent navigation.
   onRoute();
-  if (state.route.name === "search" && state.route.query) runSearch(state.route.query);
   renderChrome();
   renderToast();
 
-  return { state, player, go };
+  function suspend() {
+    if (!isActive()) return;
+    suspended = true;
+    for (const kind of Object.keys(catalogueRequests)) retireCatalogueRequest(kind);
+    if (state.toastTimer) win.clearTimeout(state.toastTimer);
+    state.toastTimer = null;
+    state.toast = null;
+  }
+
+  function destroy() {
+    if (disposed) return;
+    disposed = true;
+    suspended = false;
+    for (const kind of Object.keys(catalogueRequests)) retireCatalogueRequest(kind);
+    componentLifetime.abort();
+    if (state.toastTimer) win.clearTimeout(state.toastTimer);
+    state.toastTimer = null;
+    for (const stop of cleanups) stop();
+    cleanups.clear();
+    pwa?.destroy();
+    player.destroy();
+    attachMediaSession({ track: null, status: STATUS.idle });
+  }
+
+  return { state, player, go, destroy };
 }
 
-/* The app boots itself when the page loads; `tests` import the module for the
- * pure helpers above and never call this. */
+/* Browser startup stays automatic; Node controller tests call boot with
+ * document/window doubles and dispose the returned component explicitly. */
 if (globalThis.document?.querySelector?.("#app")) {
   if (globalThis.document.readyState === "loading") {
     globalThis.document.addEventListener("DOMContentLoaded", () => boot(), { once: true });

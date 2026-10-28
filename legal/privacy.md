@@ -221,6 +221,13 @@ user's local application data folder. **[source]**
 - **Account deletion:** not applicable — there is no {{appTitle}} account.
   **[source]**
 
+**Known native deletion limitation:** current download storage implementations
+can ignore a failed filesystem delete while download rows are removed. Some
+Settings dialogs also close before asynchronous work finishes. Files/data can
+therefore remain after apparent completion; verify the local result. These are
+open engineering defects, not a guarantee of erasure or a claim of legal review.
+**[source] [runtime]**
+
 Clearing your local history removes your local record only. It does not delete
 anything YouTube or Google may hold, and this app cannot ask them to.
 **[source] [legal]**

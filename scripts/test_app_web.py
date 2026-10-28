@@ -646,9 +646,21 @@ class HonestyIsInTheRenderedCopy(unittest.TestCase):
 
     def test_a_browser_that_refuses_storage_is_told_so(self) -> None:
         """A private window must not silently pretend the library was saved."""
-        self.assertIn("not saving data", self.main)
+        self.assertIn("Storage could not confirm saving", self.main)
+        self.assertIn("older saved library may still exist", self.main)
+        self.assertIn("not saved to browser storage", self.main)
         self.assertIn("storage.persistent", self.views)
         self.assertIn("persistent", _read(JS_DIR / "library.js"))
+
+    def test_destructive_library_handlers_require_acknowledgement(self) -> None:
+        """A volatile save must not close a destructive action as succeeded."""
+        for action in ("confirm-clear-library", "confirm-delete-playlist", "remove-from-playlist", "clear-recent"):
+            with self.subTest(action=action):
+                body = self.main.split(f'"{action}":', 1)[1].split("\n    },", 1)[0]
+                self.assertIn("commitLibrary(", body)
+        self.assertIn("requirePersistence: true", self.main)
+        self.assertIn("Change not saved", self.main)
+        self.assertIn("Library not erased", self.main)
 
     def test_nothing_claims_the_android_or_desktop_builds_ship_here(self) -> None:
         for phrase in ("Download the app", "Install the APK", "Get it on Google Play"):
