@@ -28,7 +28,7 @@ to a pretend result, a simulated queue or invented progress.
 
 ```bash
 node tools/serve.mjs 4173     # http://0.0.0.0:4173/ (serves src/)
-npm test                      # 311 tests; no install, no network
+npm test                      # 339 tests; no install, no network
 node tools/build.mjs          # src/ → dist/, then checks every shell entry
 npm run gen:icons             # regenerate js/icons.js from DhunIcons.kt
 ```
@@ -46,7 +46,8 @@ exists.
 | `js/router.js` | Hash routes as data: parse, format, tab, title, the detail set |
 | `js/api.js` | The JioSaavn seam: timeouts, failure kinds, normalisers, the shelves |
 | `js/demo.js` | The labelled sample catalogue — fictional, silent, clearly marked |
-| `js/library.js` | Likes, playlists, history, settings, storage (`dhun.web.v3`) |
+| `js/library.js` | Likes, playlists, history, settings and validation |
+| `js/app-storage.js`, `js/indexeddb-storage.js` | Async application session, transactional IndexedDB and legacy recovery |
 | `js/player.js` | Queue, repeat, shuffle, stream resolution, media session |
 | `js/player-ui.js` | The full player: transport, scrubber, queue and lyrics tabs |
 | `js/shell.js` | App bar, bottom navigation, navigation rail, mini player |
@@ -96,8 +97,7 @@ that a browser tab cannot honour.
   they are neither cached nor offered as a download.
 - **This browser is the account.** Saved library data is local, not every request: no login, no sync, no
   DHUN server copy. Queries/IDs still reach wrapper/CDN operators. Settings can export the library to a file, import it back, and
-  erase the library while keeping settings and shell cache. Browser site-data
-  controls remove those too. A private window that cannot store anything is told exactly that.
+  clear the current library while keeping settings and shell cache. Older recovery and legacy copies may remain; browser site-data controls remove those too, for the whole origin. A private window that cannot store anything is told exactly that.
 - **Nothing is framed.** `frame-ancestors` cannot be sent by a meta tag, so
   `boot()` refuses to start inside a frame and says why.
 
@@ -121,7 +121,7 @@ verification or positive readiness claim is implemented here.
 
 ## Gates
 
-- `npm test` — 311 assertions over modules and Node boot/controller fixtures: routing round trips,
+- `npm test` — 339 assertions over modules and Node boot/controller fixtures: routing round trips,
   escaping, the queue and repeat/shuffle rules, stream resolution, the library's
   return shapes, API normalisation, transfer files, every screen's rendered
   output, CSS class coverage, and the keyboard map against the dispatcher.

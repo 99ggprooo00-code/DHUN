@@ -30,13 +30,13 @@ carries a claim the repository cannot back.
 
 ## The build in one paragraph
 
-A static page — one HTML file, two stylesheets, twenty ES modules, a manifest
+A static page — one HTML file, two stylesheets, ES modules, a manifest
 and a service worker — with **no runtime dependency, no build step that needs an
 install, no DHUN-operated server and no account**. The catalogue is JioSaavn,
 read through unofficial community wrappers at `saavn.dev`, `saavn.sumit.co` and
 `saavnx.vercel.app` with ordinary
 `fetch` from the visitor's own browser. Likes, playlists, history and settings
-are `localStorage`, under one key (`dhun.web.v3`). When the catalogue does not
+are in IndexedDB, with the legacy `dhun.web.v3` localStorage key retained. When the catalogue does not
 answer, the app says so in the network's own words, keeps whatever it has, and
 falls back to a **labelled sample catalogue** whose rows carry no audio.
 
@@ -80,7 +80,7 @@ A rule that nothing checks is a rule that lasts until the next busy session.
 | [TRD.md](TRD.md) | Technical requirements: platform, Content Security Policy, network, storage, service worker, accessibility |
 | [APP-FLOW.md](APP-FLOW.md) | Routes, boot, the flows a visitor follows, failure paths, screen states |
 | [UI-UX-DESIGN.md](UI-UX-DESIGN.md) | The interface that exists: layout, tokens, components, motion, contrast, what the browser checks measure |
-| [DATA-SCHEMA.md](DATA-SCHEMA.md) | The one `localStorage` document, its limits, how it is read back, and the export file |
+| [DATA-SCHEMA.md](DATA-SCHEMA.md) | IndexedDB transactions, legacy migration, recovery, limits and the export file |
 | [PROVIDER-INTEGRATION.md](PROVIDER-INTEGRATION.md) | The catalogue origins, endpoints, failover, failure kinds, the sample catalogue, sources not in the build |
 | [PLAYBACK.md](PLAYBACK.md) | Player statuses, stream choice, queue and repeat and shuffle rules, failures, Media Session |
 | [SECURITY-PRIVACY.md](SECURITY-PRIVACY.md) | What leaves the browser, what is stored, framing, CSP, input handling, open policy questions |

@@ -16,8 +16,8 @@ product changes, and a test before it is called done.
 | Shell, hash router, screens | `app-web/src/js/main.js`, `router.js`, `views.js`, `shell.js` | Seven routes plus player state; see [APP-FLOW.md](APP-FLOW.md). |
 | Catalogue client and failover | `app-web/src/js/api.js` | Three origins, five failure kinds; see [PROVIDER-INTEGRATION.md](PROVIDER-INTEGRATION.md). |
 | Player | `app-web/src/js/player.js`, `player-ui.js` | Queue, repeat, shuffle, failures; see [PLAYBACK.md](PLAYBACK.md). |
-| Library and storage | `app-web/src/js/library.js` | One key; limits; see [DATA-SCHEMA.md](DATA-SCHEMA.md). |
-| Export and import | `app-web/src/js/transfer.js`, `library.js` | 8 MB cap, `app` marker. |
+| Library and storage | `app-web/src/js/library.js` | IndexedDB transactions and legacy migration; limits; see [DATA-SCHEMA.md](DATA-SCHEMA.md). |
+| Export and import | `app-web/src/js/transfer.js`, `library.js` | 24 MiB UTF-8 cap and pre-parse complexity limits, `app` marker. |
 | Shortcuts | `app-web/src/js/shortcuts.js` | Thirteen keys, one table; see [USER-GUIDE.md](USER-GUIDE.md) for the list a visitor sees. |
 | Offline shell and install | `app-web/src/sw.js`, `pwa.js`, `manifest.webmanifest` | Shell only. |
 | Legal texts | `app-web/src/js/data/web-legal.js`, `legal.js` | About, privacy, terms, licences, support. |

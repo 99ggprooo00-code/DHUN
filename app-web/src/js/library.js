@@ -1,12 +1,13 @@
+import { checkBackupText } from "./backup-policy.js";
+
 /**
  * Everything the browser keeps, and nothing it does not.
  *
  * THE MODEL. There is no account and no DHUN server, so "your library" is this
  * browser's storage: likes, playlists you made, what you played, and the handful
- * of settings the app remembers. `localStorage` is used because the whole
- * library is small — a track snapshot is a few hundred bytes and the cap below
- * is deliberately generous rather than clever. A service-worker cache is not a
- * database and IndexedDB would be a second failure mode for a first feature.
+ * of settings the app remembers. Production uses revision-checked IndexedDB;
+ * the legacy localStorage adapter below is retained only for compatibility and
+ * unit tests. A service-worker cache is not a library database.
  *
  * THE SNAPSHOT RULE. Likes and history store the *row the visitor saw*, not only
  * an id. A saved id that can only be drawn by asking the network is a library
@@ -14,10 +15,9 @@
  * snapshot is the fallback. Playlists store ids and look rows up in that same
  * snapshot table, which is why a playlist survives a reload with no connection.
  *
- * PRIVATE MODE. Some browsers throw on `localStorage.setItem` (quota) and some
- * expose a storage that forgets immediately (private windows). Both are handled
- * by keeping the state in memory and reporting `persistent: false`, which the
- * Settings screen shows instead of promising a save that did not happen.
+ * STORAGE FAILURE. Startup requires recovery if data cannot be read safely.
+ * Later transaction failures guard further writes and report visit-only edits;
+ * browser quota, eviction and private-window behavior remain platform-dependent.
  */
 
 export const STORAGE_KEY = "dhun.web.v3";
@@ -285,6 +285,7 @@ function assertLosslessJSONNumbers(text) {
  * JSON.parse alone silently keeps the last occurrence. The iterative scan runs
  * only after syntax validation and does not recurse on an untrusted document. */
 export function parseImportJSON(text) {
+  checkBackupText(text);
   let parsed;
   try { parsed = JSON.parse(text); } catch { throw new Error("the file is not JSON"); }
   assertLosslessJSONNumbers(text);
@@ -516,7 +517,8 @@ export function historySongs(library) {
 /* ---------------------------------------------------------------- storage -- */
 
 /**
- * A storage handle with an in-memory mirror.
+ * Legacy synchronous storage handle retained for compatibility and tests.
+ * Production boot uses openAppStorage and the IndexedDB adapter instead.
  *
  * `persistent` is the honest answer to "did that save?". A private window can
  * accept a `setItem` and forget it, so the flag is set by a write-then-read
@@ -525,11 +527,15 @@ export function historySongs(library) {
 export function createStorage(backing, key = STORAGE_KEY) {
   // Accessing the property itself can throw under browser storage policies.
   // A failed write probe is not a reason to discard still-readable saved data.
+  let accessDenied = false;
   if (backing === undefined) {
-    try { backing = globalThis.localStorage; } catch { backing = null; }
+    try { backing = globalThis.localStorage; } catch { backing = null; accessDenied = true; }
   }
   let memory = null;
   let persistent = false;
+  let observed = null;
+  let observedKnown = false;
+  let importGuard = accessDenied ? "unreadable" : null;
 
   function probe() {
     if (!backing) return false;
@@ -549,24 +555,72 @@ export function createStorage(backing, key = STORAGE_KEY) {
     get persistent() {
       return persistent;
     },
+    get importGuard() {
+      return importGuard;
+    },
     load() {
       if (memory) return memory;
+      let raw;
       try {
-        memory = normaliseLibrary(JSON.parse(backing?.getItem(key) ?? "null"));
+        raw = backing?.getItem(key) ?? null;
       } catch {
+        if (backing) { importGuard = "unreadable"; persistent = false; }
+        memory = emptyLibrary();
+        return memory;
+      }
+      try {
+        if (raw === null) {
+          memory = emptyLibrary();
+        } else {
+          // The legacy reader is intentionally permissive. Before allowing it
+          // to save, prove that normalization preserves all supplied values.
+          // This also detects duplicate keys and unsafe numeric JSON tokens.
+          const parsed = parseImportJSON(raw);
+          const candidate = normaliseLibrary(parsed);
+          try {
+            if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) ||
+                Object.hasOwn(parsed, "app") || Object.hasOwn(parsed, "version") || Object.hasOwn(parsed, "exportedAt")) {
+              throw new Error("unrecognized stored library");
+            }
+            memory = validateImport({ ...parsed, app: "DHUN web", version: FORMAT_VERSION });
+          } catch {
+            // Show whatever can be recovered for this visit, but never persist
+            // this potentially incomplete view over the original legacy bytes.
+            memory = candidate;
+            importGuard = "corrupt";
+            persistent = false;
+          }
+        }
+        if (backing) { observed = raw; observedKnown = true; }
+      } catch {
+        // Never write an empty recovery fallback over unreadable saved bytes.
+        if (backing) { importGuard = "corrupt"; persistent = false; }
         memory = emptyLibrary();
       }
       return memory;
     },
     save(library, { requirePersistence = false } = {}) {
       const kept = pruneSnapshots(library);
+      // Capture a baseline before a first save, even if load() was not called.
+      if (!memory) this.load();
       // Ordinary edits may remain useful for this visit. Destructive actions
       // and replacement imports publish new memory only after acknowledgement.
       if (!requirePersistence) memory = kept;
+      // Detect a stale tab before *any* library write, not just imports. This
+      // is best-effort only: localStorage has no atomic compare-and-swap.
+      if (!importGuard && backing && observedKnown) {
+        try {
+          if (backing.getItem(key) !== observed) importGuard = "conflict";
+        } catch {
+          importGuard = "unreadable";
+        }
+      }
+      if (importGuard) { persistent = false; return false; }
       try {
         const serialized = JSON.stringify(kept);
         backing?.setItem(key, serialized);
         persistent = Boolean(backing) && backing.getItem(key) === serialized;
+        if (persistent) { observed = serialized; observedKnown = true; }
       } catch {
         persistent = false;
       }
@@ -580,12 +634,60 @@ export function createStorage(backing, key = STORAGE_KEY) {
       return JSON.stringify({ app: "DHUN web", version: FORMAT_VERSION, exportedAt: new Date().toISOString(), ...library }, null, 2);
     },
     importAll(text) {
+      // Establish startup recovery and its guard even if the caller has not
+      // loaded the handle yet. Never import over damaged legacy bytes.
+      this.load();
+      if (importGuard) {
+        const unsafeToExport = importGuard === "corrupt" || importGuard === "unreadable";
+        throw new Error(unsafeToExport
+          ? "Saved data could not be read safely; this tab will not write again. Do not delete browser data or the original backup; seek recovery help."
+          : "The saved library needs review; this tab will not write again. Export the in-tab library and keep the original backup, then open a fresh tab to review saved data.");
+      }
       const parsed = parseImportJSON(text);
       const library = validateImport(parsed);
-      if (!this.save(library, { requirePersistence: true })) {
-        throw new Error("This browser could not confirm saving the imported library. Previous in-tab data was kept, but the saved copy may have changed. Export a backup before closing; allow storage or free space, then try again.");
+      // Remember the copy this tab last observed; reject an already stale tab
+      // before replacement. localStorage has no compare-and-swap, so another
+      // tab can still write between this check and setItem.
+      let previous;
+      try {
+        if (!backing || !observedKnown) throw new Error("storage unavailable");
+        previous = backing.getItem(key);
+      } catch {
+        throw new Error("This browser could not read the current saved library, so nothing was written. Allow storage and try again; keep your backup file.");
       }
-      return library;
+      if (previous !== observed) {
+        importGuard = "conflict";
+        persistent = false;
+        throw new Error("The saved library changed since this tab loaded; nothing was written. This tab will not write again. Export this tab's library and keep your backup, then open a fresh tab to review saved data.");
+      }
+      // Complete serialization before the first write.
+      const kept = pruneSnapshots(library);
+      const serialized = JSON.stringify(kept);
+      const unconfirmed = () => {
+        importGuard = "unconfirmed";
+        persistent = false;
+        const error = new Error("The saved library may have changed, but the import could not be confirmed (storage may be full or unavailable). This tab will not write again. Export the in-tab library, keep the original backup, and open a fresh tab to review saved data.");
+        error.code = "IMPORT_UNCERTAIN";
+        return error;
+      };
+      try {
+        backing.setItem(key, serialized);
+      } catch {
+        // A broken adapter can mutate then throw or return a stale read. Do not
+        // infer that durable data is unchanged or allow this tab to retry writes.
+        throw unconfirmed();
+      }
+      let confirmed;
+      try { confirmed = backing.getItem(key) === serialized; }
+      catch { throw unconfirmed(); }
+      if (!confirmed) throw unconfirmed();
+      persistent = true;
+      observed = serialized; observedKnown = true;
+      memory = kept;
+      return kept;
     },
   };
 }
+
+// Production transactional adapter and explicit recovery inspection.
+export { createIndexedDBStorage, inspectIndexedDBRecovery, acknowledgeLegacyDivergence, restoreMissingCurrent, restoreCorruptCurrent } from "./indexeddb-storage.js";

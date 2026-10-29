@@ -31,9 +31,11 @@ is uploaded as a library to DHUN; searches/IDs/media requests still go to third 
   the file somewhere safe.
 - **Import** a file you exported earlier (Settings → This browser → Import
   library). This replaces the library in this browser.
-- **Erase** the library (Settings → This browser → Erase library). This removes likes, playlists and history, and keeps your settings.
-  Settings and shell cache remain; clear this origin's site data to remove those too.
-  It cannot be undone. Export first if you may want it back.
+- **Erase** the current library (Settings → This browser → Erase library). This
+  clears likes, playlists and history from the current library, but settings,
+  shell cache, legacy data and previous recovery copies may remain. This is not
+  secure deletion. Browser site-data controls clear the entire origin, including
+  settings and other projects. Export anything you need before clearing data.
 
 Each browser keeps its own library. A library exported on one device can be
 imported on another.

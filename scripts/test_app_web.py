@@ -315,7 +315,7 @@ class IsARealWebAppNotAPreview(unittest.TestCase):
         self.assertIn("views.framedRefusal()", self.main_js)
         self.assertIn("export function framedRefusal(", views_js)
         guard = self.main_js.index("isFramed(win)")
-        for later in ("createStorage(", "createSource(", "root.innerHTML = html`${views.framedRefusal()}"):
+        for later in ("openAppStorage(", "createSource(", "root.innerHTML = html`${views.framedRefusal()}"):
             self.assertLess(
                 guard,
                 self.main_js.index(later),
@@ -657,7 +657,8 @@ class HonestyIsInTheRenderedCopy(unittest.TestCase):
         for action in ("confirm-clear-library", "confirm-delete-playlist", "remove-from-playlist", "clear-recent"):
             with self.subTest(action=action):
                 body = self.main.split(f'"{action}":', 1)[1].split("\n    },", 1)[0]
-                self.assertIn("commitLibrary(", body)
+                self.assertIn("afterCommit(", body)
+        self.assertIn("commitLibrary(next)", self.main)
         self.assertIn("requirePersistence: true", self.main)
         self.assertIn("Change not saved", self.main)
         self.assertIn("Library not erased", self.main)

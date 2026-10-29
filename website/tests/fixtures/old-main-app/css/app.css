@@ -1,0 +1,2641 @@
+/**
+ * DHUN web — the interface.
+ *
+ * The look is the application's, rebuilt for a browser: dark-first, artwork-led,
+ * translucent glass over the page, one accent ramp per theme, and the type scale
+ * mirrored in `tokens.css`. Nothing here invents a colour or a spacing value —
+ * every measurement is a token, and the only literals in this file are rem/em
+ * sizes, percentages and two breakpoints that CSS cannot read from a variable.
+ *
+ * The file is ordered the way a screen is drawn: page, shell, screens, parts,
+ * overlays, states, then the two media queries (wide layout, motion) and the
+ * accessibility overrides at the end.
+ */
+
+/* ------------------------------------------------------------------ page -- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  color: var(--dhun-text);
+  background-color: var(--dhun-background);
+  font: var(--dhun-text-body-medium);
+  font-family: var(--dhun-font-sans);
+  letter-spacing: var(--dhun-tracking-body-medium);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+/* The ambient wash: the accent's container tinted into the page's corners, so
+   the glass has something to be translucent *over*. It is a gradient, not an
+   image, and it costs one paint. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 45% at 12% -10%, var(--dhun-accent-container), transparent 70%),
+    radial-gradient(45% 40% at 100% 0%, color-mix(in srgb, var(--dhun-accent) 22%, transparent), transparent 72%),
+    radial-gradient(70% 60% at 50% 110%, color-mix(in srgb, var(--dhun-accent) 10%, transparent), transparent 70%);
+  opacity: 0.55;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+}
+
+:where(a, button, input, select, [tabindex]):focus-visible {
+  outline: var(--dhun-focus-ring-width) solid var(--dhun-accent);
+  outline-offset: var(--dhun-focus-ring-offset);
+  border-radius: var(--dhun-shape-small);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--dhun-accent) 35%, transparent);
+}
+
+/*
+ * A heading is focused on every screen change so a screen reader announces the
+ * new screen — and it is not a control. The global `:focus-visible` ring drew a
+ * purple box around "Make it yours" on load, which reads as a text field left in
+ * edit mode. The focus stays; the ring does not. Headings are not in the tab
+ * order (`tabindex="-1"` only), so no keyboard-operable target loses its
+ * indicator.
+ */
+h1:focus-visible,
+h2:focus-visible,
+h3:focus-visible {
+  outline: none;
+}
+
+.dhun-visually-hidden {
+  position: absolute;
+  width: var(--dhun-stroke-hairline);
+  height: var(--dhun-stroke-hairline);
+  padding: 0;
+  margin: calc(var(--dhun-stroke-hairline) * -1);
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.dhun-skip-link {
+  position: fixed;
+  top: var(--dhun-space-sm);
+  left: var(--dhun-space-sm);
+  z-index: 60;
+  transform: translateY(-200%);
+  padding: var(--dhun-space-sm) var(--dhun-space-lg);
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-accent);
+  color: var(--dhun-on-accent);
+  font: var(--dhun-text-label-large);
+  text-decoration: none;
+}
+
+.dhun-skip-link:focus {
+  transform: none;
+}
+
+/* ----------------------------------------------------------------- shell -- */
+
+.dhun-app {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  /* `minmax(0, …)`, not `1fr`: a grid item's automatic minimum is its content,
+     and a horizontally scrolling rail's content is wider than a phone. With
+     `1fr` the whole app grew to the rail's width and the page scrolled
+     sideways — measured at 720 CSS px in a 390 px window. */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "bar"
+    "main";
+  padding-bottom: var(--dhun-space-content-bottom-inset);
+}
+
+.dhun-topbar {
+  grid-area: bar;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+.dhun-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--dhun-space-md);
+  min-height: var(--dhun-space-navigation-bar-content);
+  padding: var(--dhun-space-sm) var(--dhun-space-screen-padding);
+  background: var(--dhun-glass-bar-top);
+  border-bottom: var(--dhun-space-border) solid var(--dhun-border);
+}
+
+.dhun-bar__left {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-sm);
+  min-width: 0;
+}
+
+.dhun-bar__mark {
+  display: grid;
+  place-items: center;
+  width: var(--dhun-space-icon-size-lg);
+  height: var(--dhun-space-icon-size-lg);
+  color: var(--dhun-accent);
+}
+
+.dhun-bar__titles {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/*
+ * Secondary ink, not tertiary.
+ *
+ * Both of these are 11px/600 on a translucent glass surface, and the light
+ * palette's 55%-ink tertiary measures 3.95:1 there — under the 4.5:1 floor for
+ * text this small. The palette mirrors the Android build's tokens and should
+ * keep doing so; what changes is which rung of the ladder this chrome uses.
+ */
+.dhun-bar__overline {
+  font: var(--dhun-text-label-small);
+  letter-spacing: var(--dhun-tracking-label-small);
+  text-transform: uppercase;
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-bar__title {
+  font: var(--dhun-text-title-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dhun-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-xs);
+}
+
+.dhun-main {
+  grid-area: main;
+  width: 100%;
+  min-width: 0;
+  max-width: var(--dhun-pane-master-max);
+  margin-inline: auto;
+  padding: var(--dhun-space-xl) var(--dhun-space-screen-padding) var(--dhun-space-xxxl);
+}
+
+.dhun-view,
+.dhun-screen {
+  display: block;
+  min-width: 0;
+}
+
+.dhun-rail-region {
+  display: none;
+}
+
+.dhun-nav-region {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 32;
+}
+
+.dhun-dock {
+  position: fixed;
+  inset-inline: var(--dhun-space-sm);
+  bottom: calc(var(--dhun-space-bottom-nav-height) - var(--dhun-space-sm));
+  z-index: 31;
+}
+
+/* ----------------------------------------------------------- glass layer --
+
+   The blur lives on a pseudo-element, not on the element.
+
+   `backdrop-filter` on a container that holds text applies to that container's
+   own content in some renderers — measured here in a software-rendered
+   Chromium, where every sentence inside a glass card came out blurred while the
+   headings beside it stayed sharp. The fix is the technique the effect was
+   always meant to be: a positioned layer that paints the blur, with the content
+   composited above it. A card's readability must not depend on a GPU path.
+   ------------------------------------------------------------------------- */
+
+.dhun-bar,
+.dhun-card,
+.dhun-notice,
+.dhun-settings,
+.dhun-search,
+.dhun-sheet,
+.dhun-mini,
+.dhun-tabs-nav {
+  position: relative;
+  isolation: isolate;
+}
+
+.dhun-bar::before,
+.dhun-card::before,
+.dhun-notice::before,
+.dhun-settings::before,
+.dhun-search::before,
+.dhun-sheet::before,
+.dhun-mini::before,
+.dhun-tabs-nav::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--dhun-glass-sheen);
+  backdrop-filter: blur(var(--dhun-blur-glass)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--dhun-blur-glass)) saturate(150%);
+  pointer-events: none;
+}
+
+.dhun-sheet::before {
+  backdrop-filter: blur(var(--dhun-blur-sheet)) saturate(170%);
+  -webkit-backdrop-filter: blur(var(--dhun-blur-sheet)) saturate(170%);
+}
+
+.dhun-mini::before {
+  backdrop-filter: blur(var(--dhun-blur-mini)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--dhun-blur-mini)) saturate(160%);
+}
+
+@media (forced-colors: active) {
+  .dhun-bar::before,
+  .dhun-card::before,
+  .dhun-notice::before,
+  .dhun-settings::before,
+  .dhun-search::before,
+  .dhun-sheet::before,
+  .dhun-mini::before,
+  .dhun-tabs-nav::before {
+    display: none;
+  }
+}
+
+/* --------------------------------------------------------------- artwork -- */
+
+.dhun-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: var(--dhun-surface-variant);
+  border-radius: inherit;
+}
+
+.dhun-art--blank {
+  display: grid;
+  place-items: center;
+  background:
+    linear-gradient(140deg, color-mix(in srgb, var(--dhun-accent) 40%, var(--dhun-surface-elevated)), var(--dhun-surface-variant) 60%),
+    var(--dhun-surface-variant);
+}
+
+.dhun-art__initial {
+  font: var(--dhun-text-headline-large);
+  color: color-mix(in srgb, var(--dhun-text) 70%, transparent);
+  text-transform: uppercase;
+}
+
+/* ---------------------------------------------------------------- texture -- */
+
+.dhun-card,
+.dhun-row,
+.dhun-hero,
+.dhun-settings,
+.dhun-rail,
+.dhun-search,
+.dhun-sheet,
+.dhun-mini,
+.dhun-tabs-nav,
+.dhun-rail-nav {
+  --dhun-glass-edge-current: var(--dhun-border);
+}
+
+/* ----------------------------------------------------------------- cards -- */
+
+.dhun-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-md);
+  padding: var(--dhun-space-md);
+  background: var(--dhun-glass);
+  border: var(--dhun-space-border) solid var(--dhun-border);
+  border-radius: var(--dhun-shape-card-large);
+  text-decoration: none;
+  transition: background var(--dhun-motion-fast) var(--dhun-motion-easing),
+    transform var(--dhun-motion-fast) var(--dhun-motion-easing),
+    border-color var(--dhun-motion-fast) var(--dhun-motion-easing);
+}
+
+.dhun-card:hover {
+  background: var(--dhun-glass-strong);
+  border-color: var(--dhun-border-strong);
+  transform: translateY(var(--dhun-lift-hover));
+}
+
+.dhun-card:active {
+  transform: translateY(0) scale(0.995);
+}
+
+/* An artist has no square sleeve. The card carries its kind in `data-kind`, so
+   the shape is chosen from data rather than from a class the app has to build
+   and the stylesheet has to guess. */
+.dhun-card[data-kind="artist"] .dhun-card__art {
+  border-radius: var(--dhun-shape-full);
+}
+
+.dhun-card__art {
+  position: relative;
+  display: block;
+  aspect-ratio: 1;
+  border-radius: var(--dhun-shape-artwork);
+  overflow: hidden;
+  box-shadow: 0 var(--dhun-space-sm) var(--dhun-space-xxl) color-mix(in srgb, var(--dhun-scrim) 60%, transparent);
+}
+
+.dhun-card__play {
+  position: absolute;
+  right: var(--dhun-space-sm);
+  bottom: var(--dhun-space-sm);
+  display: grid;
+  place-items: center;
+  width: var(--dhun-space-compact-target);
+  height: var(--dhun-space-compact-target);
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-accent);
+  color: var(--dhun-on-accent);
+  box-shadow: 0 var(--dhun-space-xs) var(--dhun-space-lg) color-mix(in srgb, var(--dhun-scrim-strong) 70%, transparent);
+  opacity: 0;
+  transform: translateY(var(--dhun-space-xs));
+  transition: opacity var(--dhun-motion-fast) var(--dhun-motion-easing),
+    transform var(--dhun-motion-fast) var(--dhun-motion-easing);
+}
+
+.dhun-card:hover .dhun-card__play,
+.dhun-card:focus-visible .dhun-card__play {
+  opacity: 1;
+  transform: none;
+}
+
+.dhun-card__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-xs);
+  min-width: 0;
+}
+
+.dhun-card__title {
+  font: var(--dhun-text-title-small);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dhun-card__sub {
+  font: var(--dhun-text-body-small);
+  color: var(--dhun-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dhun-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--dhun-grid-card-min), 1fr));
+  gap: var(--dhun-space-md);
+}
+
+/* ----------------------------------------------------------------- rails -- */
+
+.dhun-rail {
+  margin-top: var(--dhun-space-section-spacing);
+}
+
+.dhun-rail__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--dhun-space-md);
+  margin-bottom: var(--dhun-space-md);
+}
+
+.dhun-rail__title {
+  margin: 0;
+  font: var(--dhun-text-title-large);
+}
+
+.dhun-rail__more {
+  font: var(--dhun-text-label-medium);
+  color: var(--dhun-text-secondary);
+  text-decoration: none;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+.dhun-rail__more:hover {
+  color: var(--dhun-accent);
+}
+
+.dhun-rail__track {
+  display: grid;
+  min-width: 0;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(var(--dhun-space-artwork-card), 42%);
+  gap: var(--dhun-space-md);
+  overflow-x: auto;
+  padding-bottom: var(--dhun-space-sm);
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+}
+
+.dhun-rail__item {
+  scroll-snap-align: start;
+}
+
+.dhun-rail__empty {
+  color: var(--dhun-text-secondary);
+  font: var(--dhun-text-body-small);
+}
+
+/* ------------------------------------------------------------------ home -- */
+
+.dhun-home-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--dhun-space-sm) var(--dhun-space-md);
+  margin-bottom: var(--dhun-space-xl);
+}
+
+.dhun-home-head > div {
+  min-width: 0;
+}
+
+.dhun-home-head__kicker {
+  margin: 0 0 var(--dhun-space-xs);
+  font: var(--dhun-text-label-large);
+  letter-spacing: var(--dhun-tracking-label-large);
+  text-transform: uppercase;
+  color: var(--dhun-accent);
+}
+
+.dhun-home-head__title {
+  margin: 0;
+  font: var(--dhun-text-headline-medium);
+  letter-spacing: var(--dhun-tracking-display-large);
+  text-wrap: balance;
+}
+
+/* ------------------------------------------------------------------ hero -- */
+
+.dhun-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--dhun-shape-card-large);
+  border: var(--dhun-space-border) solid var(--dhun-border);
+  background: var(--dhun-glass);
+  isolation: isolate;
+}
+
+.dhun-hero__backdrop {
+  position: absolute;
+  inset: -20%;
+  z-index: 0;
+  background-position: center;
+  background-size: cover;
+  filter: blur(var(--dhun-blur-ambient)) saturate(160%);
+  transform: scale(1.1);
+}
+
+.dhun-hero__veil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(180deg, var(--dhun-hero-veil-top) 0%, var(--dhun-hero-veil-mid) 22%, var(--dhun-hero-veil-bottom) 62%, var(--dhun-glass-strong) 100%);
+}
+
+.dhun-hero__inner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  gap: var(--dhun-space-lg);
+  /* Centred, not bottom-aligned: with the cover taller than the text the text
+     used to hang at the card's bottom edge, leaving the top-right empty. */
+  align-items: center;
+  padding: var(--dhun-space-lg);
+}
+
+/*
+ * On a phone the hero stacks.
+ *
+ * Side by side, a 140px cover left the title a column about 170px wide: an
+ * album name broke over three lines, "5 songs" over two, and the two actions
+ * sat one above the other in a corner. Stacked, the cover keeps a square
+ * above the title and everything else has the card's full width. The row
+ * returns at 600px, where there is room for it.
+ */
+/* The feature hero sits at the top of Home on a phone, where a 200px cover
+   beside the title leaves the title 130px wide. The cover steps down and the
+   text keeps the room; the full size returns as soon as there is width for it. */
+.dhun-hero--feature .dhun-hero__art {
+  width: var(--dhun-grid-card-min);
+  height: var(--dhun-grid-card-min);
+  border-radius: var(--dhun-shape-artwork);
+}
+
+.dhun-hero--feature .dhun-hero__title {
+  font: var(--dhun-text-title-medium);
+}
+
+/* The two hero actions stay on one line and share the column they have, rather
+   than each demanding its padding and running off the card. */
+.dhun-hero--feature .dhun-hero__actions {
+  gap: var(--dhun-space-xs);
+}
+
+.dhun-hero--feature .dhun-button {
+  padding-inline: var(--dhun-space-lg);
+  min-height: var(--dhun-space-compact-target);
+}
+
+@media (max-width: 380px) {
+  .dhun-hero--feature .dhun-hero__inner {
+    gap: var(--dhun-space-md);
+    padding: var(--dhun-space-md);
+  }
+}
+
+@media (min-width: 600px) {
+  .dhun-hero__inner {
+    padding: var(--dhun-space-xl);
+  }
+
+  .dhun-hero__title {
+    font: var(--dhun-text-hero);
+  }
+
+  .dhun-hero--feature .dhun-hero__art {
+    width: var(--dhun-space-artwork-large);
+    height: var(--dhun-space-artwork-large);
+  }
+}
+
+@media (max-width: 599px) {
+  .dhun-hero__inner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--dhun-space-md);
+  }
+
+  /* The art keeps a square above the text. It has to come after the base
+     sizes above: a media query adds no specificity, and an earlier rule would
+     simply lose to the later `.dhun-hero--feature .dhun-hero__art`. */
+  .dhun-hero__art,
+  .dhun-hero--feature .dhun-hero__art {
+    width: min(52%, var(--dhun-space-artwork-playlist));
+    height: auto;
+    aspect-ratio: 1;
+  }
+
+  .dhun-hero--feature .dhun-hero__title {
+    font: var(--dhun-text-headline-small);
+  }
+}
+
+
+.dhun-hero__art {
+  flex: none;
+  width: var(--dhun-space-artwork-playlist);
+  height: var(--dhun-space-artwork-playlist);
+  border-radius: var(--dhun-shape-artwork-hero);
+  box-shadow: 0 var(--dhun-space-lg) var(--dhun-space-huge) color-mix(in srgb, var(--dhun-scrim-strong) 55%, transparent);
+}
+
+.dhun-hero--round .dhun-hero__art {
+  border-radius: var(--dhun-shape-full);
+}
+
+.dhun-hero__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-xs);
+  min-width: 0;
+}
+
+.dhun-hero__kicker {
+  margin: 0;
+  font: var(--dhun-text-label-medium);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: var(--dhun-tracking-label-medium);
+  text-transform: uppercase;
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-hero__title {
+  margin: 0;
+  font: var(--dhun-text-headline-small);
+  letter-spacing: var(--dhun-tracking-display-large);
+  text-wrap: balance;
+}
+
+.dhun-hero__meta {
+  margin: 0;
+  font: var(--dhun-text-body-medium);
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-hero__description {
+  margin: 0;
+  max-width: 52ch;
+  font: var(--dhun-text-body-small);
+  color: var(--dhun-text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.dhun-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--dhun-space-sm);
+  margin-top: var(--dhun-space-sm);
+}
+
+/* --------------------------------------------------------------- buttons -- */
+
+.dhun-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--dhun-space-sm);
+  min-height: var(--dhun-space-touch-target);
+  padding: 0 var(--dhun-space-xl);
+  border: var(--dhun-space-border) solid transparent;
+  border-radius: var(--dhun-shape-button);
+  background: none;
+  font: var(--dhun-text-label-large);
+  text-decoration: none;
+  transition: background var(--dhun-motion-fast) var(--dhun-motion-easing),
+    transform var(--dhun-motion-fast) var(--dhun-motion-easing);
+}
+
+.dhun-button:active {
+  transform: scale(0.97);
+}
+
+.dhun-button--filled {
+  background: var(--dhun-accent);
+  color: var(--dhun-on-accent);
+}
+
+.dhun-button--filled:hover {
+  background: color-mix(in srgb, var(--dhun-accent) 88%, var(--dhun-text));
+}
+
+.dhun-button--tonal {
+  background: var(--dhun-accent-container);
+  color: var(--dhun-on-accent-container);
+}
+
+.dhun-button--outlined {
+  border-color: var(--dhun-border-strong);
+  color: var(--dhun-text);
+}
+
+.dhun-button--glass {
+  background: var(--dhun-glass-strong);
+  border-color: var(--dhun-border);
+  color: var(--dhun-text);
+  backdrop-filter: blur(var(--dhun-blur-control));
+  -webkit-backdrop-filter: blur(var(--dhun-blur-control));
+}
+
+.dhun-button--play {
+  padding-inline: var(--dhun-space-xxl) var(--dhun-space-xxl);
+}
+
+.dhun-icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: var(--dhun-space-touch-target);
+  height: var(--dhun-space-touch-target);
+  padding: 0;
+  border: 0;
+  border-radius: var(--dhun-shape-full);
+  background: none;
+  color: var(--dhun-text-secondary);
+  transition: color var(--dhun-motion-fast) var(--dhun-motion-easing),
+    background var(--dhun-motion-fast) var(--dhun-motion-easing);
+}
+
+.dhun-icon-button:hover {
+  color: var(--dhun-text);
+  background: var(--dhun-overlay-hover);
+}
+
+.dhun-icon-button.is-active,
+.dhun-icon-button.is-liked {
+  color: var(--dhun-accent);
+}
+
+.dhun-text-button {
+  padding: var(--dhun-space-xs) 0;
+  border: 0;
+  background: none;
+  color: var(--dhun-text-secondary);
+  font: var(--dhun-text-label-large);
+  text-decoration: underline;
+  text-underline-offset: var(--dhun-underline-offset);
+}
+
+.dhun-text-button:hover {
+  color: var(--dhun-text);
+}
+
+.dhun-text-button--danger {
+  color: var(--dhun-error);
+}
+
+/* ----------------------------------------------------------------- chips -- */
+
+.dhun-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dhun-space-sm);
+}
+
+.dhun-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--dhun-space-xs-plus);
+  min-height: var(--dhun-space-compact-target);
+  padding: 0 var(--dhun-space-lg);
+  border: var(--dhun-space-border) solid var(--dhun-border);
+  border-radius: var(--dhun-shape-chip);
+  background: var(--dhun-glass);
+  color: var(--dhun-text-secondary);
+  font: var(--dhun-text-label-medium);
+  letter-spacing: var(--dhun-tracking-label-medium);
+  text-decoration: none;
+  transition: background var(--dhun-motion-fast) var(--dhun-motion-easing),
+    color var(--dhun-motion-fast) var(--dhun-motion-easing),
+    border-color var(--dhun-motion-fast) var(--dhun-motion-easing);
+}
+
+.dhun-chip:hover {
+  color: var(--dhun-text);
+  border-color: var(--dhun-border-strong);
+}
+
+.dhun-chip.is-active {
+  background: var(--dhun-accent);
+  border-color: var(--dhun-accent);
+  color: var(--dhun-on-accent);
+}
+
+.dhun-chip__count {
+  font: var(--dhun-text-label-small);
+  opacity: 0.75;
+}
+
+/* ------------------------------------------------------------------ rows -- */
+
+.dhun-list {
+  list-style: none;
+  margin: var(--dhun-space-md) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-xs);
+}
+
+.dhun-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--dhun-space-xs);
+  border-radius: var(--dhun-shape-large);
+  background: transparent;
+  transition: background var(--dhun-motion-fast) var(--dhun-motion-easing);
+}
+
+.dhun-row:hover {
+  background: var(--dhun-overlay-hover);
+}
+
+.dhun-row.is-current {
+  background: color-mix(in srgb, var(--dhun-accent) 12%, transparent);
+}
+
+.dhun-row__main {
+  display: grid;
+  grid-template-columns: var(--dhun-space-artwork-thumb) 1fr auto;
+  align-items: center;
+  gap: var(--dhun-space-md);
+  width: 100%;
+  min-height: var(--dhun-space-list-row-height);
+  padding: var(--dhun-space-sm);
+  border: 0;
+  border-radius: var(--dhun-shape-large);
+  background: none;
+  text-align: left;
+}
+
+.dhun-row__art {
+  position: relative;
+  width: var(--dhun-space-artwork-thumb);
+  height: var(--dhun-space-artwork-thumb);
+  border-radius: var(--dhun-shape-medium);
+  overflow: hidden;
+}
+
+.dhun-row__veil {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--dhun-scrim-strong) 55%, transparent);
+  color: var(--dhun-text);
+  opacity: 0;
+  transition: opacity var(--dhun-motion-fast) var(--dhun-motion-easing);
+}
+
+.dhun-row:hover .dhun-row__veil,
+.dhun-row__main:focus-visible .dhun-row__veil {
+  opacity: 1;
+}
+
+.dhun-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-bars-gap);
+  min-width: 0;
+}
+
+.dhun-row__title {
+  font: var(--dhun-text-track-title);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dhun-row.is-current .dhun-row__title {
+  color: var(--dhun-accent);
+}
+
+.dhun-row__sub {
+  font: var(--dhun-text-body-small);
+  color: var(--dhun-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dhun-row__duration {
+  font: var(--dhun-text-compact);
+  color: var(--dhun-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.dhun-row__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-zero);
+}
+
+.dhun-row__actions .dhun-icon-button {
+  width: var(--dhun-space-compact-target);
+  height: var(--dhun-space-compact-target);
+}
+
+.dhun-row__bars,
+.dhun-mini__bars {
+  position: absolute;
+  inset-inline: 0;
+  bottom: var(--dhun-space-xs-plus);
+  display: flex;
+  justify-content: center;
+  gap: var(--dhun-bars-gap);
+}
+
+.dhun-row__bars i,
+.dhun-mini__bars i {
+  display: block;
+  width: var(--dhun-bars-width);
+  height: var(--dhun-space-md);
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-accent);
+  box-shadow: 0 0 var(--dhun-bars-glow) var(--dhun-accent);
+  animation: dhun-bars 900ms infinite ease-in-out;
+}
+
+.dhun-row__bars i:nth-child(2),
+.dhun-mini__bars i:nth-child(2) {
+  animation-delay: 150ms;
+}
+
+.dhun-row__bars i:nth-child(3),
+.dhun-mini__bars i:nth-child(3) {
+  animation-delay: 300ms;
+}
+
+@keyframes dhun-bars {
+  0%, 100% { transform: scaleY(0.5); }
+  50% { transform: scaleY(1.15); }
+}
+
+.dhun-list__empty {
+  color: var(--dhun-text-secondary);
+  font: var(--dhun-text-body-small);
+}
+
+/* ------------------------------------------------------------------ grid -- */
+
+.dhun-page-head {
+  margin-bottom: var(--dhun-space-xl);
+}
+
+.dhun-page-head__overline {
+  margin: 0 0 var(--dhun-space-xs);
+  font: var(--dhun-text-label-large);
+  letter-spacing: var(--dhun-tracking-label-large);
+  text-transform: uppercase;
+  color: var(--dhun-accent);
+}
+
+.dhun-page-head__title {
+  margin: 0;
+  font: var(--dhun-text-headline-medium);
+  letter-spacing: var(--dhun-tracking-display-large);
+}
+
+.dhun-page-head__meta {
+  margin: var(--dhun-space-xs) 0 0;
+  font: var(--dhun-text-body-small);
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-section {
+  margin-top: var(--dhun-space-section-spacing);
+}
+
+.dhun-section__title {
+  margin: 0;
+  font: var(--dhun-text-title-large);
+}
+
+/* ---------------------------------------------------------------- search -- */
+
+.dhun-search {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-sm);
+  padding: var(--dhun-space-xs) var(--dhun-space-xs) var(--dhun-space-xs) var(--dhun-space-lg);
+  border-radius: var(--dhun-shape-button);
+  border: var(--dhun-space-border) solid var(--dhun-border);
+  background: var(--dhun-glass-strong);
+}
+
+.dhun-search__icon {
+  display: grid;
+  place-items: center;
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-search__input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--dhun-space-compact-target);
+  border: 0;
+  background: none;
+  font: var(--dhun-text-body-large);
+  color: var(--dhun-text);
+}
+
+.dhun-search__input::placeholder {
+  color: var(--dhun-text-tertiary);
+}
+
+.dhun-search__input:focus {
+  outline: none;
+}
+
+.dhun-search:focus-within {
+  border-color: var(--dhun-accent);
+}
+
+.dhun-search__go {
+  min-height: var(--dhun-space-compact-target);
+  padding: 0 var(--dhun-space-xl);
+  border: 0;
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-accent);
+  color: var(--dhun-on-accent);
+  font: var(--dhun-text-label-large);
+}
+
+.dhun-search + .dhun-chips {
+  margin-top: var(--dhun-space-md);
+}
+
+.dhun-recent {
+  margin-top: var(--dhun-space-section-spacing);
+}
+
+/* ------------------------------------------------------------------ tabs -- */
+
+.dhun-tabs {
+  display: flex;
+  gap: var(--dhun-space-xs);
+  padding: var(--dhun-space-xs);
+  border-radius: var(--dhun-shape-button);
+  background: var(--dhun-glass);
+  border: var(--dhun-space-border) solid var(--dhun-border);
+  width: 100%;
+}
+
+/* Three tabs on a 360px phone: they share the width rather than scrolling one
+   label off the edge. `width: fit-content` + overflow turned "Recently played"
+   into a label nobody could read without a sideways drag. */
+.dhun-tab {
+  flex: 1;
+  justify-content: center;
+  padding-inline: var(--dhun-space-sm);
+  min-width: 0;
+  font: var(--dhun-text-label-medium);
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
+  gap: var(--dhun-space-xs);
+}
+
+.dhun-tab__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--dhun-space-lg);
+  padding-inline: var(--dhun-space-xs);
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-overlay-pressed);
+  font: var(--dhun-text-label-small);
+}
+
+.dhun-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--dhun-space-xs);
+  min-height: var(--dhun-space-compact-target);
+  /* `nowrap` here re-broke the rule above: "Recently played" cannot fit a third
+     of a 390px strip, so the label ran past the right edge and the strip's end
+     was clipped by the screen. Labels wrap; the strip stays inside the page. */
+  padding: 0 var(--dhun-space-sm);
+  border: 0;
+  border-radius: var(--dhun-shape-full);
+  background: none;
+  color: var(--dhun-text-secondary);
+  font: var(--dhun-text-label-large);
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.dhun-tab.is-active {
+  background: var(--dhun-accent);
+  color: var(--dhun-on-accent);
+}
+
+.dhun-panel {
+  margin-top: var(--dhun-space-lg);
+}
+
+.dhun-library-tools {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--dhun-space-lg);
+}
+
+.dhun-collection-tools {
+  display: flex;
+  gap: var(--dhun-space-lg);
+  justify-content: flex-end;
+  margin-top: var(--dhun-space-lg);
+}
+
+/* The catalogue's instances, listed on Settings: host on the left, what it
+   answered on the right. A plain list, because the point is the record. */
+.dhun-source-list {
+  list-style: none;
+  margin: var(--dhun-space-sm) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--dhun-space-xs);
+}
+
+.dhun-source-list__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--dhun-space-md);
+  padding: var(--dhun-space-xs) var(--dhun-space-sm);
+  border-radius: var(--dhun-shape-small);
+  background: var(--dhun-overlay-pressed);
+  font: var(--dhun-text-label-medium);
+}
+
+.dhun-source-list__host {
+  font-family: var(--dhun-font-mono, var(--dhun-font-sans));
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-source-list__state {
+  /* Light theme tertiary lands at 3.72:1 at 12px/600; the state has to be readable. */
+  color: var(--dhun-text-secondary);
+  text-align: right;
+}
+
+/* -------------------------------------------------------------- settings -- */
+
+.dhun-settings {
+  margin-top: var(--dhun-space-xl);
+  padding: var(--dhun-space-lg);
+  border-radius: var(--dhun-shape-card-large);
+  border: var(--dhun-space-border) solid var(--dhun-border);
+  background: var(--dhun-glass);
+}
+
+.dhun-settings__title {
+  margin: 0 0 var(--dhun-space-md);
+  font: var(--dhun-text-title-medium);
+}
+
+.dhun-setting {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-sm);
+  padding-block: var(--dhun-space-sm);
+}
+
+.dhun-setting--stack {
+  gap: var(--dhun-space-xs);
+}
+
+.dhun-setting__label {
+  font: var(--dhun-text-label-large);
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-setting__note {
+  margin: 0;
+  font: var(--dhun-text-body-small);
+  color: var(--dhun-text-secondary);
+  max-width: 60ch;
+}
+
+.dhun-setting__note--mono {
+  font-family: var(--dhun-font-mono);
+  font-size: 0.8em;
+  color: var(--dhun-text);
+}
+
+.dhun-setting__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dhun-space-sm);
+  margin-block: var(--dhun-space-sm);
+}
+
+.dhun-setting-row {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-md);
+  width: 100%;
+  min-height: var(--dhun-space-touch-target);
+  padding: var(--dhun-space-xs) 0;
+  border: 0;
+  border-bottom: var(--dhun-space-border) solid var(--dhun-border);
+  background: none;
+  color: var(--dhun-text);
+  font: var(--dhun-text-body-medium);
+  text-align: left;
+  text-decoration: none;
+}
+
+.dhun-setting-row:last-of-type {
+  border-bottom: 0;
+}
+
+.dhun-settings__version {
+  margin: var(--dhun-space-md) 0 0;
+  font: var(--dhun-text-body-small);
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-file {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.dhun-file input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.dhun-range {
+  width: 100%;
+  accent-color: var(--dhun-accent);
+  min-height: var(--dhun-space-compact-target);
+  background: transparent;
+}
+
+.dhun-form {
+  display: flex;
+  gap: var(--dhun-space-sm);
+  margin-top: var(--dhun-space-md);
+}
+
+.dhun-input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--dhun-space-touch-target);
+  padding: 0 var(--dhun-space-lg);
+  border-radius: var(--dhun-shape-medium);
+  border: var(--dhun-space-border) solid var(--dhun-border-strong);
+  background: var(--dhun-surface-variant);
+  color: var(--dhun-text);
+  font: var(--dhun-text-body-large);
+}
+
+.dhun-input:focus {
+  border-color: var(--dhun-accent);
+}
+
+/* ----------------------------------------------------------------- about -- */
+
+.dhun-about-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dhun-space-sm);
+  margin-bottom: var(--dhun-space-lg);
+}
+
+.dhun-prose {
+  max-width: var(--dhun-space-legal-content-max);
+  font: var(--dhun-text-body-relaxed);
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-prose h2,
+.dhun-prose h3,
+.dhun-prose h4 {
+  color: var(--dhun-text);
+  margin: var(--dhun-space-xl) 0 var(--dhun-space-sm);
+  font: var(--dhun-text-title-medium);
+}
+
+.dhun-prose h2 {
+  font: var(--dhun-text-title-large);
+}
+
+.dhun-prose p {
+  margin: 0 0 var(--dhun-space-md);
+}
+
+.dhun-prose a {
+  color: var(--dhun-accent);
+}
+
+.dhun-prose .is-strong {
+  color: var(--dhun-text);
+  font-weight: 600;
+}
+
+.dhun-prose .is-code,
+.dhun-prose code {
+  font-family: var(--dhun-font-mono);
+  font-size: 0.88em;
+}
+
+.dhun-prose pre {
+  overflow-x: auto;
+  padding: var(--dhun-space-md);
+  border-radius: var(--dhun-shape-medium);
+  background: var(--dhun-surface-variant);
+}
+
+.dhun-prose blockquote {
+  margin: 0 0 var(--dhun-space-md);
+  padding-left: var(--dhun-space-md);
+  border-left: var(--dhun-stroke-thick) solid var(--dhun-accent);
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-prose__list {
+  margin: 0 0 var(--dhun-space-md);
+  padding-left: var(--dhun-space-xl);
+}
+
+.dhun-prose__list li[data-indent="1"] {
+  margin-left: var(--dhun-space-lg);
+}
+
+.dhun-prose__record {
+  display: grid;
+  grid-template-columns: minmax(0, 12ch) 1fr;
+  gap: var(--dhun-space-xs) var(--dhun-space-md);
+  margin: 0 0 var(--dhun-space-md);
+  padding: var(--dhun-space-md);
+  border-radius: var(--dhun-shape-medium);
+  background: var(--dhun-surface-variant);
+}
+
+/* `textTertiary` in the light theme measures 3.84:1 — under AA for 11px text,
+   the same finding the earlier contrast round fixed on five other roles.
+   Small copy uses
+   `textSecondary` (7.53:1) in both themes instead of relying on a token that is
+   only adequate for large text. */
+.dhun-prose__record dt {
+  color: var(--dhun-text-secondary);
+  font: var(--dhun-text-label-small);
+  text-transform: uppercase;
+  letter-spacing: var(--dhun-tracking-label-small);
+}
+
+.dhun-prose__record dd {
+  margin: 0;
+  color: var(--dhun-text);
+}
+
+/* ----------------------------------------------------------------- states -- */
+
+.dhun-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--dhun-space-sm);
+  margin-top: var(--dhun-space-xxxl);
+  padding: var(--dhun-space-xxl);
+  text-align: center;
+  border-radius: var(--dhun-shape-card-large);
+  border: var(--dhun-space-border) solid var(--dhun-border);
+  background: var(--dhun-glass);
+}
+
+.dhun-state__icon {
+  display: grid;
+  place-items: center;
+  width: var(--dhun-space-huge);
+  height: var(--dhun-space-huge);
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-accent-container);
+  color: var(--dhun-on-accent-container);
+}
+
+.dhun-state__title {
+  margin: 0;
+  font: var(--dhun-text-title-medium);
+}
+
+.dhun-state__body {
+  margin: 0;
+  max-width: 46ch;
+  font: var(--dhun-text-body-small);
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-state__detail {
+  margin: 0;
+  max-width: 100%;
+  padding: var(--dhun-space-sm) var(--dhun-space-md);
+  border-radius: var(--dhun-shape-medium);
+  background: var(--dhun-surface-variant);
+  color: var(--dhun-text-secondary);
+  font-family: var(--dhun-font-mono);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.dhun-state__detail-label {
+  color: var(--dhun-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: var(--dhun-tracking-label-small);
+}
+
+.dhun-state__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dhun-space-sm);
+  justify-content: center;
+}
+
+.dhun-state--error .dhun-state__icon {
+  background: var(--dhun-error-container);
+  color: var(--dhun-error);
+}
+
+.dhun-state--loading {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.dhun-spinner {
+  width: var(--dhun-space-xxl);
+  height: var(--dhun-space-xxl);
+  border-radius: var(--dhun-shape-full);
+  border: var(--dhun-stroke-thin) solid var(--dhun-border-strong);
+  border-top-color: var(--dhun-accent);
+  animation: dhun-spin 800ms linear infinite;
+}
+
+@keyframes dhun-spin {
+  to { transform: rotate(360deg); }
+}
+
+.dhun-skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-sm);
+  width: 100%;
+  margin-top: var(--dhun-space-lg);
+}
+
+.dhun-skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-md);
+}
+
+.dhun-skeleton {
+  display: block;
+  border-radius: var(--dhun-shape-medium);
+  background: linear-gradient(90deg, var(--dhun-shimmer-base), var(--dhun-shimmer-highlight), var(--dhun-shimmer-base));
+  background-size: 200% 100%;
+  animation: dhun-shimmer 1400ms infinite linear;
+}
+
+.dhun-skeleton--art {
+  width: var(--dhun-space-artwork-thumb);
+  height: var(--dhun-space-artwork-thumb);
+}
+
+.dhun-skeleton--text {
+  flex: 1;
+  height: var(--dhun-space-md);
+}
+
+@keyframes dhun-shimmer {
+  to { background-position: -200% 0; }
+}
+
+/* -------------------------------------------------------------- notices -- */
+
+.dhun-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--dhun-space-md);
+  margin-top: var(--dhun-space-lg);
+  padding: var(--dhun-space-md) var(--dhun-space-lg);
+  border-radius: var(--dhun-shape-large);
+  border: var(--dhun-space-border) solid var(--dhun-border);
+  background: var(--dhun-glass-strong);
+  font: var(--dhun-text-body-small);
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-notice strong {
+  color: var(--dhun-text);
+}
+
+.dhun-notice--warn {
+  border-color: var(--dhun-warning);
+}
+
+.dhun-notice__icon {
+  color: var(--dhun-warning);
+  display: grid;
+  place-items: center;
+}
+
+.dhun-source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--dhun-space-xs-plus);
+  margin: 0;
+  padding: var(--dhun-space-xs) var(--dhun-space-md);
+  border-radius: var(--dhun-shape-full);
+  border: var(--dhun-space-border) solid var(--dhun-border);
+  background: var(--dhun-glass-strong);
+  font: var(--dhun-text-label-small);
+  letter-spacing: var(--dhun-tracking-label-small);
+  text-transform: uppercase;
+  color: var(--dhun-text-secondary);
+  white-space: nowrap;
+}
+
+.dhun-source-badge__dot {
+  width: var(--dhun-space-sm);
+  height: var(--dhun-space-sm);
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-text-tertiary);
+}
+
+.dhun-source-badge--live .dhun-source-badge__dot {
+  background: var(--dhun-success);
+}
+
+.dhun-source-badge--sample .dhun-source-badge__dot {
+  background: var(--dhun-warning);
+}
+
+/* ------------------------------------------------------------------ dock -- */
+
+.dhun-mini {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-sm);
+  padding: var(--dhun-space-xs) var(--dhun-space-sm) var(--dhun-space-xs) var(--dhun-space-xs);
+  border-radius: var(--dhun-shape-card-large);
+  border: var(--dhun-space-border) solid var(--dhun-border-strong);
+  background: var(--dhun-glass-strong);
+  box-shadow: 0 var(--dhun-space-sm) var(--dhun-space-huge) color-mix(in srgb, var(--dhun-scrim-strong) 50%, transparent);
+  overflow: hidden;
+}
+
+.dhun-mini__progress {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: var(--dhun-space-xs);
+  width: 100%;
+  appearance: none;
+  border: 0;
+  background: transparent;
+}
+
+.dhun-progress {
+  display: block;
+  width: 100%;
+  height: var(--dhun-space-xs);
+  appearance: none;
+  border: 0;
+  background: transparent;
+}
+
+.dhun-progress::-webkit-progress-bar {
+  background: var(--dhun-border);
+}
+
+.dhun-progress::-webkit-progress-value {
+  background: var(--dhun-accent);
+}
+
+.dhun-progress::-moz-progress-bar {
+  background: var(--dhun-accent);
+}
+
+.dhun-mini__main {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-md);
+  flex: 1;
+  min-width: 0;
+  padding: var(--dhun-space-xs);
+  border: 0;
+  border-radius: var(--dhun-shape-large);
+  background: none;
+  text-align: left;
+}
+
+.dhun-mini__art {
+  position: relative;
+  flex: none;
+  width: var(--dhun-space-artwork-mini);
+  height: var(--dhun-space-artwork-mini);
+  border-radius: var(--dhun-shape-medium);
+  overflow: hidden;
+}
+
+.dhun-mini__bars {
+  bottom: var(--dhun-space-zero);
+  align-items: flex-end;
+}
+
+.dhun-mini__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dhun-mini__title {
+  font: var(--dhun-text-track-title);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dhun-mini__sub {
+  font: var(--dhun-text-body-small);
+  color: var(--dhun-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dhun-mini__controls {
+  display: flex;
+  align-items: center;
+}
+
+/* ------------------------------------------------------------------- nav -- */
+
+.dhun-tabs-nav {
+  display: flex;
+  justify-content: space-around;
+  gap: var(--dhun-space-xs);
+  padding: var(--dhun-space-xs) var(--dhun-space-sm) calc(var(--dhun-space-sm) + var(--dhun-safe-bottom));
+  min-height: var(--dhun-space-bottom-nav-height);
+  background: var(--dhun-glass-bar-top);
+  border-top: var(--dhun-space-border) solid var(--dhun-border);
+}
+
+.dhun-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--dhun-space-xs);
+  flex: 1;
+  min-height: var(--dhun-space-touch-target);
+  border: 0;
+  background: none;
+  /* Secondary: the label is 11px, and tertiary ink on the light glass nav
+     measures 3.95:1. See `.dhun-bar__overline`. */
+  color: var(--dhun-text-secondary);
+  font: var(--dhun-text-label-small);
+  letter-spacing: var(--dhun-tracking-label-small);
+}
+
+.dhun-nav-item__icon {
+  display: grid;
+  place-items: center;
+  width: var(--dhun-space-huge);
+  height: var(--dhun-space-medium-large);
+  border-radius: var(--dhun-shape-nav-indicator);
+}
+
+.dhun-nav-item.is-active {
+  color: var(--dhun-accent);
+}
+
+.dhun-nav-item.is-active .dhun-nav-item__icon {
+  background: var(--dhun-accent-container);
+  color: var(--dhun-on-accent-container);
+}
+
+.dhun-rail-nav {
+  display: none;
+  flex-direction: column;
+  gap: var(--dhun-space-xs);
+  width: var(--dhun-space-navigation-rail-width);
+  /* The item is a column inside an 88px rail; every horizontal pixel the nav
+     and the item spend on padding is a pixel the label cannot use, and at 11px
+     "Settings" needs about 52 of them. */
+  padding: var(--dhun-space-lg) var(--dhun-space-xs);
+}
+
+/*
+ * The rail's brand: the mark above the wordmark, not beside it.
+ *
+ * Side by side, the icon and a 3px-tracked "DHUN" measured 81px inside a 72px
+ * content box and spilled out of the rail — the browser suite caught it as a
+ * 9px overflow on the desktop shell. Stacked, the wordmark can keep its
+ * tracking and still fit the narrow rail, and the mark reads as a logo rather
+ * than as a fourth destination.
+ */
+.dhun-rail-nav__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--dhun-space-xs);
+  padding: var(--dhun-space-sm);
+  color: var(--dhun-accent);
+  font: var(--dhun-text-label-small);
+  letter-spacing: var(--dhun-tracking-brand);
+  text-transform: uppercase;
+}
+
+/*
+ * A rail item is a column, not a row.
+ *
+ * Side by side, the 22px icon left about 30px for the label inside an 88px
+ * rail, and `overflow-wrap: anywhere` then broke every word into two- and
+ * three-letter fragments — measured on the desktop shell as "Ho me",
+ * "Se arc h", "Lib rar y", "Set tin gs". Stacked, and with the label allowed to
+ * sit on one line, each destination reads as one word.
+ *
+ * The item is as wide as the rail: sizing it by its longest label would move
+ * the content column when a translation changes, or push a scrollbar onto the
+ * page.
+ */
+.dhun-rail-nav__item {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--dhun-space-xs);
+  width: 100%;
+  min-width: 0;
+  min-height: var(--dhun-space-touch-target);
+  padding: var(--dhun-space-sm) var(--dhun-space-xs);
+  border: 0;
+  border-radius: var(--dhun-shape-card);
+  background: none;
+  color: var(--dhun-text-secondary);
+  font: var(--dhun-text-label-small);
+  text-align: center;
+  text-decoration: none;
+}
+
+.dhun-rail-nav__label {
+  max-width: 100%;
+  /* Wrapping, not clipping: at 11px every current label fits on one line in
+     this rail, and a longer one (a translation, a worse font) wraps to a second
+     line instead of losing letters to an ellipsis. `overflow-wrap: anywhere`
+     is what must not come back — it broke "Search" into "Searc h". */
+  white-space: normal;
+  text-align: center;
+}
+
+.dhun-rail-nav__item:hover {
+  background: var(--dhun-overlay-hover);
+  color: var(--dhun-text);
+}
+
+.dhun-rail-nav__item.is-active {
+  background: var(--dhun-accent-container);
+  color: var(--dhun-on-accent-container);
+}
+
+/* --------------------------------------------------------------- overlay -- */
+
+.dhun-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+
+.dhun-overlay > * {
+  pointer-events: auto;
+}
+
+.dhun-full {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--dhun-background);
+  animation: dhun-sheet-up var(--dhun-motion-medium) var(--dhun-motion-easing);
+}
+
+@keyframes dhun-sheet-up {
+  from { transform: translateY(4%); opacity: 0.4; }
+  to { transform: none; opacity: 1; }
+}
+
+.dhun-full__backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.dhun-full__wash {
+  position: absolute;
+  inset: -25%;
+  background-position: center;
+  background-size: cover;
+  filter: blur(var(--dhun-blur-ambient-strong)) saturate(170%) brightness(0.7);
+  transform: scale(1.15);
+}
+
+.dhun-full__scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, var(--dhun-hero-veil-top), transparent 30%, var(--dhun-hero-veil-bottom) 78%, var(--dhun-glass-strong));
+}
+
+.dhun-full__inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-lg);
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* The player is rebuilt on every tick; scroll anchoring would move the port
+     under the visitor's finger when the tab panel changes height. */
+  overflow-anchor: none;
+  padding: var(--dhun-space-sm) var(--dhun-space-xl) calc(var(--dhun-space-xxl) + var(--dhun-safe-bottom));
+}
+
+/*
+ * The player scrolls; its blocks do not shrink.
+ *
+ * As flex children they had the default `flex-shrink: 1`, so a 390×844 window
+ * squeezed the queue/lyrics tab row to y=826 and collapsed the panel to nothing.
+ * The tabs were in the document and unreachable: `overflow: hidden` above, and
+ * no overflow inside to scroll. Measured in Chromium: `scrollHeight` equalled
+ * `clientHeight` at 844 with the panel entirely below the fold.
+ */
+.dhun-full__inner > * {
+  flex: none;
+}
+
+.dhun-full__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-md);
+}
+
+.dhun-full__context {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
+.dhun-full__label {
+  font: var(--dhun-text-label-small);
+  letter-spacing: var(--dhun-tracking-label-small);
+  text-transform: uppercase;
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-full__sublabel {
+  font: var(--dhun-text-label-small);
+  color: var(--dhun-text-tertiary);
+}
+
+.dhun-full__stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--dhun-space-xl);
+  margin-top: var(--dhun-space-lg);
+}
+
+.dhun-full__art {
+  width: min(78vw, var(--dhun-space-artwork-album));
+  aspect-ratio: 1;
+  border-radius: var(--dhun-shape-artwork-hero);
+  overflow: hidden;
+  box-shadow: 0 var(--dhun-space-xxl) var(--dhun-space-huge) color-mix(in srgb, var(--dhun-scrim-strong) 70%, transparent);
+}
+
+.dhun-full__meta {
+  text-align: center;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.dhun-full__title {
+  margin: 0;
+  font: var(--dhun-text-player-title);
+  letter-spacing: var(--dhun-tracking-display-large);
+  overflow-wrap: anywhere;
+}
+
+.dhun-full__artist {
+  margin: var(--dhun-space-xs) 0 0;
+  font: var(--dhun-text-body-medium);
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-full__quality {
+  margin: var(--dhun-space-xs) 0 0;
+  font: var(--dhun-text-label-small);
+  color: var(--dhun-text-tertiary);
+  letter-spacing: var(--dhun-tracking-label-small);
+  text-transform: uppercase;
+}
+
+.dhun-full__seek {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-xs);
+}
+
+.dhun-range--seek {
+  --dhun-range-height: var(--dhun-space-progress-height-active);
+}
+
+.dhun-full__times {
+  display: flex;
+  justify-content: space-between;
+  font: var(--dhun-text-label-small);
+  color: var(--dhun-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.dhun-full__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--dhun-space-sm);
+}
+
+.dhun-full__transport {
+  width: var(--dhun-space-transport-target);
+  height: var(--dhun-space-transport-target);
+}
+
+.dhun-full__play {
+  display: grid;
+  place-items: center;
+  width: var(--dhun-space-artwork-thumb);
+  height: var(--dhun-space-artwork-thumb);
+  border: 0;
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-accent);
+  color: var(--dhun-on-accent);
+  box-shadow: 0 var(--dhun-space-sm) var(--dhun-space-xxl) color-mix(in srgb, var(--dhun-accent) 35%, transparent);
+}
+
+.dhun-full__volume {
+  display: none;
+  align-items: center;
+  gap: var(--dhun-space-sm);
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-full__tabs-wrap {
+  margin-top: auto;
+  padding-top: var(--dhun-space-lg);
+}
+
+.dhun-full__tabs {
+  display: flex;
+  gap: var(--dhun-space-xs);
+}
+
+.dhun-full__panel {
+  margin-top: var(--dhun-space-md);
+}
+
+.dhun-full__empty {
+  margin: 0;
+  color: var(--dhun-text-secondary);
+  font: var(--dhun-text-body-small);
+}
+
+.dhun-lyrics-state {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-sm);
+  padding: var(--dhun-space-lg);
+  border-radius: var(--dhun-shape-large);
+  background: var(--dhun-glass);
+  border: var(--dhun-space-border) solid var(--dhun-border);
+}
+
+.dhun-lyrics-state__note {
+  margin: 0;
+  font: var(--dhun-text-body-small);
+  color: var(--dhun-text-tertiary);
+}
+
+.dhun-queue {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-xs);
+}
+
+.dhun-queue__row {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-xs);
+  border-radius: var(--dhun-shape-large);
+  background: var(--dhun-glass);
+}
+
+.dhun-queue__row.is-current {
+  background: color-mix(in srgb, var(--dhun-accent) 14%, transparent);
+}
+
+.dhun-queue__main {
+  display: grid;
+  grid-template-columns: var(--dhun-space-xxl) var(--dhun-space-menu-artwork) 1fr auto;
+  align-items: center;
+  gap: var(--dhun-space-md);
+  flex: 1;
+  min-width: 0;
+  padding: var(--dhun-space-xs);
+  border: 0;
+  background: none;
+  text-align: left;
+}
+
+.dhun-queue__main .dhun-art {
+  width: var(--dhun-space-menu-artwork);
+  height: var(--dhun-space-menu-artwork);
+  border-radius: var(--dhun-shape-small);
+}
+
+.dhun-queue__index {
+  display: grid;
+  place-items: center;
+  color: var(--dhun-text-tertiary);
+  font: var(--dhun-text-label-medium);
+}
+
+.dhun-queue__row.is-current .dhun-queue__index {
+  color: var(--dhun-accent);
+}
+
+.dhun-queue__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dhun-queue__title {
+  font: var(--dhun-text-track-title);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dhun-queue__sub,
+.dhun-queue__duration {
+  font: var(--dhun-text-body-small);
+  color: var(--dhun-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------- sheets -- */
+
+.dhun-sheet-region {
+  position: relative;
+  z-index: 50;
+}
+
+.dhun-scrim {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: var(--dhun-scrim);
+}
+
+.dhun-sheet {
+  width: min(100%, var(--dhun-pane-master-max));
+  max-height: 86dvh;
+  overflow-y: auto;
+  padding: var(--dhun-space-sm) var(--dhun-space-lg) calc(var(--dhun-space-xl) + var(--dhun-safe-bottom));
+  border-radius: var(--dhun-shape-bottom-sheet);
+  border: var(--dhun-space-border) solid var(--dhun-border);
+  border-bottom: 0;
+  background: var(--dhun-glass-bar-top);
+  animation: dhun-sheet-rise var(--dhun-motion-medium) var(--dhun-motion-easing);
+}
+
+@keyframes dhun-sheet-rise {
+  from { transform: translateY(12%); }
+  to { transform: none; }
+}
+
+.dhun-sheet__grab {
+  width: var(--dhun-space-huge);
+  height: var(--dhun-space-xs);
+  margin: var(--dhun-space-xs) auto var(--dhun-space-sm);
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-border-strong);
+}
+
+.dhun-sheet__head {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-md);
+  padding-bottom: var(--dhun-space-sm);
+}
+
+.dhun-sheet__titles {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.dhun-sheet__title {
+  font: var(--dhun-text-title-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dhun-sheet__sub {
+  font: var(--dhun-text-body-small);
+  color: var(--dhun-text-secondary);
+}
+
+.dhun-sheet__body {
+  padding-top: var(--dhun-space-sm);
+}
+
+.dhun-menu {
+  display: flex;
+  flex-direction: column;
+}
+
+.dhun-menu-row {
+  display: flex;
+  align-items: center;
+  gap: var(--dhun-space-md);
+  width: 100%;
+  min-height: var(--dhun-space-menu-row-height);
+  padding: var(--dhun-space-sm) var(--dhun-space-xs);
+  border: 0;
+  background: none;
+  color: var(--dhun-text);
+  font: var(--dhun-text-body-medium);
+  text-align: left;
+  text-decoration: none;
+  border-radius: var(--dhun-shape-medium);
+}
+
+.dhun-menu-row:hover {
+  background: var(--dhun-overlay-hover);
+}
+
+.dhun-menu-row--danger {
+  color: var(--dhun-error);
+}
+
+.dhun-shortcuts {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-xs);
+}
+
+.dhun-shortcuts__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--dhun-space-md);
+  padding: var(--dhun-space-xs) 0;
+  border-bottom: var(--dhun-space-border) solid var(--dhun-border);
+}
+
+.dhun-shortcuts dt,
+.dhun-shortcuts dd {
+  margin: 0;
+}
+
+.dhun-shortcuts kbd {
+  display: inline-block;
+  min-width: var(--dhun-space-xxl);
+  padding: var(--dhun-space-xs) var(--dhun-space-sm);
+  border-radius: var(--dhun-shape-small);
+  border: var(--dhun-space-border) solid var(--dhun-border-strong);
+  background: var(--dhun-surface-variant);
+  font-family: var(--dhun-font-mono);
+  font-size: 0.85em;
+  text-align: center;
+}
+
+.dhun-shortcuts dd {
+  color: var(--dhun-text-secondary);
+  font: var(--dhun-text-body-small);
+}
+
+/* ----------------------------------------------------------------- toast -- */
+
+.dhun-toast-region {
+  position: fixed;
+  inset-inline: 0;
+  bottom: calc(var(--dhun-space-bottom-nav-height) + var(--dhun-space-mini-player-height) + var(--dhun-space-md));
+  z-index: 55;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.dhun-toast {
+  padding: var(--dhun-space-sm) var(--dhun-space-lg);
+  border-radius: var(--dhun-shape-full);
+  background: var(--dhun-surface-elevated);
+  border: var(--dhun-space-border) solid var(--dhun-border-strong);
+  box-shadow: 0 var(--dhun-space-sm) var(--dhun-space-xxl) var(--dhun-scrim);
+  font: var(--dhun-text-label-large);
+  animation: dhun-sheet-rise var(--dhun-motion-medium) var(--dhun-motion-easing);
+}
+
+.dhun-toast--warn {
+  border-color: var(--dhun-warning);
+}
+
+/* ------------------------------------------------------------- no script -- */
+
+.dhun-noscript {
+  max-width: var(--dhun-space-legal-content-max);
+  margin: var(--dhun-space-huge) auto;
+  padding: var(--dhun-space-xxl);
+  font-family: var(--dhun-font-sans);
+}
+
+/* --------------------------------------------------------------- wide ---- */
+
+/*
+ * The app's rail breakpoint. Below it: the bottom navigation and the dock, the
+ * phone shell the application uses. At and above it: a rail beside the content,
+ * the dock sitting over the content's bottom-right corner, and the player's two
+ * columns — the same breakpoint the application's `TwoPane` uses.
+ */
+@media (min-width: 840px) {
+  .dhun-app {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "bar bar"
+      "rail main";
+    padding-bottom: var(--dhun-space-xxxl);
+  }
+
+  .dhun-rail-region {
+    grid-area: rail;
+    display: block;
+    position: sticky;
+    top: var(--dhun-space-navigation-bar-content);
+    align-self: start;
+  }
+
+  .dhun-rail-nav {
+    display: flex;
+    width: var(--dhun-space-navigation-rail-width);
+  }
+
+  .dhun-nav-region {
+    display: none;
+  }
+
+  .dhun-dock {
+    inset-inline: auto var(--dhun-space-xxl);
+    bottom: var(--dhun-space-xxl);
+    width: min(28rem, 40vw);
+  }
+
+  .dhun-main {
+    padding-inline: var(--dhun-space-xxxl);
+  }
+
+  .dhun-toast-region {
+    bottom: var(--dhun-space-xxl);
+  }
+
+  .dhun-hero__art,
+  .dhun-hero--feature .dhun-hero__art {
+    width: var(--dhun-space-artwork-album);
+    height: var(--dhun-space-artwork-album);
+  }
+
+  .dhun-rail__track {
+    grid-auto-columns: minmax(var(--dhun-space-artwork-card), 18%);
+  }
+
+  .dhun-full__inner {
+    max-width: var(--dhun-pane-master-max);
+    margin-inline: auto;
+    width: 100%;
+  }
+
+  .dhun-full__volume {
+    display: flex;
+  }
+
+  .dhun-sheet {
+    margin-bottom: var(--dhun-space-xxl);
+    border-radius: var(--dhun-shape-card-large);
+    border-bottom: var(--dhun-space-border) solid var(--dhun-border);
+  }
+
+  .dhun-scrim {
+    align-items: center;
+  }
+}
+
+/* Wide player: the application splits the cover and the controls into two
+   columns at 480px of height-orientation width. Here the same idea for a short
+   landscape window, where a stacked player would need scrolling to reach Play. */
+@media (min-width: 480px) and (orientation: landscape) and (max-height: 560px) {
+  .dhun-full__inner {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto 1fr auto;
+    column-gap: var(--dhun-space-xxl);
+    align-content: start;
+  }
+
+  .dhun-full__bar {
+    grid-column: 1 / -1;
+  }
+
+  .dhun-full__stage {
+    grid-row: 2 / 4;
+    flex-direction: column;
+    margin-top: 0;
+  }
+
+  .dhun-full__art {
+    width: var(--dhun-space-artwork-album);
+  }
+
+  .dhun-full__seek,
+  .dhun-full__controls,
+  .dhun-full__volume,
+  .dhun-full__tabs-wrap {
+    grid-column: 2;
+  }
+
+  .dhun-full__tabs-wrap {
+    margin-top: 0;
+  }
+}
+
+/* ------------------------------------------------------- short windows ---- */
+
+/*
+ * The full player is one column on a phone, and at 390×844 its Queue/Lyrics tab
+ * row landed at 826px — 18 pixels of two buttons above the fold, below a 220px
+ * artwork. The artwork is the only element there that can give up space without
+ * losing information, so on a short phone window it gives some up and the tabs
+ * sit fully above the fold (measured at 390×844: tabs 782–826, art 176).
+ *
+ * Scoped to the one-column layout: a desktop window shorter than 900px draws
+ * the player in two columns, where the art has its own column and nothing is
+ * competing for the tab row's space.
+ */
+@media (max-width: 839px) and (max-height: 900px) {
+  .dhun-full__art {
+    width: calc(var(--dhun-space-artwork-card) + var(--dhun-space-lg));
+  }
+}
+
+/* The same trade one step further down: 360×800 is a 2022-era Android phone and
+   needs another ~60px before its tab row clears the fold. */
+@media (max-width: 839px) and (max-height: 820px) {
+  .dhun-full__art {
+    width: calc(var(--dhun-space-artwork-card) - var(--dhun-space-lg));
+  }
+
+  .dhun-full__stage {
+    gap: var(--dhun-space-md);
+    margin-top: var(--dhun-space-sm);
+  }
+
+  .dhun-full__tabs-wrap {
+    padding-top: var(--dhun-space-sm);
+  }
+}
+
+/* ------------------------------------------------------------- reduced ---- */
+
+/* --------------------------------------------------------- shell details --
+   The pieces the rebuild added and the stylesheet had not yet drawn: the row's
+   play veil, the dock's failure line, the search field's clear button, and the
+   settings screen's narrower reading column. Each is a real element the app
+   emits, and an element with no rule is an unstyled control.
+   ------------------------------------------------------------------------- */
+
+.dhun-bar__back {
+  margin-inline-start: calc(var(--dhun-space-xs) * -1);
+}
+
+.dhun-nav-item__label {
+  font: var(--dhun-text-label-small);
+  letter-spacing: var(--dhun-tracking-label-small);
+}
+
+.dhun-row__icon {
+  display: grid;
+  place-items: center;
+  width: var(--dhun-space-artwork-thumb);
+  height: var(--dhun-space-artwork-thumb);
+  border-radius: var(--dhun-shape-full);
+  background: color-mix(in srgb, var(--dhun-scrim-strong) 55%, transparent);
+  color: var(--dhun-text);
+}
+
+.dhun-row__like.is-liked,
+.dhun-icon-button.is-liked {
+  color: var(--dhun-accent);
+}
+
+.dhun-sheet__footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dhun-space-sm);
+  justify-content: flex-end;
+  padding-top: var(--dhun-space-sm);
+}
+
+.dhun-notice__text {
+  /* Keep the sample/error disclosure readable beside its action on narrow screens. */
+  overflow-wrap: anywhere;
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-xs);
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+/* The notice's own control, when it has one — "Try the catalogue again" beside
+   the sentence that says why the catalogue is not there. */
+.dhun-notice__action {
+  flex: 0 0 auto;
+  align-self: center;
+}
+
+.dhun-page-head__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dhun-space-sm);
+  align-items: center;
+}
+
+.dhun-prose__heading {
+  margin: var(--dhun-space-xl) 0 var(--dhun-space-sm);
+  color: var(--dhun-text);
+}
+
+.dhun-search__clear {
+  position: absolute;
+  inset-inline-end: var(--dhun-space-sm);
+  inset-block-start: 50%;
+  transform: translateY(-50%);
+  width: var(--dhun-space-compact-target);
+  height: var(--dhun-space-compact-target);
+}
+
+.dhun-hero--entity {
+  margin-bottom: var(--dhun-space-xl);
+}
+
+.dhun-grid--playlists {
+  grid-template-columns: repeat(auto-fill, minmax(var(--dhun-grid-card-min), 1fr));
+}
+
+/* The dock's own failure line: the reason a press produced no sound, in the
+   place the visitor is already looking. */
+.dhun-mini-error {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dhun-space-xs);
+  margin-top: var(--dhun-space-xs);
+  padding: var(--dhun-space-sm) var(--dhun-space-md);
+  border: var(--dhun-space-border) solid var(--dhun-error);
+  border-radius: var(--dhun-shape-large);
+  background: var(--dhun-error-container);
+  color: var(--dhun-error);
+}
+
+.dhun-mini-error__title {
+  font: var(--dhun-text-label-large);
+}
+
+.dhun-mini-error__detail {
+  font-family: var(--dhun-font-mono);
+  font-size: 0.75rem;
+  opacity: 0.8;
+  overflow-wrap: anywhere;
+}
+
+/* A settings or legal page is a column of text, not a feed. */
+.dhun-screen--settings,
+.dhun-screen--about {
+  max-width: var(--dhun-space-legal-content-max);
+}
+
+.dhun-screen--framed {
+  padding-block: var(--dhun-space-xxl);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Windows high contrast: the glass is decoration, the borders and text are the
+   interface. Drop the blur, keep the structure, keep every focus ring. */
+@media (forced-colors: active) {
+  .dhun-card,
+  .dhun-settings,
+  .dhun-mini,
+  .dhun-bar,
+  .dhun-tabs-nav,
+  .dhun-rail-nav,
+  .dhun-sheet,
+  .dhun-search,
+  .dhun-state,
+  .dhun-notice {
+    background: Canvas;
+    border: var(--dhun-stroke-hairline) solid CanvasText;
+  }
+
+  .dhun-button--filled,
+  .dhun-search__go,
+  .dhun-full__play,
+  .dhun-chip.is-active {
+    background: Highlight;
+    color: HighlightText;
+  }
+
+  .dhun-source-badge__dot,
+  .dhun-row__bars i,
+  .dhun-mini__bars i {
+    background: CanvasText;
+    box-shadow: none;
+  }
+}
+
+@media print {
+  .dhun-bar,
+  .dhun-dock,
+  .dhun-nav-region,
+  .dhun-rail-region,
+  .dhun-overlay,
+  .dhun-sheet-region,
+  .dhun-toast-region,
+  .dhun-skip-link {
+    display: none !important;
+  }
+
+  body {
+    background: Canvas;
+    color: CanvasText;
+  }
+}

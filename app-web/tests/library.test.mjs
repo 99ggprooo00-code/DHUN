@@ -309,7 +309,9 @@ test("blocked localStorage property access does not crash library startup", () =
     const storage = createStorage();
     assert.equal(storage.persistent, false);
     assert.deepEqual(storage.load(), emptyLibrary());
+    assert.equal(storage.importGuard, "unreadable");
     assert.equal(storage.save(emptyLibrary()), false);
+    assert.throws(() => storage.importAll("{}"), /could not be read safely/);
   } finally {
     if (previous) Object.defineProperty(globalThis, "localStorage", previous);
     else delete globalThis.localStorage;
@@ -374,16 +376,17 @@ test("a backing that silently discards a write cannot acknowledge a durable eras
   assert.deepEqual(JSON.parse(backing.map.get(STORAGE_KEY)).likes, ["kept"]);
 });
 
-test("a failed import does not replace the previous library and can be retried", () => {
+test("a simulated failed import keeps the previous library and can be retried in a fresh adapter", () => {
   const before = toggleLike(emptyLibrary(), song("previous")).library;
   const next = toggleLike(emptyLibrary(), song("imported")).library;
   const backing = changingBacking(before); const storage = createStorage(backing); storage.load();
   const exported = storage.exportAll(next); backing.control.deny = true;
-  assert.throws(() => storage.importAll(exported), /could not.*sav|could not.*confirm/i);
+  assert.throws(() => storage.importAll(exported), error => error.code === "IMPORT_UNCERTAIN");
   assert.deepEqual(storage.load().likes, ["previous"]);
   assert.deepEqual(JSON.parse(backing.map.get(STORAGE_KEY)).likes, ["previous"]);
   backing.control.deny = false;
-  assert.deepEqual(storage.importAll(exported).likes, ["imported"]);
+  assert.throws(() => storage.importAll(exported), /will not write again/i);
+  assert.deepEqual(createStorage(backing).importAll(exported).likes, ["imported"]);
 });
 
 test("saved collection limits refuse additions without evicting or mutating anything", () => {

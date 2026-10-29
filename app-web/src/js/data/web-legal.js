@@ -112,10 +112,11 @@ that the same values never leave the device. **[source]**
 
 | Data | Where it lives |
 | --- | --- |
-| Likes, playlists and playlist entries | \`localStorage\`, key \`dhun.web.v3\` |
-| Listening history and recent searches | \`localStorage\`, key \`dhun.web.v3\` |
-| Referenced track-metadata snapshots: titles, artists, albums, duration, IDs and artwork URLs | \`localStorage\`, key \`dhun.web.v3\`; persisted stream URLs are blanked, unreferenced snapshots pruned |
-| Settings: theme, accent, volume, repeat, shuffle | \`localStorage\`, key \`dhun.web.v3\` |
+| Likes, playlists and playlist entries | IndexedDB database \`dhun.web.library\` |
+| Listening history and recent searches | IndexedDB database \`dhun.web.library\` |
+| Referenced track-metadata snapshots: titles, artists, albums, duration, IDs and artwork URLs | IndexedDB database \`dhun.web.library\`; persisted stream URLs are blanked, unreferenced snapshots pruned |
+| Settings: theme, accent, volume, repeat, shuffle | IndexedDB database \`dhun.web.library\` |
+| Legacy library and recovery copies | The old \`localStorage\` key \`dhun.web.v3\` is retained; IndexedDB keeps the previous library and may archive divergent legacy bytes |
 | Queue/current stream | In memory; no persisted offline audio |
 | Interface files for offline opening | Cache Storage / service worker, same-origin shell only |
 | Media/artwork | No DHUN audio-download store; normal browser caching may occur |
@@ -124,7 +125,7 @@ Export/import use a user-chosen JSON file; the app never uploads it. Storage
 refusal/quota failure can leave ordinary edits in memory with a visible warning;
 an older saved copy may still exist. Erase, playlist deletion/removal, recent-search
 clear and replacement import require a confirmed storage write; failure keeps the
-previous in-tab data and offers retry instead of reporting complete success.
+previous in-tab data and does not report success. After a storage failure or conflict, reopen and review the saved data before retrying.
 **[source]**
 
 ## 4. Requests to third parties
@@ -163,8 +164,9 @@ server logs or every browser/provider cookie, cache or transport header.
 - **Import:** Settings → This browser → Import library validates a chosen file and
   replaces the library only after storage confirms saving it.
 - **Erase library:** after confirmation, clears likes, playlists, history,
-  recent searches and snapshots but **keeps settings** and the shell cache.
-  If saving fails, the confirmation stays open with a failure message; saved
+  recent searches and snapshots from the current library, but **keeps settings**
+  and the shell cache. Older recovery records and legacy storage may still contain
+  that data; this is not secure deletion. If saving fails, the confirmation stays open with a failure message; saved
   data may still exist. Clearing is not a switch that disables future history:
   a later track selection may create new local history.
 - **Remove all local site data:** use the browser's controls for this origin to
@@ -307,8 +309,8 @@ redact console/diagnostic text first; nothing uploads automatically.
 ## Local data and privacy requests
 
 Settings → This browser offers Export library, Import library and Erase library. **Erase
-keeps settings and the shell cache**; browser site-data controls remove those
-too. DHUN has no account or remote library to delete. Provider/wrapper/CDN and
+keeps settings and the shell cache**; recovery and legacy copies may also retain
+library data. Browser site-data controls remove those too, for the whole origin. DHUN has no account or remote library to delete. Provider/wrapper/CDN and
 GitHub hosting/issue requests belong with their respective operators; local
 erase cannot delete their logs. **[source]**
 

@@ -29,8 +29,14 @@ import { demoEntity, demoHome, searchDemo } from "./demo.js";
 import {
   addToPlaylist,
   LIBRARY_LIMITS,
+  FORMAT_VERSION,
   createPlaylist,
-  createStorage,
+  inspectIndexedDBRecovery,
+  acknowledgeLegacyDivergence,
+  restoreMissingCurrent,
+  restoreCorruptCurrent,
+  parseImportJSON,
+  validateImport,
   deletePlaylist,
   historySongs,
   likedSongs,
@@ -49,7 +55,8 @@ import { legalBody } from "./legal.js";
 import { WEB_VERSION } from "./version.js";
 import { createPwa } from "./pwa.js";
 import { matchShortcut } from "./shortcuts.js";
-import { handleFileImport } from "./transfer.js";
+import { backupExportWarning, handleFileImport } from "./transfer.js";
+import { openAppStorage } from "./app-storage.js";
 
 const NETWORK_KINDS = new Set([FAILURE_KIND.network, FAILURE_KIND.timeout, FAILURE_KIND.offline]);
 const SEARCH_FILTERS = ["songs", "albums", "artists", "playlists"];
@@ -68,7 +75,7 @@ export function isFramed(win = globalThis) {
   }
 }
 
-export function boot({ win = globalThis, doc = globalThis.document } = {}) {
+export function boot({ win = globalThis, doc = globalThis.document, storage = null } = {}) {
   const root = doc.querySelector("#app");
 
   // The framing rule runs before storage is touched or a single node is
@@ -77,6 +84,141 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   if (isFramed(win)) {
     root.innerHTML = html`${views.framedRefusal()}`;
     return { state: null, player: null, go: () => {}, destroy: () => {} };
+  }
+  if (!storage) {
+    const view = doc.querySelector("#dhun-view");
+    if (view) view.innerHTML = '<section class="dhun-settings"><h1>Opening your library</h1><p>Checking saved data before enabling library changes…</p></section>';
+    return openAppStorage().then((session) => boot({ win, doc, storage: session })).catch(async (error) => {
+      if (!view) return;
+      view.innerHTML = '<section class="dhun-settings"><h1>Saved data needs review</h1><p>DHUN could not safely open the library. No library writes are enabled. Keep browser data and your original backup; do not erase site data.</p><p id="dhun-recovery-reason"></p><p>Download the available recovery representations below and keep them separately. They are not necessarily importable backups. If a record cannot be represented as JSON, it remains in browser storage; seek recovery help. Close older DHUN tabs, then retry, or seek recovery help.</p><div id="dhun-recovery-files"></div><button type="button" id="dhun-recovery-retry">Retry opening</button></section>';
+      const reason = doc.querySelector("#dhun-recovery-reason");
+      if (reason) reason.textContent = error?.message ?? "Storage is unavailable.";
+      const files = doc.querySelector("#dhun-recovery-files");
+      const diagnostic = await inspectIndexedDBRecovery();
+      const addFile = (label, name, content) => {
+        if (!files || content == null) return;
+        const button = doc.createElement("button");
+        button.type = "button"; button.textContent = label;
+        button.addEventListener("click", () => {
+          const url = win.URL.createObjectURL(new win.Blob([content], { type: "application/json" }));
+          const link = doc.createElement("a"); link.href = url; link.download = name; link.click();
+          win.setTimeout(() => win.URL.revokeObjectURL(url), 1000);
+        });
+        files.appendChild(button);
+      };
+      if (diagnostic.legacy.status === "available") addFile("Download legacy storage text (JSON string)", "dhun-legacy-recovery.json", JSON.stringify(diagnostic.legacy.text));
+      const recoveryJson = (value) => {
+        const seen = new Set();
+        function representable(item) {
+          if (item === null || typeof item === "string" || typeof item === "boolean") return true;
+          if (typeof item === "number") return Number.isFinite(item) && !Object.is(item, -0);
+          if (!item || typeof item !== "object" || seen.has(item) || (!Array.isArray(item) && Object.getPrototypeOf(item) !== Object.prototype)) return false;
+          seen.add(item);
+          const valid = (!Array.isArray(item) || (Object.keys(item).length === item.length && Object.keys(item).every((key, i) => key === String(i)))) && Object.values(item).every(representable);
+          seen.delete(item);
+          return valid;
+        }
+        if (!representable(value)) throw new Error("unrepresentable record");
+        return JSON.stringify(value, null, 2);
+      };
+      const unavailableRecord = () => {
+        if (!files) return;
+        const message = doc.createElement("p");
+        message.textContent = "A database record cannot be represented safely as JSON. It remains in browser storage; seek recovery help before clearing site data.";
+        files.appendChild(message);
+      };
+      for (const key of ["current", "previous"]) {
+        const record = diagnostic.database[key];
+        if (diagnostic.database[key === "current" ? "hasCurrent" : "hasPrevious"]) {
+          try { addFile(`Download database ${key} record`, `dhun-database-${key}-recovery.json`, recoveryJson(record)); }
+          catch { unavailableRecord(); }
+        }
+      }
+      for (const [index, item] of (diagnostic.database.archived ?? []).entries()) {
+        try { addFile(`Download archived recovery record ${index + 1}`, `dhun-archived-recovery-${index + 1}.json`, recoveryJson(item)); }
+        catch { unavailableRecord(); }
+      }
+      const backup = (label, name, text) => {
+        try {
+          if (typeof text !== "string") return false;
+          const raw = parseImportJSON(text);
+          if (!raw || typeof raw !== "object" || Array.isArray(raw) || ["app", "version", "exportedAt"].some(key => Object.hasOwn(raw, key))) return false;
+          const library = validateImport({ ...raw, app: "DHUN web", version: FORMAT_VERSION });
+          const output = JSON.stringify({ app: "DHUN web", version: FORMAT_VERSION, exportedAt: new Date().toISOString(), ...library }, null, 2);
+          if (!backupExportWarning(output, library)) { addFile(label, name, output); return true; }
+        } catch { /* raw records remain available instead */ }
+        return false;
+      };
+      backup("Download validated canonical backup", "dhun-canonical-library.json", diagnostic.database.current?.library);
+      const validPrevious = backup("Download validated previous backup", "dhun-previous-library.json", diagnostic.database.previous?.library);
+      const validLegacy = backup("Download validated legacy backup", "dhun-legacy-library.json", diagnostic.legacy.text);
+      if (!diagnostic.database.hasCurrent && diagnostic.database.hasPrevious && validPrevious && diagnostic.legacy.status !== "unavailable" && files) {
+        const restore = doc.createElement("button"); restore.type = "button"; restore.textContent = "Restore previous library when current is missing";
+        restore.addEventListener("click", async () => {
+          if (!win.confirm("The current record is missing. The previous library may be older and omit later changes. Download and review it first. Restore it only if no current record has reappeared?")) return;
+          restore.disabled = true;
+          try {
+            await restoreMissingCurrent({ expectedPrevious: diagnostic.database.previous, expectedLegacy: diagnostic.legacy.text });
+            win.location.reload();
+          } catch (failure) {
+            if (reason) reason.textContent = failure?.message ?? "Recovery could not be confirmed; keep all copies and retry.";
+            restore.disabled = false;
+          }
+        });
+        files.appendChild(restore);
+      }
+      if (error?.code === "CORRUPT" && diagnostic.database.hasCurrent && diagnostic.database.hasPrevious && validPrevious && diagnostic.legacy.status !== "unavailable" && files) {
+        let comparable = false;
+        try { recoveryJson(diagnostic.database.current); comparable = true; } catch { /* keep unsupported records untouched */ }
+        if (comparable) {
+          const restore = doc.createElement("button"); restore.type = "button"; restore.textContent = "Restore previous library and archive damaged current record";
+          restore.addEventListener("click", async () => {
+            if (!win.confirm("Download and review both records first. The previous library may omit newer changes. Replace the damaged current record with the previous library and archive both records?")) return;
+            restore.disabled = true;
+            try {
+              await restoreCorruptCurrent({ expectedCurrent: diagnostic.database.current, expectedPrevious: diagnostic.database.previous, expectedLegacy: diagnostic.legacy.text });
+              win.location.reload();
+            } catch (failure) {
+              if (reason) reason.textContent = failure?.message ?? "Recovery could not be confirmed; keep all copies and retry.";
+              restore.disabled = false;
+            }
+          });
+          files.appendChild(restore);
+        }
+      }
+      if (["LEGACY_DIVERGED", "COMMIT_UNCERTAIN"].includes(error?.code) && diagnostic.database.current && files) {
+        let adopt = null;
+        const choose = doc.createElement("button"); choose.type = "button"; choose.textContent = "Keep database library and archive legacy copy";
+        choose.addEventListener("click", async () => {
+          if (!win.confirm("Download and review both copies first. Continue with the database library? The differing legacy bytes and previous baseline will be archived in IndexedDB; the legacy key itself will not be changed. Close old tabs to prevent further divergence.")) return;
+          choose.disabled = true; if (adopt) adopt.disabled = true;
+          try {
+            await acknowledgeLegacyDivergence({ expectedCurrent: diagnostic.database.current, expectedLegacy: diagnostic.legacy.text });
+            win.location.reload();
+          } catch (failure) {
+            if (reason) reason.textContent = failure?.message ?? "The recovery choice could not be confirmed; keep all copies and retry.";
+            choose.disabled = false; if (adopt) adopt.disabled = false;
+          }
+        });
+        files.appendChild(choose);
+        if (validLegacy) {
+          adopt = doc.createElement("button"); adopt.type = "button"; adopt.textContent = "Use validated legacy library and archive database copies";
+          adopt.addEventListener("click", async () => {
+            if (!win.confirm("Download and review both copies first. Replace the current database library with the validated legacy library? Current and previous database records and legacy text will be archived. Close old tabs to prevent further divergence.")) return;
+            choose.disabled = true; adopt.disabled = true;
+            try {
+              await acknowledgeLegacyDivergence({ expectedCurrent: diagnostic.database.current, expectedLegacy: diagnostic.legacy.text, choice: "legacy" });
+              win.location.reload();
+            } catch (failure) {
+              if (reason) reason.textContent = failure?.message ?? "The recovery choice could not be confirmed; keep all copies and retry.";
+              choose.disabled = false; adopt.disabled = false;
+            }
+          });
+          files.appendChild(adopt);
+        }
+      }
+      doc.querySelector("#dhun-recovery-retry")?.addEventListener("click", () => win.location.reload());
+    });
   }
   let disposed = false;
   let suspended = false;
@@ -87,16 +229,18 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   const own = (stop) => { cleanups.add(stop); return stop; };
   const whileActive = (fn) => (...args) => { if (isActive()) return fn(...args); };
   const audio = doc.querySelector("#dhun-audio");
-  const storage = createStorage();
   // Which of the catalogue's instances answered last time is remembered, so a
   // returning visitor's first request goes to the host that worked for them
   // instead of re-learning that the first one is down.
   const source = createSource({
     preferred: storage.load().settings.sourceId ?? "",
     onOriginChange: (origin) => {
-      if (disposed) return;
-      state.library = { ...state.library, settings: { ...state.library.settings, sourceId: origin.id } };
-      save();
+      const update = () => {
+        if (disposed) return;
+        state.library = { ...state.library, settings: { ...state.library.settings, sourceId: origin.id } };
+        save();
+      };
+      if (storage.defer) storage.defer(update); else update();
     },
   });
 
@@ -143,29 +287,57 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   function save() {
     const saved = storage.save(state.library);
     state.library = storage.load(); // including the existing snapshot-pruning rule
+    if (saved && typeof saved.then === "function") {
+      showToast("Saving library…");
+      saved.then((ok) => { if (isActive()) ok ? showToast("Library saved.") : showSaveToast("", false); });
+    }
     return saved;
   }
 
   function showSaveToast(message, saved) {
-    showToast(saved ? message : "Changed for this visit only — not saved to browser storage. Export a backup before closing.", saved ? "info" : "warn");
+    if (saved && typeof saved.then === "function") {
+      saved.then((ok) => { if (isActive()) showSaveToast(message, ok); });
+      return;
+    }
+    const warning = storage.importGuard === "unconfirmed"
+      ? "The saved library may have changed, but the operation could not be confirmed. This tab cannot write; keep browser data and the original backup, and review saved data in a fresh tab."
+      : ["corrupt", "unreadable"].includes(storage.importGuard)
+      ? "Saved data could not be read safely. This tab cannot write; keep browser data and the original backup, and seek recovery help."
+      : storage.importGuard
+      ? "Changed for this visit only. This tab cannot write until saved data is reviewed in a fresh tab; export this tab's library first."
+      : "Changed for this visit only — not saved to browser storage. Export a backup before closing.";
+    showToast(saved ? message : warning, saved ? "info" : "warn");
   }
 
   function commitLibrary(next) {
-    if (!storage.save(next, { requirePersistence: true })) {
-      const error = "Not saved. This browser could not confirm the change. Your in-tab library was kept. Allow storage or free space and try again; saved data may still exist. Browser site-data controls can clear the origin separately.";
-      if (state.sheet) {
-        state.sheet = { ...state.sheet, error };
-        renderSheet();
+    const finish = (saved) => {
+      if (!saved) {
+        const error = storage.importGuard === "unconfirmed"
+          ? "The operation could not be confirmed; saved data may have changed. Keep browser data and the original backup and review it in a fresh tab."
+          : ["corrupt", "unreadable"].includes(storage.importGuard)
+          ? "Not saved. Saved data could not be read safely. Keep browser data and the original backup; seek recovery help."
+          : storage.importGuard
+          ? "Not saved. This tab cannot write until saved data is reviewed in a fresh tab. Export this tab's library and keep the original backup first."
+          : "Not saved. This browser could not confirm the change. Your in-tab library was kept. Allow storage or free space and try again; saved data may still exist. Browser site-data controls can clear the origin separately.";
+        if (state.sheet) { state.sheet = { ...state.sheet, error }; renderSheet(); }
+        renderView();
+        const dialog = state.sheet ? dialogRoot() : null;
+        if (dialog && !dialog.contains(doc.activeElement)) focusWithoutScroll(focusablesIn(dialog)[0] ?? dialog);
+        showToast(storage.importGuard ? error : "Not saved. The library in this tab was kept; allow storage or free space and retry.", "warn");
+        return false;
       }
-      renderView();
-      // Rebuilding a failed confirmation must not strand keyboard focus on body.
-      const dialog = state.sheet ? dialogRoot() : null;
-      if (dialog && !dialog.contains(doc.activeElement)) focusWithoutScroll(focusablesIn(dialog)[0] ?? dialog);
-      showToast("Not saved. The library in this tab was kept; allow storage or free space and retry.", "warn");
-      return false;
-    }
-    state.library = storage.load();
-    return true;
+      state.library = storage.load();
+      return true;
+    };
+    const saved = storage.save(next, { requirePersistence: true });
+    return saved && typeof saved.then === "function" ? saved.then(finish) : finish(saved);
+  }
+
+  function afterCommit(next, onSuccess) {
+    const result = commitLibrary(next);
+    if (result && typeof result.then === "function") {
+      result.then((saved) => { if (saved && isActive()) onSuccess(); });
+    } else if (result) onSuccess();
   }
 
   function showToast(message, tone = "info") {
@@ -820,7 +992,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
     } else if (sheet?.kind === "clear-library") {
       markup = components.sheet({
         title: "Erase this browser's library?",
-        subtitle: "Likes, playlists, history, searches and snapshots are deleted. Settings and the offline shell cache remain. This cannot be undone.",
+        subtitle: "Clears likes, playlists, history, searches and snapshots from the current library. Settings and the offline shell cache remain. Older recovery records and legacy storage may still contain data. To remove all site data use browser controls; this affects the whole origin. Export anything you need first.",
         body: html`${sheet.error ? html`<div role="alert">${components.notice({ tone: "warn", title: "Library not erased", body: sheet.error })}</div>` : html``}<div class="dhun-menu">
           <button type="button" class="dhun-menu-row dhun-menu-row--danger" data-action="confirm-clear-library">${icon("Delete", { size: 20 })}<span>Erase my library</span></button>
           <button type="button" class="dhun-menu-row" data-action="close-sheet">${icon("Close", { size: 20 })}<span>Cancel</span></button>
@@ -1135,10 +1307,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       replaceSearchRoute(query);
       runSearch(query);
     },
-    "clear-recent": () => {
-      if (!commitLibrary({ ...state.library, recentSearches: [] })) return;
-      renderView();
-    },
+    "clear-recent": () => afterCommit({ ...state.library, recentSearches: [] }, () => renderView()),
 
     /* playback */
     "play-row": (target) => {
@@ -1274,12 +1443,11 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       if (!playlist) return;
       openSheet({ kind: "confirm", title: `Delete “${playlist.name}”?`, body: "The playlist is removed from this browser. The songs themselves are not affected.", confirmLabel: "Delete playlist", action: "confirm-delete-playlist", id: playlist.id });
     },
-    "confirm-delete-playlist": (target) => {
-      if (!commitLibrary(deletePlaylist(state.library, target.dataset.id))) return;
+    "confirm-delete-playlist": (target) => afterCommit(deletePlaylist(state.library, target.dataset.id), () => {
       closeSheet();
       showToast("Playlist deleted.");
       go(routeFor("library", { libTab: "playlists" }));
-    },
+    }),
     "add-to-playlist": (target) => {
       const playlistId = target.dataset.id;
       const song = pressedSong({ dataset: { id: target.dataset.value } });
@@ -1298,10 +1466,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       closeSheet();
       renderView();
     },
-    "remove-from-playlist": (target) => {
-      if (!commitLibrary(removeFromPlaylist(state.library, state.route.id, target.dataset.id))) return;
-      renderView();
-    },
+    "remove-from-playlist": (target) => afterCommit(removeFromPlaylist(state.library, state.route.id, target.dataset.id), () => renderView()),
     "set-library-tab": (target) => go(routeFor("library", { libTab: target.dataset.value })),
 
     /* appearance */
@@ -1340,18 +1505,43 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
 
     /* storage */
     "export-library": () => {
-      const blob = new win.Blob([storage.exportAll(state.library)], { type: "application/json" });
-      const url = win.URL.createObjectURL(blob);
-      const link = doc.createElement("a");
-      link.href = url;
-      link.download = "dhun-library.json";
-      link.click();
-      win.setTimeout(() => win.URL.revokeObjectURL(url), 1000);
-      showToast("Library exported.");
+      if (!storage.transactional && ["corrupt", "unreadable"].includes(storage.importGuard)) {
+        showToast("Export unavailable: the library shown may be incomplete. Keep browser data and the original backup; seek recovery help.", "warn");
+        return;
+      }
+      const download = (text, source = null, visitOnly = false) => {
+        const warning = backupExportWarning(text, source);
+        if (warning && !win.confirm?.(`${warning} Download the complete file anyway?`)) {
+          showToast(warning, "warn");
+          return;
+        }
+        const blob = new win.Blob([text], { type: "application/json" });
+        const url = win.URL.createObjectURL(blob);
+        const link = doc.createElement("a");
+        link.href = url;
+        link.download = "dhun-library.json";
+        link.click();
+        win.setTimeout(() => win.URL.revokeObjectURL(url), 1000);
+        showToast(warning ?? (visitOnly ? "Visit-only copy exported; it may differ from the saved library." : "Library exported."), warning || visitOnly ? "warn" : undefined);
+      };
+      const failed = (error) => showToast(`Export failed: ${error?.message ?? "the library could not be serialized"}. Your library was not changed.`, "warn");
+      try {
+        if (storage.transactional && storage.importGuard) {
+          if (!win.confirm?.("This tab contains uncommitted or potentially stale changes. Download this visit-only copy? It is not necessarily the committed library. Keep browser data and the original backup, and reopen DHUN to review other copies.")) return;
+          download(JSON.stringify({ app: "DHUN web", version: FORMAT_VERSION, exportedAt: new Date().toISOString(), ...state.library }, null, 2), state.library, true);
+          return;
+        }
+        if (storage.transactional && !storage.beginExclusive()) { showToast("A library operation is still in progress. Try again when it finishes.", "warn"); return; }
+        const text = storage.exportAll(state.library);
+        if (text && typeof text.then === "function") {
+          text.then((value) => { if (isActive()) download(value); }, failed).finally(() => storage.endExclusive());
+        } else { download(text, state.library); }
+      } catch (error) { storage.endExclusive?.(); failed(error); }
     },
     "import-library": async (target) => {
       const file = target.files?.[0];
       if (!file) return;
+      if (storage.beginExclusive && !storage.beginExclusive()) { showToast("A library operation is still in progress. Try again when it finishes.", "warn"); return; }
       try {
         const imported = await handleFileImport(file, storage);
         if (disposed) return;
@@ -1362,23 +1552,32 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       } catch (error) {
         if (disposed) return;
         renderView();
-        showToast(`Import failed: ${error?.message ?? "the file could not be read"}`, "warn");
+        const label = ["IMPORT_UNCERTAIN", "COMMIT_UNCERTAIN"].includes(error?.code) ? "Import unconfirmed" : "Import failed";
+        showToast(`${label}: ${error?.message ?? "the file could not be read"}`, "warn");
       } finally {
+        storage.endExclusive?.();
         if (!disposed) target.value = ""; // selecting the same file again must allow a retry
       }
     },
     "clear-library": () => openSheet({ kind: "clear-library" }),
     "confirm-clear-library": () => {
       const next = { ...state.library, likes: [], playlists: [], history: [], snapshots: {}, recentSearches: [] };
-      if (!commitLibrary(next)) return;
-      closeSheet();
-      renderView();
-      showToast("Library erased.");
+      afterCommit(next, () => {
+        closeSheet();
+        renderView();
+        showToast("Current library cleared. Older recovery and legacy copies may remain.");
+      });
     },
   };
 
   /* ------------------------------------------------------------- dispatch -- */
 
+  const libraryWrites = new Set(["clear-recent", "set-volume", "set-repeat", "toggle-like", "create-playlist", "confirm-delete-playlist", "add-to-playlist", "remove-from-playlist", "set-theme", "set-accent", "export-library", "confirm-clear-library"]);
+  function waitingForStorage(action) {
+    if (!storage.busy || !libraryWrites.has(action)) return false;
+    showToast("A library operation is still in progress. Try again when it finishes.", "warn");
+    return true;
+  }
   own(delegate(root, "click", "[data-action]", whileActive((event, target) => {
     // A `<form data-action>` names what its *submit* does. The click that a
     // submit button dispatches (and the one Enter dispatches before it) also
@@ -1388,6 +1587,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
     // Rename then saved nothing at all, and create ran twice.
     if (target.tagName === "FORM") return;
     const action = target.dataset.action;
+    if (waitingForStorage(action)) return;
     const handler = actions[action];
     if (!handler) return;
     if (target.tagName === "A" && target.getAttribute("href")?.startsWith("#")) {
@@ -1412,10 +1612,13 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   })));
 
   own(delegate(root, "input", "[data-action='seek']", whileActive((event, target) => actions.seek(target))));
-  own(delegate(root, "input", "[data-action='set-volume']", whileActive((event, target) => actions["set-volume"](target))));
+  own(delegate(root, "input", "[data-action='set-volume']", whileActive((event, target) => { if (!waitingForStorage("set-volume")) actions["set-volume"](target); })));
 
   own(delegate(root, "submit", "form[data-action]", whileActive((event, target) => {
     const action = target.dataset.action;
+    if (storage.busy && ["search-submit", "create-playlist", "rename-playlist"].includes(action)) {
+      event.preventDefault(); showToast("A library operation is still in progress. Try again when it finishes.", "warn"); return;
+    }
     if (action === "search-submit") actions["search-submit"](target, event);
     else if (action === "create-playlist" || action === "rename-playlist") {
       event.preventDefault();
@@ -1494,8 +1697,12 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
     const track = currentTrack(playerState);
     if (track && playerState.status === STATUS.playing && recordedPlayback !== player.playbackId) {
       recordedPlayback = player.playbackId;
-      state.library = rememberPlay(state.library, track);
-      save();
+      const record = () => {
+        if (disposed) return;
+        state.library = rememberPlay(state.library, track);
+        save();
+      };
+      if (storage.defer) storage.defer(record); else record();
     }
     renderChrome();
     if (state.route.player === "open") renderOverlay();
@@ -1537,8 +1744,13 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   function storageInfo() {
     return {
       persistent: storage.persistent,
-      note: storage.persistent
-        ? "Likes, playlists and history are stored in this browser's localStorage. Exporting writes a JSON file you keep; nothing is uploaded."
+      incomplete: !storage.transactional && ["corrupt", "unreadable"].includes(storage.importGuard),
+      note: !storage.transactional && ["corrupt", "unreadable"].includes(storage.importGuard)
+        ? "Saved data could not be read safely. This tab will not write. The library shown may be incomplete; do not delete browser data or the original backup. Seek recovery help."
+        : storage.importGuard
+        ? "The saved library needs review. This tab will not write again. Export this tab's library, keep the original backup, then open a fresh tab to review saved data."
+        : storage.persistent
+        ? (storage.transactional ? "Likes, playlists and history are stored in this browser's IndexedDB. Exporting writes a JSON file you keep; nothing is uploaded." : "Likes, playlists and history are stored in this browser's localStorage. Exporting writes a JSON file you keep; nothing is uploaded.")
         : "Storage could not confirm saving. Changes may last only for this visit; an older saved library may still exist. Export a backup, allow storage or free space, then retry.",
     };
   }
@@ -1661,6 +1873,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
     for (const stop of cleanups) stop();
     cleanups.clear();
     pwa?.destroy();
+    storage.close?.();
     player.destroy();
     attachMediaSession({ track: null, status: STATUS.idle });
   }

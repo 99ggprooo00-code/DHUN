@@ -28,10 +28,10 @@ Media/images and referrer/cache/headers are browser-managed; no packet audit her
 
 ## 2. What is stored on the device
 
-One key in `localStorage`: `dhun.web.v3` (see [DATA-SCHEMA.md](DATA-SCHEMA.md)).
+The `dhun.web.library` IndexedDB database and the retained legacy `localStorage` key `dhun.web.v3` (see [DATA-SCHEMA.md](DATA-SCHEMA.md)).
 It holds likes, playlists, history, recent searches, referenced track-display
 snapshots (including artwork URLs, blanked stream URLs), and settings;
-unreferenced snapshots are pruned. SW caches shell only, browser media caching is separate. Nothing is stored in cookies, `IndexedDB` or a server.
+unreferenced snapshots are pruned. SW caches shell only, browser media caching is separate. No library is stored in cookies or on a DHUN server. The database retains a previous record and may archive divergent legacy copies.
 
 The visitor can:
 
@@ -40,13 +40,13 @@ The visitor can:
 - **Export** it: Settings → This browser → Export library.
 - **Delete** it: Settings → This browser → "Erase library"
   asks for confirmation before it removes likes, playlists, history, snapshots
-  and recent searches. It keeps the settings. A single playlist can be deleted
+  and recent searches from the current library. Previous and legacy copies may retain them. It keeps the settings. A single playlist can be deleted
   from its own screen. The browser's site-data controls for the origin also
   remove the stored record, settings included.
 
 **Storage failure is not successful deletion.** Destructive library changes and
-replacement import now require a confirmed localStorage write before replacing
-in-tab data. Failed confirmations stay open with an announced error and retry;
+replacement import now require a completed IndexedDB transaction before replacing
+in-tab data. Failed confirmations stay open with an announced error; review and reopen before retrying;
 ordinary edits may remain visit-only with an explicit warning. Saved copies may
 still exist after refusal. The origin-wide browser controls can affect other
 projects on the same host; no DHUN action deletes wrapper/CDN/GitHub logs.
@@ -91,9 +91,9 @@ not under this repository's control on GitHub Pages.
 - Templates are built with the `html` helper in `dom.js`, which escapes every
   interpolated value unless the value is already marked as markup. Catalogue text
   is also converted with a plain-text function before it is used.
-- Imported files are read only if they are at most 8 MB, are JSON, and carry the
-  `app` marker. The normaliser then discards fields it does not know and clamps
-  numbers (see [DATA-SCHEMA.md](DATA-SCHEMA.md) §5).
+- Imports are capped at 24 MiB UTF-8 and checked for JSON token and nesting
+  budgets before parsing. Validation rejects data that normalization would discard
+  or change, rather than silently dropping it (see [DATA-SCHEMA.md](DATA-SCHEMA.md) §6).
 - Hash routes are parsed by the router; an unknown name opens Home.
 
 ## 7. Secrets

@@ -24,7 +24,7 @@ table cannot quietly describe a build that has moved on.
 | Claim | Evidence |
 |---|---|
 | The build assembles from the sources, and every module is reachable from `main.js` | `app-web/tools/build.mjs` — it fails on an unreachable module or a shell entry that is not in the build |
-| 311 assertions over modules and Node controller fixtures pass with no install and no network | `app-web/tests/` — routing, escaping, queue, stream selection, library shapes, API normalisation, transfer, screens, CSS coverage, shortcuts |
+| 339 assertions over modules and Node controller fixtures pass with no install and no network | `app-web/tests/` — routing, escaping, queue, stream selection, library shapes, API normalisation, transfer, screens, CSS coverage, shortcuts |
 | The web build is a real app, not a preview: regions before the module runs, a strict CSP, `noindex`, no third-party asset, no downloads surface, a labelled sample catalogue | `scripts/test_app_web.py` |
 | Every screen renders one `h1`, resets focus to it after navigation, and titles the document | `website/tests/browser.mjs` (`entity outline`, `/app/ dialog focus`) |
 | Rendered contrast meets 4.5:1 / 3:1 on every visible line, in both themes | `website/tests/browser.mjs` (`/app/ contrast`) |
@@ -77,7 +77,7 @@ verified and this file names the evidence; an unticked box means it was not.
   site + `/app/`, and `scripts/website_smoke.py` checks served bytes after an
   authorised deployment. No fresh deployment/canonical-origin verification is
   asserted by this audit.
-- [x] **The code is unit-tested** — `cd app-web && npm test` → 311 pass;
+- [x] **The code is unit-tested** — `cd app-web && npm test` → 339 pass;
   baseline Python suite (2026-10-28 before alignment): 466 tests OK. Fresh
   current results come from the executable commands and PR/CI output; audit 06
   retains earlier alignment results, not a new run inferred from a count.
@@ -116,6 +116,17 @@ gates, neither makes the other unnecessary.
 3. Only then: the second browser and the phone, the screen-reader pass, and the
    release decision.
 
+
+## Transactional library storage
+
+The application opens IndexedDB asynchronously, checks revisions in write
+transactions, retains a previous record and legacy key, and offers explicit
+recovery when older builds diverge. IndexedDB and localStorage cannot be locked
+atomically; old tabs and browser eviction remain limitations. The clear action
+clears the current library, not retained recovery copies. See [DATA-SCHEMA.md](DATA-SCHEMA.md)
+and [RUNBOOK.md](RUNBOOK.md). Chromium tests use synthetic data, injected failures,
+a quota override and a frozen complete old app; they do not establish behavior
+on every browser or physical device.
 
 ## Controlled runtime reliability coverage
 

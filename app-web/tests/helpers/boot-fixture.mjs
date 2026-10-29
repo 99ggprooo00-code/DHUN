@@ -4,6 +4,7 @@
  * user data or sound hardware. They do not prove layout, focus or media output.
  */
 import { boot } from "../../src/js/main.js";
+import { createStorage } from "../../src/js/library.js";
 import { API_SOURCES } from "../../src/js/api.js";
 
 export const settle = () => new Promise((resolve) => setImmediate(resolve));
@@ -138,7 +139,7 @@ function fetchDouble({ respectAbort = true, fail = () => false } = {}) {
   return { calls, fetchImpl, close() { closed = true; for (const call of calls) call.succeed(); } };
 }
 
-export function bootFixture(t, { hash = "#/search", replaceSearchFields = false, ...fetchOptions } = {}) {
+export function bootFixture(t, { hash = "#/search", replaceSearchFields = false, storageSeed = [], ...fetchOptions } = {}) {
   const dom = documentDouble(replaceSearchFields);
   const transport = fetchDouble(fetchOptions);
   const win = new Events(); win.self = win; win.top = win;
@@ -154,7 +155,7 @@ export function bootFixture(t, { hash = "#/search", replaceSearchFields = false,
   const timers = new Map(); let timerId = 0;
   win.setTimeout = (fn) => { timers.set(++timerId, fn); return timerId; };
   win.clearTimeout = (id) => timers.delete(id);
-  const saved = new Map();
+  const saved = new Map(storageSeed);
   const storage = { getItem: (key) => saved.get(key) ?? null, setItem: (key, value) => saved.set(key, String(value)), removeItem: (key) => saved.delete(key) };
   const mounts = [];
   function mount() {
@@ -163,7 +164,7 @@ export function bootFixture(t, { hash = "#/search", replaceSearchFields = false,
     try {
       globalThis.fetch = transport.fetchImpl;
       Object.defineProperty(globalThis, "localStorage", { configurable: true, value: storage });
-      const mounted = boot({ win, doc: dom.doc }); mounts.push(mounted); return mounted;
+      const mounted = boot({ win, doc: dom.doc, storage: createStorage(storage) }); mounts.push(mounted); return mounted;
     } catch (error) {
       transport.close(); throw error;
     } finally {
@@ -190,7 +191,7 @@ export function bootFixture(t, { hash = "#/search", replaceSearchFields = false,
     }
   }
   return {
-    ...app, win, doc: dom.doc, root: dom.root, calls: transport.calls, audio: dom.audio,
+    ...app, win, doc: dom.doc, root: dom.root, calls: transport.calls, audio: dom.audio, backing: storage, saved,
     timers, mediaQueries, mount,
     navigate(next, { historyState = null } = {}) { win.location.hash = next; win.history.state = historyState; win.emit("hashchange"); },
     submit(query) {

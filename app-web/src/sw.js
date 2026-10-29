@@ -27,7 +27,7 @@
  * old cache is deleted rather than accumulating.
  */
 
-const DEFAULT_CACHE = "dhun-web-v3.0.8";
+const DEFAULT_CACHE = "dhun-web-v3.0.10";
 
 /** Everything the interface needs to open offline. Kept as an explicit list so
  *  a forgotten module is a missing-file error in development rather than a
@@ -45,6 +45,9 @@ const SHELL = [
   "./js/icons.js",
   "./js/api.js",
   "./js/library.js",
+  "./js/indexeddb-storage.js",
+  "./js/app-storage.js",
+  "./js/backup-policy.js",
   "./js/player.js",
   "./js/router.js",
   "./js/components.js",

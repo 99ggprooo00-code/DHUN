@@ -252,15 +252,17 @@ test("the settings screen says what this browser is storing, and offers a way ou
   const markup = text(screens.settings());
   assert.ok(markup.includes("Kept in this browser") || markup.includes("browser only") || markup.includes("this browser"));
   assert.ok(markup.includes("Export library"));
+  assert.match(String(markup), /up to 24 MiB of UTF-8 JSON/);
+  assert.match(String(markup), /browser storage quota or available memory/);
   assert.ok(markup.includes("Import library"));
   assert.ok(markup.includes("Erase library"), "the delete control must name its actual scope");
   assert.ok(!markup.includes("Erase everything"), "settings and shell cache are kept");
   assert.ok(!markup.includes("Equalizer"), "the browser cannot honour the app's equaliser, so it must not draw one");
 });
 
-test("a private window is told that nothing is being saved", () => {
+test("a guarded tab does not claim its changes are saved", () => {
   const markup = text(views.libraryScreen(libraryVm({ storage: { persistent: false, note: "" } })));
-  assert.ok(markup.includes("not saving data") || markup.includes("not saving"));
+  assert.ok(markup.includes("cannot confirm saving"));
 });
 
 test("the about screen renders the web build's own pages", () => {

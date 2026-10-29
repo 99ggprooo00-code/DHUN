@@ -43,8 +43,9 @@ address may carry `player=open`, and `ptab` selects its Queue or Lyrics tab.
 
 1. The framing check runs first. If the page is inside a frame, the framed
    refusal screen is drawn and nothing else starts.
-2. The library is read from `localStorage`. A missing or unreadable record starts
-   an empty library. It is not shown as an error.
+2. The library is opened asynchronously from IndexedDB, migrating a valid legacy
+   `localStorage` key if necessary. Unreadable, corrupt or diverged data opens
+   recovery and does not enable writes.
 3. The router, player, shell and shortcuts are created.
 4. The service worker is registered (see [TRD.md](TRD.md) §6).
 5. Home loads its shelves if the route is Home. A search route in the address
@@ -104,7 +105,7 @@ Home or Search  →  track row  →  Play
 - Settings → This browser → **Export library** writes a JSON file (`app:
   "DHUN web"`, `version: 3`). The file is saved by the browser; nothing is
   uploaded.
-- Settings → This browser → **Import library** accepts a file of at most 8 MB
+- Settings → This browser → **Import library** accepts a file of at most 24 MiB (UTF-8), subject to complexity and storage limits
   whose `app` field is `DHUN web`. Any other file is refused with the reason
   shown. A valid file replaces the library on this device.
 

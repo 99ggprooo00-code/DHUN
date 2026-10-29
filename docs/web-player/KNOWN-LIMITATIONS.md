@@ -56,7 +56,7 @@ absent rather than stubbed:
   "download" control to find.
 - **No cache-budget setting.** There is no audio cache to budget.
 - **No account, no sync, no server copy.** The library is this browser's
-  `localStorage`, under one key. Another device, another browser or a cleared
+  IndexedDB database, with retained legacy and recovery copies. Another device, another browser or a cleared
   profile is an empty library. Export and import are the only way to move it.
 - **No catalog browser.** The Android build has a browsable catalogue; the web
   build has Home, Search, and the pages a row or a card links to.
@@ -81,8 +81,8 @@ absent rather than stubbed:
 ## This browser, not that one
 
 - **Storage is per browser and per origin.** A private window may throw on write
-  or forget what it wrote; the app detects that, keeps the library in memory, and
-  says so on Settings instead of promising a save.
+  or forget what it wrote; startup may require recovery and later failed edits may
+  remain visit-only. Browser eviction cannot always be detected.
 - **The keyboard map is global to the page.** It is not taken from text fields
   and not from combinations the browser owns, but a browser extension can take
   those keys first.
@@ -112,7 +112,7 @@ for executable failure coverage; this is not a blanket “everything works” cl
 When storage cannot acknowledge a write, destructive changes and replacement
 import stay failed rather than pretending to erase/replace durable data. Ordinary
 edits can still work for the visit with warnings. Multi-tab lost updates,
-corrupt-record recovery/backup and silent truncation of over-limit stored lists
-during startup normalization, uncertain durable outcomes after a failed import
+corrupt-record recovery/backup and incomplete visit-only views of guarded
+legacy data, uncertain durable outcomes after a failed import
 readback, real stream lifetime/stalls and non-Chromium/device
 acceptance remain follow-ups. No actual provider audio was heard in this task.
