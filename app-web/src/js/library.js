@@ -199,6 +199,134 @@ export function normaliseLibrary(raw) {
   return pruneSnapshots({ likes, playlists, history, snapshots, recentSearches, settings });
 }
 
+/** Parse valid JSON while rejecting duplicate object keys (including escapes).
+ * JSON.parse alone silently keeps the last occurrence. The iterative scan runs
+ * only after syntax validation and does not recurse on an untrusted document. */
+export function parseImportJSON(text) {
+  let parsed;
+  try { parsed = JSON.parse(text); } catch { throw new Error("the file is not JSON"); }
+  const stack = [];
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    if (char === '"') {
+      const start = i;
+      i += 1;
+      while (i < text.length) {
+        if (text[i] === "\\") { i += 2; continue; }
+        if (text[i] === '"') break;
+        i += 1;
+      }
+      let next = i + 1;
+      while (/\s/.test(text[next] ?? "") && next < text.length) next += 1;
+      if (text[next] === ":") {
+        const keys = stack[stack.length - 1];
+        const key = JSON.parse(text.slice(start, i + 1));
+        if (keys.has(key)) throw new Error("the file contains a duplicate JSON object key; no library was replaced");
+        keys.add(key);
+      }
+    } else if (char === "{") stack.push(new Set());
+    else if (char === "[") stack.push(null);
+    else if (char === "}" || char === "]") stack.pop();
+  }
+  return parsed;
+}
+
+/**
+ * Import is a replacement, not startup recovery. Reject anything that the
+ * permissive storage reader would silently drop or change. Missing optional
+ * snapshot fields and settings receive the same defaults as older v3 exports.
+ */
+export function validateImport(raw) {
+  const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+  const invalid = (path, why) => { throw new Error(`Invalid library: ${path} ${why}. The current library was not replaced.`); };
+  if (!object(raw) || raw.app !== "DHUN web") invalid("file", "is not a DHUN web export");
+  if (raw.version !== FORMAT_VERSION) invalid("version", `must be ${FORMAT_VERSION}`);
+  const fields = ["likes", "playlists", "history", "snapshots", "recentSearches", "settings"];
+  for (const key of Object.keys(raw)) {
+    if (![...fields, "app", "version", "exportedAt"].includes(key)) invalid(key, "is an unsupported field");
+  }
+  for (const key of ["likes", "playlists", "history", "recentSearches"]) {
+    if (!Array.isArray(raw[key])) invalid(key, "must be an array");
+    if (raw[key].length > LIBRARY_LIMITS[key]) invalid(key, `exceeds the limit of ${LIBRARY_LIMITS[key]}`);
+  }
+  if (!object(raw.snapshots)) invalid("snapshots", "must be an object");
+  if (!object(raw.settings)) invalid("settings", "must be an object");
+  if (raw.exportedAt !== undefined && typeof raw.exportedAt !== "string") invalid("exportedAt", "must be text");
+
+  const id = (value, path) => {
+    if (!(typeof value === "string" || (typeof value === "number" && Number.isFinite(value))) || !String(value)) {
+      invalid(path, "must be a nonempty string or number");
+    }
+    return String(value);
+  };
+  const unique = (values, path) => {
+    const seen = new Set();
+    for (const value of values) {
+      if (seen.has(value)) invalid(path, "contains a duplicate entry");
+      seen.add(value);
+    }
+  };
+  unique(raw.likes.map((v) => id(v, "likes")), "likes");
+  const playlistIds = [];
+  for (const playlist of raw.playlists) {
+    if (!object(playlist)) invalid("playlist", "must be an object");
+    playlistIds.push(id(playlist.id, "playlist id"));
+    if (typeof playlist.name !== "string" || !playlist.name.trim()) invalid("playlist name", "must be nonempty text");
+    if (!Array.isArray(playlist.trackIds)) invalid("playlist trackIds", "must be an array");
+    if (playlist.trackIds.length > LIBRARY_LIMITS.playlistTracks) invalid("playlist trackIds", `exceeds the limit of ${LIBRARY_LIMITS.playlistTracks}`);
+    unique(playlist.trackIds.map((v) => id(v, "playlist track id")), "playlist trackIds");
+  }
+  unique(playlistIds, "playlist ids");
+  for (const entry of raw.history) {
+    if (typeof entry === "string") id(entry, "history id");
+    else if (object(entry)) id(entry.id, "history id");
+    else invalid("history entry", "must contain an id");
+  }
+  for (const [key, value] of Object.entries(raw.snapshots)) {
+    if (!object(value) || id(value.id, "snapshot id") !== key) invalid("snapshot", "must have an id matching its key");
+  }
+  for (const value of raw.recentSearches) {
+    if (typeof value !== "string" || !value.trim()) invalid("recentSearches", "must contain nonempty text");
+  }
+
+  let normalized;
+  try { normalized = normaliseLibrary(raw); }
+  catch { invalid("file", "has an invalid nested structure"); }
+
+  // Compare every supplied value, including unknown fields. Extra defaults are
+  // fine; removed fields, clamping, truncation and duplicate collapsing are not.
+  // Legacy numeric IDs/numeric strings and whitespace trimming are lossless
+  // representations accepted by the existing reader.
+  function compare(input, output, path) {
+    if (input === output) return;
+    if (typeof input === "number" && typeof output === "string" && String(input) === output) return;
+    if (typeof input === "string" && typeof output === "number" && input.trim() && Number.isFinite(Number(input)) && Number(input) === output) return;
+    if (typeof input === "string" && typeof output === "string" && input.trim() === output) return;
+    if (Array.isArray(input) && Array.isArray(output)) {
+      if (input.length !== output.length) invalid(path, "would lose entries during import");
+      input.forEach((value, i) => compare(value, output[i], `${path}[${i}]`));
+      return;
+    }
+    if (object(input) && object(output)) {
+      for (const key of Object.keys(input)) {
+        if (!Object.hasOwn(output, key)) invalid(`${path}.${key}`, "would be discarded or is unsupported");
+        compare(input[key], output[key], `${path}.${key}`);
+      }
+      return;
+    }
+    invalid(path, "would change during import");
+  }
+  for (const field of fields) {
+    if (field === "history") {
+      raw.history.forEach((entry, i) => {
+        if (typeof entry === "string") compare(entry, normalized.history[i]?.id, `history[${i}]`);
+        else compare(entry, normalized.history[i], `history[${i}]`);
+      });
+    } else compare(raw[field], normalized[field], field);
+  }
+  return normalized;
+}
+
 /* ------------------------------------------------------------- operations -- */
 
 /** Add or remove a like. Returns the new state and which way it went. */
@@ -368,10 +496,10 @@ export function createStorage(backing, key = STORAGE_KEY) {
       return JSON.stringify({ app: "DHUN web", version: FORMAT_VERSION, exportedAt: new Date().toISOString(), ...library }, null, 2);
     },
     importAll(text) {
-      const parsed = JSON.parse(text);
-      const library = normaliseLibrary(parsed);
+      const parsed = parseImportJSON(text);
+      const library = validateImport(parsed);
       if (!this.save(library, { requirePersistence: true })) {
-        throw new Error("This browser could not confirm saving the imported library. Previous in-tab data was kept. Allow storage or free space, then try again.");
+        throw new Error("This browser could not confirm saving the imported library. Previous in-tab data was kept, but the saved copy may have changed. Export a backup before closing; allow storage or free space, then try again.");
       }
       return library;
     },

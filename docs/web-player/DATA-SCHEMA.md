@@ -99,9 +99,8 @@ These are enforced when a list is written. Each limit is in
 | Snapshots | None of their own | Snapshots exist only for ids the likes, history or playlists refer to, so the total is bounded by the limits above. Unreferenced snapshots are removed (`pruneSnapshots`). |
 
 History and recent searches roll over silently. The saved-collection limits
-refuse new entries rather than evicting existing ones. Loading or importing an
-over-limit document still truncates lists during normalization; it does not warn
-or back up the original document.
+refuse new entries rather than evicting existing ones. Loading an over-limit
+stored document still truncates lists during normalization; import rejects it.
 
 ## 5. Reading a stored document back
 
@@ -131,17 +130,36 @@ uploaded.
 
 **Import** a file that Export library wrote (Settings → This browser → Import library):
 
-1. The file must be at most **8 MB**.
-2. It must be valid JSON.
-3. Its `app` field must be exactly `DHUN web`. Any other file is refused with the
-   reason.
-4. The document is normalised (§5) and saved with acknowledgement **before**
-   replacing the in-tab library. If saving fails, the old in-tab data remains,
-   an import failure is displayed, and the same file can be selected for retry.
+1. The file must be at most **8 MB**, valid JSON with no duplicate object keys,
+   `app: "DHUN web"`, and `version: 3` (`FORMAT_VERSION`).
+2. All six library fields in §2 must be present with the documented array/object
+   shapes. Playlists need an id, nonempty name and track-id array; snapshot ids
+   must match their keys. Unknown top-level fields are rejected except the export
+   metadata (`app`, `version`, `exportedAt`).
+3. Existing §4 collection limits, 120-character playlist names, 400-character
+   descriptions and 40-character `sourceId` apply. Duplicate likes, playlist
+   ids, playlist track ids or searches that collapse on normalization are refused.
+   Invalid nested values, unsupported snapshot fields, orphan snapshots and
+   values that would be clamped, truncated or discarded are refused with a reason.
+   This also rejects older exports carrying obsolete equalizer settings rather
+   than silently discarding them. Keep the original file and inspect it if refused.
+4. Compatibility conversions already used by the storage reader are accepted when
+   they preserve the supplied values: numeric ids to strings, numeric strings to
+   numbers, whitespace trim,
+   historical string history entries, and defaults for missing optional nested
+   fields/settings. Missing snapshots for referenced ids are permitted for older
+   libraries; such rows may not be visible until their metadata is recovered.
+5. Validation completes before any write. On validation failure both in-tab and
+   stored data are untouched. A valid candidate is written to the single storage
+   key and read back before replacing in-tab data. If the write fails, the in-tab
+   library remains. If readback fails after a successful write, the durable copy
+   may already have changed; export the in-tab library before closing and verify
+   storage. There is no cross-tab transaction or compare-and-swap, and rollback
+   could overwrite another tab's changes. The file itself is never modified.
 
-The file's `version` must be `3` (`FORMAT_VERSION`). Any other version, or none, is
-refused with the version named, and the library is not touched. A future format
-needs its own reader before its files can be imported.
+Startup's permissive recovery (§5) is unchanged; import is intentionally stricter
+because it replaces a library. A backup exported from another browser still needs
+to fit the existing 8 MB import limit. No import of other format versions is made.
 
 ## 7. What is not stored
 
