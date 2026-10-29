@@ -5,10 +5,9 @@ import { checkBackupText } from "./backup-policy.js";
  *
  * THE MODEL. There is no account and no DHUN server, so "your library" is this
  * browser's storage: likes, playlists you made, what you played, and the handful
- * of settings the app remembers. `localStorage` is used because the whole
- * library is small — a track snapshot is a few hundred bytes and the cap below
- * is deliberately generous rather than clever. A service-worker cache is not a
- * database and IndexedDB would be a second failure mode for a first feature.
+ * of settings the app remembers. Production uses revision-checked IndexedDB;
+ * the legacy localStorage adapter below is retained only for compatibility and
+ * unit tests. A service-worker cache is not a library database.
  *
  * THE SNAPSHOT RULE. Likes and history store the *row the visitor saw*, not only
  * an id. A saved id that can only be drawn by asking the network is a library
@@ -16,10 +15,9 @@ import { checkBackupText } from "./backup-policy.js";
  * snapshot is the fallback. Playlists store ids and look rows up in that same
  * snapshot table, which is why a playlist survives a reload with no connection.
  *
- * PRIVATE MODE. Some browsers throw on `localStorage.setItem` (quota) and some
- * expose a storage that forgets immediately (private windows). Both are handled
- * by keeping the state in memory and reporting `persistent: false`, which the
- * Settings screen shows instead of promising a save that did not happen.
+ * STORAGE FAILURE. Startup requires recovery if data cannot be read safely.
+ * Later transaction failures guard further writes and report visit-only edits;
+ * browser quota, eviction and private-window behavior remain platform-dependent.
  */
 
 export const STORAGE_KEY = "dhun.web.v3";
@@ -519,7 +517,8 @@ export function historySongs(library) {
 /* ---------------------------------------------------------------- storage -- */
 
 /**
- * A storage handle with an in-memory mirror.
+ * Legacy synchronous storage handle retained for compatibility and tests.
+ * Production boot uses openAppStorage and the IndexedDB adapter instead.
  *
  * `persistent` is the honest answer to "did that save?". A private window can
  * accept a `setItem` and forget it, so the flag is set by a write-then-read
@@ -690,5 +689,5 @@ export function createStorage(backing, key = STORAGE_KEY) {
   };
 }
 
-// Transactional adapter is under development; app boot still uses createStorage.
-export { createIndexedDBStorage } from "./indexeddb-storage.js";
+// Production transactional adapter and explicit recovery inspection.
+export { createIndexedDBStorage, inspectIndexedDBRecovery, acknowledgeLegacyDivergence, restoreMissingCurrent } from "./indexeddb-storage.js";

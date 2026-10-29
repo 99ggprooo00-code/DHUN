@@ -51,6 +51,7 @@ import { chromium } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { newAppContext } from "./catalogue-fixture.mjs";
 import { checkIndexedDBStorage } from "./indexeddb-check.mjs";
+import { checkIntegratedStorage } from "./integrated-storage.mjs";
 import { installSyntheticPlayback } from "./runtime-fixtures.mjs";
 import { API_SOURCES } from "../../app-web/src/js/api.js";
 
@@ -2035,10 +2036,11 @@ async function checkWebLibraryBack(browser) {
       const page = await context.newPage();
       await page.goto(url("/app/#/settings"), { waitUntil: "load" });
       await page.evaluate(async () => {
-        const { createStorage, emptyLibrary, toggleLike, rememberPlay } = await import("/app/js/library.js");
+        const { createIndexedDBStorage, emptyLibrary, toggleLike, rememberPlay } = await import("/app/js/library.js");
         const song = { id: "navigation-fixture", title: "Navigation fixture", album: { id: "album-fixture", name: "Fixture album" } };
         const library = rememberPlay(toggleLike(emptyLibrary(), song).library, song, 1234);
-        if (!createStorage().save(library)) throw new Error("browser fixture could not be saved");
+        const storage = await createIndexedDBStorage();
+        try { await storage.save(library); } finally { storage.close(); }
       });
       await page.goto(url(`/app/#/library/${tab}`), { waitUntil: "load" });
       await page.reload({ waitUntil: "load" });
@@ -2062,6 +2064,7 @@ async function checkWebHistoryOrigins(browser) {
   try {
     const page = await context.newPage();
     await page.goto(url("/app/#/search?q=rain"), { waitUntil: "load" });
+    await page.locator('.dhun-tabs-nav [data-tab="SEARCH"][aria-current="page"]').waitFor();
     await page.evaluate(() => { location.hash = "#/album/album-fixture"; });
     await page.locator('.dhun-tabs-nav [data-tab="SEARCH"][aria-current="page"]').waitFor();
     await page.locator('.dhun-tabs-nav [data-tab="LIBRARY"]').click();
@@ -2102,6 +2105,7 @@ async function checkWebConsecutiveDetails(browser) {
     const page = await context.newPage();
     const selectedSearch = '.dhun-tabs-nav [data-tab="SEARCH"][aria-current="page"]';
     await page.goto(url("/app/#/search?q=rain"), { waitUntil: "load" });
+    await page.locator(selectedSearch).waitFor();
     for (const id of ["first", "second"]) {
       await page.evaluate((id) => { location.hash = `#/album/${id}`; }, id);
       await page.waitForURL(new RegExp(`#\\/album\\/${id}$`));
@@ -2652,27 +2656,35 @@ async function checkWebLegal(browser) {
 
     // Disposable context, fictional metadata only; never touch a user's library.
     await page.evaluate(async () => {
-      const { emptyLibrary, createStorage, toggleLike, rememberPlay, rememberSearch, createPlaylist, normaliseLibrary } = await import("./js/library.js");
+      const { emptyLibrary, createIndexedDBStorage, toggleLike, rememberPlay, rememberSearch, createPlaylist, normaliseLibrary } = await import("./js/library.js");
       const song = { id: "audit-local-only", title: "Synthetic audit row", artist: "Test", stream: "", image: "" };
       let library = toggleLike(emptyLibrary(), song).library;
       library = rememberPlay(library, song);
       library = rememberSearch(library, "synthetic local audit query");
       library = createPlaylist(library, "Synthetic audit playlist").library;
       library.settings = { ...library.settings, theme: "light", accent: "amber", volume: 0.25 };
-      createStorage().save(normaliseLibrary(library));
+      const storage = await createIndexedDBStorage();
+      try { await storage.save(normaliseLibrary(library)); } finally { storage.close(); }
     });
     await page.goto(`${BASE}/app/#/settings`);
     await page.reload({ waitUntil: "networkidle" });
     await page.locator('[data-action="clear-library"]').waitFor();
     const before = await page.evaluate(async () => {
       await navigator.serviceWorker.ready;
-      return { library: JSON.parse(localStorage.getItem("dhun.web.v3")), caches: await caches.keys() };
+      const { createIndexedDBStorage } = await import("/app/js/library.js");
+      const storage = await createIndexedDBStorage();
+      try { return { library: await storage.read(), caches: await caches.keys() }; } finally { storage.close(); }
     });
     await page.getByRole("button", { name: "Erase library", exact: true }).click();
     const dialog = await page.locator('.dhun-sheet[role="dialog"]').innerText();
-    if (!/Settings and the offline shell cache remain/.test(dialog)) fail("/app/ erase disclosure", "confirmation does not state what remains");
+    if (!/Settings and the offline shell cache remain/.test(dialog) || !/Older recovery records and legacy storage may still contain data/.test(dialog)) fail("/app/ erase disclosure", "confirmation does not state what remains");
     await page.locator('[data-action="confirm-clear-library"]').click();
-    const after = await page.evaluate(async () => ({ library: JSON.parse(localStorage.getItem("dhun.web.v3")), caches: await caches.keys() }));
+    await page.getByText(/Current library cleared/).waitFor();
+    const after = await page.evaluate(async () => {
+      const { createIndexedDBStorage } = await import("/app/js/library.js");
+      const storage = await createIndexedDBStorage();
+      try { return { library: await storage.read(), caches: await caches.keys() }; } finally { storage.close(); }
+    });
     const settingsRetained = Object.keys(before.library.settings).length === Object.keys(after.library.settings).length && Object.entries(before.library.settings).every(([key, value]) => after.library.settings[key] === value);
     const scopes = ["likes", "playlists", "history", "recentSearches"];
     if (!scopes.every((key) => before.library[key].length > 0 && after.library[key].length === 0) || !before.caches.length || Object.keys(after.library.snapshots).length || !settingsRetained || !before.caches.every((key) => after.caches.includes(key))) {
@@ -2697,159 +2709,93 @@ async function checkWebLegal(browser) {
 // contrast measurement behind it.
 /** Fault injection uses disposable synthetic data; no real user library. */
 async function checkWebStorageFailures(browser) {
-  const seed = {
-    likes: ["runtime-kept"], history: [], recentSearches: [],
+  const key = "dhun.web.v3";
+  const seed = { likes: ["runtime-kept"], history: [], recentSearches: [],
     playlists: [{ id: "pl-runtime", name: "Runtime playlist", trackIds: ["runtime-kept"], createdAt: 1, updatedAt: 1 }],
     snapshots: { "runtime-kept": { id: "runtime-kept", title: "Runtime preserved row", artist: "Synthetic fixture", duration: 1, stream: "", image: "" } },
-    settings: { theme: "light", accent: "amber", volume: 0.25, repeat: "off", shuffle: false, sourceId: "" },
-  };
-  const key = "dhun.web.v3";
-  const problems = [];
-  const watch = page => {
-    page.on("pageerror", error => problems.push(`pageerror: ${error.message}`));
-    page.on("console", message => { if (message.type() === "error" && !NETWORK_NOISE.test(message.text())) problems.push(message.text()); });
-    page.on("response", response => { if (response.status() >= 400 && new URL(response.url()).origin === new URL(BASE).origin) problems.push(`HTTP ${response.status()} ${new URL(response.url()).pathname}`); });
-    return page;
-  };
+    settings: { theme: "light", accent: "amber", volume: 0.25, repeat: "off", shuffle: false, sourceId: "" } };
   const contexts = [];
-  const fresh = async () => {
-    const context = await newAppContext(browser, { viewport: { width: 390, height: 844 } });
-    contexts.push(context); return context;
-  };
-  const prepare = async (context, denyProbe = false) => context.addInitScript(({ key, seed, denyProbe }) => {
+  const fresh = async () => { const context = await newAppContext(browser, { viewport: { width: 390, height: 844 }, serviceWorkers: "block" }); contexts.push(context); return context; };
+  const prepare = context => context.addInitScript(({ key, seed }) => {
     if (localStorage.getItem(key) === null) localStorage.setItem(key, JSON.stringify(seed));
-    window.__runtimeDenyWrites = denyProbe;
-    const write = Storage.prototype.setItem;
-    Storage.prototype.setItem = function (name, value) {
-      if (window.__runtimeDenyWrites) throw new DOMException("Controlled test storage refusal", "QuotaExceededError");
-      return write.call(this, name, value);
+    const put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (...args) {
+      const request = put.apply(this, args);
+      if (window.__runtimeAbortWrites) this.transaction.abort(); // injected transaction abort, not observed quota
+      return request;
     };
-  }, { key, seed, denyProbe });
-  const saved = page => page.evaluate(key => JSON.parse(localStorage.getItem(key)), key);
+  }, { key, seed });
+  const saved = page => page.evaluate(async () => {
+    const db = await new Promise((resolve, reject) => { const r = indexedDB.open("dhun.web.library"); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
+    return new Promise((resolve, reject) => { const r = db.transaction("library").objectStore("library").get("current"); r.onsuccess = () => { db.close(); resolve(JSON.parse(r.result.library)); }; r.onerror = () => reject(r.error); });
+  });
   try {
     let context = await fresh();
     await context.addInitScript(() => Object.defineProperty(window, "localStorage", { get() { throw new DOMException("Controlled storage policy", "SecurityError"); } }));
-    let page = watch(await context.newPage()); const errors = [];
-    page.on("pageerror", error => errors.push(error.message));
-    await page.goto(url("/app/#/settings"));
-    await page.locator('[data-action="clear-library"]').waitFor();
-    await page.getByText(/library shown may be incomplete.*do not delete browser data/i).waitFor();
-    if (errors.length) fail("/app/ storage getter", errors.join(" | "));
-    else record("/app/ storage getter", "blocked localStorage property does not crash Settings startup; the incomplete fallback is not presented as recovered data");
+    let page = await context.newPage(); await page.goto(url("/app/#/settings"));
+    await page.getByRole("heading", { name: "Saved data needs review" }).waitFor();
+    record("/app/ storage getter", "injected unreadable legacy storage opens recovery rather than a writable empty library");
 
-    context = await fresh(); await prepare(context, true); page = watch(await context.newPage());
-    await page.goto(url("/app/#/library/likes"));
-    await page.getByText("Runtime preserved row", { exact: true }).first().waitFor();
-    if ((await saved(page)).likes[0] !== "runtime-kept") fail("/app/ read-only storage", "saved fixture was modified");
-    else record("/app/ read-only storage", "denied write probe still loads existing readable likes and does not wipe the saved copy");
-
-    context = await fresh(); await prepare(context); page = watch(await context.newPage());
-    await page.goto(url("/app/#/settings"));
-    await page.locator('[data-action="clear-library"]').waitFor();
-    await page.evaluate(() => { window.__runtimeDenyWrites = true; });
+    context = await fresh(); await prepare(context); page = await context.newPage();
+    await page.goto(url("/app/#/settings")); await page.locator('[data-action="clear-library"]').waitFor();
+    await page.evaluate(() => { window.__runtimeAbortWrites = true; });
     await page.locator('[data-action="clear-library"]').click();
     await page.locator('[data-action="confirm-clear-library"]').click();
-    const alert = page.locator('[role="dialog"] [role="alert"]');
-    await alert.waitFor();
-    const focusInsideFailure = await page.evaluate(() => document.querySelector('[role="dialog"]')?.contains(document.activeElement));
-    if (!focusInsideFailure || !(await page.locator('[data-action="confirm-clear-library"]').isVisible()) || (await saved(page)).likes[0] !== "runtime-kept" || /Library erased\./.test(await page.locator("#dhun-toast").innerText())) {
-      fail("/app/ failed erase", "confirmation/state/saved copy or failure feedback violated the acknowledgement contract");
-    } else record("/app/ failed erase", "quota failure retains the confirmation and saved library, with an announced inline failure instead of success");
+    await page.locator('[role="dialog"] [role="alert"]').waitFor();
+    const focused = await page.evaluate(() => document.querySelector('[role="dialog"]')?.contains(document.activeElement));
+    if (!focused || (await saved(page)).likes[0] !== "runtime-kept" || /Current library cleared/.test(await page.locator("#dhun-toast").innerText())) fail("/app/ failed erase", "injected abort lost focus/data or reported success");
+    else record("/app/ failed erase", "injected IndexedDB abort preserves the saved library and confirmation, with an announced failure");
     const axe = await new AxeBuilder({ page }).include('[role="dialog"]').analyze();
     const severe = axe.violations.filter(item => ["serious", "critical"].includes(item.impact));
     if (severe.length) fail("/app/ erase failure accessibility", severe.map(item => item.id).join(", "));
     else record("/app/ erase failure accessibility", "failed destructive confirmation has no serious/critical axe violation");
-    await page.evaluate(() => { window.__runtimeDenyWrites = false; });
-    await page.locator('[data-action="confirm-clear-library"]').click();
-    await page.reload();
-    await page.locator('[data-action="clear-library"]').waitFor();
+    await page.reload(); await page.locator('[data-action="clear-library"]').click();
+    await page.locator('[data-action="confirm-clear-library"]').click(); await page.getByText(/Current library cleared/).waitFor();
+    await page.reload(); await page.locator('[data-action="clear-library"]').waitFor();
     const erased = await saved(page);
-    if (erased.likes.length || erased.playlists.length || Object.keys(erased.snapshots).length || erased.settings.theme !== "light") fail("/app/ erase retry", "same-handle retry failed or changed retained settings");
-    else record("/app/ erase retry", "restoring write permission allows the same confirmation to finish; reload confirms cleared library and retained settings");
+    if (erased.likes.length || erased.playlists.length || Object.keys(erased.snapshots).length || erased.settings.theme !== "light") fail("/app/ erase retry", "fresh session did not retain settings and clear the current library");
+    else record("/app/ erase retry", "after reopening, successful erase survives reload and retains settings; previous/legacy copies remain");
 
-    context = await fresh(); await prepare(context); page = watch(await context.newPage());
-    await page.goto(url("/app/#/collection/pl-runtime"));
-    await page.locator('[data-action="delete-playlist"]').waitFor();
-    await page.evaluate(() => { window.__runtimeDenyWrites = true; });
-    await page.locator('[data-action="delete-playlist"]').click();
-    await page.locator('[data-action="confirm-delete-playlist"]').click();
+    context = await fresh(); await prepare(context); page = await context.newPage();
+    await page.goto(url("/app/#/collection/pl-runtime")); await page.locator('[data-action="delete-playlist"]').waitFor();
+    await page.evaluate(() => { window.__runtimeAbortWrites = true; });
+    await page.locator('[data-action="delete-playlist"]').click(); await page.locator('[data-action="confirm-delete-playlist"]').click();
     await page.locator('[role="dialog"] [role="alert"]').waitFor();
-    if ((await saved(page)).playlists.length !== 1) fail("/app/ playlist delete refusal", "failed delete changed the saved playlist");
-    await page.evaluate(() => { window.__runtimeDenyWrites = false; });
-    await page.locator('[data-action="confirm-delete-playlist"]').click();
-    if ((await saved(page)).playlists.length || (await saved(page)).likes.length !== 1) fail("/app/ playlist delete retry", "retry failed or deleted unrelated likes");
-    else record("/app/ playlist delete retry", "failed deletion retains the playlist/dialog; successful retry removes only that playlist");
-    await page.goto(url("/app/#/settings"));
-    await page.locator('[data-action="import-library"]').waitFor({ state: "attached" });
+    if ((await saved(page)).playlists.length !== 1) fail("/app/ playlist delete refusal", "aborted delete changed saved playlist");
+    await page.reload(); await page.locator('[data-action="delete-playlist"]').click(); await page.locator('[data-action="confirm-delete-playlist"]').click();
+    await page.getByText("Playlist deleted.").waitFor();
+    if ((await saved(page)).playlists.length || (await saved(page)).likes.length !== 1) fail("/app/ playlist delete retry", "fresh retry failed or removed likes");
+    else record("/app/ playlist delete retry", "injected abort keeps saved playlist; a fresh session deletes only the requested playlist");
+
+    await page.goto(url("/app/#/settings")); await page.locator('[data-action="import-library"]').waitFor({ state: "attached" });
     const replacement = { ...seed, app: "DHUN web", version: 3, likes: [], playlists: [], snapshots: {} };
     const file = { name: "controlled-library.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(replacement)) };
-    await page.evaluate(() => { window.__runtimeDenyWrites = true; });
+    await page.evaluate(() => { window.__runtimeAbortWrites = true; });
     await page.locator('[data-action="import-library"]').setInputFiles(file);
-    await page.waitForFunction(() => document.querySelector("#dhun-toast")?.textContent.includes("Import unconfirmed"));
-    if ((await saved(page)).likes[0] !== "runtime-kept") fail("/app/ import refusal", "fault-injected quota refusal replaced the old saved library");
-    await page.evaluate(() => { window.__runtimeDenyWrites = false; });
-    await page.locator('[data-action="import-library"]').setInputFiles(file);
-    await page.waitForFunction(() => document.querySelector("#dhun-toast")?.textContent.includes("will not write again"));
-    if ((await saved(page)).likes[0] !== "runtime-kept") fail("/app/ import guard", "guarded retry changed the saved library");
-    await page.reload();
-    await page.locator('[data-action="import-library"]').waitFor({ state: "attached" });
-    await page.locator('[data-action="import-library"]').setInputFiles(file);
-    await page.waitForFunction(() => document.querySelector("#dhun-toast")?.textContent.includes("Library imported"));
-    if ((await saved(page)).likes.length) fail("/app/ import retry", "fresh-tab retry did not persist the replacement");
-    else record("/app/ import retry", "quota refusal preserves saved data; the uncertain tab blocks retry, and a fresh page can restore after storage recovers");
-    context = await fresh(); await prepare(context); page = watch(await context.newPage());
-    await page.goto(url("/app/#/library/playlists"));
-    await page.evaluate(() => { window.__runtimeDenyWrites = true; });
-    await page.locator('[data-action="new-playlist"]').first().click();
-    await page.locator('[role="dialog"] input[name="name"]').fill("Visit-only runtime playlist");
+    await page.waitForFunction(() => document.querySelector("#dhun-toast")?.textContent.includes("Import failed"));
+    if ((await saved(page)).likes[0] !== "runtime-kept") fail("/app/ import refusal", "aborted import replaced saved data");
+    await page.reload(); await page.locator('[data-action="import-library"]').setInputFiles(file);
+    await page.getByText("Library imported.").waitFor();
+    if ((await saved(page)).likes.length) fail("/app/ import retry", "fresh retry did not persist the replacement");
+    else record("/app/ import retry", "injected transaction abort reports failure and keeps old data; a fresh session imports successfully");
+
+    context = await fresh(); await prepare(context); page = await context.newPage();
+    await page.goto(url("/app/#/library/playlists")); await page.locator('[data-action="new-playlist"]').waitFor();
+    await page.evaluate(() => { window.__runtimeAbortWrites = true; });
+    await page.locator('[data-action="new-playlist"]').first().click(); await page.locator('[role="dialog"] input[name="name"]').fill("Visit-only runtime playlist");
     await page.locator('[role="dialog"] button[type="submit"]').click();
-    await page.waitForFunction(() => document.querySelector("#dhun-toast")?.textContent.includes("not saved to browser storage"));
+    await page.getByText(/cannot write until saved data is reviewed/i).first().waitFor();
     await page.getByText("Visit-only runtime playlist", { exact: true }).waitFor();
-    if ((await saved(page)).playlists.some(playlist => playlist.name === "Visit-only runtime playlist")) fail("/app/ visit-only edits", "fault-injected write unexpectedly reached storage");
-    else record("/app/ visit-only edits", "ordinary edits remain useful in memory but explicitly say they were not saved to browser storage");
+    if ((await saved(page)).playlists.some(p => p.name === "Visit-only runtime playlist")) fail("/app/ visit-only edits", "aborted edit unexpectedly reached the database");
+    else record("/app/ visit-only edits", "ordinary edit survives in memory with an explicit warning after injected abort");
 
-    // Two live tabs: a stale ordinary edit must not overwrite a newer saved
-    // copy when the conflict exists before its best-effort pre-write check.
-    context = await fresh(); await prepare(context);
-    const older = watch(await context.newPage()), newer = watch(await context.newPage());
-    await older.goto(url("/app/#/settings")); await newer.goto(url("/app/#/settings"));
-    await newer.locator('[data-action="set-theme"][data-value="dark"]').click();
-    const newerSaved = await newer.evaluate(key => localStorage.getItem(key), key);
-    await older.locator('[data-action="set-theme"][data-value="system"]').click();
-    await older.getByText(/saved library needs review.*will not write again/i).waitFor();
-    if (await older.evaluate(key => localStorage.getItem(key), key) !== newerSaved) fail("/app/ stale ordinary edit", "stale tab overwrote the newer saved library");
-    await newer.reload();
-    if ((await saved(newer)).settings.theme !== "dark") fail("/app/ stale ordinary reload", "newer saved value did not survive reload");
-    else record("/app/ stale ordinary edit", "a pre-existing two-tab conflict leaves the newer saved library intact and blocks later writes in the stale tab");
-
-    // Malformed persisted bytes are synthetic; the fallback must not be saved
-    // over the only copy and must not be presented as recovered data.
     context = await fresh();
     await context.addInitScript(key => { if (localStorage.getItem(key) === null) localStorage.setItem(key, "{broken library"); }, key);
-    page = watch(await context.newPage()); await page.goto(url("/app/#/settings"));
-    await page.getByText(/library shown may be incomplete.*do not delete browser data/i).waitFor();
-    await page.locator('[data-action="set-theme"][data-value="light"]').click();
-    if (await page.evaluate(key => localStorage.getItem(key), key) !== "{broken library") fail("/app/ corrupt library", "ordinary edit overwrote malformed saved bytes");
-    else record("/app/ corrupt library", "synthetic malformed saved bytes are retained while the fallback warns and stays visit-only");
-
-    context = await fresh();
-    const damaged = JSON.stringify({ ...seed, likes: ["runtime-kept", "runtime-kept"] });
-    await context.addInitScript(({ key, damaged }) => { if (localStorage.getItem(key) === null) localStorage.setItem(key, damaged); }, { key, damaged });
-    page = watch(await context.newPage()); await page.goto(url("/app/#/settings"));
-    await page.getByText(/library shown may be incomplete.*do not delete browser data/i).waitFor();
-    await page.locator('[data-action="set-theme"][data-value="light"]').click();
-    await page.locator('[data-action="export-library"]').click();
-    await page.getByText(/export unavailable.*may be incomplete/i).waitFor();
-    if (await page.evaluate(key => localStorage.getItem(key), key) !== damaged) fail("/app/ damaged legacy library", "ordinary edit overwrote synthetic parseable damaged data");
-    await page.reload();
-    await page.getByText(/library shown may be incomplete.*do not delete browser data/i).waitFor();
-    if (await page.evaluate(key => localStorage.getItem(key), key) !== damaged) fail("/app/ damaged legacy reload", "reload overwrote synthetic damaged data");
-    else record("/app/ damaged legacy library", "parseable duplicate legacy data is guarded and its original bytes survive edit and reload");
-    if (problems.length) fail("/app/ storage runtime errors", problems.join(" | "));
-    else record("/app/ storage runtime errors", "fault-injected real workflows have no unexpected console/page errors or same-origin HTTP failure");
-  } finally {
-    await Promise.all(contexts.map(context => context.close()));
-  }
+    page = await context.newPage(); await page.goto(url("/app/#/settings"));
+    await page.getByRole("heading", { name: "Saved data needs review" }).waitFor();
+    if (await page.evaluate(key => localStorage.getItem(key), key) !== "{broken library") fail("/app/ corrupt library", "startup overwrote malformed legacy data");
+    else record("/app/ corrupt library", "malformed legacy bytes remain untouched and startup requires recovery");
+  } finally { await Promise.all(contexts.map(context => context.close())); }
 }
 
 /** Real HTMLMediaElement decoding of generated PCM, NOT provider/human audio. */
@@ -2888,7 +2834,11 @@ async function checkWebSyntheticMedia(browser) {
     await page.locator('[data-action="confirm-clear-library"]').click();
     const from = await page.evaluate(() => document.querySelector("#dhun-audio").currentTime);
     await page.waitForFunction(from => document.querySelector("#dhun-audio").currentTime > from + 0.4, from);
-    const clearStayed = await page.evaluate(() => JSON.parse(localStorage.getItem("dhun.web.v3")).history.length === 0);
+    const clearStayed = await page.evaluate(async () => {
+      const { createIndexedDBStorage } = await import("/app/js/library.js");
+      const storage = await createIndexedDBStorage();
+      try { return (await storage.read()).history.length === 0; } finally { storage.close(); }
+    });
     if (!clearStayed) fail("/app/ history after erase", "progress ticks recreated just-erased history without a new selection");
     else record("/app/ history after erase", "active media keeps playing, but progress ticks do not rewrite/recreate erased history");
     await page.locator('[data-action="open-player"]').first().click();
@@ -3037,6 +2987,7 @@ const CHECKS = [
   ["/app/ legal and erase scope", () => checkWebLegal(browser)],
   ["/app/ storage failures", () => checkWebStorageFailures(browser)],
   ["/app/ IndexedDB adapter", () => checkIndexedDBStorage(browser, { base: BASE, record })],
+  ["/app/ integrated storage", () => checkIntegratedStorage(browser, { base: BASE, record })],
   ["/app/ synthetic media transport", () => checkWebSyntheticMedia(browser)],
   ["/app/ Search draft and caret", () => checkWebSearchDraft(browser)],
   ["screenshots", () => captureScreenshots(browser)],

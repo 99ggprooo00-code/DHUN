@@ -117,6 +117,17 @@ gates, neither makes the other unnecessary.
    release decision.
 
 
+## Transactional library storage
+
+The application opens IndexedDB asynchronously, checks revisions in write
+transactions, retains a previous record and legacy key, and offers explicit
+recovery when older builds diverge. IndexedDB and localStorage cannot be locked
+atomically; old tabs and browser eviction remain limitations. The clear action
+clears the current library, not retained recovery copies. See [DATA-SCHEMA.md](DATA-SCHEMA.md)
+and [RUNBOOK.md](RUNBOOK.md). Chromium tests use synthetic data, injected failures,
+a quota override and a frozen complete old app; they do not establish behavior
+on every browser or physical device.
+
 ## Controlled runtime reliability coverage
 
 `app-web/tests/` covers storage acknowledgement/retry, transport intent, shared

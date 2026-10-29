@@ -27,8 +27,9 @@ been deleted — the list is checked against the directory, not trusted.
 | `js/api.js` | The JioSaavn seam: endpoints, normalisers, timeouts, failure kinds |
 | `js/player.js` | Queue, repeat, shuffle, stream resolution, the media element, Media Session |
 | `js/backup-policy.js` | Backup byte, token and nesting budgets before parsing |
-| `js/library.js` | Likes, playlists, history, snapshots, settings, current storage (`dhun.web.v3`) |
-| `js/indexeddb-storage.js` | In-development transaction adapter, not yet used by app startup; see `DATA-SCHEMA.md` |
+| `js/library.js` | Library operations and validation; legacy storage compatibility |
+| `js/indexeddb-storage.js` | Production revision-checked IndexedDB transactions, migration and recovery |
+| `js/app-storage.js` | Asynchronous application storage session, pending gates and deferred mutations |
 | `js/views.js` | One function per screen: Home, Search, Library, album, artist, playlist, collection, Settings, About, the framing refusal |
 | `js/shell.js` | App bar, bottom navigation, navigation rail, docked mini player |
 | `js/player-ui.js` | The full player: transport, scrubber, queue and lyrics tabs |
@@ -52,7 +53,8 @@ index.html          region shells (#dhun-topbar, #main, #dhun-dock, …), CSP, n
         ├── js/router.js       hash route ↔ state (pure)
         ├── js/api.js          the JioSaavn seam: endpoints, normalisers, failures
         ├── js/player.js       queue, repeat, shuffle, stream resolution (pure + element)
-        ├── js/library.js      localStorage library, settings, import/export rules
+        ├── js/library.js      library operations and validation
+        ├── js/app-storage.js, js/indexeddb-storage.js   async session and transactional storage
         ├── js/views.js        one function per screen, returning markup
         ├── js/shell.js        app bar, bottom navigation, rail, docked mini player
         ├── js/player-ui.js    the full player: transport, scrubber, queue/lyrics tabs
@@ -75,9 +77,10 @@ screens take a view-model and return a string.
    JavaScript: inside a frame, the app draws a refusal and starts nothing
    (`framedRefusal()` in `views.js`). `scripts/test_app_web.py` asserts the check
    is still there.
-2. **Load this browser's library** (`library.js`). If `localStorage` throws or a
-   private window forgets what it wrote, the library is kept in memory and
-   `persistent: false` is reported on Settings instead of a save being promised.
+2. **Open this browser's library** asynchronously. Validate and migrate legacy
+   data before enabling the UI. Failure opens recovery, never a writable empty
+   fallback. Later writes use revision-checked IndexedDB transactions; failures
+   guard the tab and preserve visit-only edits for explicit export.
 3. **Resolve the theme** from the settings (`dark`, `light`, `system`), write it
    to `<html data-dhun-theme>`, and render. The palettes are keyed on the root,
    not on `#app`: a theme on the app element themes the chrome and leaves the

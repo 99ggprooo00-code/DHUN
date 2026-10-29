@@ -1,44 +1,43 @@
 # Data schema — DHUN Web (`/app/`)
 
-The web counterpart of [`docs/backend-schema.md`](../backend-schema.md). The
-browser build has **no backend and no database**. Everything a visitor keeps is
-one JSON document in the browser's `localStorage`, under one key. This file
-describes that document, the limits on it, how a stored document is read back,
-and the export file. The code is in `app-web/src/js/library.js`.
+The browser build has no backend. Its source of truth is an origin-scoped
+IndexedDB database, not the legacy localStorage key. The library payload remains
+v3 JSON; the database envelope has a separate schema and revision.
 
-## 1. Storage
+## 1. Storage and transaction boundaries
 
 | Item | Value |
 |---|---|
-| Store | `window.localStorage` (origin-scoped) |
-| Key | `dhun.web.v3` (`STORAGE_KEY`) |
-| Encoding | UTF-8 JSON, one object |
-| Written by | `createStorage().save()`, on every change |
-| Read by | `createStorage().load()`, once at boot |
-| Other keys | None. The build does not read keys written by earlier builds. |
+| Canonical database / object store | `dhun.web.library` / `library` |
+| Records | `current`, `previous`, and optional `legacy-recovery:*` archives |
+| Current envelope | schema 1, revision, serialized library, legacy baseline, optional recovery epoch |
+| Legacy input | `localStorage` key `dhun.web.v3`, retained and never written by the new app |
+| Implementation | `indexeddb-storage.js`, `app-storage.js`, `main.js` |
 
-At startup, accessing the storage property and probing writes are guarded.
-A failed write probe does **not** discard an existing readable library. Each
-save retries and confirms a write by reading it back; quota/permission recovery
-can therefore work in the same tab. Ordinary failed edits remain useful in
-memory, with a visit-only warning rather than a durable-success claim. An older
-saved copy may still exist; when the tab's library was read safely, export it
-before closing if persistence is uncertain. If saved data could not be read or
-parsed, the fallback may be incomplete: retain browser data and the original
-backup instead of treating an export of the fallback as recovery.
+Startup waits for validation and migration before enabling the app. With no
+current or previous record, a valid legacy library (or an empty library when
+there is no legacy key) is installed transactionally at revision 1. Existing
+current data is never replaced by migration. The legacy key remains untouched;
+interrupted migration can be retried. Invalid, unreadable, missing/inconsistent
+records or unavailable IndexedDB open a recovery screen, not an empty writable
+fallback. A missing database and missing legacy key cannot reveal whether a
+browser previously evicted or cleared data.
 
-Erase, playlist deletion/removal, recent-search clear and replacement import use
-`save(..., { requirePersistence: true })`: previous in-tab data is published over
-only after storage acknowledges the candidate. Failure retains that data and,
-for confirmations, an inline announced error with retry/cancel. This is a
-single-key browser acknowledgement, not a cross-tab transaction, indefinite
-retention promise or deletion of provider logs. Browser site-data controls clear
-the **origin**, potentially affecting other projects on the same host.
+Each mutation validates before a read-write transaction that checks the tab's
+expected revision and recovery epoch and atomically writes the previous and current records. Only
+transaction completion acknowledges success. The UI gates overlapping writes,
+serializes background changes and waits for destructive actions and imports.
+An abort leaves the preceding transaction intact; a conflict blocks further
+writes in that tab. Ordinary in-tab changes can remain visit-only, with a warning
+and an explicitly labelled export. Reload/review the saved data before retrying.
+Export reads a consistent committed snapshot without advancing a stale tab's
+expected revision; it does not authorize a later overwrite.
 
-History is recorded once per playback selection, not every progress event.
-Clearing while a track continues does not immediately recreate its history;
-a later selection can create new history. Storage key and export format remain
-**v3**; no existing library is migrated or discarded by this change.
+Erase clears the **current** library while retaining settings and shell cache.
+The preceding recovery record, old localStorage key and archives can still
+contain removed data. This is not secure deletion; browser site-data controls
+clear the whole origin, including settings and unrelated projects. Export needed
+data first. A later track selection may record new history.
 
 ## 2. Document shape
 
@@ -102,31 +101,17 @@ These are enforced when a list is written. Each limit is in
 | Snapshots | None of their own | Snapshots exist only for ids the likes, history or playlists refer to, so the total is bounded by the limits above. Unreferenced snapshots are removed (`pruneSnapshots`). |
 
 History and recent searches roll over silently. The saved-collection limits
-refuse new entries rather than evicting existing ones. An over-limit stored
-document may show a truncated visit-only view but is protected from being
-overwritten; import rejects it.
+refuse new entries rather than evicting existing ones. An over-limit stored document is guarded and requires recovery; import rejects it.
 
 ## 5. Reading a stored document back
 
-After JSON parsing, `normaliseLibrary` permissively converts stored values into
-an in-memory library:
-
-- A value that is not an array is treated as an empty array.
-- Each list is capped at its limit on the way in.
-- A playlist without a usable id or name is removed.
-- A snapshot whose id does not match its key is removed.
-- Numbers are clamped; invalid settings fall back to defaults.
-
-Before allowing writes, startup validates the stored JSON with the import parser
-and verifies that supplied values survive normalization. Damaged, unsupported,
-or unrecognized values instead produce a guarded, potentially incomplete
-visit-only view; malformed JSON or a thrown read/normalization error produces an
-empty guarded fallback. Neither fallback can be saved over the original bytes in
-this tab. The same 24 MiB, token and nesting budgets apply to this startup check,
-so a larger or more complex legacy library is also guarded even if otherwise
-valid. Keep its original bytes and seek recovery; do not treat the displayed view
-as a complete backup. The export action refuses to download that guarded view.
-This validation cannot prove data was not lost before the current stored bytes
+Startup validates library text and envelope metadata before permitting writes.
+Unsupported, lossy, malformed or over-budget data is left in place and presented
+for recovery, not normalized into a writable fallback. Raw legacy text and JSON
+representations of supported database records can be downloaded; a record that
+cannot be represented as JSON remains in browser storage. Validated importable
+backups are offered only when the relevant data passes the full backup policy.
+Neither validation nor recovery can prove data was not lost before these copies
 were written.
 
 ## 6. Export and import
@@ -168,19 +153,13 @@ truncated. Serialization failures are reported without a success message.
    historical string history entries, and defaults for missing optional nested
    fields/settings. Missing snapshots for referenced ids are permitted for older
    libraries; such rows may not be visible until their metadata is recovered.
-5. Validation and serialization finish before any library write. A pre-write
-   read rejects a library already changed since this tab last observed it. A
-   candidate is then written to the single storage key and read back before
-   replacing in-tab data. If the write throws, or readback fails or differs
-   after an attempted write, the durable outcome is **unconfirmed**: it may contain
-   the import or another tab's data while this tab retains its previous library.
-   After an unconfirmed outcome or detected conflict, this tab will not write
-   again; ordinary edits are visit-only. Export the in-tab library, keep the
-   original file, and open a fresh tab to review the saved library. There is no
-   cross-tab transaction or compare-and-swap: a concurrent write between the
-   pre-check and replacement can still be overwritten. The app does not roll
-   back blindly, because that could overwrite another tab's changes. The backup
-   file itself is never modified.
+5. Validation and serialization finish before any write. A read-write IndexedDB
+   transaction compares the expected revision and commits the validated replacement
+   and previous record together. An abort does not publish the candidate. A
+   concurrent revision conflict blocks further writes and keeps the prior in-tab
+   state. An operation may nevertheless be unconfirmed if legacy storage changes
+   around transaction completion; saved data may have changed. Keep the backup,
+   export any visit-only changes and review in a fresh tab.
 
 The 24 MiB budget accommodates the reproduced 9.8 MB valid export but is not a
 promise that every library fits: browser memory and quota differ. The complexity
@@ -190,68 +169,32 @@ unavailable. Keep the original file and existing library; free storage, try a
 browser/device with sufficient capacity, or seek recovery help. Do not delete
 the only copy to make room. No other format version is imported.
 
-Startup still displays a permissively normalized view of some damaged data,
-but blocks writes if it cannot validate that view (§5). The post-write uncertainty
-and concurrent-write race described above remain limitations; the import is not
-fully transactional.
-The guard is per tab and does not stop another open tab from writing. Ordinary
-saves also perform a best-effort stale-value check; it is not atomic with the
-write. If startup cannot read or parse saved data, the shown empty fallback is
-not a recovered library: this tab blocks writes and tells the visitor to retain
-browser data and their original backup. Unsupported or lossy legacy shapes remain
-guarded rather than being saved over (§5).
+### Older versions and recovery
 
-### Transactional migration: required follow-up, not implemented
+IndexedDB and localStorage cannot participate in one transaction. An old open tab
+or downgraded build can still write the legacy key, even after migration. New
+sessions compare its exact text to the recorded baseline on open, before a write
+and after commit. A detected mismatch stops writes and preserves both sides; a
+post-commit mismatch is reported as unconfirmed, not as a failed transaction.
+A legacy write can occur immediately after any check, so detection is not a
+lock or a guarantee of immediate notification. Close old tabs before review.
 
-`js/indexeddb-storage.js` contains an **in-development adapter**; the app does
-not call it, and the current storage behavior above remains in force. It uses
-one IndexedDB object store with `current` and `previous` records, each carrying
-schema, revision, serialized library, and the untouched legacy-key baseline.
-A read-write transaction checks the expected revision and replaces both records
-atomically. Initialization retains legacy bytes and never overwrites an existing
-current record. A changed legacy key blocks new adapter writes; an already-open
-old app can still modify that key, including while a transaction is in flight.
-A post-commit mismatch is reported for review rather than as a confirmed success.
-Export reads a committed snapshot without advancing the tab's expected revision.
-The adapter has Chromium-only component tests, including injected abort and
-legacy-change failures and a frozen main-branch storage adapter; it is **not** a
-complete migration, user-facing recovery path, or end-to-end application test.
-Migration reconciliation, UI operation serialization, startup integration,
-uncertain outcomes, and the remaining compatibility tests must be completed
-before enabling it.
-
-A separate migration needs an asynchronous storage lifecycle rather than an
-IndexedDB sidecar beside the current synchronous `save` calls:
-
-1. Keep the existing `dhun.web.v3` bytes untouched. Read and validate a legacy
-   snapshot before migration; malformed or unrecognized data must require
-   recovery, not become a silently saved empty library. Initialize the new store
-   and its revision in a single IndexedDB read-write transaction. A failed or
-   interrupted initialization must leave the old key intact and must not mark
-   migration complete.
-2. Route **every** library load, edit, erase and import through the new store.
-   Within one read-write transaction, compare the tab's expected revision, then
-   write the validated candidate and new revision. Publish in-tab state only
-   after transaction completion. A conflict or aborted transaction must leave
-   the previously committed record intact. An interrupted or unacknowledged
-   completion must be reported as uncertain and reconciled on restart, not
-   assumed to have aborted.
-3. IndexedDB cannot atomically include a localStorage key. Record the legacy
-   snapshot, retain the original, and detect later legacy-key changes on startup
-   and during the session. Older app tabs and downgraded builds do not honor the
-   new revision protocol: preserve both divergent copies and require explicit
-   recovery rather than deleting either or silently choosing one. A change can
-   race a check, so even this detection does not prevent all cross-version
-   divergence. Test a legacy tab that writes before, during and after migration.
-4. Refactor the synchronous UI and storage handlers for async startup, pending
-   edits and cancellation. Test real two-tab transactions, abort, quota,
-   interruption, unreadable/corrupt records, migration and downgrade. Define
-   recovery and export paths before enabling migration, including IndexedDB
-   unavailable/private modes. Transaction completion does not protect against
-   later browser eviction, site-data clearing or device failure.
-
-Until that migration and its compatibility path are implemented and verified,
-do not claim every unsuccessful import leaves the saved copy unchanged.
+The recovery screen offers separate raw representations and, where valid,
+importable canonical and legacy backups. After review, the visitor may explicitly
+retain the canonical database library, or replace it with the validated legacy
+library, while archiving both database records, the differing legacy text and
+prior baseline in the database. The transaction rechecks the reviewed
+canonical record and legacy text. It never modifies the legacy key. If either
+changes again, review must be repeated; a post-commit race is unconfirmed.
+There is no automatic merge or automatic selection of either side. When the
+current key is truly missing and the previous record is valid, recovery offers
+a validated previous backup and an explicit restore. It rechecks absence, the
+previous record and legacy baseline transactionally before installing it. A
+fresh random epoch prevents an old tab from matching a reused revision. A
+previous record may omit newer changes. If current is corrupt rather than missing,
+no automatic replacement is offered; preserve copies and seek recovery help.
+Browser eviction, device failure, quota, memory pressure and unrepresentable
+corrupt records remain outside the transaction guarantee.
 
 ## 7. What is not stored
 

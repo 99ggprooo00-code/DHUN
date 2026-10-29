@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
-/** Real Chromium tests for the in-development IndexedDB adapter. The app does
- * not use this adapter yet; these are not end-to-end migration acceptance. */
+/** Real Chromium component tests for the production IndexedDB adapter.
+ * End-to-end application tests are in integrated-storage.mjs. */
 export async function checkIndexedDBStorage(browser, { base, record }) {
   const context = await browser.newContext({ serviceWorkers: "block" });
   const a = await context.newPage(); const b = await context.newPage();

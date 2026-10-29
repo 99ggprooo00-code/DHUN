@@ -61,12 +61,13 @@ element's own state is the first thing to check.
 
 ## 3. A visitor lost their library
 
-- **Erase was used:** Settings → This browser → "Erase everything in this
-  browser" removes the library and keeps settings. It cannot be undone by the
-  project. An export file restores the library only if the visitor kept one.
-- **The browser is in private mode, or storage is full:** the Settings screen
-  says the browser is not saving data. Nothing can be recovered from the project's
-  side.
+- **Erase was used:** "Erase library" clears the current library while keeping
+  settings and shell cache. The previous database record, retained legacy key or
+  archives may still contain the data; erasure itself has no one-click undo.
+  Keep browser data and any exports, use the recovery downloads where available,
+  and seek help. Browser site-data clearing removes the entire origin.
+- **Storage is unavailable or full:** startup can show recovery; later failed
+  edits may be visit-only. Nothing can be recovered from a DHUN server.
 - **Another browser or device:** the library is per browser. Import an export file
   on the other device.
 
@@ -77,15 +78,22 @@ element's own state is the first thing to check.
   A file within those limits can still exceed browser storage quota.
 - "the file is not JSON": keep the original file and check that it is an intact
   `dhun-library.json` export.
-- If saved data cannot be read, parsed or validated without losing values, the
-  displayed fallback may be incomplete. The tab stops writing and refuses to
-  export this view: retain browser data and the original backup, and seek
-  recovery help. A legacy record exceeding the startup validation budgets is
-  also guarded even if otherwise valid.
-- "Import unconfirmed" or a saved-library conflict: the tab stops writing to
-  browser storage. Export the in-tab library and keep the original backup; open
-  a fresh tab to inspect the saved library before attempting another import.
-  A readback failure may mean the saved copy changed even without confirmation.
+- If startup data cannot be read or validated, recovery disables writes. Keep
+  browser data and the original backup; download available recovery
+  representations and validated backups separately. A record that cannot be
+  represented as JSON remains in the browser; seek recovery help.
+- Older tabs or downgraded builds can change the legacy key after migration.
+  Close them, download and review both sides, then explicitly keep the database
+  copy or use the validated legacy library only if that is the visitor's
+  decision; both choices archive the competing copies. Each choice rechecks both
+  sides but cannot atomically lock localStorage. There is no automatic merge.
+  When current is missing, a validated previous backup can be downloaded or
+  explicitly restored after review; it may omit newer changes. A corrupt current
+  record is not automatically overwritten.
+- "Import unconfirmed" or a saved-library conflict: the tab stops writing.
+  Export the explicitly labelled visit-only copy and keep the original backup;
+  open a fresh tab to review the saved library before attempting another import.
+  A transaction may have committed even if its result is unconfirmed.
 - "the file was not exported by this app": same. The `app` field must be
   `DHUN web`.
 
@@ -97,8 +105,9 @@ a notice to close the tab and reopen DHUN; it takes over when no DHUN tab is ope
 
 - Ask the visitor to close **every** DHUN tab, then reopen `/app/`.
 - If it still shows the old version, the browser may hold the old worker. The
-  visitor can clear the site's data for `/app/` in the browser settings. The
-  library is lost unless it was exported (see §3).
+  visitor should preserve and export all needed data before considering browser
+  site-data controls: those clear the whole origin, including the library and
+  unrelated projects. Do not clear data as a first recovery step.
 - **Do not** change the cache name by hand. The cache name is derived from
   `WEB_VERSION`; bumping that version is the supported way to retire the old cache
   (see [RELEASE-DEPLOYMENT.md](RELEASE-DEPLOYMENT.md) §2).

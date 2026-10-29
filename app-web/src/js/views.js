@@ -435,7 +435,7 @@ export function libraryScreen(vm) {
   })();
 
   return html`<div class="dhun-screen">
-    ${pageHeader({ overline: "Your library", title: "Made of what you saved here", meta: vm.storage.persistent ? "Kept in this browser only" : "This browser is not saving data (private mode)" })}
+    ${pageHeader({ overline: "Your library", title: "Made of what you saved here", meta: vm.storage.persistent ? "Kept in this browser only" : "This tab cannot confirm saving changes" })}
     <div class="dhun-tabs" role="tablist" aria-label="Library sections">
       ${tabs.map((tab) => html`<button type="button" role="tab" id="lib-tab-${tab.id}" class="dhun-tab${vm.tab === tab.id ? " is-active" : ""}"
         aria-selected="${vm.tab === tab.id ? "true" : "false"}" aria-controls="library-panel" data-action="set-library-tab" data-value="${tab.id}">
@@ -444,7 +444,7 @@ export function libraryScreen(vm) {
     </div>
     <div class="dhun-panel" id="library-panel" role="tabpanel" aria-labelledby="lib-tab-${vm.tab}">${body}</div>
     ${!vm.storage.persistent
-      ? notice({ tone: "warn", title: "Nothing is being saved.", body: "This browser's storage is unavailable — private mode, or a full quota. The library works for this visit only." })
+      ? notice({ tone: "warn", title: "This tab cannot confirm saving.", body: vm.storage.note ?? "Changes may last only for this visit. Keep existing browser data and your backups." })
       : html``}
   </div>`;
 }
@@ -547,7 +547,7 @@ export function settingsScreen(vm) {
       <h2 class="dhun-settings__title">This browser</h2>
       <div class="dhun-setting dhun-setting--stack">
         <p class="dhun-setting__note">${vm.storage.note}</p>
-        <p class="dhun-setting__note">Imports accept up to ${BACKUP_MAX_BYTES / (1024 * 1024)} MiB of UTF-8 JSON, subject to complexity and browser storage limits. Keep your backup until you have verified the restore.</p>
+        <p class="dhun-setting__note">Imports accept up to ${BACKUP_MAX_BYTES / (1024 * 1024)} MiB of UTF-8 JSON, subject to complexity limits. Even a valid backup may exceed browser storage quota or available memory. Keep your backup until you have verified the restore.</p>
         <div class="dhun-setting__buttons">
           <button type="button" class="dhun-button dhun-button--outlined" data-action="export-library">Export library</button>
           <label class="dhun-button dhun-button--outlined dhun-file">Import library<input type="file" accept="application/json,.json" data-action="import-library" /></label>

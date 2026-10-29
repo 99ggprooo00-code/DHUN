@@ -4,6 +4,7 @@
  * user data or sound hardware. They do not prove layout, focus or media output.
  */
 import { boot } from "../../src/js/main.js";
+import { createStorage } from "../../src/js/library.js";
 import { API_SOURCES } from "../../src/js/api.js";
 
 export const settle = () => new Promise((resolve) => setImmediate(resolve));
@@ -163,7 +164,7 @@ export function bootFixture(t, { hash = "#/search", replaceSearchFields = false,
     try {
       globalThis.fetch = transport.fetchImpl;
       Object.defineProperty(globalThis, "localStorage", { configurable: true, value: storage });
-      const mounted = boot({ win, doc: dom.doc }); mounts.push(mounted); return mounted;
+      const mounted = boot({ win, doc: dom.doc, storage: createStorage(storage) }); mounts.push(mounted); return mounted;
     } catch (error) {
       transport.close(); throw error;
     } finally {

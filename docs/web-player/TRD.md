@@ -65,11 +65,10 @@ Endpoint paths are listed in [PROVIDER-INTEGRATION.md](PROVIDER-INTEGRATION.md).
 
 ## 5. Storage
 
-- `localStorage` under one key, `dhun.web.v3`. Schema and limits are in
-  [DATA-SCHEMA.md](DATA-SCHEMA.md).
-- No `IndexedDB`, no `Cache Storage` for user data. The only cache is the
-  service worker's shell cache (`dhun-web-v3.0.4`), which holds application
-  files, not audio and not catalogue responses.
+- IndexedDB is canonical; the legacy `localStorage` key `dhun.web.v3` is retained.
+  Schema, migration and limitations are in [DATA-SCHEMA.md](DATA-SCHEMA.md).
+- No `Cache Storage` for user data. The service-worker shell cache holds
+  application files, not audio or catalogue responses.
 
 ## 6. Service worker
 
