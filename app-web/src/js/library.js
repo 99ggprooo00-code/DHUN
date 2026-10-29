@@ -201,11 +201,11 @@ export function normaliseLibrary(raw) {
 
 /** Canonicalise a decimal without converting it through binary floating point. */
 function decimalValue(token) {
-  const match = /^(-?)(\\d+)(?:\\.(\\d+))?(?:[eE]([+-]?\\d+))?$/.exec(token);
+  const match = /^(-?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(token);
   if (!match) return null;
   const negative = match[1] === "-";
   const fraction = match[3] ?? "";
-  let digits = `${match[2]}${fraction}`.replace(/^0+/, "");
+  let digits = (match[2] + fraction).replace(/^0+/, "");
   if (!digits) return { negative, digits: "0", exponent: 0 };
   let exponent = Number(match[4] ?? 0) - fraction.length;
   if (!Number.isSafeInteger(exponent)) return null;
@@ -233,14 +233,14 @@ function assertLosslessJSONNumbers(text) {
     if (text[i] === '"') {
       i += 1;
       while (i < text.length) {
-        if (text[i] === "\\\\") { i += 2; continue; }
+        if (text[i] === "\\") { i += 2; continue; }
         if (text[i] === '"') break;
         i += 1;
       }
       continue;
     }
     if (text[i] !== "-" && (text[i] < "0" || text[i] > "9")) continue;
-    const match = /^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?/.exec(text.slice(i));
+    const match = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/.exec(text.slice(i));
     if (!match) continue;
     const token = match[0];
     const number = Number(token);
