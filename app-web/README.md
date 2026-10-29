@@ -28,7 +28,7 @@ to a pretend result, a simulated queue or invented progress.
 
 ```bash
 node tools/serve.mjs 4173     # http://0.0.0.0:4173/ (serves src/)
-npm test                      # 269 tests; no install, no network
+npm test                      # 279 tests; no install, no network
 node tools/build.mjs          # src/ → dist/, then checks every shell entry
 npm run gen:icons             # regenerate js/icons.js from DhunIcons.kt
 ```
@@ -90,8 +90,9 @@ that a browser tab cannot honour.
 - **No downloads.** ADR-006's device-side store has no browser equivalent. The
   Library is playlists, liked songs and history, all in this browser.
 - **Offline is the shell, not the music.** The service worker caches the app's
-  own files (`tools/build.mjs` checks that the shell list is complete) so the app
-  and your library open without a network. Streams are cross-origin and signed;
+  own files (`tools/build.mjs` checks that the shell list is complete) to help the app
+  and your library open without a network. Caching is best-effort, not verified.
+  Streams are cross-origin and signed;
   they are neither cached nor offered as a download.
 - **This browser is the account.** Saved library data is local, not every request: no login, no sync, no
   DHUN server copy. Queries/IDs still reach wrapper/CDN operators. Settings can export the library to a file, import it back, and
@@ -100,9 +101,27 @@ that a browser tab cannot honour.
 - **Nothing is framed.** `frame-ancestors` cannot be sent by a meta tag, so
   `boot()` refuses to start inside a frame and says why.
 
+## Service-worker state
+
+`sw: ready` means a worker has activated, not that every shell asset is
+available offline. Installation caches assets on a best-effort basis and may
+succeed even if individual writes fail. Until there is a reliable shell-cache
+verification mechanism, `offlineReady` stays false (unverified), including
+when the worker is active. Audio and API responses are not cached. The UI
+currently uses the update notice, not `offlineReady`, so it does not announce
+unverified success.
+
+A future verifier would need to identify the active worker and its exact build,
+check that build's mandatory shell assets in its own cache, and ignore results
+from workers or attempts that have since been replaced. URL presence alone is
+not enough to establish a coherent build: updates can reuse a version-named
+cache, and navigation can replace cached HTML independently of its modules.
+Even a verified snapshot can later be invalidated by cache eviction. No such
+verification or positive readiness claim is implemented here.
+
 ## Gates
 
-- `npm test` — 269 assertions over modules and Node boot/controller fixtures: routing round trips,
+- `npm test` — 279 assertions over modules and Node boot/controller fixtures: routing round trips,
   escaping, the queue and repeat/shuffle rules, stream resolution, the library's
   return shapes, API normalisation, transfer files, every screen's rendered
   output, CSS class coverage, and the keyboard map against the dispatcher.

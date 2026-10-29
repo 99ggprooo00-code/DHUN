@@ -3,11 +3,10 @@
  *
  * The three things a web app owes a visitor that a website does not:
  *
- *   1. **It opens offline.** A service worker caches the shell, so a reload on a
- *      train shows the app and its library instead of a dinosaur. Audio cannot
+ *   1. **It can open offline.** A service worker caches the shell on a best-effort
+ *      basis; missing cache entries can still prevent offline use. Audio cannot
  *      be cached (streams are signed and cross-origin, and caching them would
- *      be a download feature the app deliberately does not have) — the app says
- *      exactly that instead of failing silently.
+ *      be a download feature the app deliberately does not have).
  *   2. **It installs.** `beforeinstallprompt` is captured and surfaced as a
  *      button, not fired automatically: an install prompt that appears unbidden
  *      is the reason people distrust install prompts.
@@ -16,9 +15,8 @@
  *      asking the visitor to close and reopen; nothing reloads the page, because
  *      a reload would stop playback.
  *
- * When any of this is unavailable the module reports which part failed in
- * `state`; `main.js` turns that into one sentence on screen rather than a
- * silent no-op.
+ * This module exposes lifecycle and install state; `main.js` currently uses
+ * the update-ready flag to show a notice. It does not display offline readiness.
  */
 
 import { listen } from "./dom.js";
@@ -41,8 +39,8 @@ export function createPwa({
   let destroyed = false;
   let started = false;
   const subscriptions = new Set();
-  let stopInstalling = () => {};
   let registration = null;
+  const observedWorkers = new Map();
   let deferredPrompt = null;
   let state = {
     sw: navigator?.serviceWorker ? SW_STATE.REGISTERING : SW_STATE.UNSUPPORTED,
@@ -68,6 +66,48 @@ export function createPwa({
     return stop;
   }
 
+  // READY means an activated worker, not a verified offline shell. The worker
+  // intentionally tolerates failed cache writes, and there is no cache-completeness
+  // protocol. Therefore offlineReady remains false (not verified), even on READY.
+  // Observe all concurrent workers: an active worker can finish activation while
+  // an update is installing or waiting.
+  function observeWorkers() {
+    const current = new Set([registration.installing, registration.waiting, registration.active].filter(Boolean));
+    for (const [worker, stop] of observedWorkers) {
+      if (!current.has(worker)) { stop(); observedWorkers.delete(worker); }
+    }
+    for (const worker of current) {
+      if (observedWorkers.has(worker)) continue;
+      const stop = watch(worker, "statechange", () => {
+        if (!observedWorkers.has(worker)) return;
+        // The browser may clear installing before dispatching its redundant event.
+        if (worker.state === "redundant" && !registration.installing && !registration.waiting && !registration.active) {
+          emit({ sw: SW_STATE.FAILED, updateReady: false, offlineReady: false, error: "the service worker installation failed" });
+          return;
+        }
+        refreshWorkerState();
+      });
+      observedWorkers.set(worker, stop);
+    }
+  }
+
+  function refreshWorkerState() {
+    if (!registration) return;
+    const worker = registration.installing || registration.waiting || registration.active;
+    observeWorkers();
+    const active = registration.active?.state === "activated";
+    const waiting = registration.waiting && registration.waiting.state !== "redundant";
+    if (waiting && active) {
+      emit({ sw: SW_STATE.UPDATE_READY, updateReady: true, offlineReady: false, error: null });
+    } else if (active || worker?.state === "activated") {
+      emit({ sw: SW_STATE.READY, updateReady: false, offlineReady: false, error: null });
+    } else if (worker?.state === "redundant") {
+      emit({ sw: SW_STATE.FAILED, updateReady: false, offlineReady: false, error: "the service worker installation failed" });
+    } else {
+      emit({ sw: SW_STATE.REGISTERING, updateReady: false, offlineReady: false, error: null });
+    }
+  }
+
   async function register() {
     if (destroyed) return null;
     if (!navigator?.serviceWorker?.register) {
@@ -78,26 +118,11 @@ export function createPwa({
       const result = await navigator.serviceWorker.register(swUrl, { scope });
       if (destroyed) return null;
       registration = result;
-      if (registration.waiting) {
-        emit({ sw: SW_STATE.UPDATE_READY, updateReady: true });
-      } else {
-        emit({ sw: SW_STATE.READY, offlineReady: true });
-      }
-      watch(registration, "updatefound", () => {
-        stopInstalling();
-        const installing = registration?.installing;
-        if (!installing) return;
-        stopInstalling = watch(installing, "statechange", () => {
-          // `installed` with a controller already present means an update, not a
-          // first install: show the notice instead of swapping under the user.
-          if (installing.state === "installed" && navigator.serviceWorker.controller) {
-            emit({ sw: SW_STATE.UPDATE_READY, updateReady: true });
-          }
-        });
-      });
+      watch(registration, "updatefound", refreshWorkerState);
+      refreshWorkerState();
       return registration;
     } catch (error) {
-      emit({ sw: SW_STATE.FAILED, error: error?.message ?? "the service worker could not be registered" });
+      emit({ sw: SW_STATE.FAILED, updateReady: false, offlineReady: false, error: error?.message ?? "the service worker could not be registered" });
       return null;
     }
   }
@@ -161,7 +186,7 @@ export function createPwa({
       for (const stop of [...subscriptions]) stop();
       deferredPrompt = null;
       registration = null;
-      stopInstalling = () => {};
+      observedWorkers.clear();
     },
     /** Hand the app's own version to the worker so its cache name can move. */
     announceVersion(version) {
