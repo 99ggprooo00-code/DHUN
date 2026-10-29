@@ -16,6 +16,7 @@ import dev.dhun.core.Track
 import dev.dhun.data.DataLayer
 import dev.dhun.data.DatabaseDriverFactory
 import dev.dhun.data.DatabaseFactory
+import dev.dhun.data.PlaylistRepository
 import dev.dhun.innertube.SearchFilter
 import dev.dhun.player.DhunPlayer
 import dev.dhun.presentation.browse.AlbumUiState
@@ -25,16 +26,20 @@ import dev.dhun.presentation.browse.ArtistViewModel
 import dev.dhun.presentation.browse.PlaylistUiState
 import dev.dhun.presentation.browse.PlaylistViewModel
 import dev.dhun.provider.MusicProvider
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -267,4 +272,136 @@ class BrowseViewModelTest {
             vm.close()
         }
     }
+
+    @Test
+    fun playlistDeletionWaitsForPersistenceAndIgnoresRepeatedConfirmations(): Unit = runBlocking {
+        val data = DataLayer(DatabaseFactory.create(DatabaseDriverFactory.inMemory().createDriver()))
+        val created = data.playlists.create("Pending")
+        val song = track("retained")
+        data.playlists.addTrack(created.id, song)
+        val player = FakePlayer()
+        player.prepareQueue(listOf(song), 0, true)
+        val gate = CompletableDeferred<Unit>()
+        val calls = AtomicInteger()
+        val repo = object : PlaylistRepository by data.playlists {
+            override suspend fun delete(id: String) {
+                calls.incrementAndGet()
+                gate.await()
+                data.playlists.delete(id)
+            }
+        }
+        val vm = PlaylistViewModel(FakeBrowseProvider(), repo, player, created.id, isLocal = true)
+        try {
+            eventually { (vm.state.value as? PlaylistUiState.Local)?.playlist != null }
+            // Opening/cancelling the confirmation does not invoke delete.
+            vm.clearDeletionError()
+            assertEquals(0, calls.get())
+            vm.delete()
+            assertTrue(vm.deletion.value.isDeleting)
+            repeat(10) { vm.delete() }
+            eventually { calls.get() == 1 }
+            assertFalse(vm.deleted.value)
+            assertEquals(created.id, data.playlists.observePlaylist(created.id).first()?.id)
+            gate.complete(Unit)
+            eventually { vm.deleted.value }
+            eventually { (vm.state.value as? PlaylistUiState.Local)?.playlist == null }
+            assertEquals(1, calls.get())
+            assertEquals(listOf(song), player.queue.value)
+        } finally { vm.close() }
+    }
+
+    @Test
+    fun playlistDeletionFailureIsVisibleAndRetrySucceeds(): Unit = runBlocking {
+        val data = DataLayer(DatabaseFactory.create(DatabaseDriverFactory.inMemory().createDriver()))
+        val created = data.playlists.create("Retry")
+        val calls = AtomicInteger()
+        val repo = object : PlaylistRepository by data.playlists {
+            override suspend fun delete(id: String) {
+                if (calls.incrementAndGet() == 1) throw IllegalStateException("injected database failure")
+                data.playlists.delete(id)
+            }
+        }
+        val vm = PlaylistViewModel(FakeBrowseProvider(), repo, FakePlayer(), created.id, isLocal = true)
+        try {
+            eventually { (vm.state.value as? PlaylistUiState.Local)?.playlist != null }
+            vm.delete()
+            eventually { vm.deletion.value.errorMessage != null }
+            assertFalse(vm.deleted.value)
+            assertFalse(vm.deletion.value.isDeleting)
+            assertTrue(vm.deletion.value.errorMessage!!.contains("try again"))
+            assertEquals(created.id, data.playlists.observePlaylist(created.id).first()?.id)
+            vm.clearDeletionError() // dismiss and reopen: retry is still available
+            assertFalse(vm.deletion.value.isDeleting)
+            assertNull(vm.deletion.value.errorMessage)
+            assertEquals(1, calls.get())
+            vm.delete()
+            eventually { vm.deleted.value }
+            assertEquals(2, calls.get())
+            assertNull(data.playlists.observePlaylist(created.id).first())
+        } finally { vm.close() }
+    }
+
+    @Test
+    fun postCommitFailureIsUncertainButRetryCanConfirmAbsence(): Unit = runBlocking {
+        val data = DataLayer(DatabaseFactory.create(DatabaseDriverFactory.inMemory().createDriver()))
+        val created = data.playlists.create("Uncertain")
+        val calls = AtomicInteger()
+        val repo = object : PlaylistRepository by data.playlists {
+            override suspend fun delete(id: String) {
+                data.playlists.delete(id)
+                if (calls.incrementAndGet() == 1) throw IllegalStateException("lost acknowledgement after commit")
+            }
+        }
+        val vm = PlaylistViewModel(FakeBrowseProvider(), repo, FakePlayer(), created.id, isLocal = true)
+        try {
+            eventually { (vm.state.value as? PlaylistUiState.Local)?.playlist != null }
+            vm.delete()
+            eventually { vm.deletion.value.errorMessage != null }
+            eventually { (vm.state.value as? PlaylistUiState.Local)?.playlist == null }
+            assertFalse(vm.deleted.value) // never claim success from a thrown operation
+            assertFalse(vm.deletion.value.isDeleting)
+            vm.delete() // idempotent SQL delete now confirms the desired absence
+            eventually { vm.deleted.value }
+            assertEquals(2, calls.get())
+            assertNull(data.playlists.observePlaylist(created.id).first())
+        } finally { vm.close() }
+    }
+
+    @Test
+    fun cancelledPlaylistDeletionDoesNotReportSuccess(): Unit = runBlocking {
+        val data = DataLayer(DatabaseFactory.create(DatabaseDriverFactory.inMemory().createDriver()))
+        val created = data.playlists.create("Cancel")
+        val started = CompletableDeferred<Unit>()
+        val gate = CompletableDeferred<Unit>()
+        val repo = object : PlaylistRepository by data.playlists {
+            override suspend fun delete(id: String) {
+                started.complete(Unit)
+                gate.await()
+                data.playlists.delete(id)
+            }
+        }
+        val vm = PlaylistViewModel(FakeBrowseProvider(), repo, FakePlayer(), created.id, isLocal = true)
+        vm.delete()
+        withTimeout(15_000) { started.await() }
+        vm.close()
+        eventually { vm.deletion.value.errorMessage != null }
+        assertFalse(vm.deleted.value)
+        assertEquals(created.id, data.playlists.observePlaylist(created.id).first()?.id)
+    }
+
+    @Test
+    fun missingPlaylistDeletionIsSafeAndRemoteDeletionIsIgnored(): Unit = runBlocking {
+        val data = DataLayer(DatabaseFactory.create(DatabaseDriverFactory.inMemory().createDriver()))
+        val other = data.playlists.create("Keep")
+        val local = PlaylistViewModel(FakeBrowseProvider(), data.playlists, FakePlayer(), "missing", isLocal = true)
+        val remote = PlaylistViewModel(FakeBrowseProvider(), data.playlists, FakePlayer(), other.id, isLocal = false)
+        try {
+            local.delete()
+            eventually { local.deleted.value }
+            remote.delete()
+            assertFalse(remote.deleted.value)
+            assertEquals(other.id, data.playlists.observePlaylist(other.id).first()?.id)
+        } finally { local.close(); remote.close() }
+    }
+
 }

@@ -83,6 +83,10 @@ fun PlaylistScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val deleted by viewModel.deleted.collectAsState()
+    val deletion by viewModel.deletion.collectAsState()
+    // Own the dialog above LocalPlaylistContent: the DB observer can emit a
+    // missing row before delete() returns, and must not dismiss a pending dialog.
+    var deletingName by remember(viewModel) { mutableStateOf<String?>(null) }
 
     LaunchedEffect(deleted) { if (deleted) onDeleted() }
 
@@ -124,8 +128,8 @@ fun PlaylistScreen(
                 val playlist = s.playlist
                 if (playlist == null) {
                     EmptyView(
-                        title = "Playlist deleted",
-                        message = "This local playlist no longer exists.",
+                        title = "Playlist unavailable",
+                        message = "This local playlist is no longer available.",
                         actionLabel = "Back",
                         onAction = onBack,
                         modifier = Modifier.fillMaxSize(),
@@ -139,6 +143,7 @@ fun PlaylistScreen(
                         onPlayAll = { viewModel.play(0) },
                         onShuffle = { viewModel.playShuffled() },
                         onTrackPlay = onTrackPlay,
+                        onDelete = { deletingName = playlist.name },
                     )
                 }
             }
@@ -166,6 +171,22 @@ fun PlaylistScreen(
                 )
             }
         }
+    }
+    deletingName?.let { name ->
+        DeleteConfirmDialog(
+            playlistName = name,
+            isDeleting = deletion.isDeleting,
+            errorMessage = deletion.errorMessage,
+            onDismiss = {
+                // A back press can race Compose's next StateFlow recomposition.
+                // Check the synchronous ViewModel gate, not the collected snapshot.
+                if (!viewModel.deletion.value.isDeleting) {
+                    deletingName = null
+                    viewModel.clearDeletionError()
+                }
+            },
+            onConfirm = { viewModel.delete() },
+        )
     }
 }
 
@@ -275,9 +296,9 @@ private fun LocalPlaylistContent(
     onPlayAll: () -> Unit,
     onShuffle: () -> Unit,
     onTrackPlay: (Track, List<Track>, Int) -> Unit,
+    onDelete: () -> Unit,
 ) {
     var showRename by remember { mutableStateOf(false) }
-    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         PlaylistHeader(
@@ -292,7 +313,7 @@ private fun LocalPlaylistContent(
             actions = {
                 Row(horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm)) {
                     DhunOutlinedButton(onClick = { showRename = true }) { Text("Rename") }
-                    DhunOutlinedButton(onClick = { showDeleteConfirm = true }) { Text("Delete") }
+                    DhunOutlinedButton(onClick = onDelete) { Text("Delete") }
                 }
             },
         )
@@ -353,13 +374,6 @@ private fun LocalPlaylistContent(
                 viewModel.rename(newName)
                 showRename = false
             },
-        )
-    }
-    if (showDeleteConfirm) {
-        DeleteConfirmDialog(
-            playlistName = title,
-            onDismiss = { showDeleteConfirm = false },
-            onConfirm = { viewModel.delete(); showDeleteConfirm = false },
         )
     }
 }
@@ -486,6 +500,8 @@ private fun RenameDialog(
 @Composable
 private fun DeleteConfirmDialog(
     playlistName: String,
+    isDeleting: Boolean,
+    errorMessage: String?,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
@@ -505,15 +521,21 @@ private fun DeleteConfirmDialog(
                 )
                 Spacer(modifier = Modifier.height(DhunSpacing.sm))
                 Text(
-                    "This removes the local playlist. Tracks stay in your favorites/history if saved there.",
+                    "This removes the playlist from your local library. Songs, downloads, favorites and history are not deleted. Backups or device storage may retain copies; this is not secure erasure.",
                     style = MaterialTheme.typography.bodySmall,
                     color = DhunColors.textSecondary,
                 )
+                if (errorMessage != null) {
+                    Spacer(modifier = Modifier.height(DhunSpacing.sm))
+                    Text(errorMessage, style = MaterialTheme.typography.bodySmall, color = DhunColors.error)
+                }
                 Spacer(modifier = Modifier.height(DhunSpacing.md))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    DhunTextButton(onClick = onDismiss) { Text("Cancel") }
+                    DhunTextButton(onClick = onDismiss, enabled = !isDeleting) { Text("Cancel") }
                     Spacer(modifier = Modifier.weight(1f))
-                    DhunButton(onClick = onConfirm) { Text("Delete") }
+                    DhunButton(onClick = onConfirm, enabled = !isDeleting, loading = isDeleting) {
+                        Text(if (errorMessage == null) "Delete" else "Retry deletion")
+                    }
                 }
             }
         }

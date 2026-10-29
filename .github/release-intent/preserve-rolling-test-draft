@@ -1,0 +1,3 @@
+One-shot build-only intent for this playlist deletion merge.
+The existing private rolling test draft and its assets must not be replaced by this main push.
+Retaining this file on later pushes has no effect: only its addition relative to the first parent requests build-only.

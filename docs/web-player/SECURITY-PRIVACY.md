@@ -41,7 +41,8 @@ The visitor can:
 - **Delete** it: Settings → This browser → "Erase library"
   asks for confirmation before it removes likes, playlists, history, snapshots
   and recent searches from the current library. Previous and legacy copies may retain them. It keeps the settings. A single playlist can be deleted
-  from its own screen. The browser's site-data controls for the origin also
+  from the current library on its own screen, but recovery and legacy copies may
+  retain it too. The browser's site-data controls for the origin also
   remove the stored record, settings included.
 
 **Storage failure is not successful deletion.** Destructive library changes and

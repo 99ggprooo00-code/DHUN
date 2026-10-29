@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
 /** Real Chromium component tests for the production IndexedDB adapter.
  * End-to-end application tests are in integrated-storage.mjs. */
 export async function checkIndexedDBStorage(browser, { base, record }) {
@@ -215,14 +216,17 @@ export async function checkIndexedDBStorage(browser, { base, record }) {
       const page = await quotaContext.newPage(); await page.goto(`${base}/404.html`);
       const cdp = await quotaContext.newCDPSession(page);
       await cdp.send("Storage.overrideQuotaForOrigin", { origin: new URL(base).origin, quotaSize: 2 * 1024 * 1024 });
-      await page.evaluate(async () => {
+      // Repeated characters can compress below quota in newer Chromium. Use
+      // incompressible data so this exercises a real quota failure, not size assumptions.
+      const payload = randomBytes(4.5 * 1024 * 1024).toString("base64");
+      await page.evaluate(async (payload) => {
         const m = await import("/app/js/library.js");
         const databaseName = `dhun-quota-${Math.random()}`, legacyKey = `${databaseName}-legacy`;
         const adapter = await m.createIndexedDBStorage({ databaseName, legacyKey });
         const before = { ...(await adapter.read()), likes: ["saved-before-quota"] };
         await adapter.save(before);
         try {
-          await adapter.save({ ...before, settings: { ...before.settings, extra: "x".repeat(6 * 1024 * 1024) } });
+          await adapter.save({ ...before, settings: { ...before.settings, extra: payload } });
           throw Error("quota-limited transaction unexpectedly succeeded");
         } catch (error) {
           if (error.code !== "ABORTED" || error.cause?.name !== "QuotaExceededError") throw error;
@@ -231,7 +235,7 @@ export async function checkIndexedDBStorage(browser, { base, record }) {
         const reopened = await m.createIndexedDBStorage({ databaseName, legacyKey });
         if ((await reopened.read()).likes[0] !== "saved-before-quota") throw Error("quota abort lost committed record");
         reopened.close();
-      });
+      }, payload);
       await cdp.detach();
       record("/app/ IndexedDB adapter quota", "Chromium quota override caused a real IndexedDB QuotaExceededError; the prior committed record survived reopen");
     } finally { await quotaContext.close(); }

@@ -1,6 +1,7 @@
 /** End-to-end browser storage checks against the production app and a frozen
  * complete old-main app (faa4a012). Fictional data; not a deployed-site test. */
 import assert from "node:assert/strict";
+import { randomBytes } from "node:crypto";
 import { readFile, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -284,7 +285,8 @@ export async function checkIntegratedStorage(browser, { base, record }) {
     await cdp.send("Storage.overrideQuotaForOrigin", { origin: new URL(base).origin, quotaSize: 2 * 1024 * 1024 });
     await quota.goto(`${base}/app/#/settings`); await waitSettings(quota);
     const beforeQuota = await raw(quota);
-    const big = { ...exported, settings: { ...exported.settings, extra: "x".repeat(6 * 1024 * 1024) } };
+    // Compression can make a repeated 6 MiB string fit inside a 2 MiB quota.
+    const big = { ...exported, settings: { ...exported.settings, extra: randomBytes(4.5 * 1024 * 1024).toString("base64") } };
     const importOutcome = quota.waitForFunction(() => /Import (failed|unconfirmed)|Library imported/.test(document.querySelector("#dhun-toast")?.textContent || ""), null, { timeout: 30000 });
     await quota.locator('[data-action="import-library"]').setInputFiles({ name: "quota.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(big)) });
     await importOutcome;
