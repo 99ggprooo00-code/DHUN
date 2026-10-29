@@ -338,6 +338,28 @@ class BrowseViewModelTest {
     }
 
     @Test
+    fun cancelledPlaylistDeletionDoesNotReportSuccess(): Unit = runBlocking {
+        val data = DataLayer(DatabaseFactory.create(DatabaseDriverFactory.inMemory().createDriver()))
+        val created = data.playlists.create("Cancel")
+        val started = CompletableDeferred<Unit>()
+        val gate = CompletableDeferred<Unit>()
+        val repo = object : PlaylistRepository by data.playlists {
+            override suspend fun delete(id: String) {
+                started.complete(Unit)
+                gate.await()
+                data.playlists.delete(id)
+            }
+        }
+        val vm = PlaylistViewModel(FakeBrowseProvider(), repo, FakePlayer(), created.id, isLocal = true)
+        vm.delete()
+        withTimeout(15_000) { started.await() }
+        vm.close()
+        eventually { vm.deletion.value.errorMessage != null }
+        assertFalse(vm.deleted.value)
+        assertEquals(created.id, data.playlists.observePlaylist(created.id).first()?.id)
+    }
+
+    @Test
     fun missingPlaylistDeletionIsSafeAndRemoteDeletionIsIgnored(): Unit = runBlocking {
         val data = DataLayer(DatabaseFactory.create(DatabaseDriverFactory.inMemory().createDriver()))
         val other = data.playlists.create("Keep")

@@ -148,7 +148,11 @@ class PlaylistViewModel(
     }
 
     fun clearDeletionError() {
-        if (!_deletion.value.isDeleting) _deletion.value = PlaylistDeletionState()
+        while (true) {
+            val current = _deletion.value
+            if (current.isDeleting) return
+            if (_deletion.compareAndSet(current, PlaylistDeletionState())) return
+        }
     }
 
     fun removeTrack(track: Track) {
