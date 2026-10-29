@@ -40,6 +40,7 @@ on:
       - 'scripts/**'
       - '.github/workflows/test-release.yml'
       - '.github/release-intent/v1.00.002'
+      - '.github/release-intent/preserve-rolling-test-draft'
 
 permissions:
   contents: read
@@ -289,8 +290,9 @@ jobs:
 
   publish_test:
     # Ordinary main pushes refresh only the private rolling test draft.
-    # A one-shot public intent skips this job, preserving the existing draft.
-    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.release_plan.outputs.channel == 'test' }}
+    # A newly added build-only intent (or public intent) skips this job.
+    # Never delete the existing draft for a build-only run.
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.release_plan.outputs.channel == 'test' && needs.release_plan.outputs.build_only == 'false' }}
     needs: [release_plan, apk, msi]
     runs-on: ubuntu-latest
     timeout-minutes: 15

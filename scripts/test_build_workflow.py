@@ -43,6 +43,7 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn("github.ref == 'refs/heads/main'", self.publish_test)
         self.assertIn("needs: [release_plan, apk, msi]", self.publish_test)
         self.assertIn("needs.release_plan.outputs.channel == 'test'", self.publish_test)
+        self.assertIn("needs.release_plan.outputs.build_only == 'false'", self.publish_test)
         self.assertIn("gh release create test", self.publish_test)
         self.assertNotIn("Stage, verify and publish the fixed v1.00.002", self.publish_test)
         # Only a newly added marker can select public on a main push.
