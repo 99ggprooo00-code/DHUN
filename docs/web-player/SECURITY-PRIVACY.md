@@ -91,9 +91,9 @@ not under this repository's control on GitHub Pages.
 - Templates are built with the `html` helper in `dom.js`, which escapes every
   interpolated value unless the value is already marked as markup. Catalogue text
   is also converted with a plain-text function before it is used.
-- Imported files are read only if they are at most 8 MB, are JSON, and carry the
-  `app` marker. The normaliser then discards fields it does not know and clamps
-  numbers (see [DATA-SCHEMA.md](DATA-SCHEMA.md) §5).
+- Imports are capped at 24 MiB UTF-8 and checked for JSON token and nesting
+  budgets before parsing. Validation rejects data that normalization would discard
+  or change, rather than silently dropping it (see [DATA-SCHEMA.md](DATA-SCHEMA.md) §6).
 - Hash routes are parsed by the router; an unknown name opens Home.
 
 ## 7. Secrets

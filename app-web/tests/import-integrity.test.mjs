@@ -105,12 +105,26 @@ test("a failed write keeps the prior library and permits retry", async () => {
   assert.deepEqual((await handleFileImport(file(candidate), f.storage)).likes, []);
 });
 
-test("readback failure after a write retains in-tab data but durable outcome is uncertain", async () => {
+test("unreadable storage is rejected before a write", async () => {
   const f = setup(); const candidate = f.storage.exportAll(emptyLibrary());
   f.control.failRead = true;
-  await assert.rejects(handleFileImport(file(candidate), f.storage), /could not confirm/i);
+  await assert.rejects(handleFileImport(file(candidate), f.storage), /could not read.*nothing was written/i);
   assert.deepEqual(f.storage.load(), f.previous);
-  assert.notEqual(f.map.get(STORAGE_KEY), f.original, "the write may already have succeeded before readback fails");
+  assert.equal(f.map.get(STORAGE_KEY), f.original);
+});
+
+test("readback failure after a successful write has an uncertain durable outcome", async () => {
+  const map = new Map(); let failAfterWrite = false; let wrote = false;
+  const backing = { setItem(k, v) { map.set(k, String(v)); if (failAfterWrite && k === STORAGE_KEY) wrote = true; },
+    getItem(k) { if (wrote && k === STORAGE_KEY) throw Error("readback failed"); return map.get(k) ?? null; },
+    removeItem(k) { map.delete(k); } };
+  const storage = createStorage(backing);
+  const previous = toggleLike(emptyLibrary(), { id: "old" }).library;
+  assert.equal(storage.save(previous), true); const original = map.get(STORAGE_KEY);
+  const candidate = storage.exportAll(emptyLibrary()); failAfterWrite = true;
+  await assert.rejects(handleFileImport(file(candidate), storage), /could not confirm/i);
+  assert.deepEqual(storage.load(), previous);
+  assert.notEqual(map.get(STORAGE_KEY), original);
 });
 
 test("controller reports invalid import without a success message or in-tab replacement", async (t) => {

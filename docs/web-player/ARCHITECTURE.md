@@ -26,6 +26,7 @@ been deleted — the list is checked against the directory, not trusted.
 | `js/router.js` | Hash routes as data: parse, format, tab, title, the detail set |
 | `js/api.js` | The JioSaavn seam: endpoints, normalisers, timeouts, failure kinds |
 | `js/player.js` | Queue, repeat, shuffle, stream resolution, the media element, Media Session |
+| `js/backup-policy.js` | Backup byte, token and nesting budgets before parsing |
 | `js/library.js` | Likes, playlists, history, snapshots, settings, storage (`dhun.web.v3`) |
 | `js/views.js` | One function per screen: Home, Search, Library, album, artist, playlist, collection, Settings, About, the framing refusal |
 | `js/shell.js` | App bar, bottom navigation, navigation rail, docked mini player |

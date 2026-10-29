@@ -13,7 +13,7 @@ import { emptyLibrary, createStorage, toggleLike } from "../src/js/library.js";
 function fakeFile(content, { size = null, name = "dhun-library.json" } = {}) {
   return {
     name,
-    size: size ?? content.length,
+    size: size ?? Buffer.byteLength(content),
     async text() {
       return content;
     },
@@ -21,23 +21,17 @@ function fakeFile(content, { size = null, name = "dhun-library.json" } = {}) {
 }
 
 function fakeStorage(initial = emptyLibrary()) {
-  let library = initial;
-  return {
-    get library() {
-      return library;
-    },
-    importAll(text) {
-      library = JSON.parse(text);
-      return library;
-    },
-  };
+  const map = new Map();
+  const storage = createStorage({ setItem: (k, v) => map.set(k, String(v)), getItem: (k) => map.get(k) ?? null, removeItem: (k) => map.delete(k) });
+  assert.equal(storage.save(initial), true);
+  return { get library() { return storage.load(); }, importAll: text => storage.importAll(text) };
 }
 
 test("a file is rejected before it is read when it is too large", async () => {
   const storage = fakeStorage();
   await assert.rejects(
-    () => handleFileImport(fakeFile("{}", { size: 9 * 1024 * 1024 }), storage),
-    /larger than 8 MB/,
+    () => handleFileImport(fakeFile("{}", { size: 25 * 1024 * 1024 }), storage),
+    /exceeds the 24 MiB/,
   );
   assert.deepEqual(storage.library, emptyLibrary(), "a refused file must not touch the library");
 });

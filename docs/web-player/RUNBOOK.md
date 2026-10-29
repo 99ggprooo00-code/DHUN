@@ -72,8 +72,11 @@ element's own state is the first thing to check.
 
 ## 4. A visitor's export or import fails
 
-- "the file is larger than 8 MB" or "the file is not JSON": the file is not an
-  export from this app. Ask for the file the app wrote (`dhun-library.json`).
+- A 24 MiB, token or nesting limit error means this build cannot restore that
+  file. Keep the original backup and the existing library; seek recovery help.
+  A file within those limits can still exceed browser storage quota.
+- "the file is not JSON": keep the original file and check that it is an intact
+  `dhun-library.json` export.
 - "the file was not exported by this app": same. The `app` field must be
   `DHUN web`.
 

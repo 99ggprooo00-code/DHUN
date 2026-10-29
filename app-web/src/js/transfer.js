@@ -1,4 +1,5 @@
-import { FORMAT_VERSION, parseImportJSON } from "./library.js";
+import { FORMAT_VERSION, parseImportJSON, validateImport } from "./library.js";
+import { checkBackupSize } from "./backup-policy.js";
 
 /**
  * Importing a library file.
@@ -10,7 +11,7 @@ import { FORMAT_VERSION, parseImportJSON } from "./library.js";
  */
 export async function handleFileImport(file, storage) {
   if (!file) throw new Error("no file was chosen");
-  if (file.size > 8 * 1024 * 1024) throw new Error("the file is larger than 8 MB");
+  checkBackupSize(file.size);
   const text = await file.text();
   const parsed = parseImportJSON(text);
   if (parsed?.app !== "DHUN web") throw new Error("the file was not exported by this app");
@@ -22,4 +23,16 @@ export async function handleFileImport(file, storage) {
     );
   }
   return storage.importAll(text);
+}
+
+/** Warn if a downloaded file cannot be restored under this build's policy.
+ * Do not discard the file: it may be the visitor's only copy. */
+export function backupExportWarning(text, sourceLibrary) {
+  try {
+    validateImport(parseImportJSON(text));
+    if (sourceLibrary) validateImport({ ...sourceLibrary, app: "DHUN web", version: FORMAT_VERSION });
+    return null;
+  } catch (error) {
+    return `This backup cannot be restored by this version: ${error?.message ?? "validation failed"}. Keep the file and existing library; seek recovery help.`;
+  }
 }

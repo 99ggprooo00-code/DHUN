@@ -104,7 +104,7 @@ Home or Search  →  track row  →  Play
 - Settings → This browser → **Export library** writes a JSON file (`app:
   "DHUN web"`, `version: 3`). The file is saved by the browser; nothing is
   uploaded.
-- Settings → This browser → **Import library** accepts a file of at most 8 MB
+- Settings → This browser → **Import library** accepts a file of at most 24 MiB (UTF-8), subject to complexity and storage limits
   whose `app` field is `DHUN web`. Any other file is refused with the reason
   shown. A valid file replaces the library on this device.
 

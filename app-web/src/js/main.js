@@ -49,7 +49,7 @@ import { legalBody } from "./legal.js";
 import { WEB_VERSION } from "./version.js";
 import { createPwa } from "./pwa.js";
 import { matchShortcut } from "./shortcuts.js";
-import { handleFileImport } from "./transfer.js";
+import { backupExportWarning, handleFileImport } from "./transfer.js";
 
 const NETWORK_KINDS = new Set([FAILURE_KIND.network, FAILURE_KIND.timeout, FAILURE_KIND.offline]);
 const SEARCH_FILTERS = ["songs", "albums", "artists", "playlists"];
@@ -1340,14 +1340,24 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
 
     /* storage */
     "export-library": () => {
-      const blob = new win.Blob([storage.exportAll(state.library)], { type: "application/json" });
-      const url = win.URL.createObjectURL(blob);
-      const link = doc.createElement("a");
-      link.href = url;
-      link.download = "dhun-library.json";
-      link.click();
-      win.setTimeout(() => win.URL.revokeObjectURL(url), 1000);
-      showToast("Library exported.");
+      try {
+        const text = storage.exportAll(state.library);
+        const warning = backupExportWarning(text, state.library);
+        if (warning && !win.confirm?.(`${warning} Download the complete file anyway?`)) {
+          showToast(warning, "warn");
+          return;
+        }
+        const blob = new win.Blob([text], { type: "application/json" });
+        const url = win.URL.createObjectURL(blob);
+        const link = doc.createElement("a");
+        link.href = url;
+        link.download = "dhun-library.json";
+        link.click();
+        win.setTimeout(() => win.URL.revokeObjectURL(url), 1000);
+        showToast(warning ?? "Library exported.", warning ? "warn" : undefined);
+      } catch (error) {
+        showToast(`Export failed: ${error?.message ?? "the library could not be serialized"}. Your library was not changed.`, "warn");
+      }
     },
     "import-library": async (target) => {
       const file = target.files?.[0];

@@ -126,12 +126,18 @@ normalising, so a corrupt document that is saved over is lost.
 ```
 
 The file is created in the browser and downloaded by the visitor. Nothing is
-uploaded.
+uploaded. Before the download starts, the app validates the serialized backup
+against the restore policy. If it cannot be restored by this version, the visitor
+is warned and may still download the complete file for recovery; it is not
+truncated. Serialization failures are reported without a success message.
 
 **Import** a file that Export library wrote (Settings → This browser → Import library):
 
-1. The file must be at most **8 MB**, valid JSON with no duplicate object keys and no numeric tokens that would
-   change value when parsed and re-exported (including negative zero),
+1. The file must be at most **24 MiB** (25,165,824 UTF-8 bytes), contain at
+   most **1,500,000 JSON tokens** and have at most **128 nested containers**.
+   Token and depth checks run before JSON parsing; existing collection limits
+   remain in force. The file must be valid JSON with no duplicate object keys and
+   no numeric tokens that would change value on re-export (including negative zero),
    `app: "DHUN web"`, and `version: 3` (`FORMAT_VERSION`).
 2. All six library fields in §2 must be present with the documented array/object
    shapes. Playlists need an id, nonempty name and track-id array; snapshot ids
@@ -158,9 +164,18 @@ uploaded.
    storage. There is no cross-tab transaction or compare-and-swap, and rollback
    could overwrite another tab's changes. The file itself is never modified.
 
+The 24 MiB budget accommodates the reproduced 9.8 MB valid export but is not a
+promise that every library fits: browser memory and quota differ. The complexity
+budgets also reject unusually wide or deeply nested extension data, even below
+24 MiB. A file within these limits can still fail when browser storage is full or
+unavailable. Keep the original file and existing library; free storage, try a
+browser/device with sufficient capacity, or seek recovery help. Do not delete
+the only copy to make room. No other format version is imported.
+
 Startup's permissive recovery (§5) is unchanged; import is intentionally stricter
-because it replaces a library. A backup exported from another browser still needs
-to fit the existing 8 MB import limit. No import of other format versions is made.
+because it replaces a library. A storage read is attempted before writing; a
+successful write followed by a failed readback still has the uncertain outcome
+noted above.
 
 ## 7. What is not stored
 

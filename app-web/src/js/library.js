@@ -1,3 +1,5 @@
+import { checkBackupText } from "./backup-policy.js";
+
 /**
  * Everything the browser keeps, and nothing it does not.
  *
@@ -285,6 +287,7 @@ function assertLosslessJSONNumbers(text) {
  * JSON.parse alone silently keeps the last occurrence. The iterative scan runs
  * only after syntax validation and does not recurse on an untrusted document. */
 export function parseImportJSON(text) {
+  checkBackupText(text);
   let parsed;
   try { parsed = JSON.parse(text); } catch { throw new Error("the file is not JSON"); }
   assertLosslessJSONNumbers(text);
@@ -582,6 +585,14 @@ export function createStorage(backing, key = STORAGE_KEY) {
     importAll(text) {
       const parsed = parseImportJSON(text);
       const library = validateImport(parsed);
+      // Detect an inaccessible store before attempting replacement. This cannot
+      // eliminate a readback failure after a successful write or cross-tab races.
+      try {
+        if (!backing) throw new Error("storage unavailable");
+        backing.getItem(key);
+      } catch {
+        throw new Error("This browser could not read the current saved library, so nothing was written. Allow storage and try again; keep your backup file.");
+      }
       if (!this.save(library, { requirePersistence: true })) {
         throw new Error("This browser could not confirm saving the imported library. Previous in-tab data was kept, but the saved copy may have changed. Export a backup before closing; allow storage or free space, then try again.");
       }
