@@ -1,7 +1,7 @@
 /** Replacement imports: real storage adapter with isolated backing; no browser I/O. */
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addToPlaylist, createPlaylist, createStorage, emptyLibrary, LIBRARY_LIMITS, rememberPlay, rememberSearch, STORAGE_KEY, toggleLike } from "../src/js/library.js";
+import { addToPlaylist, createPlaylist, createStorage, emptyLibrary, LIBRARY_LIMITS, rememberPlay, rememberSearch, STORAGE_KEY, toggleLike, validateImport } from "../src/js/library.js";
 import { handleFileImport } from "../src/js/transfer.js";
 import { bootFixture, settle } from "./helpers/boot-fixture.mjs";
 
@@ -147,4 +147,47 @@ test("exact playlist, track, history and search limits are accepted", async () =
   assert.equal(imported.playlists[0].trackIds.length, LIBRARY_LIMITS.playlistTracks);
   assert.equal(imported.history.length, LIBRARY_LIMITS.history);
   assert.equal(imported.recentSearches.length, LIBRARY_LIMITS.recentSearches);
+});
+
+test("direct validation rejects non-finite and negative-zero values at any depth", () => {
+  for (const value of [Infinity, -Infinity, NaN, -0]) {
+    const raw = { app: "DHUN web", version: 3, ...emptyLibrary(), settings: { extra: [{ value }] } };
+    assert.throws(() => validateImport(raw), /non-finite or negative-zero/i);
+  }
+});
+
+test("unsafe numeric tokens cannot replace existing data through either import path", async () => {
+  const f = setup(); const base = JSON.stringify(f.valid);
+  for (const token of ["1e400", "9007199254740993", "1e-400", "-0", "-0.0", "1.0000000000000001", "4e-324", `0.1${"0".repeat(100_000)}1`]) {
+    const text = base.replace('"settings":{', `"settings":{"extra":[{"nested":${token}}],`);
+    await assert.rejects(handleFileImport(file(text), f.storage), /number.*preserve/i);
+    assert.throws(() => f.storage.importAll(text), /number.*preserve/i);
+    assert.equal(f.map.get(STORAGE_KEY), f.original);
+    assert.deepEqual(f.storage.load(), f.previous);
+  }
+});
+
+test("equivalent decimal spellings and safe legacy numeric strings round trip", async () => {
+  const f = setup(); const text = JSON.stringify(f.valid).replace('"settings":{', '"settings":{"extra":[0.10,1e0,-12.50,5e-324,9007199254740992],');
+  const imported = await handleFileImport(file(text), f.storage);
+  assert.deepEqual(imported.settings.extra, [0.1, 1, -12.5, 5e-324, 9007199254740992]);
+  assert.deepEqual((await handleFileImport(file(f.storage.exportAll(imported)), f.storage)).settings.extra, imported.settings.extra);
+  // Numeric-looking text and escaped quotes inside strings are not JSON numbers.
+  const quoted = structuredClone(f.valid);
+  quoted.settings.extra = ['text "1e400" and \\ -0 9007199254740993'];
+  assert.deepEqual((await handleFileImport(file(JSON.stringify(quoted)), f.storage)).settings.extra, quoted.settings.extra);
+  for (const value of ["+0.5", ".5", "0.500", "5e-1", "000.50", "1."]) {
+    const candidate = structuredClone(f.valid); candidate.settings.volume = value;
+    assert.equal((await handleFileImport(file(JSON.stringify(candidate)), f.storage)).settings.volume, Number(value));
+  }
+});
+
+test("controller reports unsafe numeric input without replacing its in-tab library", async (t) => {
+  const app = bootFixture(t); const previous = app.state.library;
+  const candidate = JSON.stringify({ app: "DHUN web", version: 3, ...previous });
+  app.importFile(file(candidate.replace('"settings":{', '"settings":{"extra":[1e-400],')));
+  await settle(); await settle();
+  assert.strictEqual(app.state.library, previous);
+  assert.match(app.state.toast.message, /Import failed:.*number.*preserve/i);
+  assert.doesNotMatch(app.state.toast.message, /Library imported/);
 });

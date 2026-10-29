@@ -199,12 +199,95 @@ export function normaliseLibrary(raw) {
   return pruneSnapshots({ likes, playlists, history, snapshots, recentSearches, settings });
 }
 
+/** Direct validation can also receive objects not produced by JSON.parse.
+ * Walk iteratively and reject numbers that serialization would change. */
+function rejectUnsafeNumbers(root) {
+  function* children(value) {
+    if (Array.isArray(value)) { yield* value; return; }
+    for (const key in value) if (Object.hasOwn(value, key)) yield value[key];
+  }
+  const pending = [[root][Symbol.iterator]()];
+  const visited = new WeakSet();
+  while (pending.length) {
+    const next = pending[pending.length - 1].next();
+    if (next.done) { pending.pop(); continue; }
+    const value = next.value;
+    if (typeof value === "number" && (!Number.isFinite(value) || Object.is(value, -0))) {
+      throw new Error("the file contains a non-finite or negative-zero number; the current library was not replaced");
+    }
+    if (value !== null && typeof value === "object" && !visited.has(value)) {
+      visited.add(value);
+      pending.push(children(value));
+    }
+  }
+}
+
+/** Canonicalise a decimal without converting it through binary floating point. */
+function decimalValue(token) {
+  // Legacy string fields may use an explicit plus, leading zeroes, `.5` or
+  // `1.` even though those spellings are not JSON number tokens.
+  const match = /^([+-]?)(?:(\d+)(?:\.(\d*))?|\.(\d+))(?:[eE]([+-]?\d+))?$/.exec(token);
+  if (!match) return null;
+  const negative = match[1] === "-";
+  const fraction = match[3] ?? match[4] ?? "";
+  let digits = ((match[2] ?? "0") + fraction).replace(/^0+/, "");
+  if (!digits) return { negative, digits: "0", exponent: 0 };
+  let exponent = Number(match[5] ?? 0) - fraction.length;
+  if (!Number.isSafeInteger(exponent)) return null;
+  let end = digits.length;
+  while (end > 1 && digits[end - 1] === "0") end -= 1;
+  if (end !== digits.length) {
+    exponent += digits.length - end;
+    digits = digits.slice(0, end);
+  }
+  if (!Number.isSafeInteger(exponent)) return null;
+  return { negative, digits, exponent };
+}
+
+function sameDecimalValue(left, right) {
+  const a = decimalValue(left);
+  const b = decimalValue(right);
+  return Boolean(a && b && a.negative === b.negative && a.digits === b.digits && a.exponent === b.exponent);
+}
+
+/**
+ * JSON.parse converts numeric tokens to IEEE-754 before validation. Reject any
+ * token whose decimal value differs from the Number's JSON representation, including
+ * overflow, precision loss, underflow and negative zero. JSON syntax is checked
+ * first, so this scanner only needs to skip strings and inspect number tokens.
+ */
+function assertLosslessJSONNumbers(text) {
+  const numberToken = /-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/y;
+  for (let i = 0; i < text.length; i += 1) {
+    if (text[i] === '"') {
+      i += 1;
+      while (i < text.length) {
+        if (text[i] === "\\") { i += 2; continue; }
+        if (text[i] === '"') break;
+        i += 1;
+      }
+      continue;
+    }
+    if (text[i] !== "-" && (text[i] < "0" || text[i] > "9")) continue;
+    numberToken.lastIndex = i;
+    const match = numberToken.exec(text);
+    if (!match) continue;
+    const token = match[0];
+    const number = Number(token);
+    if (!Number.isFinite(number) || !sameDecimalValue(token, String(number))) {
+      throw new Error("the file contains a number JavaScript cannot preserve exactly; no library was replaced");
+    }
+    i += token.length - 1;
+  }
+}
+
 /** Parse valid JSON while rejecting duplicate object keys (including escapes).
  * JSON.parse alone silently keeps the last occurrence. The iterative scan runs
  * only after syntax validation and does not recurse on an untrusted document. */
 export function parseImportJSON(text) {
   let parsed;
   try { parsed = JSON.parse(text); } catch { throw new Error("the file is not JSON"); }
+  assertLosslessJSONNumbers(text);
   const stack = [];
   for (let i = 0; i < text.length; i += 1) {
     const char = text[i];
@@ -237,6 +320,7 @@ export function parseImportJSON(text) {
  * snapshot fields and settings receive the same defaults as older v3 exports.
  */
 export function validateImport(raw) {
+  rejectUnsafeNumbers(raw);
   const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
   const invalid = (path, why) => { throw new Error(`Invalid library: ${path} ${why}. The current library was not replaced.`); };
   if (!object(raw) || raw.app !== "DHUN web") invalid("file", "is not a DHUN web export");
@@ -300,7 +384,7 @@ export function validateImport(raw) {
   function compare(input, output, path) {
     if (input === output) return;
     if (typeof input === "number" && typeof output === "string" && String(input) === output) return;
-    if (typeof input === "string" && typeof output === "number" && input.trim() && Number.isFinite(Number(input)) && Number(input) === output) return;
+    if (typeof input === "string" && typeof output === "number" && input.trim() && Number.isFinite(Number(input)) && sameDecimalValue(input.trim(), String(output))) return;
     if (typeof input === "string" && typeof output === "string" && input.trim() === output) return;
     if (Array.isArray(input) && Array.isArray(output)) {
       if (input.length !== output.length) invalid(path, "would lose entries during import");
