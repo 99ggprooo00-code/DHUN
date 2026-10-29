@@ -138,7 +138,7 @@ function fetchDouble({ respectAbort = true, fail = () => false } = {}) {
   return { calls, fetchImpl, close() { closed = true; for (const call of calls) call.succeed(); } };
 }
 
-export function bootFixture(t, { hash = "#/search", replaceSearchFields = false, ...fetchOptions } = {}) {
+export function bootFixture(t, { hash = "#/search", replaceSearchFields = false, storageSeed = [], ...fetchOptions } = {}) {
   const dom = documentDouble(replaceSearchFields);
   const transport = fetchDouble(fetchOptions);
   const win = new Events(); win.self = win; win.top = win;
@@ -154,7 +154,7 @@ export function bootFixture(t, { hash = "#/search", replaceSearchFields = false,
   const timers = new Map(); let timerId = 0;
   win.setTimeout = (fn) => { timers.set(++timerId, fn); return timerId; };
   win.clearTimeout = (id) => timers.delete(id);
-  const saved = new Map();
+  const saved = new Map(storageSeed);
   const storage = { getItem: (key) => saved.get(key) ?? null, setItem: (key, value) => saved.set(key, String(value)), removeItem: (key) => saved.delete(key) };
   const mounts = [];
   function mount() {

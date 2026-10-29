@@ -181,15 +181,47 @@ the only copy to make room. No other format version is imported.
 Startup's permissive recovery (§5) is unchanged; import is intentionally stricter
 because it replaces a library. The post-write uncertainty and concurrent-write
 race described above remain limitations; the import is not fully transactional.
-The guard is per tab and does not stop another open tab from writing.
+The guard is per tab and does not stop another open tab from writing. Ordinary
+saves also perform a best-effort stale-value check; it is not atomic with the
+write. If startup cannot read or parse saved data, the shown empty fallback is
+not a recovered library: this tab blocks writes and tells the visitor to retain
+browser data and their original backup. Some syntactically valid legacy shapes
+are still permissively normalized and may lose unsupported data (§5).
 
-A narrowly scoped follow-up would migrate the library and a revision to an
-IndexedDB object store and commit replacements in a read-write transaction that
-checks the revision. Migration must retain the legacy localStorage value until
-verified, coordinate older tabs and downgrade behavior, test aborted and
-interrupted transactions and browser storage policies, and avoid claiming
-protection against later site-data eviction. Until that work is verified, do not
-claim every unsuccessful import leaves the saved copy unchanged.
+### Transactional migration: required follow-up, not implemented
+
+A separate migration needs an asynchronous storage lifecycle rather than an
+IndexedDB sidecar beside the current synchronous `save` calls:
+
+1. Keep the existing `dhun.web.v3` bytes untouched. Read and validate a legacy
+   snapshot before migration; malformed or unrecognized data must require
+   recovery, not become a silently saved empty library. Initialize the new store
+   and its revision in a single IndexedDB read-write transaction. A failed or
+   interrupted initialization must leave the old key intact and must not mark
+   migration complete.
+2. Route **every** library load, edit, erase and import through the new store.
+   Within one read-write transaction, compare the tab's expected revision, then
+   write the validated candidate and new revision. Publish in-tab state only
+   after transaction completion. A conflict or aborted transaction must leave
+   the previously committed record intact. An interrupted or unacknowledged
+   completion must be reported as uncertain and reconciled on restart, not
+   assumed to have aborted.
+3. IndexedDB cannot atomically include a localStorage key. Record the legacy
+   snapshot, retain the original, and detect later legacy-key changes on startup
+   and during the session. Older app tabs and downgraded builds do not honor the
+   new revision protocol: preserve both divergent copies and require explicit
+   recovery rather than deleting either or silently choosing one. A change can
+   race a check, so even this detection does not prevent all cross-version
+   divergence. Test a legacy tab that writes before, during and after migration.
+4. Refactor the synchronous UI and storage handlers for async startup, pending
+   edits and cancellation. Test real two-tab transactions, abort, quota,
+   interruption, unreadable/corrupt records, migration and downgrade. Define
+   recovery and export paths before enabling migration, including IndexedDB
+   unavailable/private modes. Transaction completion does not protect against
+   later browser eviction, site-data clearing or device failure.
+
+Until that migration and its compatibility path are implemented and verified,
+do not claim every unsuccessful import leaves the saved copy unchanged.
 
 ## 7. What is not stored
 

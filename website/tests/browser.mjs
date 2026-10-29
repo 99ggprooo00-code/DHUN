@@ -2805,6 +2805,30 @@ async function checkWebStorageFailures(browser) {
     await page.getByText("Visit-only runtime playlist", { exact: true }).waitFor();
     if ((await saved(page)).playlists.some(playlist => playlist.name === "Visit-only runtime playlist")) fail("/app/ visit-only edits", "fault-injected write unexpectedly reached storage");
     else record("/app/ visit-only edits", "ordinary edits remain useful in memory but explicitly say they were not saved to browser storage");
+
+    // Two live tabs: a stale ordinary edit must not overwrite a newer saved
+    // copy when the conflict exists before its best-effort pre-write check.
+    context = await fresh(); await prepare(context);
+    const older = watch(await context.newPage()), newer = watch(await context.newPage());
+    await older.goto(url("/app/#/settings")); await newer.goto(url("/app/#/settings"));
+    await newer.locator('[data-action="set-theme"][data-value="dark"]').click();
+    const newerSaved = await newer.evaluate(key => localStorage.getItem(key), key);
+    await older.locator('[data-action="set-theme"][data-value="system"]').click();
+    await older.getByText(/saved library needs review.*will not write again/i).waitFor();
+    if (await older.evaluate(key => localStorage.getItem(key), key) !== newerSaved) fail("/app/ stale ordinary edit", "stale tab overwrote the newer saved library");
+    await newer.reload();
+    if ((await saved(newer)).settings.theme !== "dark") fail("/app/ stale ordinary reload", "newer saved value did not survive reload");
+    else record("/app/ stale ordinary edit", "a pre-existing two-tab conflict leaves the newer saved library intact and blocks later writes in the stale tab");
+
+    // Malformed persisted bytes are synthetic; the fallback must not be saved
+    // over the only copy and must not be presented as recovered data.
+    context = await fresh();
+    await context.addInitScript(key => { if (localStorage.getItem(key) === null) localStorage.setItem(key, "{broken library"); }, key);
+    page = watch(await context.newPage()); await page.goto(url("/app/#/settings"));
+    await page.getByText(/library shown may be incomplete.*do not delete browser data/i).waitFor();
+    await page.locator('[data-action="set-theme"][data-value="light"]').click();
+    if (await page.evaluate(key => localStorage.getItem(key), key) !== "{broken library") fail("/app/ corrupt library", "ordinary edit overwrote malformed saved bytes");
+    else record("/app/ corrupt library", "synthetic malformed saved bytes are retained while the fallback warns and stays visit-only");
     if (problems.length) fail("/app/ storage runtime errors", problems.join(" | "));
     else record("/app/ storage runtime errors", "fault-injected real workflows have no unexpected console/page errors or same-origin HTTP failure");
   } finally {

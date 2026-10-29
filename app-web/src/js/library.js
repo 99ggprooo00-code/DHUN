@@ -560,22 +560,40 @@ export function createStorage(backing, key = STORAGE_KEY) {
     },
     load() {
       if (memory) return memory;
+      let raw;
       try {
-        const raw = backing?.getItem(key) ?? null;
+        raw = backing?.getItem(key) ?? null;
+      } catch {
+        if (backing) { importGuard = "unreadable"; persistent = false; }
+        memory = emptyLibrary();
+        return memory;
+      }
+      try {
         memory = normaliseLibrary(JSON.parse(raw ?? "null"));
         if (backing) { observed = raw; observedKnown = true; }
       } catch {
+        // Never write an empty recovery fallback over unreadable saved bytes.
+        if (backing) { importGuard = "corrupt"; persistent = false; }
         memory = emptyLibrary();
       }
       return memory;
     },
     save(library, { requirePersistence = false } = {}) {
       const kept = pruneSnapshots(library);
+      // Capture a baseline before a first save, even if load() was not called.
+      if (!memory) this.load();
       // Ordinary edits may remain useful for this visit. Destructive actions
       // and replacement imports publish new memory only after acknowledgement.
       if (!requirePersistence) memory = kept;
-      // After an uncertain import, never overwrite a possibly newer saved copy
-      // with this tab's stale memory. Ordinary edits remain visit-only.
+      // Detect a stale tab before *any* library write, not just imports. This
+      // is best-effort only: localStorage has no atomic compare-and-swap.
+      if (!importGuard && backing && observedKnown) {
+        try {
+          if (backing.getItem(key) !== observed) importGuard = "conflict";
+        } catch {
+          importGuard = "unreadable";
+        }
+      }
       if (importGuard) { persistent = false; return false; }
       try {
         const serialized = JSON.stringify(kept);
@@ -596,7 +614,10 @@ export function createStorage(backing, key = STORAGE_KEY) {
     },
     importAll(text) {
       if (importGuard) {
-        throw new Error("The saved library needs review; this tab will not write again. Export the in-tab library and keep the original backup, then open a fresh tab to review saved data.");
+        const unsafeToExport = importGuard === "corrupt" || importGuard === "unreadable";
+        throw new Error(unsafeToExport
+          ? "Saved data could not be read safely; this tab will not write again. Do not delete browser data or the original backup; seek recovery help."
+          : "The saved library needs review; this tab will not write again. Export the in-tab library and keep the original backup, then open a fresh tab to review saved data.");
       }
       const parsed = parseImportJSON(text);
       const library = validateImport(parsed);

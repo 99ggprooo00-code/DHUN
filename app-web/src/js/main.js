@@ -147,7 +147,9 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   }
 
   function showSaveToast(message, saved) {
-    const warning = storage.importGuard
+    const warning = ["corrupt", "unreadable"].includes(storage.importGuard)
+      ? "Saved data could not be read safely. This tab cannot write; keep browser data and the original backup, and seek recovery help."
+      : storage.importGuard
       ? "Changed for this visit only. This tab cannot write until saved data is reviewed in a fresh tab; export this tab's library first."
       : "Changed for this visit only — not saved to browser storage. Export a backup before closing.";
     showToast(saved ? message : warning, saved ? "info" : "warn");
@@ -155,7 +157,9 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
 
   function commitLibrary(next) {
     if (!storage.save(next, { requirePersistence: true })) {
-      const error = storage.importGuard
+      const error = ["corrupt", "unreadable"].includes(storage.importGuard)
+        ? "Not saved. Saved data could not be read safely. Keep browser data and the original backup; seek recovery help."
+        : storage.importGuard
         ? "Not saved. This tab cannot write until saved data is reviewed in a fresh tab. Export this tab's library and keep the original backup first."
         : "Not saved. This browser could not confirm the change. Your in-tab library was kept. Allow storage or free space and try again; saved data may still exist. Browser site-data controls can clear the origin separately.";
       if (state.sheet) {
@@ -1553,7 +1557,9 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   function storageInfo() {
     return {
       persistent: storage.persistent,
-      note: storage.importGuard
+      note: ["corrupt", "unreadable"].includes(storage.importGuard)
+        ? "Saved data could not be read safely. This tab will not write. The library shown may be incomplete; do not delete browser data or the original backup. Seek recovery help."
+        : storage.importGuard
         ? "The saved library needs review. This tab will not write again. Export this tab's library, keep the original backup, then open a fresh tab to review saved data."
         : storage.persistent
         ? "Likes, playlists and history are stored in this browser's localStorage. Exporting writes a JSON file you keep; nothing is uploaded."

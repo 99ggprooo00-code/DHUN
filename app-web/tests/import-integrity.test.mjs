@@ -311,7 +311,8 @@ test("corrupt existing storage cannot be overwritten by an import", async () => 
   const map = new Map([[STORAGE_KEY, '{not-json']]);
   const backing = { getItem: k => map.get(k) ?? null, setItem: (k, v) => map.set(k, String(v)), removeItem: k => map.delete(k) };
   const storage = createStorage(backing); storage.load();
-  await assert.rejects(handleFileImport(file(storage.exportAll(emptyLibrary())), storage), /nothing was written/i);
+  await assert.rejects(handleFileImport(file(storage.exportAll(emptyLibrary())), storage), /could not be read safely/i);
+  assert.equal(storage.save(emptyLibrary()), false);
   assert.equal(map.get(STORAGE_KEY), '{not-json');
 });
 
@@ -329,4 +330,78 @@ test("a write that mutates then throws with stale readback remains unconfirmed",
   assert.deepEqual(storage.load().likes, ["old"]);
   assert.equal(storage.importGuard, "unconfirmed");
   assert.equal(storage.save(before), false);
+});
+
+test("a stale ordinary edit is visit-only and does not overwrite a newer tab", () => {
+  const map = new Map(); let writes = 0;
+  const backing = { getItem: k => map.get(k) ?? null, setItem(k, v) { map.set(k, String(v)); if (k === STORAGE_KEY) writes++; }, removeItem: k => map.delete(k) };
+  const a = createStorage(backing), b = createStorage(backing);
+  a.load(); b.load();
+  const newer = toggleLike(emptyLibrary(), { id: "other-tab" }).library;
+  assert.equal(b.save(newer), true); const previous = map.get(STORAGE_KEY); const count = writes;
+  const visitOnly = toggleLike(a.load(), { id: "local-edit" }).library;
+  assert.equal(a.save(visitOnly), false);
+  assert.equal(a.importGuard, "conflict");
+  assert.deepEqual(a.load().likes, ["local-edit"]);
+  assert.equal(map.get(STORAGE_KEY), previous); assert.equal(writes, count);
+  assert.deepEqual(createStorage(backing).load().likes, ["other-tab"]);
+});
+
+test("malformed startup storage is protected from ordinary and destructive saves", () => {
+  const map = new Map([[STORAGE_KEY, '{broken library']]);
+  const backing = { getItem: k => map.get(k) ?? null, setItem: (k, v) => map.set(k, String(v)), removeItem: k => map.delete(k) };
+  const storage = createStorage(backing);
+  assert.deepEqual(storage.load(), emptyLibrary());
+  assert.equal(storage.importGuard, "corrupt");
+  assert.equal(storage.persistent, false);
+  assert.equal(storage.save(toggleLike(emptyLibrary(), { id: "visit" }).library), false);
+  assert.equal(storage.save(emptyLibrary(), { requirePersistence: true }), false);
+  assert.equal(map.get(STORAGE_KEY), '{broken library');
+  assert.equal(createStorage(backing).importGuard, null, "guard is established on load");
+  const reopened = createStorage(backing); reopened.load();
+  assert.equal(reopened.importGuard, "corrupt");
+  assert.equal(map.get(STORAGE_KEY), '{broken library');
+});
+
+test("an initial storage read exception blocks later writes, even after access returns", () => {
+  const map = new Map([[STORAGE_KEY, JSON.stringify(toggleLike(emptyLibrary(), { id: "saved" }).library)]]);
+  let deny = true;
+  const backing = { getItem(k) { if (deny && k === STORAGE_KEY) throw Error("read denied"); return map.get(k) ?? null; }, setItem: (k, v) => map.set(k, String(v)), removeItem: k => map.delete(k) };
+  const storage = createStorage(backing); const previous = map.get(STORAGE_KEY);
+  assert.deepEqual(storage.load(), emptyLibrary()); assert.equal(storage.importGuard, "unreadable");
+  deny = false;
+  assert.equal(storage.save(emptyLibrary()), false); assert.equal(map.get(STORAGE_KEY), previous);
+  assert.deepEqual(createStorage(backing).load().likes, ["saved"]);
+});
+
+test("settings warns that a corrupt startup fallback is incomplete and preserves its bytes", async t => {
+  const raw = '{not-json';
+  const app = bootFixture(t, { hash: "#/settings", storageSeed: [[STORAGE_KEY, raw]] });
+  assert.match(String(app.doc.querySelector("#dhun-view").innerHTML), /library shown may be incomplete.*do not delete browser data/i);
+  app.click("set-theme", "light");
+  assert.equal(app.state.library.settings.theme, "light");
+  assert.equal(app.saved.get(STORAGE_KEY), raw);
+  const backup = JSON.stringify({ app: "DHUN web", version: 3, ...emptyLibrary() });
+  app.importFile(file(backup)); await settle(); await settle();
+  assert.match(app.state.toast.message, /could not be read safely.*do not delete browser data/i);
+  assert.equal(app.saved.get(STORAGE_KEY), raw);
+});
+
+test("ordinary saves still have a check-to-write race without atomic compare-and-swap", () => {
+  const map = new Map(); let injectRace = false;
+  const other = toggleLike(emptyLibrary(), { id: "other-tab" }).library;
+  const backing = {
+    getItem(k) {
+      const prior = map.get(k) ?? null;
+      if (injectRace && k === STORAGE_KEY) { injectRace = false; map.set(k, JSON.stringify(other)); }
+      return prior;
+    },
+    setItem: (k, value) => map.set(k, String(value)),
+    removeItem: k => map.delete(k),
+  };
+  const tab = createStorage(backing); tab.load();
+  const local = toggleLike(emptyLibrary(), { id: "local" }).library;
+  injectRace = true;
+  assert.equal(tab.save(local), true);
+  assert.deepEqual(JSON.parse(map.get(STORAGE_KEY)).likes, ["local"], "the intervening update is not detected atomically");
 });
