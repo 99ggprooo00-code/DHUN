@@ -1,4 +1,4 @@
-import { FORMAT_VERSION } from "./library.js";
+import { FORMAT_VERSION, parseImportJSON } from "./library.js";
 
 /**
  * Importing a library file.
@@ -12,12 +12,7 @@ export async function handleFileImport(file, storage) {
   if (!file) throw new Error("no file was chosen");
   if (file.size > 8 * 1024 * 1024) throw new Error("the file is larger than 8 MB");
   const text = await file.text();
-  let parsed;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    throw new Error("the file is not JSON");
-  }
+  const parsed = parseImportJSON(text);
   if (parsed?.app !== "DHUN web") throw new Error("the file was not exported by this app");
   // Only the format this build writes is read. A file from another format is
   // refused rather than guessed at: the shape could have changed underneath it.
