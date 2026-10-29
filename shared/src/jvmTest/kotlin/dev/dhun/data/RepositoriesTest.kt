@@ -134,6 +134,7 @@ class RepositoriesTest {
                 localAudioPath = audio.absolutePath, mimeType = "audio/webm",
                 downloadState = DownloadState.COMPLETED,
             ))
+            data.nowPlaying.saveQueue(listOf(song), 0, 12_000L, RepeatMode.ONE, false)
             data.playlists.delete(first.id)
             data.playlists.delete("missing") // idempotent, cannot affect other rows
             driver.close()
@@ -145,11 +146,41 @@ class RepositoriesTest {
             assertTrue(data.library.isFavorite(song.id))
             assertEquals(listOf(song.id), data.history.observeHistory(10).first().map { it.track.id })
             assertTrue(data.downloads.isDownloaded(song.id))
+            assertEquals(listOf(song), data.nowPlaying.load()?.queue)
+            assertEquals(12_000L, data.nowPlaying.load()?.positionMs)
             assertEquals("synthetic audio", audio.readText())
         } finally {
             driver.close()
             dir.deleteRecursively()
         }
+    }
+
+    @Test
+    fun playlistDeletionRollsBackMembershipWhenRowDeleteFails(): Unit = runBlocking {
+        // A BEFORE DELETE trigger aborts the second statement of the transaction,
+        // after deleteAllTracks has run. Without a transaction, membership is lost.
+        val driver = DatabaseDriverFactory.inMemory().createDriver()
+        try {
+            val data = DataLayer(DatabaseFactory.create(driver))
+            val playlist = data.playlists.create("Keep on failure")
+            val other = data.playlists.create("Another playlist")
+            val song = track("rollback")
+            data.playlists.addTrack(playlist.id, song)
+            data.playlists.addTrack(other.id, song)
+            data.library.addFavorite(song)
+            driver.execute(null,
+                "CREATE TRIGGER abort_playlist_delete BEFORE DELETE ON Playlist " +
+                    "BEGIN SELECT RAISE(ABORT, 'injected storage failure'); END", 0)
+            kotlin.test.assertFailsWith<Exception> { data.playlists.delete(playlist.id) }
+            assertEquals(playlist.id, data.playlists.observePlaylist(playlist.id).first()?.id)
+            assertEquals(listOf(song.id), data.playlists.observeTracks(playlist.id).first().map { it.id })
+            assertEquals(listOf(song.id), data.playlists.observeTracks(other.id).first().map { it.id })
+            assertTrue(data.library.isFavorite(song.id))
+            driver.execute(null, "DROP TRIGGER abort_playlist_delete", 0)
+            data.playlists.delete(playlist.id)
+            assertNull(data.playlists.observePlaylist(playlist.id).first())
+            assertEquals(listOf(song.id), data.playlists.observeTracks(other.id).first().map { it.id })
+        } finally { driver.close() }
     }
 
     @Test

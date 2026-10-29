@@ -338,6 +338,32 @@ class BrowseViewModelTest {
     }
 
     @Test
+    fun postCommitFailureIsUncertainButRetryCanConfirmAbsence(): Unit = runBlocking {
+        val data = DataLayer(DatabaseFactory.create(DatabaseDriverFactory.inMemory().createDriver()))
+        val created = data.playlists.create("Uncertain")
+        val calls = AtomicInteger()
+        val repo = object : PlaylistRepository by data.playlists {
+            override suspend fun delete(id: String) {
+                data.playlists.delete(id)
+                if (calls.incrementAndGet() == 1) throw IllegalStateException("lost acknowledgement after commit")
+            }
+        }
+        val vm = PlaylistViewModel(FakeBrowseProvider(), repo, FakePlayer(), created.id, isLocal = true)
+        try {
+            eventually { (vm.state.value as? PlaylistUiState.Local)?.playlist != null }
+            vm.delete()
+            eventually { vm.deletion.value.errorMessage != null }
+            eventually { (vm.state.value as? PlaylistUiState.Local)?.playlist == null }
+            assertFalse(vm.deleted.value) // never claim success from a thrown operation
+            assertFalse(vm.deletion.value.isDeleting)
+            vm.delete() // idempotent SQL delete now confirms the desired absence
+            eventually { vm.deleted.value }
+            assertEquals(2, calls.get())
+            assertNull(data.playlists.observePlaylist(created.id).first())
+        } finally { vm.close() }
+    }
+
+    @Test
     fun cancelledPlaylistDeletionDoesNotReportSuccess(): Unit = runBlocking {
         val data = DataLayer(DatabaseFactory.create(DatabaseDriverFactory.inMemory().createDriver()))
         val created = data.playlists.create("Cancel")

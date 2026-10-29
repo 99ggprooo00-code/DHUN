@@ -531,7 +531,9 @@ private fun DeleteConfirmDialog(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     DhunTextButton(onClick = onDismiss, enabled = !isDeleting) { Text("Cancel") }
                     Spacer(modifier = Modifier.weight(1f))
-                    DhunButton(onClick = onConfirm, enabled = !isDeleting, loading = isDeleting) { Text("Delete") }
+                    DhunButton(onClick = onConfirm, enabled = !isDeleting, loading = isDeleting) {
+                        Text(if (errorMessage == null) "Delete" else "Retry deletion")
+                    }
                 }
             }
         }
