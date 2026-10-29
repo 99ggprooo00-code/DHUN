@@ -1349,6 +1349,10 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
 
     /* storage */
     "export-library": () => {
+      if (["corrupt", "unreadable"].includes(storage.importGuard)) {
+        showToast("Export unavailable: the library shown may be incomplete. Keep browser data and the original backup; seek recovery help.", "warn");
+        return;
+      }
       try {
         const text = storage.exportAll(state.library);
         const warning = backupExportWarning(text, state.library);

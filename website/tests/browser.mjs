@@ -2830,6 +2830,20 @@ async function checkWebStorageFailures(browser) {
     await page.locator('[data-action="set-theme"][data-value="light"]').click();
     if (await page.evaluate(key => localStorage.getItem(key), key) !== "{broken library") fail("/app/ corrupt library", "ordinary edit overwrote malformed saved bytes");
     else record("/app/ corrupt library", "synthetic malformed saved bytes are retained while the fallback warns and stays visit-only");
+
+    context = await fresh();
+    const damaged = JSON.stringify({ ...seed, likes: ["runtime-kept", "runtime-kept"] });
+    await context.addInitScript(({ key, damaged }) => { if (localStorage.getItem(key) === null) localStorage.setItem(key, damaged); }, { key, damaged });
+    page = watch(await context.newPage()); await page.goto(url("/app/#/settings"));
+    await page.getByText(/library shown may be incomplete.*do not delete browser data/i).waitFor();
+    await page.locator('[data-action="set-theme"][data-value="light"]').click();
+    await page.locator('[data-action="export-library"]').click();
+    await page.getByText(/export unavailable.*may be incomplete/i).waitFor();
+    if (await page.evaluate(key => localStorage.getItem(key), key) !== damaged) fail("/app/ damaged legacy library", "ordinary edit overwrote synthetic parseable damaged data");
+    await page.reload();
+    await page.getByText(/library shown may be incomplete.*do not delete browser data/i).waitFor();
+    if (await page.evaluate(key => localStorage.getItem(key), key) !== damaged) fail("/app/ damaged legacy reload", "reload overwrote synthetic damaged data");
+    else record("/app/ damaged legacy library", "parseable duplicate legacy data is guarded and its original bytes survive edit and reload");
     if (problems.length) fail("/app/ storage runtime errors", problems.join(" | "));
     else record("/app/ storage runtime errors", "fault-injected real workflows have no unexpected console/page errors or same-origin HTTP failure");
   } finally {

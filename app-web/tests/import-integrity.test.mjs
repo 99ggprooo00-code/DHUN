@@ -405,3 +405,61 @@ test("ordinary saves still have a check-to-write race without atomic compare-and
   assert.equal(tab.save(local), true);
   assert.deepEqual(JSON.parse(map.get(STORAGE_KEY)).likes, ["local"], "the intervening update is not detected atomically");
 });
+
+test("parseable damaged or unsupported saved data cannot be normalized and overwritten", () => {
+  const base = emptyLibrary();
+  const cases = [
+    JSON.stringify({ ...base, likes: ["saved", "saved"] }),
+    JSON.stringify({ ...base, likes: Array.from({ length: LIBRARY_LIMITS.likes + 1 }, (_, i) => String(i)) }),
+    JSON.stringify({ ...base, playlists: [{ id: "p", name: " ", trackIds: [] }] }),
+    JSON.stringify({ ...base, settings: { ...base.settings, volume: 2 } }),
+    JSON.stringify({ ...base, unsupported: ["important"] }),
+    JSON.stringify({ ...base, settings: { ...base.settings, equalizerEnabled: true } }),
+    '{"likes":[],"likes":["saved"],"playlists":[],"history":[],"snapshots":{},"recentSearches":[],"settings":{}}',
+    JSON.stringify({ ...base, likes: ["NUMBER_TOKEN"] }).replace('"NUMBER_TOKEN"', "9007199254740993"),
+    JSON.stringify({ ...base, likes: null }),
+  ];
+  for (const raw of cases) {
+    const map = new Map([[STORAGE_KEY, raw]]);
+    const backing = { getItem: k => map.get(k) ?? null, setItem: (k, v) => map.set(k, String(v)), removeItem: k => map.delete(k) };
+    const firstImport = createStorage(backing);
+    assert.throws(() => firstImport.importAll(JSON.stringify({ app: "DHUN web", version: 3, ...base })), /could not be read safely/);
+    assert.equal(map.get(STORAGE_KEY), raw, "import before load must not overwrite damaged bytes");
+    const storage = createStorage(backing); storage.load();
+    assert.equal(storage.importGuard, "corrupt", raw.slice(0, 120));
+    assert.equal(storage.save(emptyLibrary()), false);
+    assert.equal(storage.save(emptyLibrary(), { requirePersistence: true }), false);
+    assert.throws(() => storage.importAll(JSON.stringify({ app: "DHUN web", version: 3, ...base })), /could not be read safely/);
+    assert.equal(map.get(STORAGE_KEY), raw);
+    const reopened = createStorage(backing); reopened.load();
+    assert.equal(reopened.importGuard, "corrupt");
+    assert.equal(map.get(STORAGE_KEY), raw);
+  }
+});
+
+test("recognized lossless legacy values remain readable and writable", () => {
+  const raw = JSON.stringify({ ...emptyLibrary(), likes: [17], history: ["old"] });
+  const map = new Map([[STORAGE_KEY, raw]]);
+  const backing = { getItem: k => map.get(k) ?? null, setItem: (k, v) => map.set(k, String(v)), removeItem: k => map.delete(k) };
+  const storage = createStorage(backing); const library = storage.load();
+  assert.equal(storage.importGuard, null);
+  assert.deepEqual(library.likes, ["17"]);
+  assert.deepEqual(library.history, [{ id: "old", at: 0 }]);
+  assert.equal(storage.save(library), true);
+  assert.deepEqual(createStorage(backing).load(), library);
+});
+
+test("settings warns on parseable damaged data and leaves its original bytes intact", async t => {
+  const raw = JSON.stringify({ ...emptyLibrary(), likes: ["recoverable", "recoverable"] });
+  const app = bootFixture(t, { hash: "#/settings", storageSeed: [[STORAGE_KEY, raw]] });
+  assert.deepEqual(app.state.library.likes, ["recoverable"]);
+  assert.match(String(app.doc.querySelector("#dhun-view").innerHTML), /library shown may be incomplete.*do not delete browser data/i);
+  app.click("set-theme", "light");
+  assert.equal(app.saved.get(STORAGE_KEY), raw);
+  app.click("export-library");
+  assert.match(app.state.toast.message, /export unavailable.*may be incomplete/i);
+  app.importFile(file(JSON.stringify({ app: "DHUN web", version: 3, ...emptyLibrary() })));
+  await settle(); await settle();
+  assert.match(app.state.toast.message, /could not be read safely.*do not delete browser data/i);
+  assert.equal(app.saved.get(STORAGE_KEY), raw);
+});

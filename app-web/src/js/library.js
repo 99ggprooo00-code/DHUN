@@ -570,7 +570,28 @@ export function createStorage(backing, key = STORAGE_KEY) {
         return memory;
       }
       try {
-        memory = normaliseLibrary(JSON.parse(raw ?? "null"));
+        if (raw === null) {
+          memory = emptyLibrary();
+        } else {
+          // The legacy reader is intentionally permissive. Before allowing it
+          // to save, prove that normalization preserves all supplied values.
+          // This also detects duplicate keys and unsafe numeric JSON tokens.
+          const parsed = parseImportJSON(raw);
+          const candidate = normaliseLibrary(parsed);
+          try {
+            if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) ||
+                Object.hasOwn(parsed, "app") || Object.hasOwn(parsed, "version") || Object.hasOwn(parsed, "exportedAt")) {
+              throw new Error("unrecognized stored library");
+            }
+            memory = validateImport({ ...parsed, app: "DHUN web", version: FORMAT_VERSION });
+          } catch {
+            // Show whatever can be recovered for this visit, but never persist
+            // this potentially incomplete view over the original legacy bytes.
+            memory = candidate;
+            importGuard = "corrupt";
+            persistent = false;
+          }
+        }
         if (backing) { observed = raw; observedKnown = true; }
       } catch {
         // Never write an empty recovery fallback over unreadable saved bytes.
@@ -614,6 +635,9 @@ export function createStorage(backing, key = STORAGE_KEY) {
       return JSON.stringify({ app: "DHUN web", version: FORMAT_VERSION, exportedAt: new Date().toISOString(), ...library }, null, 2);
     },
     importAll(text) {
+      // Establish startup recovery and its guard even if the caller has not
+      // loaded the handle yet. Never import over damaged legacy bytes.
+      this.load();
       if (importGuard) {
         const unsafeToExport = importGuard === "corrupt" || importGuard === "unreadable";
         throw new Error(unsafeToExport
@@ -625,7 +649,6 @@ export function createStorage(backing, key = STORAGE_KEY) {
       // Remember the copy this tab last observed; reject an already stale tab
       // before replacement. localStorage has no compare-and-swap, so another
       // tab can still write between this check and setItem.
-      this.load();
       let previous;
       try {
         if (!backing || !observedKnown) throw new Error("storage unavailable");

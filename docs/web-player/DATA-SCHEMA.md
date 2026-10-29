@@ -102,8 +102,9 @@ These are enforced when a list is written. Each limit is in
 | Snapshots | None of their own | Snapshots exist only for ids the likes, history or playlists refer to, so the total is bounded by the limits above. Unreferenced snapshots are removed (`pruneSnapshots`). |
 
 History and recent searches roll over silently. The saved-collection limits
-refuse new entries rather than evicting existing ones. Loading an over-limit
-stored document still truncates lists during normalization; import rejects it.
+refuse new entries rather than evicting existing ones. An over-limit stored
+document may show a truncated visit-only view but is protected from being
+overwritten; import rejects it.
 
 ## 5. Reading a stored document back
 
@@ -116,10 +117,17 @@ an in-memory library:
 - A snapshot whose id does not match its key is removed.
 - Numbers are clamped; invalid settings fall back to defaults.
 
-Syntactically valid but damaged or unrecognized data can therefore yield a
-smaller library without an error screen; a later save can overwrite the original
-bytes. Malformed JSON or a thrown read/normalization error instead produces a
-guarded fallback that this tab cannot save over the original.
+Before allowing writes, startup validates the stored JSON with the import parser
+and verifies that supplied values survive normalization. Damaged, unsupported,
+or unrecognized values instead produce a guarded, potentially incomplete
+visit-only view; malformed JSON or a thrown read/normalization error produces an
+empty guarded fallback. Neither fallback can be saved over the original bytes in
+this tab. The same 24 MiB, token and nesting budgets apply to this startup check,
+so a larger or more complex legacy library is also guarded even if otherwise
+valid. Keep its original bytes and seek recovery; do not treat the displayed view
+as a complete backup. The export action refuses to download that guarded view.
+This validation cannot prove data was not lost before the current stored bytes
+were written.
 
 ## 6. Export and import
 
@@ -182,15 +190,16 @@ unavailable. Keep the original file and existing library; free storage, try a
 browser/device with sufficient capacity, or seek recovery help. Do not delete
 the only copy to make room. No other format version is imported.
 
-Startup still permissively normalizes parseable values (§5); import is
-intentionally stricter because it replaces a library. The post-write uncertainty and concurrent-write
-race described above remain limitations; the import is not fully transactional.
+Startup still displays a permissively normalized view of some damaged data,
+but blocks writes if it cannot validate that view (§5). The post-write uncertainty
+and concurrent-write race described above remain limitations; the import is not
+fully transactional.
 The guard is per tab and does not stop another open tab from writing. Ordinary
 saves also perform a best-effort stale-value check; it is not atomic with the
 write. If startup cannot read or parse saved data, the shown empty fallback is
 not a recovered library: this tab blocks writes and tells the visitor to retain
-browser data and their original backup. Some syntactically valid legacy shapes
-are still permissively normalized and may lose unsupported data (§5).
+browser data and their original backup. Unsupported or lossy legacy shapes remain
+guarded rather than being saved over (§5).
 
 ### Transactional migration: required follow-up, not implemented
 

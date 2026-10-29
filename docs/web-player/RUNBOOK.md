@@ -77,9 +77,11 @@ element's own state is the first thing to check.
   A file within those limits can still exceed browser storage quota.
 - "the file is not JSON": keep the original file and check that it is an intact
   `dhun-library.json` export.
-- If saved data cannot be read or parsed, the displayed fallback may be
-  incomplete. The tab stops writing: retain browser data and the original
-  backup, and seek recovery help rather than treating the fallback as recovery.
+- If saved data cannot be read, parsed or validated without losing values, the
+  displayed fallback may be incomplete. The tab stops writing and refuses to
+  export this view: retain browser data and the original backup, and seek
+  recovery help. A legacy record exceeding the startup validation budgets is
+  also guarded even if otherwise valid.
 - "Import unconfirmed" or a saved-library conflict: the tab stops writing to
   browser storage. Export the in-tab library and keep the original backup; open
   a fresh tab to inspect the saved library before attempting another import.
