@@ -57,10 +57,7 @@ class HomeViewModel(
      */
     private val mutations = MutationTracker(scope)
     val mutation: StateFlow<MutationState> = mutations.state
-    val actionError: StateFlow<String?> = mutations.state
-        .map { it.errorMessage }
-        .stateIn(scope, SharingStarted.Eagerly, null)
-    fun dismissActionError() = mutations.dismissError()
+    fun dismissMutationError() = mutations.dismissError()
 
     // Generation, feed and request flags change atomically. A separate generation
     // check followed by a UI write could still overwrite a concurrent refresh on

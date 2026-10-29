@@ -26,7 +26,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -56,10 +55,7 @@ class SearchViewModel(
      */
     private val mutations = MutationTracker(scope)
     val mutation: StateFlow<MutationState> = mutations.state
-    val actionError: StateFlow<String?> = mutations.state
-        .map { it.errorMessage }
-        .stateIn(scope, SharingStarted.Eagerly, null)
-    fun dismissActionError() = mutations.dismissError()
+    fun dismissMutationError() = mutations.dismissError()
     private val addToPlaylistUseCase = AddToPlaylistUseCase(playlistRepository)
 
     private val _query = MutableStateFlow("")

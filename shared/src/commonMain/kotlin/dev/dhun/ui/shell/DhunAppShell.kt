@@ -195,8 +195,8 @@ fun DhunAppShell(
     // Like/Unlike is offered from Home, Search, the queue and the full player,
     // and all of them route through one of these two models. A failure is shown
     // once, above whatever is on screen, instead of failing silently.
-    val homeActionError by homeViewModel.actionError.collectAsState()
-    val searchActionError by searchViewModel.actionError.collectAsState()
+    val homeMutation by homeViewModel.mutation.collectAsState()
+    val searchMutation by searchViewModel.mutation.collectAsState()
     val currentTrack by playerViewModel.currentTrack.collectAsState()
     // Phase 10: library owns Playlists / Favorites / History tabs.
     // If the host doesn't supply a ViewModel, create one from DataLayer.
@@ -638,7 +638,7 @@ fun DhunAppShell(
         // A failed Like/Unlike or download request has no dialog of its own.
         // Reported above the page (and above the expanded player, where the
         // same heart is available) as a polite live region.
-        val actionError = homeActionError ?: searchActionError
+        val actionError = homeMutation.errorMessage ?: searchMutation.errorMessage
         TopLevelAnimatedVisibility(
             visible = actionError != null,
             enter = slideInVertically { -it } + fadeIn(DhunAnimations.mediumTween()),
@@ -651,8 +651,8 @@ fun DhunAppShell(
             ActionErrorBanner(
                 message = actionError.orEmpty(),
                 onDismiss = {
-                    homeViewModel.dismissActionError()
-                    searchViewModel.dismissActionError()
+                    homeViewModel.dismissMutationError()
+                    searchViewModel.dismissMutationError()
                 },
                 modifier = Modifier.safeDrawingPadding(),
             )

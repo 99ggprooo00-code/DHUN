@@ -227,12 +227,12 @@ class HomeViewModelTest {
                 scope = testScope,
             )
             vm.toggleFavorite(sampleTrack("like-1"))
-            eventually { vm.actionError.value != null }
-            assertEquals("Could not update Liked Songs. Try again.", vm.actionError.value)
+            eventually { vm.mutation.value.errorMessage != null }
+            assertEquals("Could not update Liked Songs. Try again.", vm.mutation.value.errorMessage)
             assertTrue(uncaught.isEmpty(), "the failure must not escape the coroutine: $uncaught")
 
-            vm.dismissActionError()
-            assertNull(vm.actionError.value)
+            vm.dismissMutationError()
+            assertNull(vm.mutation.value.errorMessage)
         } finally {
             testScope.cancel()
         }
