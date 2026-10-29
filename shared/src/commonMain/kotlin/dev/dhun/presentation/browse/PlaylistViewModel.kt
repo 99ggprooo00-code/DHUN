@@ -8,6 +8,8 @@ import dev.dhun.data.LocalPlaylist
 import dev.dhun.data.PlaylistRepository
 import dev.dhun.player.DhunPlayer
 import dev.dhun.player.resetModesForNewQueue
+import dev.dhun.presentation.MutationState
+import dev.dhun.presentation.MutationTracker
 import dev.dhun.data.SettingsRepository
 import dev.dhun.provider.MusicProvider
 import kotlinx.coroutines.CancellationException
@@ -60,6 +62,16 @@ class PlaylistViewModel(
     val deleted: StateFlow<Boolean> = _deleted.asStateFlow()
     private val _deletion = MutableStateFlow(PlaylistDeletionState())
     val deletion: StateFlow<PlaylistDeletionState> = _deletion.asStateFlow()
+
+    /**
+     * Pending/failure state for the row edits on a local playlist (remove,
+     * reorder). Both used to be `scope.launch { playlists.… }` with no
+     * handling, so a failed swipe silently left the row in place and a failed
+     * drag snapped the list back with no explanation.
+     */
+    private val mutations = MutationTracker(scope)
+    val mutation: StateFlow<MutationState> = mutations.state
+    fun dismissMutationError() = mutations.dismissError()
 
     init {
         if (isLocal) {
@@ -115,9 +127,16 @@ class PlaylistViewModel(
 
     /* ---------------- local CRUD ---------------- */
 
-    fun rename(newName: String) {
-        if (!isLocal || newName.isBlank()) return
-        scope.launch { playlists.rename(playlistId, newName.trim()) }
+    /**
+     * Renames the local playlist. Suspends and propagates failure so the dialog
+     * can keep itself open with a retry — closing it on the tap made a failed
+     * rename look identical to a successful one.
+     */
+    suspend fun rename(newName: String) {
+        if (!isLocal) return
+        val trimmed = newName.trim()
+        if (trimmed.isBlank() || trimmed == _state.value.let { (it as? PlaylistUiState.Local)?.playlist?.name }) return
+        playlists.rename(playlistId, trimmed)
     }
 
     fun delete() {
@@ -157,12 +176,18 @@ class PlaylistViewModel(
 
     fun removeTrack(track: Track) {
         if (!isLocal) return
-        scope.launch { playlists.removeTrack(playlistId, track.id) }
+        mutations.run(
+            key = "playlist-remove:${track.id}",
+            failureMessage = "Could not remove \"${track.title}\" from this playlist. Try again.",
+        ) { playlists.removeTrack(playlistId, track.id) }
     }
 
     fun moveTrack(from: Int, to: Int) {
         if (!isLocal) return
-        scope.launch { playlists.move(playlistId, from, to) }
+        mutations.run(
+            key = "playlist-move",
+            failureMessage = "Could not save the new order. The list was put back; try again.",
+        ) { playlists.move(playlistId, from, to) }
     }
 
     fun close() = scope.cancel()

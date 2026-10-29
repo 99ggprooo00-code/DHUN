@@ -36,8 +36,20 @@ data class MutationState(
     val runningKeys: Set<String> = emptySet(),
     /** Message for the last failure that has not been dismissed or retried. */
     val errorMessage: String? = null,
+    /**
+     * The key whose action failed, so a dialog shows only its own failure and
+     * a screen-level banner can ignore messages a dialog already owns.
+     * `null` for failures that belong to the screen (e.g. a preference write).
+     */
+    val errorKey: String? = null,
 ) {
     fun isRunning(key: String): Boolean = key in runningKeys
+
+    /** The failure message belonging to [key], or null. */
+    fun errorFor(key: String): String? = if (errorKey == key) errorMessage else null
+
+    /** Failures that no dialog owns — what a screen banner renders. */
+    val screenErrorMessage: String? get() = if (errorKey == null) errorMessage else null
 
     /** True while at least one mutation runs (used for dialog confirm gating). */
     val isBusy: Boolean get() = runningKeys.isNotEmpty()
@@ -80,7 +92,11 @@ class MutationTracker(private val scope: CoroutineScope) {
         while (true) {
             val current = _state.value
             if (key in current.runningKeys) return false
-            val next = current.copy(runningKeys = current.runningKeys + key, errorMessage = null)
+            val next = current.copy(
+                runningKeys = current.runningKeys + key,
+                errorMessage = null,
+                errorKey = null,
+            )
             if (_state.compareAndSet(current, next)) break
         }
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
@@ -95,20 +111,27 @@ class MutationTracker(private val scope: CoroutineScope) {
                 // Keep the mutation's failure in the model instead of the
                 // thread's uncaught-exception handler.
                 _state.update {
-                    it.copy(runningKeys = it.runningKeys - key, errorMessage = failureMessage)
+                    it.copy(
+                        runningKeys = it.runningKeys - key,
+                        errorMessage = failureMessage,
+                        errorKey = key,
+                    )
                 }
             }
         }
         return true
     }
 
-    /** Records a failure that happened outside a [run] block (e.g. a write). */
-    fun report(failureMessage: String) {
-        _state.update { it.copy(errorMessage = failureMessage) }
+    /**
+     * Records a failure that happened outside a [run] block (e.g. a preference
+     * write). [key] is null for screen-level messages.
+     */
+    fun report(failureMessage: String, key: String? = null) {
+        _state.update { it.copy(errorMessage = failureMessage, errorKey = key) }
     }
 
     fun dismissError() {
-        _state.update { it.copy(errorMessage = null) }
+        _state.update { it.copy(errorMessage = null, errorKey = null) }
     }
 
     private fun finish(key: String) {

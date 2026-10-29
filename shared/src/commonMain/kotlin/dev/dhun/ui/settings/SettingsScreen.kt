@@ -33,12 +33,15 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -54,7 +57,9 @@ import dev.dhun.design.VisualPart
 import dev.dhun.design.supportsRealtimeBlur
 import dev.dhun.design.components.DhunAppearanceControls
 import dev.dhun.design.components.DhunFilterChip
+import dev.dhun.design.components.DhunButton
 import dev.dhun.design.components.DhunIconButton
+import dev.dhun.design.components.DhunTextButton
 import dev.dhun.design.components.DhunTonalButton
 import dev.dhun.design.components.SectionHeader
 import dev.dhun.design.components.dhunMouseDragScroll
@@ -129,6 +134,11 @@ fun SettingsScreen(
         }
 
         val systemDark = isSystemInDarkTheme()
+        // Pending/failure state for every destructive action here. The dialogs
+        // below are result-driven: they stay open while the clear runs and show
+        // a retryable message if it fails (the same contract the library's
+        // clear-history and the playlist delete dialogs use).
+        val maintenance by viewModel.maintenanceState.collectAsState()
         var confirmReset by remember { mutableStateOf(false) }
         var confirmLyricsClear by remember { mutableStateOf(false) }
         var confirmAudioClear by remember { mutableStateOf(false) }
@@ -138,6 +148,12 @@ fun SettingsScreen(
                 .padding(horizontal = DhunSpacing.screenPadding),
             verticalArrangement = Arrangement.spacedBy(DhunSpacing.md),
         ) {
+            maintenance.screenErrorMessage?.let { message ->
+                SettingsFailureNotice(
+                    message = message,
+                    onDismiss = viewModel::dismissMaintenanceError,
+                )
+            }
             if (category == null) SettingsHub(
                 isDesktop = isDesktop,
                 themeId = themeId,
@@ -242,13 +258,18 @@ fun SettingsScreen(
             if (category == SettingsCategory.STORAGE) SettingsGroup("Storage, Cache & Data") {
                 CacheBudgetRow(viewModel)
                 if (viewModel.canClearAudioCache) {
-                    SettingsNavigationRow("Clear audio cache", "Remove streamed audio files", { confirmAudioClear = true })
+                    SettingsNavigationRow(
+                        "Clear audio cache",
+                        if (maintenance.isRunning(SettingsViewModel.KEY_CLEAR_AUDIO)) "Clearing streamed audio files…" else "Remove streamed audio files",
+                        { confirmAudioClear = true },
+                    )
                     viewModel.freedAudioBytes.collectAsState().value?.let { freed ->
-                        Text("Freed ${freed / (1024 * 1024)} MB", modifier = Modifier.padding(horizontal = DhunSpacing.screenPadding))
-                    }
-                    if (viewModel.audioCacheError.collectAsState().value) {
-                        Text("Could not clear audio in use. Try again after playback stops.",
-                            modifier = Modifier.padding(horizontal = DhunSpacing.screenPadding))
+                        Text(
+                            if (freed > 0) "Freed ${freed / (1024 * 1024)} MB" else "Audio cache was already empty",
+                            modifier = Modifier.padding(horizontal = DhunSpacing.screenPadding),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = DhunColors.textSecondary,
+                        )
                     }
                 }
             }
@@ -263,70 +284,164 @@ fun SettingsScreen(
             }
             Spacer(modifier = Modifier.height(DhunSpacing.xl))
         }
+        // A confirmation closes only after ITS action completed successfully.
+        // (Previously every dialog closed the instant the button was tapped, so
+        // a failed clear looked exactly like a successful one.)
+        val completedKey by viewModel.lastCompletedKey.collectAsState()
+        LaunchedEffect(completedKey) {
+            when (completedKey) {
+                null -> {}
+                SettingsViewModel.KEY_CLEAR_AUDIO -> {
+                    confirmAudioClear = false
+                    viewModel.consumeCompletedAction()
+                }
+                SettingsViewModel.KEY_CLEAR_LYRICS -> {
+                    confirmLyricsClear = false
+                    viewModel.consumeCompletedAction()
+                }
+                SettingsViewModel.KEY_CLEAR_SEARCH, SettingsViewModel.KEY_CLEAR_PLAY -> {
+                    confirmHistory = ""
+                    viewModel.consumeCompletedAction()
+                }
+                SettingsViewModel.KEY_RESET -> {
+                    confirmReset = false
+                    equalizerSession?.restore(dev.dhun.player.equalizer.EqualizerState())
+                    DhunAppearance.reset()
+                    viewModel.consumeCompletedAction()
+                }
+            }
+        }
         if (confirmAudioClear) SettingsConfirmDialog(
             onDismissRequest = { confirmAudioClear = false },
             title = { Text("Clear audio cache?") },
             text = { Text("Streamed tracks may need to load again.") },
-            confirmButton = { TextButton(onClick = {
-                viewModel.clearAudioCache()
-                confirmAudioClear = false
-            }) { Text("Clear") } },
-            dismissButton = { TextButton(onClick = { confirmAudioClear = false }) { Text("Cancel") } },
+            isPending = maintenance.isRunning(SettingsViewModel.KEY_CLEAR_AUDIO),
+            errorMessage = maintenance.errorFor(SettingsViewModel.KEY_CLEAR_AUDIO),
+            confirmLabel = "Clear",
+            pendingLabel = "Clearing…",
+            onConfirm = { viewModel.clearAudioCache() },
         )
-        if (confirmHistory.isNotEmpty()) SettingsConfirmDialog(
-            onDismissRequest = { confirmHistory = "" },
-            title = { Text("Clear ${confirmHistory} history?") },
-            text = { Text("This cannot be undone.") },
-            confirmButton = { TextButton(onClick = {
-                if (confirmHistory == "search") viewModel.clearSearchHistory() else viewModel.clearPlayHistory()
-                confirmHistory = ""
-            }) { Text("Clear") } },
-            dismissButton = { TextButton(onClick = { confirmHistory = "" }) { Text("Cancel") } },
-        )
+        if (confirmHistory.isNotEmpty()) {
+            val historyKey = if (confirmHistory == "search") {
+                SettingsViewModel.KEY_CLEAR_SEARCH
+            } else {
+                SettingsViewModel.KEY_CLEAR_PLAY
+            }
+            SettingsConfirmDialog(
+                onDismissRequest = { confirmHistory = "" },
+                title = { Text("Clear ${confirmHistory} history?") },
+                text = { Text("This cannot be undone.") },
+                isPending = maintenance.isRunning(historyKey),
+                errorMessage = maintenance.errorFor(historyKey),
+                confirmLabel = "Clear",
+                pendingLabel = "Clearing…",
+                onConfirm = {
+                    if (confirmHistory == "search") viewModel.clearSearchHistory() else viewModel.clearPlayHistory()
+                },
+            )
+        }
         if (confirmLyricsClear) SettingsConfirmDialog(
             onDismissRequest = { confirmLyricsClear = false },
             title = { Text("Clear lyrics cache?") },
             text = { Text("Automatic lyrics will be fetched again. Saved per-song choices remain; use Use automatic in the lyrics match picker to reset one.") },
-            confirmButton = { TextButton(onClick = {
-                viewModel.clearLyricsCache()
-                confirmLyricsClear = false
-            }) { Text("Clear") } },
-            dismissButton = { TextButton(onClick = { confirmLyricsClear = false }) { Text("Cancel") } },
+            isPending = maintenance.isRunning(SettingsViewModel.KEY_CLEAR_LYRICS),
+            errorMessage = maintenance.errorFor(SettingsViewModel.KEY_CLEAR_LYRICS),
+            confirmLabel = "Clear",
+            pendingLabel = "Clearing…",
+            onConfirm = { viewModel.clearLyricsCache() },
         )
         if (confirmReset) SettingsConfirmDialog(
             onDismissRequest = { confirmReset = false },
             title = { Text("Reset settings?") },
             text = { Text("All preferences will return to their defaults.") },
-            confirmButton = { TextButton(onClick = {
-                viewModel.reset()
-                equalizerSession?.restore(dev.dhun.player.equalizer.EqualizerState())
-                DhunAppearance.reset()
-                confirmReset = false
-            }) { Text("Reset") } },
-            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Cancel") } },
+            isPending = maintenance.isRunning(SettingsViewModel.KEY_RESET),
+            errorMessage = maintenance.errorFor(SettingsViewModel.KEY_RESET),
+            confirmLabel = "Reset",
+            pendingLabel = "Resetting…",
+            // Live appearance/EQ state is reset in the LaunchedEffect above,
+            // only after the persisted reset reports success.
+            onConfirm = { viewModel.reset() },
         )
     }
 }
 
+/**
+ * One confirmation surface for every destructive Settings action.
+ *
+ * It is result-driven, not tap-driven: while [isPending] the confirm button
+ * shows [pendingLabel] and cannot be tapped again; when [errorMessage] is set
+ * the message stays on screen and the button offers a retry. The caller closes
+ * the dialog when its action actually succeeded.
+ */
 @Composable
 private fun SettingsConfirmDialog(
     onDismissRequest: () -> Unit,
     title: @Composable () -> Unit,
     text: @Composable () -> Unit,
-    confirmButton: @Composable () -> Unit,
-    dismissButton: @Composable () -> Unit,
+    isPending: Boolean = false,
+    errorMessage: String? = null,
+    confirmLabel: String = "Clear",
+    pendingLabel: String = "Clearing…",
+    onConfirm: () -> Unit,
+    dismissLabel: String = "Cancel",
 ) {
-    Dialog(onDismissRequest = onDismissRequest) {
-        GlassCard(modifier = Modifier.fillMaxWidth(), opaqueBase = true) {
-            Column(modifier = Modifier.fillMaxWidth().padding(DhunSpacing.lg),
-                verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm)) {
+    Dialog(onDismissRequest = { if (!isPending) onDismissRequest() }) {
+        GlassCard(
+            modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
+            opaqueBase = true,
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(DhunSpacing.lg),
+                verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
+            ) {
                 title()
                 text()
+                if (errorMessage != null) {
+                    Text(
+                        text = errorMessage,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DhunColors.error,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                    )
+                }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    dismissButton()
-                    confirmButton()
+                    DhunTextButton(onClick = onDismissRequest, enabled = !isPending) { Text(dismissLabel) }
+                    Spacer(modifier = Modifier.weight(1f))
+                    DhunButton(
+                        onClick = onConfirm,
+                        enabled = !isPending,
+                        loading = isPending,
+                    ) {
+                        Text(
+                            when {
+                                isPending -> pendingLabel
+                                errorMessage != null -> "Try again"
+                                else -> confirmLabel
+                            },
+                        )
+                    }
                 }
             }
+        }
+    }
+}
+
+/** A screen-level failure that no dialog owns (e.g. a preference write). */
+@Composable
+private fun SettingsFailureNotice(message: String, onDismiss: () -> Unit) {
+    GlassCard(modifier = Modifier.fillMaxWidth(), elevated = false) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(DhunSpacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
+        ) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = DhunColors.error,
+                modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
+            )
+            DhunTextButton(onClick = onDismiss) { Text("Dismiss") }
         }
     }
 }

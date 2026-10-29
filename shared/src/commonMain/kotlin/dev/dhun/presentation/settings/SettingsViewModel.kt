@@ -6,6 +6,9 @@ import dev.dhun.design.VisualPart
 import dev.dhun.domain.GetSettingUseCase
 import dev.dhun.domain.UpdateSettingUseCase
 import dev.dhun.player.AudioCacheBudget
+import dev.dhun.presentation.MutationState
+import dev.dhun.presentation.MutationTracker
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -38,8 +41,41 @@ class SettingsViewModel(
     private val writeMutex = Mutex()
     private fun enqueueWrite(action: suspend () -> Unit) {
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
-            writeMutex.withLock { action() }
+            writeMutex.withLock {
+                try {
+                    action()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    // A failed preference write used to escape this coroutine
+                    // and reach the platform's uncaught-exception handler (an
+                    // app crash on Android). It is a user-facing failure now:
+                    // the control stays where it was and Settings says so.
+                    maintenance.report(SAVE_FAILED)
+                }
+            }
         }
+    }
+
+    /**
+     * Pending/failure state for the destructive maintenance actions and for
+     * preference writes. The dialogs read [maintenanceState] so a confirm
+     * button can show "Clearing…" and keep its failure on screen for a retry,
+     * the same contract the playlist-delete and clear-history dialogs use.
+     */
+    private val maintenance = MutationTracker(scope)
+    val maintenanceState: StateFlow<MutationState> = maintenance.state
+    fun dismissMaintenanceError() = maintenance.dismissError()
+
+    /**
+     * The key of the last maintenance action that **completed successfully**.
+     * A confirmation dialog closes on this signal, never on the tap — a clear
+     * that failed leaves its dialog open with a retry.
+     */
+    private val _lastCompletedKey = MutableStateFlow<String?>(null)
+    val lastCompletedKey: StateFlow<String?> = _lastCompletedKey.asStateFlow()
+    fun consumeCompletedAction() {
+        _lastCompletedKey.value = null
     }
 
     private val _themeId = MutableStateFlow(SettingsKeys.THEME_DEFAULT)
@@ -252,7 +288,7 @@ class SettingsViewModel(
         _lyricsPreferSynced.value = enabled
         enqueueWrite {
             update.boolean(SettingsKeys.LYRICS_PREFER_SYNCED, enabled)
-            clearLyricsCacheAction?.invoke()
+            clearLyricsCacheAfterPreferenceChange()
         }
     }
     fun setLyricsAutoScroll(enabled: Boolean) {
@@ -273,36 +309,53 @@ class SettingsViewModel(
         val order = _providerOrder.value
         enqueueWrite {
             update.string(SettingsKeys.LYRICS_PROVIDER_ORDER, order)
-            clearLyricsCacheAction?.invoke()
+            clearLyricsCacheAfterPreferenceChange()
         }
     }
 
+    /**
+     * Clears the automatic lyrics cache. The Settings dialog keeps its confirm
+     * button pending on [maintenanceState] and shows [LYRICS_CLEAR_FAILED]
+     * instead of closing as if the clear had happened.
+     */
     fun clearLyricsCache() {
         val action = clearLyricsCacheAction ?: return
-        scope.launch { action() }
+        maintenance.run(KEY_CLEAR_LYRICS, LYRICS_CLEAR_FAILED, onSuccess = { _lastCompletedKey.value = KEY_CLEAR_LYRICS }) { action() }
+    }
+
+    /** Cache clear fired by a provider/preference change, after the write. */
+    private suspend fun clearLyricsCacheAfterPreferenceChange() {
+        val action = clearLyricsCacheAction ?: return
+        try {
+            action()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            maintenance.report(LYRICS_CLEAR_FAILED)
+        }
     }
 
     val canClearAudioCache: Boolean get() = clearAudioCacheAction != null
     private val _freedAudioBytes = MutableStateFlow<Long?>(null)
     val freedAudioBytes: StateFlow<Long?> = _freedAudioBytes.asStateFlow()
-    private val _audioCacheError = MutableStateFlow(false)
-    val audioCacheError: StateFlow<Boolean> = _audioCacheError.asStateFlow()
+
     fun clearAudioCache() {
-        clearAudioCacheAction?.let { action ->
-            scope.launch {
-                _audioCacheError.value = false
-                runCatching { withContext(Dispatchers.Default) { action() } }
-                    .onSuccess { _freedAudioBytes.value = it }
-                    .onFailure { _audioCacheError.value = true }
-            }
+        val action = clearAudioCacheAction ?: return
+        _freedAudioBytes.value = null
+        maintenance.run(KEY_CLEAR_AUDIO, AUDIO_CLEAR_FAILED, onSuccess = { _lastCompletedKey.value = KEY_CLEAR_AUDIO }) {
+            val freed = withContext(Dispatchers.Default) { action() }
+            _freedAudioBytes.value = freed
         }
     }
 
     fun clearSearchHistory() {
-        clearSearchHistoryAction?.let { action -> scope.launch { action() } }
+        val action = clearSearchHistoryAction ?: return
+        maintenance.run(KEY_CLEAR_SEARCH, SEARCH_HISTORY_CLEAR_FAILED, onSuccess = { _lastCompletedKey.value = KEY_CLEAR_SEARCH }) { action() }
     }
+
     fun clearPlayHistory() {
-        clearPlayHistoryAction?.let { action -> scope.launch { action() } }
+        val action = clearPlayHistoryAction ?: return
+        maintenance.run(KEY_CLEAR_PLAY, PLAY_HISTORY_CLEAR_FAILED, onSuccess = { _lastCompletedKey.value = KEY_CLEAR_PLAY }) { action() }
     }
 
     fun setPreferredProvider(id: String) = setPreferredProvider(id, afterPersist = {})
@@ -317,7 +370,7 @@ class SettingsViewModel(
         _preferredProvider.value = id
         enqueueWrite {
             update.string(SettingsKeys.LYRICS_PREFERRED_PROVIDER, id)
-            clearLyricsCacheAction?.invoke()
+            clearLyricsCacheAfterPreferenceChange()
             afterPersist()
         }
     }
@@ -376,10 +429,29 @@ class SettingsViewModel(
         _explicitContent.value = SettingsKeys.EXPLICIT_CONTENT_DEFAULT
         _pauseOnMute.value = SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME_DEFAULT
         _persistShuffleRepeat.value = SettingsKeys.PERSIST_SHUFFLE_REPEAT_DEFAULT
-        enqueueWrite { SettingsKeys.all.forEach { update.remove(it) } }
+        // Same write mutex as every other control, so a slider moved after
+        // Reset cannot be erased by it (and vice versa). The tracker adds the
+        // pending/failure contract the dialog needs.
+        maintenance.run(KEY_RESET, RESET_FAILED, onSuccess = { _lastCompletedKey.value = KEY_RESET }) {
+            writeMutex.withLock { SettingsKeys.all.forEach { update.remove(it) } }
+        }
     }
 
     companion object {
+        /* Mutation keys + user-facing failure messages, one pair per action. */
+        const val KEY_CLEAR_LYRICS = "clear-lyrics-cache"
+        const val KEY_CLEAR_AUDIO = "clear-audio-cache"
+        const val KEY_CLEAR_SEARCH = "clear-search-history"
+        const val KEY_CLEAR_PLAY = "clear-play-history"
+        const val KEY_RESET = "reset-settings"
+
+        const val SAVE_FAILED = "Could not save that setting. Check free space and try again."
+        const val LYRICS_CLEAR_FAILED = "Could not clear the lyrics cache. Please try again."
+        const val AUDIO_CLEAR_FAILED = "Could not clear the audio cache. Stop playback and try again."
+        const val SEARCH_HISTORY_CLEAR_FAILED = "Could not clear the search history. Please try again."
+        const val PLAY_HISTORY_CLEAR_FAILED = "Could not clear the play history. Please try again."
+        const val RESET_FAILED = "Could not reset every setting. Please try again."
+
         /**
          * The budget ladder offered by the UI. `0` is the documented
          * "unlimited" sentinel (see [AudioCacheBudget]); every entry survives

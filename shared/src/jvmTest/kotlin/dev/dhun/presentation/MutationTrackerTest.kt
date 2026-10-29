@@ -151,6 +151,25 @@ class MutationTrackerTest {
     }
 
     @Test
+    fun aFailureIsScopedToTheActionThatFailed() {
+        val h = Harness()
+        try {
+            h.tracker.run("audio-cache", "audio failed") { error("boom") }
+            runBlocking { await { !h.tracker.state.value.isBusy } }
+            assertEquals("audio failed", h.tracker.state.value.errorFor("audio-cache"))
+            assertNull(h.tracker.state.value.errorFor("lyrics-cache"), "another dialog must not show it")
+            assertNull(h.tracker.state.value.screenErrorMessage, "a dialog owns the message, not the banner")
+
+            // A preference write has no owner dialog, so the screen shows it.
+            h.tracker.report("Could not save that setting.")
+            assertEquals("Could not save that setting.", h.tracker.state.value.screenErrorMessage)
+            assertNull(h.tracker.state.value.errorFor("audio-cache"), "the dialog's own message was replaced")
+        } finally {
+            h.close()
+        }
+    }
+
+    @Test
     fun reportedFailuresCanBeDismissed() {
         val h = Harness()
         try {

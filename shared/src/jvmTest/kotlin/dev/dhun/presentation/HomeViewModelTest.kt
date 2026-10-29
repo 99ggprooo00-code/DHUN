@@ -12,6 +12,7 @@ import dev.dhun.core.SearchResults
 import dev.dhun.core.StreamInfo
 import dev.dhun.core.Track
 import dev.dhun.data.DataLayer
+import dev.dhun.data.LibraryRepository
 import dev.dhun.data.DatabaseDriverFactory
 import dev.dhun.data.DatabaseFactory
 import dev.dhun.domain.GetHomeFeedUseCase
@@ -21,6 +22,7 @@ import dev.dhun.innertube.SearchFilter
 import dev.dhun.presentation.home.HomeUiState
 import dev.dhun.presentation.home.HomeViewModel
 import dev.dhun.provider.MusicProvider
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,6 +33,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class HomeViewModelTest {
@@ -193,5 +196,45 @@ class HomeViewModelTest {
         assertEquals(HomeShelfKind.MOOD, GetHomeFeedUseCase.classifySection("Moods & genres"))
         assertEquals(HomeShelfKind.QUICK_PICKS, GetHomeFeedUseCase.classifySection("Quick picks"))
         assertEquals(HomeShelfKind.OTHER, GetHomeFeedUseCase.classifySection("Something else"))
+    }
+
+    /**
+     * The Like control routes through this model from Home, the queue and the
+     * full player. A failed write used to escape an unguarded `scope.launch`
+     * (an Android crash) or vanish; it is a reported message now.
+     */
+    @Test
+    fun aFailedFavoriteIsReportedOnHome(): Unit = runBlocking {
+        val uncaught = mutableListOf<Throwable>()
+        val testScope = CoroutineScope(
+            SupervisorJob() + Dispatchers.Default +
+                CoroutineExceptionHandler { _, error -> uncaught += error },
+        )
+        try {
+            val data = testData()
+            val provider = FakeMusicProvider(DhunResult.Success(emptyList()))
+            val failingLibrary = object : LibraryRepository by data.library {
+                override suspend fun isFavorite(trackId: String): Boolean = false
+                override suspend fun addFavorite(track: Track) {
+                    error("disk full")
+                }
+            }
+            val vm = HomeViewModel(
+                getHomeFeed = GetHomeFeedUseCase(provider, data.history),
+                getRecommendations = GetRecommendationsUseCase(provider, data.history, failingLibrary),
+                historyRepository = data.history,
+                libraryRepository = failingLibrary,
+                scope = testScope,
+            )
+            vm.toggleFavorite(sampleTrack("like-1"))
+            eventually { vm.actionError.value != null }
+            assertEquals("Could not update Liked Songs. Try again.", vm.actionError.value)
+            assertTrue(uncaught.isEmpty(), "the failure must not escape the coroutine: $uncaught")
+
+            vm.dismissActionError()
+            assertNull(vm.actionError.value)
+        } finally {
+            testScope.cancel()
+        }
     }
 }

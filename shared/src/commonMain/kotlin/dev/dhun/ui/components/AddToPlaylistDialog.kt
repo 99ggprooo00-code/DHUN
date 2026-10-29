@@ -31,7 +31,7 @@ import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.DhunButton
 import dev.dhun.design.components.DhunTextField
 import dev.dhun.design.components.DhunTextButton
-import kotlinx.coroutines.launch
+import dev.dhun.presentation.MutationTracker
 
 /**
  * Local-playlist picker for one track.
@@ -74,15 +74,27 @@ fun AddToPlaylistDialog(
 ) {
     val playlists by playlistRepository.observePlaylists().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
+    // Result-driven, like every other mutation in the app: `onAdded` and
+    // `onDismiss` run only after the write returned normally, a failure is
+    // shown inside this sheet (it used to escape the coroutine as a crash), and
+    // a second tap while the write is in flight is ignored.
+    val tracker = remember { MutationTracker(scope) }
+    val mutation by tracker.state.collectAsState()
     var isCreatingNew by remember { mutableStateOf(false) }
     var newPlaylistName by remember { mutableStateOf("") }
     var errorText by remember { mutableStateOf<String?>(null) }
+    val failureText = mutation.errorMessage ?: errorText
 
     val addToPlaylist: (String, String) -> Unit = { playlistId, name ->
-        scope.launch {
+        tracker.run(
+            key = "add:$playlistId",
+            failureMessage = "Could not add this song to \"$name\". Try again.",
+            onSuccess = {
+                onAdded(name)
+                onDismiss()
+            },
+        ) {
             playlistRepository.addTrack(playlistId, track)
-            onAdded(name)
-            onDismiss()
         }
     }
     val createAndAdd: () -> Unit = {
@@ -90,11 +102,18 @@ fun AddToPlaylistDialog(
         if (name.isBlank()) {
             errorText = "Name cannot be empty"
         } else {
-            scope.launch {
+            var created: String? = null
+            tracker.run(
+                key = "create-and-add",
+                failureMessage = "Could not create that playlist. Check free space and try again.",
+                onSuccess = {
+                    onAdded(created ?: name)
+                    onDismiss()
+                },
+            ) {
                 val playlist = playlistRepository.create(name)
                 playlistRepository.addTrack(playlist.id, track)
-                onAdded(playlist.name)
-                onDismiss()
+                created = playlist.name
             }
         }
     }
@@ -136,7 +155,7 @@ fun AddToPlaylistDialog(
                     isError = errorText != null,
                     onSubmit = createAndAdd,
                 )
-                errorText?.let {
+                failureText?.let {
                     Text(
                         text = it,
                         color = DhunColors.error,
@@ -163,6 +182,21 @@ fun AddToPlaylistDialog(
                     }
                 }
             } else {
+                // A failure from a playlist row (not the "new playlist" input).
+                if (playlists.isNotEmpty()) {
+                    failureText?.let {
+                        Text(
+                            text = it,
+                            color = DhunColors.error,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(
+                                start = DhunSpacing.mdPlus,
+                                end = DhunSpacing.mdPlus,
+                                bottom = DhunSpacing.xs,
+                            ),
+                        )
+                    }
+                }
                 if (playlists.isEmpty()) {
                     Text(
                         text = "No playlists yet — create one below.",

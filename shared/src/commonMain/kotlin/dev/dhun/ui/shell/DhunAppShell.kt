@@ -100,6 +100,7 @@ import dev.dhun.provider.MusicProvider
 import dev.dhun.ui.browse.AlbumScreen
 import dev.dhun.ui.browse.ArtistScreen
 import dev.dhun.ui.browse.PlaylistScreen
+import dev.dhun.ui.components.ActionErrorBanner
 import dev.dhun.ui.components.AddToPlaylistDialog
 import dev.dhun.ui.components.TrackOverflowDialog
 import dev.dhun.ui.home.HomeScreen
@@ -191,6 +192,11 @@ fun DhunAppShell(
     var overflowTrack by remember { mutableStateOf<Track?>(null) }
     var addToPlaylistTrack by remember { mutableStateOf<Track?>(null) }
     val favoriteIds by homeViewModel.favoriteIds.collectAsState()
+    // Like/Unlike is offered from Home, Search, the queue and the full player,
+    // and all of them route through one of these two models. A failure is shown
+    // once, above whatever is on screen, instead of failing silently.
+    val homeActionError by homeViewModel.actionError.collectAsState()
+    val searchActionError by searchViewModel.actionError.collectAsState()
     val currentTrack by playerViewModel.currentTrack.collectAsState()
     // Phase 10: library owns Playlists / Favorites / History tabs.
     // If the host doesn't supply a ViewModel, create one from DataLayer.
@@ -627,6 +633,29 @@ fun DhunAppShell(
                 .zIndex(FULL_PLAYER_LAYER_Z_INDEX + 1f),
         ) {
             OfflineStatusBanner(modifier = Modifier.safeDrawingPadding())
+        }
+
+        // A failed Like/Unlike or download request has no dialog of its own.
+        // Reported above the page (and above the expanded player, where the
+        // same heart is available) as a polite live region.
+        val actionError = homeActionError ?: searchActionError
+        TopLevelAnimatedVisibility(
+            visible = actionError != null,
+            enter = slideInVertically { -it } + fadeIn(DhunAnimations.mediumTween()),
+            exit = slideOutVertically { -it } + fadeOut(DhunAnimations.fastTween()),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .zIndex(FULL_PLAYER_LAYER_Z_INDEX + 2f),
+        ) {
+            ActionErrorBanner(
+                message = actionError.orEmpty(),
+                onDismiss = {
+                    homeViewModel.dismissActionError()
+                    searchViewModel.dismissActionError()
+                },
+                modifier = Modifier.safeDrawingPadding(),
+            )
         }
 
             } // Close Box(weight=1f)
