@@ -524,7 +524,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
     // The highlighted destination is a property of the screen you are on, not of
     // the last tab you pressed: Settings and About belong to no destination, and
     // leaving Library lit under them claimed otherwise.
-    const activeTab = tabFor(route) ?? "";
+    const activeTab = tabFor(route, state.tab) ?? "";
     setRegion("dhun-rail-region", navRail({ active: activeTab }));
     setRegion("dhun-nav-region", bottomNav({ active: activeTab }));
     // The dock carries the failure as well as the track. A playback error that
@@ -761,7 +761,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
             ? html`<button type="button" class="dhun-menu-row dhun-menu-row--danger" data-action="remove-from-playlist" data-id="${song.id}">${icon("Close", { size: 20 })}<span>Remove from this playlist</span></button>`
             : html``}
           <button type="button" class="dhun-menu-row" data-action="toggle-like" data-id="${song.id}">${icon(state.library.likes.includes(song.id) ? "Favorite" : "FavoriteBorder", { size: 20 })}<span>${state.library.likes.includes(song.id) ? "Remove from Liked songs" : "Save to Liked songs"}</span></button>
-          ${song.kind ? html`<a class="dhun-menu-row" href="${hrefFor(song)}">${icon("Album", { size: 20 })}<span>Open ${song.album?.name || "the album"}</span></a>` : html``}
+          ${song.album?.id && !(state.route.name === "album" && state.route.id === String(song.album.id)) ? html`<a class="dhun-menu-row" href="${hrefFor(song)}">${icon("Album", { size: 20 })}<span>Open ${song.album?.name || "the album"}</span></a>` : html``}
         `,
       });
     } else if (sheet?.kind === "add-to-playlist") {
@@ -982,6 +982,11 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
     if (!isActive()) return;
     const previous = state.route;
     const route = parseRoute(win.location.hash);
+    // A dialog belongs to the screen on which it was opened. Hash links,
+    // browser Back and primary navigation must not leave it covering the next one.
+    if (["name", "id", "query", "libTab", "doc", "player", "playerTab"].some(
+      (key) => (previous[key] ?? null) !== (route[key] ?? null),
+    )) closeSheet();
     state.route = route;
     state.tab = tabFor(route, state.tab) ?? state.tab;
     if (route.player !== "open") closeOverlayOnly();
@@ -1057,9 +1062,12 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
         return;
       }
       if (DETAIL_ROUTES.includes(state.route.name)) {
-        const map = { album: "home", artist: "home", playlist: "search", collection: "library", settings: "home", about: "settings" };
-        const name = map[state.route.name] ?? "home";
-        go(name === "library" ? routeFor("library", { libTab: "playlists" }) : routeFor(name));
+        const catalogueDetail = ["album", "artist", "playlist"].includes(state.route.name);
+        const origin = { HOME: "home", SEARCH: "search", LIBRARY: "library" }[state.tab] ?? "home";
+        const fallback = { collection: "library", settings: "home", about: "settings" };
+        const name = catalogueDetail ? origin : fallback[state.route.name] ?? "home";
+        const extra = name === "library" ? { libTab: "playlists" } : name === "search" ? { query: state.search.query } : {};
+        go(routeFor(name, extra));
         return;
       }
       go(routeFor("home"));

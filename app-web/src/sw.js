@@ -27,7 +27,7 @@
  * old cache is deleted rather than accumulating.
  */
 
-const DEFAULT_CACHE = "dhun-web-v3.0.5";
+const DEFAULT_CACHE = "dhun-web-v3.0.7";
 
 /** Everything the interface needs to open offline. Kept as an explicit list so
  *  a forgotten module is a missing-file error in development rather than a
