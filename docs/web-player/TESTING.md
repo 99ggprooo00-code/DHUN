@@ -23,7 +23,7 @@ Run from the repository root unless noted.
 The counts printed by these commands are the source of truth. The docs gate
 reads the number of `test(` declarations in `app-web/tests/*.test.mjs` and fails
 if a document states a different number for the browser suite. At the time of
-writing that number is **259**, including controlled Node boot/controller
+writing that number is **269**, including controlled Node boot/controller
 integration. The test-file inventory is separate from helper files.
 
 ## 2. The browser-app suite
@@ -49,6 +49,7 @@ boot/controller integration tests (not real browser interaction):
 | `router.test.mjs` | Routes, and that every route survives a round trip. |
 | `shell.test.mjs` | The shipping contract: one app, one stylesheet set, one offline shell. |
 | `shortcuts.test.mjs` | The keyboard map, and a refusal to take keys from someone typing. |
+| `search-composition.test.mjs` | Connected browser input ownership, no script value/selection writes during composition, stale events and submission/shortcut guards; not a native IME test. |
 | `tokens.test.mjs` | Design tokens. |
 | `transfer.test.mjs` | Importing a library from a file. |
 | `views.test.mjs` | The screens render, escape, and tell the truth. |
@@ -180,3 +181,19 @@ The focused Search cases model field replacement in Node and verify draft/caret
 ownership. The existing Chromium harness also runs a controlled delayed-response
 Search draft/caret check. It checks real DOM focus/values, not visibility of a
 phone's software keyboard or actual provider/audio acceptance.
+
+### Composition evidence boundaries
+
+For the same Search request intent, tests now require the **same input node**,
+not merely restored text/caret in a replacement. The result-region patch leaves
+the form and IME target connected and does not write identical value/selection.
+Composition Escape/processing keys belong to the IME, and composing Search does
+not submit an incomplete draft. Ended/stale events, new explicit queries and
+retirement are covered. The prior replacement-specific fixture assertion was
+strengthened to input identity; all earlier draft/caret/error assertions remain.
+
+The Chromium delayed-response check dispatches composition/input/key events and
+checks actual DOM continuity, focus and selection. Those scripted events do not
+open an Android keyboard, emulate a native Compose text field, or verify a real
+IME's composition buffer. Physical-device Search/IME work is still required;
+use the maintained [hardware checklist](../runbooks/s3-hardware-checklist.md).

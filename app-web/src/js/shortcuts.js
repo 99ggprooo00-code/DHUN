@@ -59,7 +59,9 @@ const BY_KEY = new Map(SHORTCUTS.map((shortcut) => [shortcut.key, shortcut]));
  */
 export function matchShortcut(event, { inDialog = false } = {}) {
   if (!event || typeof event.key !== "string") return null;
-  // Escape is the way out of a dialog and works from anywhere, including a field.
+  // Candidate editing/cancellation belongs to the IME, not global app shortcuts.
+  if (event.isComposing || event.keyCode === 229) return null;
+  // Outside composition, Escape is the way out of a dialog, including from a field.
   if (event.key === "Escape") {
     if (event.ctrlKey || event.metaKey || event.altKey) return null;
     return { action: "escape", preventDefault: false };

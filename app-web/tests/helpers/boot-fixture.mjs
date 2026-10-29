@@ -53,7 +53,7 @@ function documentDouble(replaceSearchFields = false) {
   };
   doc.body = node("body", "BODY"); doc.documentElement = node("html", "HTML");
   doc.activeElement = doc.body; doc.title = "";
-  doc.getElementById = (id) => replaceSearchFields && id === "search-input" ? nodes.get(id) ?? null : node(id);
+  doc.getElementById = (id) => replaceSearchFields && ["search-input", "search-results"].includes(id) ? nodes.get(id) ?? null : node(id);
   doc.querySelector = (selector) => {
     if (selector === "#dhun-view h1" || selector === "#dhun-topbar h1") return node("heading", "H1");
     if (replaceSearchFields && selector === "#search-input") return nodes.get("search-input") ?? null;
@@ -74,6 +74,8 @@ function documentDouble(replaceSearchFields = false) {
         const old = nodes.get("search-input");
         if (old && doc.activeElement === old) doc.activeElement = doc.body;
         nodes.delete("search-input");
+        nodes.delete("search-results");
+        if (markup.includes('id="search-results"')) node("search-results").innerHTML = markup;
         const match = /<input\s+id="search-input"[^>]*\bvalue="([^"]*)"/.exec(markup);
         if (match) {
           const field = new NodeElement("INPUT", doc, "search-input");
@@ -204,6 +206,17 @@ export function bootFixture(t, { hash = "#/search", replaceSearchFields = false,
       const input = new NodeElement("INPUT", dom.doc);
       input.dataset.action = "import-library"; input.files = [file]; input.value = "fixture.json";
       dispatch("change", input); return input;
+    },
+    composeStart(target = dom.doc.querySelector("#search-input")) {
+      dom.root.emit("compositionstart", { target, data: "" });
+    },
+    composeEnd(target = dom.doc.querySelector("#search-input"), data = "") {
+      dom.root.emit("compositionend", { target, data });
+    },
+    key(key, extra = {}) {
+      let prevented = false;
+      dom.doc.emit("keydown", { key, target: dom.doc.activeElement, preventDefault() { prevented = true; }, ...extra });
+      return prevented;
     },
     close: transport.close,
   };

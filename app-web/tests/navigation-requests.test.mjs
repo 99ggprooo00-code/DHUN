@@ -422,7 +422,7 @@ test("focused unsubmitted Search text and selection survive an asynchronous resu
   field.focus(); field.value = 'new draft & धुन "quoted"'; field.setSelectionRange(4, 9);
   app.calls[0].succeed(); await settle();
   const current = app.doc.querySelector("#search-input");
-  assert.notStrictEqual(current, field, "the fixture must exercise replacement, not accidentally retain a fake node");
+  assert.strictEqual(current, field, "same-intent results must preserve the actual input, including IME ownership");
   assert.equal(current.value, 'new draft & धुन "quoted"');
   assert.strictEqual(app.doc.activeElement, current);
   assert.equal(current.selectionStart, 4); assert.equal(current.selectionEnd, 9);

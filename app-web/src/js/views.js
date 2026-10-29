@@ -134,28 +134,6 @@ export const SEARCH_FILTERS = Object.freeze([
  * word.
  */
 export function searchScreen(vm) {
-  const results = (() => {
-    if (vm.status === "loading") return loadingState([`Searching for “${vm.query}”`]);
-    // A failure the visitor can do nothing about is a dead end. The catalogue
-    // failures this build meets (offline, timeout, a 5xx) are worth one more
-    // attempt, so the state offers it instead of only describing it.
-    if (vm.status === "error") return errorState({ ...vm.error, actions: [{ id: "retry", label: "Try again" }] });
-    if (vm.status === "idle") return searchIdle(vm);
-    if (!vm.results.length) {
-      return emptyState({
-        title: `No ${vm.filter} for “${vm.query}”`,
-        body: "The catalogue answered with nothing for that query. Try a different spelling, or another filter.",
-        iconName: "Search",
-      });
-    }
-    if (vm.filter === "songs") {
-      return songList(vm.results, { currentId: vm.currentId, playing: vm.playing, likes: vm.likes, context: "search" });
-    }
-    return html`<div class="dhun-grid dhun-grid--${vm.filter}">
-      ${vm.results.map((item) => card(item, { href: vm.hrefFor(item), kind: vm.filter === "albums" ? "album" : vm.filter === "artists" ? "artist" : "playlist" }))}
-    </div>`;
-  })();
-
   return html`<div class="dhun-screen">
     <h1 class="dhun-visually-hidden">Search</h1>
     <form class="dhun-search" role="search" data-action="search-submit">
@@ -170,9 +148,33 @@ export function searchScreen(vm) {
       ${SEARCH_FILTERS.map((filter) => chip(filter.label, { active: vm.filter === filter.id, action: "set-search-filter", value: filter.id }))}
     </div>
 
-    ${results}
+    <div id="search-results">${searchResults(vm)}</div>
   </div>`;
 }
+
+/** Only the result region changes during the same Search/IME intent. */
+export function searchResults(vm) {
+  if (vm.status === "loading") return loadingState([`Searching for “${vm.query}”`]);
+  // A failure the visitor can do nothing about is a dead end. The catalogue
+  // failures this build meets (offline, timeout, a 5xx) are worth one more
+  // attempt, so the state offers it instead of only describing it.
+  if (vm.status === "error") return errorState({ ...vm.error, actions: [{ id: "retry", label: "Try again" }] });
+  if (vm.status === "idle") return searchIdle(vm);
+  if (!vm.results.length) {
+    return emptyState({
+      title: `No ${vm.filter} for “${vm.query}”`,
+      body: "The catalogue answered with nothing for that query. Try a different spelling, or another filter.",
+      iconName: "Search",
+    });
+  }
+  if (vm.filter === "songs") {
+    return songList(vm.results, { currentId: vm.currentId, playing: vm.playing, likes: vm.likes, context: "search" });
+  }
+  return html`<div class="dhun-grid dhun-grid--${vm.filter}">
+    ${vm.results.map((item) => card(item, { href: vm.hrefFor(item), kind: vm.filter === "albums" ? "album" : vm.filter === "artists" ? "artist" : "playlist" }))}
+  </div>`;
+}
+
 
 function searchIdle(vm) {
   if (!vm.recent.length) {

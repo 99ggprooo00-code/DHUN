@@ -2802,16 +2802,36 @@ async function checkWebSearchDraft(browser) {
     const original = await next("focus-original");
     const focusedAfterSubmit = await field.evaluate(element => document.activeElement === element);
     if (!focusedAfterSubmit) throw new Error("explicit Search submission lost the existing continued-typing focus contract");
+    await page.evaluate(() => { location.hash = "#/search?q=focus-original&player=open"; });
+    await page.waitForFunction(() => document.querySelector("#app").dataset.player === "open");
     const draft = 'new draft & धुन "quoted"';
-    await field.fill(draft); await field.evaluate(element => element.setSelectionRange(4, 9));
+    await field.fill(draft);
+    await field.evaluate(element => {
+      window.__searchCompositionTarget = element;
+      element.setSelectionRange(4, 9);
+      element.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true, data: "" }));
+      element.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertCompositionText", data: "धु", isComposing: true }));
+      element.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, key: "Escape", isComposing: true }));
+      element.form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    const composingHash = await page.evaluate(() => location.hash);
+    if (!composingHash.includes("player=open") || !composingHash.includes("q=focus-original")) {
+      throw new Error(`scripted composition Escape/submit changed the app intent: ${composingHash}`);
+    }
+    record("/app/ composition key ownership", "scripted composition Escape and submit do not close the player route or send an incomplete draft; not a native IME test");
     original.release();
     await page.getByText("Controlled Search focus-original", { exact: true }).waitFor();
-    const after = await field.evaluate(element => ({ value: element.value, focused: document.activeElement === element, start: element.selectionStart, end: element.selectionEnd }));
+    const after = await field.evaluate(element => ({ value: element.value, focused: document.activeElement === element,
+      sameTarget: element === window.__searchCompositionTarget && window.__searchCompositionTarget.isConnected,
+      start: element.selectionStart, end: element.selectionEnd }));
+    if (!after.sameTarget) fail("/app/ composition DOM continuity", "a result update detached the composing input; refocusing a replacement cannot restore native composition");
+    else record("/app/ composition DOM continuity", "the original DOM input stays connected through a controlled result while composition events are active; no physical-IME claim");
     if (after.value !== draft || !after.focused || after.start !== 4 || after.end !== 9) {
       fail("/app/ Search draft", `async results replaced an unsubmitted draft/caret: ${JSON.stringify(after)}`);
     } else record("/app/ Search draft", "actual Chromium keeps focused unsubmitted text and selection after a controlled async reply; no mobile-IME claim");
     if (pending.size !== 1) throw new Error("unsubmitted text started an unexpected catalogue request");
 
+    await field.evaluate(element => element.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "धुन" })));
     await field.fill("focus-fresh"); await field.press("Enter");
     const fresh = await next("focus-fresh");
     const committed = await field.inputValue();

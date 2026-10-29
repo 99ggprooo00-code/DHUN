@@ -1,3 +1,38 @@
+# CURRENT ACTIVE TASK — 2026-10-29: mobile Search/IME verification
+
+**Branch/base:** `arena/3f9f6220-dhun` / `46885ce` (merged PR #198). Starting tree
+was clean. Current authority permits scoped implementation/tests, commit/push/PR
+and merge only after every applicable gate; no admin/force bypass or public app
+release. Native KMP and browser JS evidence remain separate.
+
+- [x] Confirm actual main/PR ancestry and the four passing normal baseline CI
+  workflows. Read Search input, draft, request, keyboard and teardown contracts.
+- [x] Establish physical blocker: no executable ADB, configured SDK/JDK, exposed
+  USB transport or authorised remote phone. No device list executed, no APK/data/
+  device-setting operation. Native model/OS/IME/build observations are NOT RUN.
+- [x] Continue independent browser work: 7 controlled regressions fail before
+  correction; focused 78/78 and full 269 Node cases pass after connected-input
+  result updates, composition submission/shortcut guards and stale-event checks.
+  Native implementation/focus policy untouched. Web cache patch is 3.0.3.
+- [x] Add safe, precise native Search/IME manual matrix to the maintained hardware
+  checklist; historic digests below it are not current-build acceptance.
+- [x] Full available local gates: 269 JS / 20 docs, 497 Python, 63 site rules,
+  build/minifier/HTML/4 claims pages/32 quality checks and root/project-prefix
+  HTTP smoke pass; temporary servers stopped and root output restored.
+- [ ] Browser/native CI for the final pushed head; use the PR's actual results.
+  Three isolated guard-removal mutations fail their targeted regressions.
+- [ ] Physical native keyboard/IME acceptance. It remains externally blocked;
+  do not infer it from Node, scripted Chromium events, Robolectric or packaging.
+
+**Current file / next:** browser composition tests and
+`docs/runbooks/s3-hardware-checklist.md`. Finish applicable gates, push only this
+assigned branch and open a limited-scope PR. Keep merge closed while required
+real-phone acceptance is blocked; no native-device completion claim.
+
+---
+
+## Earlier task snapshot — preserved verbatim as history
+
 # CURRENT ACTIVE TASK
 
 ## CURRENT ACTIVE TASK — 2026-10-28: multi-source alignment audit

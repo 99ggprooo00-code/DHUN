@@ -85,3 +85,9 @@ the only publisher.
   recorded, not listening.
 - Whether every host that might serve the site sends the same headers. The
   project uses GitHub Pages only.
+
+Version 3.0.3 also carries connected-input Search result updates and composition
+protocol guards. It changes the worker script/cache namespace so existing clients
+can receive the fix after the normal close/reopen update cycle, without forced
+reload or keyboard dismissal. Native application versions and storage schema are
+unchanged; this is not native-device/IME or audible-provider acceptance.

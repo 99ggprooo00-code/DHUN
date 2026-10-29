@@ -1,5 +1,92 @@
 # Runbook: S3 hardware checklist (pre-tag device testing)
 
+## Current Mobile Search / keyboard / IME record — 2026-10-29
+
+**Physical native Android result: NOT RUN / access blocked.** In the current
+Agent workspace no ADB executable, configured Android SDK/JDK or accessible USB
+transport was found; no authorised remote-device endpoint was supplied. No
+`adb devices` list was executed, so this is **not** an executed zero-device
+result. No emulator/KVM, native build/install, device settings or application
+storage was changed. Device model, Android/API, IME/version and installed build
+are **not observed**. Main baseline `46885ce` includes merged PR #198, but that
+source identity is not proof of what any phone has installed.
+
+This maintained section supersedes **only current Search test selection**. The
+older APK/MSI identities and hardware reports below are dated history, not hashes
+for a current build. Browser Node/Chromium tests are a separate target and cannot
+sign off these native rows. Scripted CompositionEvents are not a real Android IME.
+
+### Safe native build and installation, when an approved device runner exists
+
+Read [INSTALL.md](../INSTALL.md) and the chosen build's provenance before testing.
+The native target is `:app-android`, application ID `dev.dhun.android`, Java 17,
+Android SDK 35, minimum API 24. Existing checks/build are:
+
+```sh
+./gradlew :shared:jvmTest :app-android:testDebugUnitTest :app-android:assembleDebug --no-daemon
+```
+
+Debug APKs are under `app-android/build/outputs/apk/debug/`; choose the universal
+output unless deliberately testing a matching ABI split. Default public identity
+is versionName `1.00.002` / versionCode `7`; rolling test properties can override
+both, so record the **actual installed** name/code, source commit, APK filename
+and SHA-256, not the defaults or an old digest from this document.
+
+Prefer an already-installed matching development build. Before any upgrade,
+confirm the package ID, signature, channel and non-decreasing versionCode. The
+repository's public throwaway test key does not authenticate a maintainer and
+must not be used to replace an incompatible installation. Only after an approved,
+compatible upgrade is established may `adb install -r <verified-apk>` be used.
+Do not uninstall, clear app data, downgrade with `-d`, replace signing keys,
+reset permissions/IME/network settings, or assume the native app has general
+library export. If safe upgrade/data preservation cannot be established, stop
+the installation test and mark it blocked. No such command was run here.
+
+### Record once per physical run (no serials, credentials or personal data)
+
+- Date/time/timezone; device model; Android release + API; orientation.
+- **Native Android** target, package/versionName/versionCode, installed APK hash,
+  build channel and source commit; retain previous version/data observations.
+- IME name/version, language, layout and input mode. Use an already-installed
+  supported keyboard; do not install another keyboard merely for this check.
+- Controlled nonpersonal queries (for example `rain`, `धुन`, `नेपाली गीत`).
+- Pending/error condition and how it was safely produced; use an existing
+  approved condition/fixture, not a new proxy or security bypass. If a condition
+  cannot be produced, mark that row **not tested**, not passed.
+
+### Native physical-device matrix — fill actual observations, never infer them
+
+Every row is currently **NOT RUN**. Baseline behavior must be observed: opening
+Search need not force keyboard acquisition; tap the input separately. While
+editing, same-intent result/error updates must not unexpectedly blur, replace
+the draft, caret/selection or composing buffer. New explicit submissions may
+supersede the prior draft. Do not force dismissal to make a test pass.
+
+| # | Exact steps on the native Android app | Check / expected contract | Actual / reproducibility |
+|---|---|---|---|
+| 1 | Open Search without tapping; then tap its field | Record initial focus/keyboard, then keyboard acquisition after tap | NOT RUN |
+| 2 | Enter `rain`, submit, keep editing while that request loads | Record keyboard visibility through loading/results; no unexpected focus loss | NOT RUN |
+| 3 | While request A is pending, type an unsubmitted longer draft | A's reply must not replace the newer draft; record exact text before/after | NOT RUN |
+| 4 | Place caret in the middle; insert characters while results arrive | Caret remains at the intended editing position; no jump/end truncation | NOT RUN |
+| 5 | Select a substring and replace it; allow a reply during selection | Selection/replacement and visible text stay correct | NOT RUN |
+| 6 | Submit B before A finishes; repeat for filter/retry | Only B/current intent publishes; expected cancellation is not a provider error | NOT RUN |
+| 7 | Leave Search during loading, return, repeat three times | Observe focus, draft/intent, cancellation and restoration; no stale A takeover | NOT RUN |
+| 8 | Use an approved error condition while a newer draft is unsubmitted | Error remains honest but must not destroy draft/selection or steal focus | NOT RUN |
+| 9 | With the configured composing/transliteration IME, enter a non-English draft; accept/cancel candidates; use IME Search | Native composition/candidate selection stays intact; no premature partial search or forced keyboard hide | NOT RUN |
+| 10 | Repeat loading/empty/error/results transitions with keyboard open | No unexpected focus changes, stale text or noisy cancellation errors | NOT RUN |
+| 11 | Clear the field during a pending search/suggestion; wait for old completion | Query stays cleared; record any stale results/suggestions separately | NOT RUN |
+
+For each failure record **row, exact actions, submitted query vs current draft,
+keyboard open/closed, composing/candidate state, caret/selection, expected vs
+observed result, and count reproduced / attempts**. Record the tested build and
+IME for every failure. Sanitise screenshots/logs; do not upload personal queries,
+artwork, device IDs, credentials or signed stream URLs. Node/JVM/Robolectric,
+compilation and HTTP smoke are not native-device observations. Do not start audio
+for this Search-only matrix; audible provider playback remains a separate gate.
+
+---
+
+
 **Why this needs a human:** the agent sandbox has no devices, no speakers,
 and no Windows taskbar. Everything below must be seen/heard on real
 hardware. Budget ~2 hours wall-clock (mostly the unattended soaks).

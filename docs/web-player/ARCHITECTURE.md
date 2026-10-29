@@ -124,6 +124,21 @@ the same request intent. A new explicit submit owns the canonical field value;
 unsubmitted text is neither sent nor persisted. This retains the continued-typing
 focus policy, not a guarantee about a phone's software keyboard or IME composition.
 
+### Composition-safe Search rendering
+
+Same-intent Search updates patch only `#search-results` using the pure
+`views.searchResults` renderer. The actual form/input remains connected; a
+string/caret snapshot cannot reconstruct native IME state. Identical value and
+selection are not rewritten, and an active composing target stays under IME
+control. New explicit request intents still render their canonical query.
+
+Owned composition listeners track the current input/request and clear on intent
+replacement, retirement and teardown. Composing/processing keystrokes are not
+app shortcuts; partial composing text is not submitted. Old end events cannot
+resurrect retired text. No native KMP behavior or keyboard-dismissal policy is
+changed. Real Android IME/keyboard acceptance is separate from Node/Chromium DOM
+protocol coverage.
+
 ### Component and page lifetime
 
 `boot()` returns an idempotent `destroy()` for explicit unmounting. Non-cached
