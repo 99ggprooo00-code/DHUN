@@ -70,3 +70,27 @@ test("activation retires only older DHUN shell versions, preserving unrelated ca
   const runtime = worker(); await runtime.activate();
   assert.deepEqual(runtime.deleted, ["dhun-web-v0.0.0"]);
 });
+
+test("best-effort installation can succeed with a missing required shell entry", async () => {
+  const listeners = new Map(); const cached = [];
+  const self = { addEventListener: (name, handler) => listeners.set(name, handler) };
+  const caches = { open: async () => ({ add: async request => {
+    if (request.url === "./js/main.js") throw new Error("controlled missing module");
+    cached.push(request.url);
+  } }) };
+  class Request { constructor(url) { this.url = url; } }
+  runInNewContext(readFileSync(new URL("../src/sw.js", import.meta.url), "utf8"), { self, caches, Request });
+  let install; listeners.get("install")({ waitUntil(promise) { install = promise; } });
+  await install;
+  assert.ok(cached.includes("./index.html"));
+  assert.ok(!cached.includes("./js/main.js"), "successful installation does not guarantee a complete shell");
+});
+
+test("cache storage denial causes installation to fail", async () => {
+  const listeners = new Map();
+  const self = { addEventListener: (name, handler) => listeners.set(name, handler) };
+  const caches = { open: async () => { throw new Error("controlled cache denial"); } };
+  runInNewContext(readFileSync(new URL("../src/sw.js", import.meta.url), "utf8"), { self, caches });
+  let install; listeners.get("install")({ waitUntil(promise) { install = promise; } });
+  await assert.rejects(install, /controlled cache denial/);
+});
