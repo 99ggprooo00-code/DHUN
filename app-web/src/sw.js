@@ -45,6 +45,7 @@ const SHELL = [
   "./js/icons.js",
   "./js/api.js",
   "./js/library.js",
+  "./js/indexeddb-storage.js",
   "./js/backup-policy.js",
   "./js/player.js",
   "./js/router.js",

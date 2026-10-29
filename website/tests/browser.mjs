@@ -50,6 +50,7 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { newAppContext } from "./catalogue-fixture.mjs";
+import { checkIndexedDBStorage } from "./indexeddb-check.mjs";
 import { installSyntheticPlayback } from "./runtime-fixtures.mjs";
 import { API_SOURCES } from "../../app-web/src/js/api.js";
 
@@ -3035,6 +3036,7 @@ const CHECKS = [
   ["/app/ consecutive catalogue history", () => checkWebConsecutiveDetails(browser)],
   ["/app/ legal and erase scope", () => checkWebLegal(browser)],
   ["/app/ storage failures", () => checkWebStorageFailures(browser)],
+  ["/app/ IndexedDB adapter", () => checkIndexedDBStorage(browser, { base: BASE, record })],
   ["/app/ synthetic media transport", () => checkWebSyntheticMedia(browser)],
   ["/app/ Search draft and caret", () => checkWebSearchDraft(browser)],
   ["screenshots", () => captureScreenshots(browser)],

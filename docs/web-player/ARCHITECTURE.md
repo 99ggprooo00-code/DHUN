@@ -27,7 +27,8 @@ been deleted — the list is checked against the directory, not trusted.
 | `js/api.js` | The JioSaavn seam: endpoints, normalisers, timeouts, failure kinds |
 | `js/player.js` | Queue, repeat, shuffle, stream resolution, the media element, Media Session |
 | `js/backup-policy.js` | Backup byte, token and nesting budgets before parsing |
-| `js/library.js` | Likes, playlists, history, snapshots, settings, storage (`dhun.web.v3`) |
+| `js/library.js` | Likes, playlists, history, snapshots, settings, current storage (`dhun.web.v3`) |
+| `js/indexeddb-storage.js` | In-development transaction adapter, not yet used by app startup; see `DATA-SCHEMA.md` |
 | `js/views.js` | One function per screen: Home, Search, Library, album, artist, playlist, collection, Settings, About, the framing refusal |
 | `js/shell.js` | App bar, bottom navigation, navigation rail, docked mini player |
 | `js/player-ui.js` | The full player: transport, scrubber, queue and lyrics tabs |

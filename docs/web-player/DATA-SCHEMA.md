@@ -203,6 +203,23 @@ guarded rather than being saved over (§5).
 
 ### Transactional migration: required follow-up, not implemented
 
+`js/indexeddb-storage.js` contains an **in-development adapter**; the app does
+not call it, and the current storage behavior above remains in force. It uses
+one IndexedDB object store with `current` and `previous` records, each carrying
+schema, revision, serialized library, and the untouched legacy-key baseline.
+A read-write transaction checks the expected revision and replaces both records
+atomically. Initialization retains legacy bytes and never overwrites an existing
+current record. A changed legacy key blocks new adapter writes; an already-open
+old app can still modify that key, including while a transaction is in flight.
+A post-commit mismatch is reported for review rather than as a confirmed success.
+Export reads a committed snapshot without advancing the tab's expected revision.
+The adapter has Chromium-only component tests, including injected abort and
+legacy-change failures and a frozen main-branch storage adapter; it is **not** a
+complete migration, user-facing recovery path, or end-to-end application test.
+Migration reconciliation, UI operation serialization, startup integration,
+uncertain outcomes, and the remaining compatibility tests must be completed
+before enabling it.
+
 A separate migration needs an asynchronous storage lifecycle rather than an
 IndexedDB sidecar beside the current synchronous `save` calls:
 

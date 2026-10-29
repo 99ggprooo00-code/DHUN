@@ -689,3 +689,6 @@ export function createStorage(backing, key = STORAGE_KEY) {
     },
   };
 }
+
+// Transactional adapter is under development; app boot still uses createStorage.
+export { createIndexedDBStorage } from "./indexeddb-storage.js";
