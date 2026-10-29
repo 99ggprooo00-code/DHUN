@@ -8,7 +8,7 @@ states, auth/security, playback ownership and source-aware routing. Keep this
 JS client separate from native KMP/Compose; D5 is design-only.
 
 The browser build is a static page that assembles itself at runtime. There is no
-framework, no bundler, no transpiler and no dependency: twenty ES modules loaded
+framework, no bundler, no transpiler and no dependency: ES modules loaded
 by `<script type="module">`, two stylesheets, and the browser's own platform for
 everything else. That is a constraint with a reason — nothing has to be fetched
 to run it, build it, or check it — and it is why the module boundary matters

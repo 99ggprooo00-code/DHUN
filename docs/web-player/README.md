@@ -30,7 +30,7 @@ carries a claim the repository cannot back.
 
 ## The build in one paragraph
 
-A static page — one HTML file, two stylesheets, twenty ES modules, a manifest
+A static page — one HTML file, two stylesheets, ES modules, a manifest
 and a service worker — with **no runtime dependency, no build step that needs an
 install, no DHUN-operated server and no account**. The catalogue is JioSaavn,
 read through unofficial community wrappers at `saavn.dev`, `saavn.sumit.co` and
