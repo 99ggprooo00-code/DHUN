@@ -22,7 +22,10 @@ A failed write probe does **not** discard an existing readable library. Each
 save retries and confirms a write by reading it back; quota/permission recovery
 can therefore work in the same tab. Ordinary failed edits remain useful in
 memory, with a visit-only warning rather than a durable-success claim. An older
-saved copy may still exist; export before closing when persistence is uncertain.
+saved copy may still exist; when the tab's library was read safely, export it
+before closing if persistence is uncertain. If saved data could not be read or
+parsed, the fallback may be incomplete: retain browser data and the original
+backup instead of treating an export of the fallback as recovery.
 
 Erase, playlist deletion/removal, recent-search clear and replacement import use
 `save(..., { requirePersistence: true })`: previous in-tab data is published over
@@ -104,8 +107,8 @@ stored document still truncates lists during normalization; import rejects it.
 
 ## 5. Reading a stored document back
 
-`normaliseLibrary` takes whatever `localStorage` returns and produces a valid
-library. It does this without throwing:
+After JSON parsing, `normaliseLibrary` permissively converts stored values into
+an in-memory library:
 
 - A value that is not an array is treated as an empty array.
 - Each list is capped at its limit on the way in.
@@ -113,9 +116,10 @@ library. It does this without throwing:
 - A snapshot whose id does not match its key is removed.
 - Numbers are clamped; invalid settings fall back to defaults.
 
-A corrupt document therefore gives a usable, possibly smaller library. It does
-not give an error screen. Nothing in the build backs up the previous value before
-normalising, so a corrupt document that is saved over is lost.
+Syntactically valid but damaged or unrecognized data can therefore yield a
+smaller library without an error screen; a later save can overwrite the original
+bytes. Malformed JSON or a thrown read/normalization error instead produces a
+guarded fallback that this tab cannot save over the original.
 
 ## 6. Export and import
 
@@ -178,8 +182,8 @@ unavailable. Keep the original file and existing library; free storage, try a
 browser/device with sufficient capacity, or seek recovery help. Do not delete
 the only copy to make room. No other format version is imported.
 
-Startup's permissive recovery (§5) is unchanged; import is intentionally stricter
-because it replaces a library. The post-write uncertainty and concurrent-write
+Startup still permissively normalizes parseable values (§5); import is
+intentionally stricter because it replaces a library. The post-write uncertainty and concurrent-write
 race described above remain limitations; the import is not fully transactional.
 The guard is per tab and does not stop another open tab from writing. Ordinary
 saves also perform a best-effort stale-value check; it is not atomic with the
