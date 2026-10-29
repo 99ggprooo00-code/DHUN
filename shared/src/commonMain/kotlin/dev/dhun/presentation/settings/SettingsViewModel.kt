@@ -140,6 +140,26 @@ class SettingsViewModel(
 
     init {
         scope.launch {
+            // Every control on this screen reads a persisted value, and the
+            // whole app waits for [loaded] before it applies appearance and
+            // visual tuning. An unhandled read failure killed this coroutine
+            // (an uncaught exception on Android) and left `loaded` false
+            // forever: Settings never rendered its controls, and the rest of
+            // the app never applied stored preferences. A failed read now
+            // falls back to the documented defaults and says so.
+            try {
+                loadPersistedValues()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                maintenance.report(SETTINGS_LOAD_FAILED)
+            } finally {
+                _loaded.value = true
+            }
+        }
+    }
+
+    private suspend fun loadPersistedValues() {
             _themeId.value = get.string(SettingsKeys.THEME, SettingsKeys.THEME_DEFAULT)
             _accentId.value = get.string(SettingsKeys.ACCENT, SettingsKeys.ACCENT_DEFAULT)
             _cacheSizeMb.value = AudioCacheBudget.clampMb(
@@ -190,8 +210,6 @@ class SettingsViewModel(
             _pauseOnMute.value = get.boolean(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME, SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME_DEFAULT)
             _persistShuffleRepeat.value = get.boolean(SettingsKeys.PERSIST_SHUFFLE_REPEAT, SettingsKeys.PERSIST_SHUFFLE_REPEAT_DEFAULT)
             _recordListeningHistory.value = get.boolean(SettingsKeys.RECORD_LISTENING_HISTORY, SettingsKeys.RECORD_LISTENING_HISTORY_DEFAULT)
-            _loaded.value = true
-        }
     }
 
     /**
@@ -451,6 +469,7 @@ class SettingsViewModel(
         const val SEARCH_HISTORY_CLEAR_FAILED = "Could not clear the search history. Please try again."
         const val PLAY_HISTORY_CLEAR_FAILED = "Could not clear the play history. Please try again."
         const val RESET_FAILED = "Could not reset every setting. Please try again."
+        const val SETTINGS_LOAD_FAILED = "Could not read your saved settings, so DHUN is using its defaults."
 
         /**
          * The budget ladder offered by the UI. `0` is the documented

@@ -3,6 +3,7 @@ package dev.dhun.presentation.settings
 import dev.dhun.data.DataLayer
 import dev.dhun.data.DatabaseDriverFactory
 import dev.dhun.data.DatabaseFactory
+import dev.dhun.data.SettingsKeys
 import dev.dhun.data.SettingsRepository
 import dev.dhun.domain.GetSettingUseCase
 import dev.dhun.domain.UpdateSettingUseCase
@@ -257,6 +258,39 @@ class SettingsMaintenanceActionsTest {
                 vm.maintenanceState.value.errorFor(SettingsViewModel.KEY_RESET),
             )
             assertNull(vm.lastCompletedKey.value, "a failed reset must not close its dialog")
+            assertTrue(h.uncaught.isEmpty(), "the failure must not escape the coroutine: ${h.uncaught}")
+        } finally {
+            h.close()
+        }
+    }
+
+    /**
+     * `init { scope.launch { …read every key… } }` had no handler. A failed read
+     * killed that coroutine (an uncaught exception on Android) and left `loaded`
+     * false forever, so Settings never rendered its controls and the rest of the
+     * app never applied stored preferences. It now falls back to the documented
+     * defaults, still reports loaded, and says what happened.
+     */
+    @Test
+    fun aFailedSettingsReadFallsBackToDefaultsAndStillLoads(): Unit = runBlocking {
+        val d = data()
+        val h = Harness()
+        val brokenSettings = object : SettingsRepository by d.settings {
+            override suspend fun getString(key: String): String? = error("database is corrupt")
+        }
+        val vm = SettingsViewModel(
+            GetSettingUseCase(brokenSettings),
+            UpdateSettingUseCase(brokenSettings),
+            h.scope,
+        )
+        try {
+            eventually { vm.loaded.value }
+            assertEquals(SettingsKeys.THEME_DEFAULT, vm.themeId.value)
+            assertEquals(SettingsKeys.CACHE_SIZE_MB_DEFAULT, vm.cacheSizeMb.value)
+            assertEquals(
+                SettingsViewModel.SETTINGS_LOAD_FAILED,
+                vm.maintenanceState.value.screenErrorMessage,
+            )
             assertTrue(h.uncaught.isEmpty(), "the failure must not escape the coroutine: ${h.uncaught}")
         } finally {
             h.close()
