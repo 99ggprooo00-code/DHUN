@@ -252,6 +252,8 @@ test("the settings screen says what this browser is storing, and offers a way ou
   const markup = text(screens.settings());
   assert.ok(markup.includes("Kept in this browser") || markup.includes("browser only") || markup.includes("this browser"));
   assert.ok(markup.includes("Export library"));
+  assert.match(String(markup), /up to 24 MiB of UTF-8 JSON/);
+  assert.match(String(markup), /browser storage limits/);
   assert.ok(markup.includes("Import library"));
   assert.ok(markup.includes("Erase library"), "the delete control must name its actual scope");
   assert.ok(!markup.includes("Erase everything"), "settings and shell cache are kept");

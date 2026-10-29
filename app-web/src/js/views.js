@@ -18,6 +18,7 @@
  */
 
 import { html } from "./dom.js";
+import { BACKUP_MAX_BYTES } from "./backup-policy.js";
 import { icon } from "./components.js";
 import { formatCount, formatDuration, greetingFor, metaLine, pluralise } from "./format.js";
 import {
@@ -546,6 +547,7 @@ export function settingsScreen(vm) {
       <h2 class="dhun-settings__title">This browser</h2>
       <div class="dhun-setting dhun-setting--stack">
         <p class="dhun-setting__note">${vm.storage.note}</p>
+        <p class="dhun-setting__note">Imports accept up to ${BACKUP_MAX_BYTES / (1024 * 1024)} MiB of UTF-8 JSON, subject to complexity and browser storage limits. Keep your backup until you have verified the restore.</p>
         <div class="dhun-setting__buttons">
           <button type="button" class="dhun-button dhun-button--outlined" data-action="export-library">Export library</button>
           <label class="dhun-button dhun-button--outlined dhun-file">Import library<input type="file" accept="application/json,.json" data-action="import-library" /></label>
