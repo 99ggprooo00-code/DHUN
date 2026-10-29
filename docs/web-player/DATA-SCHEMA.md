@@ -156,13 +156,20 @@ truncated. Serialization failures are reported without a success message.
    historical string history entries, and defaults for missing optional nested
    fields/settings. Missing snapshots for referenced ids are permitted for older
    libraries; such rows may not be visible until their metadata is recovered.
-5. Validation completes before any write. On validation failure both in-tab and
-   stored data are untouched. A valid candidate is written to the single storage
-   key and read back before replacing in-tab data. If the write fails, the in-tab
-   library remains. If readback fails after a successful write, the durable copy
-   may already have changed; export the in-tab library before closing and verify
-   storage. There is no cross-tab transaction or compare-and-swap, and rollback
-   could overwrite another tab's changes. The file itself is never modified.
+5. Validation and serialization finish before any library write. A pre-write
+   read rejects a library already changed since this tab last observed it. A
+   candidate is then written to the single storage key and read back before
+   replacing in-tab data. If a write throws and readback confirms the previous
+   value, the saved library is unchanged. If readback fails or differs after
+   an attempted write, the durable outcome is **unconfirmed**: it may contain
+   the import or another tab's data while this tab retains its previous library.
+   After an unconfirmed outcome or detected conflict, this tab will not write
+   again; ordinary edits are visit-only. Export the in-tab library, keep the
+   original file, and open a fresh tab to review the saved library. There is no
+   cross-tab transaction or compare-and-swap: a concurrent write between the
+   pre-check and replacement can still be overwritten. The app does not roll
+   back blindly, because that could overwrite another tab's changes. The backup
+   file itself is never modified.
 
 The 24 MiB budget accommodates the reproduced 9.8 MB valid export but is not a
 promise that every library fits: browser memory and quota differ. The complexity
@@ -173,9 +180,17 @@ browser/device with sufficient capacity, or seek recovery help. Do not delete
 the only copy to make room. No other format version is imported.
 
 Startup's permissive recovery (§5) is unchanged; import is intentionally stricter
-because it replaces a library. A storage read is attempted before writing; a
-successful write followed by a failed readback still has the uncertain outcome
-noted above.
+because it replaces a library. The post-write uncertainty and concurrent-write
+race described above remain limitations; the import is not fully transactional.
+The guard is per tab and does not stop another open tab from writing.
+
+A narrowly scoped follow-up would migrate the library and a revision to an
+IndexedDB object store and commit replacements in a read-write transaction that
+checks the revision. Migration must retain the legacy localStorage value until
+verified, coordinate older tabs and downgrade behavior, test aborted and
+interrupted transactions and browser storage policies, and avoid claiming
+protection against later site-data eviction. Until that work is verified, do not
+claim every unsuccessful import leaves the saved copy unchanged.
 
 ## 7. What is not stored
 

@@ -147,12 +147,17 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   }
 
   function showSaveToast(message, saved) {
-    showToast(saved ? message : "Changed for this visit only — not saved to browser storage. Export a backup before closing.", saved ? "info" : "warn");
+    const warning = storage.importGuard
+      ? "Changed for this visit only. This tab cannot write until saved data is reviewed in a fresh tab; export this tab's library first."
+      : "Changed for this visit only — not saved to browser storage. Export a backup before closing.";
+    showToast(saved ? message : warning, saved ? "info" : "warn");
   }
 
   function commitLibrary(next) {
     if (!storage.save(next, { requirePersistence: true })) {
-      const error = "Not saved. This browser could not confirm the change. Your in-tab library was kept. Allow storage or free space and try again; saved data may still exist. Browser site-data controls can clear the origin separately.";
+      const error = storage.importGuard
+        ? "Not saved. This tab cannot write until saved data is reviewed in a fresh tab. Export this tab's library and keep the original backup first."
+        : "Not saved. This browser could not confirm the change. Your in-tab library was kept. Allow storage or free space and try again; saved data may still exist. Browser site-data controls can clear the origin separately.";
       if (state.sheet) {
         state.sheet = { ...state.sheet, error };
         renderSheet();
@@ -161,7 +166,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       // Rebuilding a failed confirmation must not strand keyboard focus on body.
       const dialog = state.sheet ? dialogRoot() : null;
       if (dialog && !dialog.contains(doc.activeElement)) focusWithoutScroll(focusablesIn(dialog)[0] ?? dialog);
-      showToast("Not saved. The library in this tab was kept; allow storage or free space and retry.", "warn");
+      showToast(storage.importGuard ? error : "Not saved. The library in this tab was kept; allow storage or free space and retry.", "warn");
       return false;
     }
     state.library = storage.load();
@@ -1372,7 +1377,8 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       } catch (error) {
         if (disposed) return;
         renderView();
-        showToast(`Import failed: ${error?.message ?? "the file could not be read"}`, "warn");
+        const label = error?.code === "IMPORT_UNCERTAIN" ? "Import unconfirmed" : "Import failed";
+        showToast(`${label}: ${error?.message ?? "the file could not be read"}`, "warn");
       } finally {
         if (!disposed) target.value = ""; // selecting the same file again must allow a retry
       }
@@ -1547,7 +1553,9 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   function storageInfo() {
     return {
       persistent: storage.persistent,
-      note: storage.persistent
+      note: storage.importGuard
+        ? "The saved library needs review. This tab will not write again. Export this tab's library, keep the original backup, then open a fresh tab to review saved data."
+        : storage.persistent
         ? "Likes, playlists and history are stored in this browser's localStorage. Exporting writes a JSON file you keep; nothing is uploaded."
         : "Storage could not confirm saving. Changes may last only for this visit; an older saved library may still exist. Export a backup, allow storage or free space, then retry.",
     };

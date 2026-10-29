@@ -77,6 +77,10 @@ element's own state is the first thing to check.
   A file within those limits can still exceed browser storage quota.
 - "the file is not JSON": keep the original file and check that it is an intact
   `dhun-library.json` export.
+- "Import unconfirmed" or a saved-library conflict: the tab stops writing to
+  browser storage. Export the in-tab library and keep the original backup; open
+  a fresh tab to inspect the saved library before attempting another import.
+  A readback failure may mean the saved copy changed even without confirmation.
 - "the file was not exported by this app": same. The `app` field must be
   `DHUN web`.
 

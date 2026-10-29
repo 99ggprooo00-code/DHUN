@@ -533,6 +533,9 @@ export function createStorage(backing, key = STORAGE_KEY) {
   }
   let memory = null;
   let persistent = false;
+  let observed = null;
+  let observedKnown = false;
+  let importGuard = null;
 
   function probe() {
     if (!backing) return false;
@@ -552,10 +555,15 @@ export function createStorage(backing, key = STORAGE_KEY) {
     get persistent() {
       return persistent;
     },
+    get importGuard() {
+      return importGuard;
+    },
     load() {
       if (memory) return memory;
       try {
-        memory = normaliseLibrary(JSON.parse(backing?.getItem(key) ?? "null"));
+        const raw = backing?.getItem(key) ?? null;
+        memory = normaliseLibrary(JSON.parse(raw ?? "null"));
+        if (backing) { observed = raw; observedKnown = true; }
       } catch {
         memory = emptyLibrary();
       }
@@ -566,10 +574,14 @@ export function createStorage(backing, key = STORAGE_KEY) {
       // Ordinary edits may remain useful for this visit. Destructive actions
       // and replacement imports publish new memory only after acknowledgement.
       if (!requirePersistence) memory = kept;
+      // After an uncertain import, never overwrite a possibly newer saved copy
+      // with this tab's stale memory. Ordinary edits remain visit-only.
+      if (importGuard) { persistent = false; return false; }
       try {
         const serialized = JSON.stringify(kept);
         backing?.setItem(key, serialized);
         persistent = Boolean(backing) && backing.getItem(key) === serialized;
+        if (persistent) { observed = serialized; observedKnown = true; }
       } catch {
         persistent = false;
       }
@@ -583,20 +595,58 @@ export function createStorage(backing, key = STORAGE_KEY) {
       return JSON.stringify({ app: "DHUN web", version: FORMAT_VERSION, exportedAt: new Date().toISOString(), ...library }, null, 2);
     },
     importAll(text) {
+      if (importGuard) {
+        throw new Error("The saved library needs review; this tab will not write again. Export the in-tab library and keep the original backup, then open a fresh tab to review saved data.");
+      }
       const parsed = parseImportJSON(text);
       const library = validateImport(parsed);
-      // Detect an inaccessible store before attempting replacement. This cannot
-      // eliminate a readback failure after a successful write or cross-tab races.
+      // Remember the copy this tab last observed; reject an already stale tab
+      // before replacement. localStorage has no compare-and-swap, so another
+      // tab can still write between this check and setItem.
+      this.load();
+      let previous;
       try {
-        if (!backing) throw new Error("storage unavailable");
-        backing.getItem(key);
+        if (!backing || !observedKnown) throw new Error("storage unavailable");
+        previous = backing.getItem(key);
       } catch {
         throw new Error("This browser could not read the current saved library, so nothing was written. Allow storage and try again; keep your backup file.");
       }
-      if (!this.save(library, { requirePersistence: true })) {
-        throw new Error("This browser could not confirm saving the imported library. Previous in-tab data was kept, but the saved copy may have changed. Export a backup before closing; allow storage or free space, then try again.");
+      if (previous !== observed) {
+        importGuard = "conflict";
+        persistent = false;
+        throw new Error("The saved library changed since this tab loaded; nothing was written. This tab will not write again. Export this tab's library and keep your backup, then open a fresh tab to review saved data.");
       }
-      return library;
+      // Complete serialization before the first write.
+      const kept = pruneSnapshots(library);
+      const serialized = JSON.stringify(kept);
+      const unconfirmed = () => {
+        importGuard = "unconfirmed";
+        persistent = false;
+        const error = new Error("The saved library may have changed, but the import could not be confirmed. This tab will not write again. Export the in-tab library, keep the original backup, and open a fresh tab to review saved data.");
+        error.code = "IMPORT_UNCERTAIN";
+        return error;
+      };
+      try {
+        backing.setItem(key, serialized);
+      } catch {
+        // A conforming quota failure leaves the old key intact. Read it before
+        // saying so: unusual adapters can mutate and then throw.
+        let unchanged = false;
+        try { unchanged = backing.getItem(key) === previous; } catch { /* outcome unknown */ }
+        if (unchanged) {
+          persistent = false;
+          throw new Error("This browser could not confirm saving the imported library; the saved library was unchanged. Keep the backup and allow storage or free space before retrying.");
+        }
+        throw unconfirmed();
+      }
+      let confirmed;
+      try { confirmed = backing.getItem(key) === serialized; }
+      catch { throw unconfirmed(); }
+      if (!confirmed) throw unconfirmed();
+      persistent = true;
+      observed = serialized; observedKnown = true;
+      memory = kept;
+      return kept;
     },
   };
 }

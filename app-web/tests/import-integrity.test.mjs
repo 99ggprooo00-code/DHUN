@@ -122,9 +122,10 @@ test("readback failure after a successful write has an uncertain durable outcome
   const previous = toggleLike(emptyLibrary(), { id: "old" }).library;
   assert.equal(storage.save(previous), true); const original = map.get(STORAGE_KEY);
   const candidate = storage.exportAll(emptyLibrary()); failAfterWrite = true;
-  await assert.rejects(handleFileImport(file(candidate), storage), /could not confirm/i);
+  await assert.rejects(handleFileImport(file(candidate), storage), /could not be confirmed/i);
   assert.deepEqual(storage.load(), previous);
   assert.notEqual(map.get(STORAGE_KEY), original);
+  assert.equal(storage.importGuard, "unconfirmed");
 });
 
 test("controller reports invalid import without a success message or in-tab replacement", async (t) => {
@@ -204,4 +205,110 @@ test("controller reports unsafe numeric input without replacing its in-tab libra
   assert.strictEqual(app.state.library, previous);
   assert.match(app.state.toast.message, /Import failed:.*number.*preserve/i);
   assert.doesNotMatch(app.state.toast.message, /Library imported/);
+});
+
+test("unconfirmed import blocks subsequent writes and a fresh adapter sees the durable result", async () => {
+  const map = new Map(); let breakReadback = false, wrote = false, writes = 0;
+  const backing = {
+    setItem(k, v) { map.set(k, String(v)); if (k === STORAGE_KEY) { writes++; if (breakReadback) wrote = true; } },
+    getItem(k) { if (wrote && k === STORAGE_KEY) throw Error("readback denied"); return map.get(k) ?? null; },
+    removeItem(k) { map.delete(k); },
+  };
+  const a = createStorage(backing), before = toggleLike(emptyLibrary(), { id: "old" }).library;
+  assert.equal(a.save(before), true);
+  const next = toggleLike(emptyLibrary(), { id: "candidate" }).library;
+  const text = a.exportAll(next); breakReadback = true;
+  await assert.rejects(handleFileImport(file(text), a), error => error.code === "IMPORT_UNCERTAIN");
+  assert.equal(a.importGuard, "unconfirmed");
+  assert.deepEqual(a.load().likes, ["old"]);
+  assert.deepEqual(JSON.parse(map.get(STORAGE_KEY)).likes, ["candidate"]);
+  const afterCommit = writes;
+  const visitEdit = toggleLike(a.load(), { id: "visit" }).library;
+  assert.equal(a.save(visitEdit), false);
+  assert.deepEqual(a.load().likes, ["visit", "old"]);
+  assert.equal(a.save(emptyLibrary(), { requirePersistence: true }), false);
+  await assert.rejects(handleFileImport(file(text), a), /will not write again/i);
+  assert.equal(writes, afterCommit, "the guarded tab never overwrites the saved candidate");
+  breakReadback = false; wrote = false;
+  assert.deepEqual(createStorage(backing).load().likes, ["candidate"]);
+});
+
+test("mismatched readback preserves another tab's later write and blocks stale writes", async () => {
+  const map = new Map(); let race = false, writes = 0;
+  const other = toggleLike(emptyLibrary(), { id: "other-tab" }).library;
+  const backing = { getItem: k => map.get(k) ?? null, removeItem: k => map.delete(k),
+    setItem(k, v) { map.set(k, String(v)); if (k === STORAGE_KEY) { writes++; if (race) map.set(k, JSON.stringify(other)); } } };
+  const a = createStorage(backing); assert.equal(a.save(toggleLike(emptyLibrary(), { id: "old" }).library), true);
+  const text = a.exportAll(emptyLibrary()); race = true;
+  await assert.rejects(handleFileImport(file(text), a), error => error.code === "IMPORT_UNCERTAIN");
+  assert.deepEqual(JSON.parse(map.get(STORAGE_KEY)).likes, ["other-tab"]);
+  const count = writes; assert.equal(a.save(a.load()), false); assert.equal(writes, count);
+  assert.deepEqual(createStorage(backing).load().likes, ["other-tab"]);
+});
+
+test("a write that mutates and then throws is unconfirmed, not a safe quota failure", async () => {
+  const map = new Map(); let afterMutation = false;
+  const backing = { getItem: k => map.get(k) ?? null, removeItem: k => map.delete(k),
+    setItem(k, v) { map.set(k, String(v)); if (afterMutation && k === STORAGE_KEY) throw Error("unexpected failure"); } };
+  const a = createStorage(backing); assert.equal(a.save(toggleLike(emptyLibrary(), { id: "old" }).library), true);
+  const text = a.exportAll(emptyLibrary()); afterMutation = true;
+  await assert.rejects(handleFileImport(file(text), a), error => error.code === "IMPORT_UNCERTAIN");
+  assert.deepEqual(a.load().likes, ["old"]); assert.deepEqual(JSON.parse(map.get(STORAGE_KEY)).likes, []);
+  assert.equal(a.importGuard, "unconfirmed");
+});
+
+test("a stale tab refuses import and does not overwrite the other tab", async () => {
+  const map = new Map(); const backing = { getItem: k => map.get(k) ?? null, setItem: (k, v) => map.set(k, String(v)), removeItem: k => map.delete(k) };
+  const a = createStorage(backing), b = createStorage(backing); a.load(); b.load();
+  const other = toggleLike(emptyLibrary(), { id: "other-tab" }).library;
+  assert.equal(b.save(other), true); const saved = map.get(STORAGE_KEY);
+  await assert.rejects(handleFileImport(file(a.exportAll(emptyLibrary())), a), /changed since this tab loaded/i);
+  assert.equal(a.importGuard, "conflict"); assert.equal(map.get(STORAGE_KEY), saved);
+  assert.equal(a.save(emptyLibrary()), false); assert.equal(map.get(STORAGE_KEY), saved);
+  assert.deepEqual(createStorage(backing).load().likes, ["other-tab"]);
+});
+
+test("an intervening write between the last check and setItem remains a documented race", async () => {
+  const map = new Map(); let race = false;
+  const other = toggleLike(emptyLibrary(), { id: "other-tab" }).library;
+  const backing = { getItem: k => map.get(k) ?? null, removeItem: k => map.delete(k),
+    setItem(k, v) { if (race && k === STORAGE_KEY) map.set(k, JSON.stringify(other)); map.set(k, String(v)); } };
+  const a = createStorage(backing); assert.equal(a.save(toggleLike(emptyLibrary(), { id: "old" }).library), true);
+  const text = a.exportAll(emptyLibrary()); race = true;
+  await handleFileImport(file(text), a);
+  assert.deepEqual(JSON.parse(map.get(STORAGE_KEY)).likes, [], "single-key storage has no atomic compare-and-swap");
+});
+
+test("controller distinguishes unconfirmed import and refuses later saves", async (t) => {
+  const app = bootFixture(t, { hash: "#/settings" }); const before = app.state.library;
+  const set = app.backing.setItem, get = app.backing.getItem; let wrote = false;
+  app.backing.setItem = (k, v) => { set(k, v); if (k === STORAGE_KEY) wrote = true; };
+  app.backing.getItem = k => { if (wrote && k === STORAGE_KEY) throw Error("readback failure"); return get(k); };
+  const text = JSON.stringify({ app: "DHUN web", version: 3, ...emptyLibrary() });
+  app.importFile(file(text)); await settle(); await settle();
+  assert.strictEqual(app.state.library, before);
+  assert.match(app.state.toast.message, /Import unconfirmed:.*will not write again/i);
+  const durable = app.saved.get(STORAGE_KEY);
+  app.click("set-theme", "light");
+  assert.equal(app.saved.get(STORAGE_KEY), durable);
+  assert.equal(app.state.library.settings.theme, "light");
+  assert.match(String(app.doc.querySelector("#dhun-view").innerHTML), /saved library needs review.*will not write again/i);
+});
+
+test("even a non-Error readback exception activates the write guard", async () => {
+  const map = new Map(); let wrote = false;
+  const backing = { getItem(k) { if (wrote && k === STORAGE_KEY) throw null; return map.get(k) ?? null; },
+    setItem(k, v) { map.set(k, String(v)); if (k === STORAGE_KEY) wrote = true; }, removeItem: k => map.delete(k) };
+  const storage = createStorage(backing); storage.load();
+  await assert.rejects(handleFileImport(file(storage.exportAll(emptyLibrary())), storage), error => error.code === "IMPORT_UNCERTAIN");
+  assert.equal(storage.importGuard, "unconfirmed");
+  assert.equal(storage.save(emptyLibrary()), false);
+});
+
+test("corrupt existing storage cannot be overwritten by an import", async () => {
+  const map = new Map([[STORAGE_KEY, '{not-json']]);
+  const backing = { getItem: k => map.get(k) ?? null, setItem: (k, v) => map.set(k, String(v)), removeItem: k => map.delete(k) };
+  const storage = createStorage(backing); storage.load();
+  await assert.rejects(handleFileImport(file(storage.exportAll(emptyLibrary())), storage), /nothing was written/i);
+  assert.equal(map.get(STORAGE_KEY), '{not-json');
 });

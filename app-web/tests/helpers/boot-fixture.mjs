@@ -190,7 +190,7 @@ export function bootFixture(t, { hash = "#/search", replaceSearchFields = false,
     }
   }
   return {
-    ...app, win, doc: dom.doc, root: dom.root, calls: transport.calls, audio: dom.audio,
+    ...app, win, doc: dom.doc, root: dom.root, calls: transport.calls, audio: dom.audio, backing: storage, saved,
     timers, mediaQueries, mount,
     navigate(next, { historyState = null } = {}) { win.location.hash = next; win.history.state = historyState; win.emit("hashchange"); },
     submit(query) {
