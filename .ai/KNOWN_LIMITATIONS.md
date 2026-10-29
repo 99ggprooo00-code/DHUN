@@ -1,3 +1,21 @@
+# Current Search verification limits — 2026-10-29
+
+- Physical native Android Search/keyboard/IME: NOT RUN. No usable ADB/SDK/JDK or
+  USB device transport/configured remote target in this workspace. No executed
+  zero-device list, no observed model/OS/IME/build, no native install/data change.
+- Native source was inspected but not altered; Java absence blocks local Gradle
+  startup. Existing native CI can compile/test models, not observe a phone IME.
+- Browser result renders now retain the real input and leave composing value/
+  selection alone. Synthetic composition-event and DOM checks are not Android
+  Compose input, physical keyboard visibility, actual IME composition or audio.
+- Physical matrix and data-safe build/install prerequisites are in the maintained
+  [hardware checklist](../docs/runbooks/s3-hardware-checklist.md). All rows stay
+  NOT RUN until actual, build-bound device observations are available.
+- Required phone acceptance is an external merge blocker for this verification
+  task even if the independent browser correction and automated CI are green.
+
+---
+
 # KNOWN_LIMITATIONS
 
 ## Current provider/legal/architecture reconciliation — 2026-10-28

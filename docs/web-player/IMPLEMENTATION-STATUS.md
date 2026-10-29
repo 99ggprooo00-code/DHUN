@@ -24,7 +24,7 @@ table cannot quietly describe a build that has moved on.
 | Claim | Evidence |
 |---|---|
 | The build assembles from the sources, and every module is reachable from `main.js` | `app-web/tools/build.mjs` — it fails on an unreachable module or a shell entry that is not in the build |
-| 259 assertions over modules and Node controller fixtures pass with no install and no network | `app-web/tests/` — routing, escaping, queue, stream selection, library shapes, API normalisation, transfer, screens, CSS coverage, shortcuts |
+| 269 assertions over modules and Node controller fixtures pass with no install and no network | `app-web/tests/` — routing, escaping, queue, stream selection, library shapes, API normalisation, transfer, screens, CSS coverage, shortcuts |
 | The web build is a real app, not a preview: regions before the module runs, a strict CSP, `noindex`, no third-party asset, no downloads surface, a labelled sample catalogue | `scripts/test_app_web.py` |
 | Every screen renders one `h1`, resets focus to it after navigation, and titles the document | `website/tests/browser.mjs` (`entity outline`, `/app/ dialog focus`) |
 | Rendered contrast meets 4.5:1 / 3:1 on every visible line, in both themes | `website/tests/browser.mjs` (`/app/ contrast`) |
@@ -37,6 +37,7 @@ table cannot quietly describe a build that has moved on.
 | The catalogue seam turns a timeout, an offline browser and an HTTP error into distinct sentences, with the technical detail labelled | `app-web/src/js/api.js`, `app-web/tests/api.test.mjs` |
 | A dead instance is skipped, the one that answered is remembered, and a total failure names every host | `app-web/src/js/api.js` (`createRacer`, `describeAttempts`), `app-web/tests/api.test.mjs` (six failover tests), `scripts/test_app_web.py` (the CSP must name every instance `api.js` requests) |
 | Screen requests retire quietly; cached pages suspend/resume; explicit destruction removes observers and ignores late continuations without cancelling another live owner | `app-web/src/js/main.js`, `app-web/tests/navigation-requests.test.mjs`, `app-web/tests/pwa.test.mjs` (controlled Node integration, not browser acceptance) |
+| Same-intent browser results retain the composing input; composition keys and partial submission stay with the IME | `app-web/src/js/main.js`, `app-web/src/js/views.js`, `app-web/tests/search-composition.test.mjs`, `website/tests/browser.mjs` (scripted protocol/DOM checks, not a physical Android IME) |
 | A row with no stream is refused in words rather than played silently | `app-web/src/js/player.js`, `app-web/src/js/player-ui.js` |
 | The site and `/app/` deploy together from one workflow, and the served bytes are re-read after each publish | `.github/workflows/website.yml`, `scripts/website_smoke.py` |
 | These documents describe the build that exists | `scripts/web_player_docs.py` |
@@ -76,7 +77,7 @@ verified and this file names the evidence; an unticked box means it was not.
   site + `/app/`, and `scripts/website_smoke.py` checks served bytes after an
   authorised deployment. No fresh deployment/canonical-origin verification is
   asserted by this audit.
-- [x] **The code is unit-tested** — `cd app-web && npm test` → 259 pass;
+- [x] **The code is unit-tested** — `cd app-web && npm test` → 269 pass;
   baseline Python suite (2026-10-28 before alignment): 466 tests OK. Fresh
   current results come from the executable commands and PR/CI output; audit 06
   retains earlier alignment results, not a new run inferred from a count.

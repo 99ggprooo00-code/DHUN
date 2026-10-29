@@ -69,3 +69,16 @@ test("the help sheet's groups come from the same table", () => {
   assert.deepEqual(groups.map((group) => group.group), ["Playback", "Navigation"]);
   assert.equal(groups.flatMap((group) => group.shortcuts).length, SHORTCUTS.length);
 });
+
+test("composition keystrokes belong to the IME, including Escape", () => {
+  for (const key of ["Escape", " ", "/", "ArrowRight", "m"]) {
+    assert.equal(matchShortcut({ key, isComposing: true, target: { tagName: "DIV" } }), null, key);
+  }
+});
+
+test("legacy processing-key events do not trigger app shortcuts", () => {
+  for (const key of ["Escape", " ", "/"]) {
+    assert.equal(matchShortcut({ key, keyCode: 229, target: { tagName: "DIV" } }), null, key);
+  }
+  assert.equal(matchShortcut({ key: "Escape", target: { tagName: "INPUT" } }).action, "escape");
+});
