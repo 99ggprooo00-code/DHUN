@@ -65,8 +65,9 @@ Home or Search  →  track row  →  Play
   library on this device. The record keeps the track's id and the time it was
   added, not its audio. Audio is read again from the catalogue when the track
   plays.
-- When a list is full, the oldest entry is dropped. The limits are in
-  [DATA-SCHEMA.md](DATA-SCHEMA.md) §4.
+- Full likes, playlists and playlist tracks refuse new additions with a message;
+  remove an item first. History and recent searches roll over. Import and storage
+  normalization can still truncate oversized lists; see [DATA-SCHEMA.md](DATA-SCHEMA.md) §4.
 - If the catalogue no longer returns a saved track, the player says the row has no
   audio URL and tells the visitor to open the track from its source.
 

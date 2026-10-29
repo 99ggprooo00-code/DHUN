@@ -385,3 +385,23 @@ test("a failed import does not replace the previous library and can be retried",
   backing.control.deny = false;
   assert.deepEqual(storage.importAll(exported).likes, ["imported"]);
 });
+
+test("saved collection limits refuse additions without evicting or mutating anything", () => {
+  const library = emptyLibrary();
+  library.likes = Array.from({ length: LIBRARY_LIMITS.likes }, (_, i) => `like-${i}`);
+  library.playlists = Array.from({ length: LIBRARY_LIMITS.playlists }, (_, i) => ({
+    id: `p-${i}`, name: `Playlist ${i}`, trackIds: [], createdAt: i, updatedAt: i,
+  }));
+  library.playlists[0].trackIds = Array.from({ length: LIBRARY_LIMITS.playlistTracks }, (_, i) => `track-${i}`);
+  const before = structuredClone(library);
+  assert.equal(toggleLike(library, song("new")).reason, "limit");
+  assert.equal(createPlaylist(library, "New").reason, "limit");
+  assert.equal(addToPlaylist(library, "p-0", song("new")).reason, "limit");
+  assert.equal(addToPlaylist(library, "p-0", song("track-0")).reason, "duplicate");
+  assert.equal(addToPlaylist(library, "missing", song("new")).reason, "missing");
+  assert.deepEqual(library, before);
+  assert.equal(toggleLike(library, song("like-0")).liked, false, "removal still works at capacity");
+  const smaller = removeFromPlaylist(library, "p-0", "track-0");
+  assert.equal(addToPlaylist(smaller, "p-0", song("new")).added, true);
+  assert.ok(createPlaylist(deletePlaylist(library, "p-1"), "New").playlist);
+});

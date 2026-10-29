@@ -91,16 +91,17 @@ These are enforced when a list is written. Each limit is in
 
 | List | Limit | When the limit is reached |
 |---|---|---|
-| Likes | 2,000 | The oldest like is dropped. |
+| Likes | 2,000 | New likes are refused with a message until one is removed. |
 | History | 200 | The oldest entry is dropped. |
-| Playlists | 200 | The oldest playlist (last in the list) is dropped. |
-| Tracks per playlist | 1,000 | The newest added track is not kept. |
+| Playlists | 200 | Creation is refused with a message until one is deleted. |
+| Tracks per playlist | 1,000 | New tracks are refused with a message until one is removed. |
 | Recent searches | 10 | The oldest search is dropped. |
 | Snapshots | None of their own | Snapshots exist only for ids the likes, history or playlists refer to, so the total is bounded by the limits above. Unreferenced snapshots are removed (`pruneSnapshots`). |
 
-Dropping is silent: nothing tells the visitor that the oldest entry went.
-[KNOWN-LIMITATIONS.md](KNOWN-LIMITATIONS.md) lists it as a limit a visitor can
-meet.
+History and recent searches roll over silently. The saved-collection limits
+refuse new entries rather than evicting existing ones. Loading or importing an
+over-limit document still truncates lists during normalization; it does not warn
+or back up the original document.
 
 ## 5. Reading a stored document back
 

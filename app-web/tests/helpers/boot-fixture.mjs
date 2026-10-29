@@ -198,6 +198,11 @@ export function bootFixture(t, { hash = "#/search", replaceSearchFields = false,
       const input = new NodeElement("INPUT", dom.doc); input.value = query;
       form.querySelector = () => input; dispatch("submit", form);
     },
+    createPlaylist(name, songId = "") {
+      const form = new NodeElement("FORM", dom.doc); form.dataset = { action: "create-playlist", value: songId };
+      const input = new NodeElement("INPUT", dom.doc); input.value = name;
+      form.querySelector = () => input; dispatch("submit", form);
+    },
     click(action, value, extra = {}) {
       const target = new NodeElement("BUTTON", dom.doc); target.dataset = { action, value, ...extra };
       dispatch("click", target);

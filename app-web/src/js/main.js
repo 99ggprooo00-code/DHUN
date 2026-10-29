@@ -28,6 +28,7 @@ import { API_ORIGIN, HOME_RAILS, createSource, describeAttempts, describeFailure
 import { demoEntity, demoHome, searchDemo } from "./demo.js";
 import {
   addToPlaylist,
+  LIBRARY_LIMITS,
   createPlaylist,
   createStorage,
   deletePlaylist,
@@ -1170,6 +1171,10 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       const song = pressedSong(target);
       if (!song) return;
       const result = toggleLike(state.library, song);
+      if (result.reason === "limit") {
+        showToast(`Liked songs is full (${LIBRARY_LIMITS.likes}). Remove a song before adding another.`, "warn");
+        return result;
+      }
       state.library = result.library;
       const saved = save();
       showSaveToast(result.liked ? "Saved to Liked songs." : "Removed from Liked songs.", saved);
@@ -1203,7 +1208,9 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       const name = target.querySelector("input[name='name']")?.value ?? "";
       const result = createPlaylist(state.library, name);
       if (!result.playlist) {
-        showToast("A playlist needs a name.", "warn");
+        showToast(result.reason === "limit"
+          ? `Playlist limit reached (${LIBRARY_LIMITS.playlists}). Delete a playlist before creating another.`
+          : "A playlist needs a name.", "warn");
         return;
       }
       state.library = result.library;
@@ -1238,9 +1245,16 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       const song = pressedSong({ dataset: { id: target.dataset.value } });
       if (!song) return;
       const result = addToPlaylist(state.library, playlistId, song);
+      if (!result.added) {
+        const message = result.reason === "limit"
+          ? `This playlist is full (${LIBRARY_LIMITS.playlistTracks} tracks). Remove a track before adding another.`
+          : result.reason === "duplicate" ? "Already in that playlist." : "Could not add to that playlist.";
+        showToast(message, "warn");
+        return;
+      }
       state.library = result.library;
       const saved = save();
-      showSaveToast(result.added ? "Added to the playlist." : "Already in that playlist.", saved);
+      showSaveToast("Added to the playlist.", saved);
       closeSheet();
       renderView();
     },
