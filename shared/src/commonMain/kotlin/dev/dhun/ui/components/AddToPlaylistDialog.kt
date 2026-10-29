@@ -86,15 +86,24 @@ fun AddToPlaylistDialog(
     val failureText = mutation.errorMessage ?: errorText
 
     val addToPlaylist: (String, String) -> Unit = { playlistId, name ->
+        // The repository tells us WHICH thing happened. Reporting "added" for a
+        // track that was already there is the same class of false confirmation
+        // this sheet used to give on a failed write: say so, keep the sheet open
+        // so the user can pick another playlist, and only close on a real add.
+        var alreadyThere = false
         tracker.run(
             key = "add:$playlistId",
             failureMessage = "Could not add this song to \"$name\". Try again.",
             onSuccess = {
-                onAdded(name)
-                onDismiss()
+                if (alreadyThere) {
+                    errorText = "Already in \"$name\"."
+                } else {
+                    onAdded(name)
+                    onDismiss()
+                }
             },
         ) {
-            playlistRepository.addTrack(playlistId, track)
+            alreadyThere = !playlistRepository.addTrack(playlistId, track)
         }
     }
     val createAndAdd: () -> Unit = {
@@ -107,6 +116,8 @@ fun AddToPlaylistDialog(
                 key = "create-and-add",
                 failureMessage = "Could not create that playlist. Check free space and try again.",
                 onSuccess = {
+                    // A brand-new playlist always accepts the track: this is a
+                    // real add, so it is the one path that closes the sheet.
                     onAdded(created ?: name)
                     onDismiss()
                 },

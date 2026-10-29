@@ -32,6 +32,8 @@ from the Compose screen through the screen model into the repository:
 | Playlist page (local) | Rename | dialog closed immediately, rename launched | Failed rename looked saved |
 | Playlist page (local) | Swipe-remove, drag-reorder | `scope.launch { playlists.… }` with no handler | Row stayed / order snapped back, with no message |
 | Add to playlist sheet | Add / Create & add | repository call outside any try/catch | Crash on Android on failure; no in-sheet error |
+| Add to playlist sheet | Add (duplicate) | `addTrack` returns `false` when the track is already there; the sheet ignored the result | "Added to <playlist>" + the sheet closed for a write that changed nothing |
+| Settings (startup) | reading the persisted values | `init { scope.launch { …read every key… } }` with no handler | A failed read killed the coroutine (crash on Android) and left `loaded` false for ever: Settings never rendered and no stored preference was applied |
 
 Root cause, one sentence: **the app confirmed mutations optimistically (by
 closing its UI or by saying nothing) instead of after the suspend call
@@ -75,7 +77,11 @@ Applied to: `SettingsViewModel`, `LibraryViewModel`, `PlaylistViewModel`,
   same heart lives) for a failed Like/Unlike from Home, Search, the queue or the
   full player.
 - Add to playlist: pending/error inside the sheet; `onAdded`/`onDismiss` only
-  after the write returned.
+  after the write returned, and a track that is already in the chosen playlist
+  is reported as "Already in <name>" instead of a false "added".
+- Settings startup: a failed read of the persisted values now falls back to the
+  documented defaults, still reports `loaded`, and shows a notice — instead of
+  dying with an uncaught exception and leaving the screen permanently unloaded.
 
 No provider, extraction, download-transport, database-schema, navigation or
 visual-identity change. No new dependency.
@@ -94,7 +100,8 @@ New:
   its dialog open and is retryable; duplicate clear tap ignored; audio clear
   reports the bytes it reclaimed; a failure is scoped to its own action; a
   failed preference write is reported (not thrown out of the coroutine); a
-  failed reset does not claim success.
+  failed reset does not claim success; a failed settings read falls back to
+  defaults, still loads, and reports why.
 
 Extended regressions:
 
@@ -106,6 +113,9 @@ Extended regressions:
 - `HomeViewModelTest` — failed Like surfaces on Home.
 - `BrowseViewModelTest` — playlist remove/reorder failures reported; rename
   propagates its failure to the dialog.
+- `HomeViewModelTest` also pins the fix for a lagging derived flow: the message
+  is read from the tracked `MutationState`, so dismissing it is visible
+  immediately (the first CI run on this branch failed on exactly that gap).
 
 ## 4. Verification status (kept separate on purpose)
 
