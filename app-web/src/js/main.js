@@ -1441,7 +1441,7 @@ export function boot({ win = globalThis, doc = globalThis.document, storage = nu
     "delete-playlist": () => {
       const playlist = state.library.playlists.find((entry) => entry.id === state.route.id);
       if (!playlist) return;
-      openSheet({ kind: "confirm", title: `Delete “${playlist.name}”?`, body: "The playlist is removed from this browser. The songs themselves are not affected.", confirmLabel: "Delete playlist", action: "confirm-delete-playlist", id: playlist.id });
+      openSheet({ kind: "confirm", title: `Delete “${playlist.name}”?`, body: "The playlist is removed from the current library. Older recovery records and legacy storage may still contain it. The songs themselves are not affected.", confirmLabel: "Delete playlist", action: "confirm-delete-playlist", id: playlist.id });
     },
     "confirm-delete-playlist": (target) => afterCommit(deletePlaylist(state.library, target.dataset.id), () => {
       closeSheet();

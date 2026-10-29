@@ -2759,13 +2759,27 @@ async function checkWebStorageFailures(browser) {
     context = await fresh(); await prepare(context); page = await context.newPage();
     await page.goto(url("/app/#/collection/pl-runtime")); await page.locator('[data-action="delete-playlist"]').waitFor();
     await page.evaluate(() => { window.__runtimeAbortWrites = true; });
-    await page.locator('[data-action="delete-playlist"]').click(); await page.locator('[data-action="confirm-delete-playlist"]').click();
+    await page.locator('[data-action="delete-playlist"]').click();
+    const playlistDialog = await page.locator('[role="dialog"]').innerText();
+    if (!/removed from the current library/.test(playlistDialog) || !/Older recovery records and legacy storage may still contain it/.test(playlistDialog)) fail("/app/ playlist delete disclosure", "confirmation does not disclose retained recovery copies");
+    else record("/app/ playlist delete disclosure", "confirmation states that recovery and legacy copies may retain the playlist");
+    await page.locator('[data-action="confirm-delete-playlist"]').click();
     await page.locator('[role="dialog"] [role="alert"]').waitFor();
     if ((await saved(page)).playlists.length !== 1) fail("/app/ playlist delete refusal", "aborted delete changed saved playlist");
     await page.reload(); await page.locator('[data-action="delete-playlist"]').click(); await page.locator('[data-action="confirm-delete-playlist"]').click();
     await page.getByText("Playlist deleted.").waitFor();
     if ((await saved(page)).playlists.length || (await saved(page)).likes.length !== 1) fail("/app/ playlist delete retry", "fresh retry failed or removed likes");
     else record("/app/ playlist delete retry", "injected abort keeps saved playlist; a fresh session deletes only the requested playlist");
+    const retained = await page.evaluate(async (key) => {
+      const db = await new Promise((resolve, reject) => { const r = indexedDB.open("dhun.web.library"); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error); });
+      return new Promise((resolve, reject) => {
+        const r = db.transaction("library").objectStore("library").get("previous");
+        r.onsuccess = () => { db.close(); resolve({ previous: JSON.parse(r.result.library).playlists.length, legacy: JSON.parse(localStorage.getItem(key)).playlists.length }); };
+        r.onerror = () => reject(r.error);
+      });
+    }, key);
+    if (retained.previous !== 1 || retained.legacy !== 1) fail("/app/ playlist recovery copies", "expected previous and legacy copies to retain the deleted playlist");
+    else record("/app/ playlist recovery copies", "previous IndexedDB and legacy copies remain after deleting the current playlist");
 
     await page.goto(url("/app/#/settings")); await page.locator('[data-action="import-library"]').waitFor({ state: "attached" });
     const replacement = { ...seed, app: "DHUN web", version: 3, likes: [], playlists: [], snapshots: {} };
