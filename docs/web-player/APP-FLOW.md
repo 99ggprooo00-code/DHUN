@@ -72,8 +72,9 @@ Home or Search  →  track row  →  Play
   added, not its audio. Audio is read again from the catalogue when the track
   plays.
 - Full likes, playlists and playlist tracks refuse new additions with a message;
-  remove an item first. History and recent searches roll over. Import and storage
-  normalization can still truncate oversized lists; see [DATA-SCHEMA.md](DATA-SCHEMA.md) §4.
+  remove an item first. History and recent searches roll over. Import rejects
+  oversized lists; startup storage normalization can still truncate them. See
+  [DATA-SCHEMA.md](DATA-SCHEMA.md) §4–6.
 - If the catalogue no longer returns a saved track, the player says the row has no
   audio URL and tells the visitor to open the track from its source.
 
