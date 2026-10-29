@@ -330,6 +330,10 @@ class BrowseViewModelTest {
             assertFalse(vm.deletion.value.isDeleting)
             assertTrue(vm.deletion.value.errorMessage!!.contains("try again"))
             assertEquals(created.id, data.playlists.observePlaylist(created.id).first()?.id)
+            vm.clearDeletionError() // dismiss and reopen: retry is still available
+            assertFalse(vm.deletion.value.isDeleting)
+            assertNull(vm.deletion.value.errorMessage)
+            assertEquals(1, calls.get())
             vm.delete()
             eventually { vm.deleted.value }
             assertEquals(2, calls.get())
