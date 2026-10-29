@@ -18,6 +18,27 @@
 
 # KNOWN_LIMITATIONS
 
+## 2026-10-29 — native mutation feedback (branch `arena/8b985cde-dhun`)
+
+The audit's own follow-up line ("some dismiss before completion or lack uniform
+error feedback") is now addressed for the native app. Settings clears
+(lyrics/search/play history, audio cache), settings reset, every preference
+write, create playlist, Like/Unlike, history-row removal, download
+enqueue/pause/resume/cancel/remove, playlist play/rename/remove/reorder and the
+add-to-playlist sheet are result-driven: pending is visible, a failure is a
+message (dialog copy with retry, or a banner whose control is the retry), and
+success-shaped UI runs only after the write returns. Details and the full defect
+table: [verification 31](../docs/verification/31-native-mutation-feedback.md).
+
+**Still unverified by this change:** no Android emulator or physical device, no
+interactive Windows session and no JDK/Gradle/Android SDK in this sandbox. The
+new state machines are covered by `:shared:jvmTest` in GitHub CI; the Compose
+rendering paths (dialog copy, banner placement, live-region announcement) are
+source-reviewed only. Notification/lock-screen transport, audio-focus recovery,
+process-death queue restore, the foreground download service, libVLC error
+surfacing and MSI install-over are unchanged and remain CI-packaging-only or
+unverified evidence.
+
 ## Current provider/legal/architecture reconciliation — 2026-10-28
 
 See [PRD §1](../docs/PRD.md#1-product-definition-and-source-of-truth),

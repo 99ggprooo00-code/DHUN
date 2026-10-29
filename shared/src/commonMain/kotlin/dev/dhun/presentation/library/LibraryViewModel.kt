@@ -208,6 +208,7 @@ private const val DOWNLOAD_RESUME_FAILED = "Could not resume that download. Try 
 private const val DOWNLOAD_CANCEL_FAILED = "Could not cancel that download. Try again."
 private const val DOWNLOAD_REMOVE_FAILED = "Could not delete that download. The file may still be on disk."
 private const val PLAYLIST_RENAME_FAILED = "Could not rename that playlist. Try again."
+private const val PLAYLIST_PLAY_FAILED = "Could not read that playlist to start playing it. Try again."
 private const val FAVORITE_FAILED = "Could not update Liked Songs. Try again."
 private const val HISTORY_REMOVE_FAILED = "Could not remove that play from history. Try again."
 
@@ -533,11 +534,12 @@ class LibraryViewModel(
     }
 
     fun playPlaylist(playlistId: String, startIndex: Int = 0) {
-        scope.launch {
-            val tracks = runCatching {
-                playlists.observeTracks(playlistId).first()
-            }.getOrNull() ?: emptyList()
-            if (tracks.isEmpty()) return@launch
+        // Reading the playlist could fail (database busy/locked) and the old
+        // `runCatching { … }.getOrNull() ?: emptyList()` made that look like an
+        // empty playlist: the Play button did nothing and said nothing.
+        mutations.run("play-playlist:$playlistId", PLAYLIST_PLAY_FAILED) {
+            val tracks = playlists.observeTracks(playlistId).first()
+            if (tracks.isEmpty()) return@run
             val safe = startIndex.coerceIn(0, tracks.size - 1)
             setPlayContext(PlayContext.PLAYLIST)
             player.prepareQueue(tracks, safe, playWhenReady = true)
