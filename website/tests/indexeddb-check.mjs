@@ -173,6 +173,68 @@ export async function checkIndexedDBStorage(browser, { base, record }) {
       catch (error) { if (error.code !== "LEGACY_UNREADABLE") throw error; }
     }, { prefix });
     record("/app/ IndexedDB adapter recovery metadata", "injected missing previous record and unavailable database are refused without overwriting the current record");
+
+    const raceDb = `${prefix}-concurrent`, raceKey = `${prefix}-concurrent-key`;
+    for (const page of [a, b]) await page.evaluate(async ({ raceDb, raceKey }) => {
+      const m = await import("/app/js/library.js");
+      window.raceAdapter = await m.createIndexedDBStorage({ databaseName: raceDb, legacyKey: raceKey });
+    }, { raceDb, raceKey });
+    const outcomes = await Promise.all([a, b].map((page, index) => page.evaluate(async index => {
+      const m = await import("/app/js/library.js");
+      try { await window.raceAdapter.save({ ...m.emptyLibrary(), likes: [`writer-${index}`] }); return "committed"; }
+      catch (error) { return error.code ?? error.message; }
+    }, index)));
+    if (outcomes.filter(x => x === "committed").length !== 1 || outcomes.filter(x => x === "CONFLICT").length !== 1) throw Error(`concurrent writes produced ${outcomes.join(", ")}`);
+    const winner = await a.evaluate(async ({ raceDb, raceKey }) => {
+      const m = await import("/app/js/library.js"); const reopened = await m.createIndexedDBStorage({ databaseName: raceDb, legacyKey: raceKey });
+      const value = (await reopened.read()).likes[0]; reopened.close(); return value;
+    }, { raceDb, raceKey });
+    if (!/^writer-[01]$/.test(winner)) throw Error("concurrent winner did not survive reopening");
+    record("/app/ IndexedDB adapter concurrent writes", "two Chromium tabs attempted the same revision concurrently; exactly one committed and the other conflicted");
+
+    await a.evaluate(async ({ prefix }) => {
+      const m = await import("/app/js/library.js"), databaseName = `${prefix}-unicode`, legacyKey = `${prefix}-unicode-key`;
+      const adapter = await m.createIndexedDBStorage({ databaseName, legacyKey });
+      const text = "धुन🎵".repeat(200000), library = { ...(await adapter.read()), settings: { ...(await adapter.read()).settings, extra: text } };
+      await adapter.save(library); adapter.close();
+      const reopened = await m.createIndexedDBStorage({ databaseName, legacyKey });
+      if ((await reopened.read()).settings.extra !== text) throw Error("Unicode data changed across database reopen");
+      const backup = await reopened.exportAll();
+      if (JSON.parse(backup).settings.extra !== text) throw Error("Unicode data changed during export");
+      reopened.close();
+      const restored = await m.createIndexedDBStorage({ databaseName: `${databaseName}-restore`, legacyKey: `${legacyKey}-restore` });
+      await restored.importAll(backup); restored.close();
+      const checked = await m.createIndexedDBStorage({ databaseName: `${databaseName}-restore`, legacyKey: `${legacyKey}-restore` });
+      if ((await checked.read()).settings.extra !== text) throw Error("Unicode data changed during import and reopen");
+      checked.close();
+    }, { prefix });
+    record("/app/ IndexedDB adapter Unicode", "a multi-megabyte Unicode library survived export, import and reopen in Chromium");
+
+    const quotaContext = await browser.newContext({ serviceWorkers: "block" });
+    try {
+      const page = await quotaContext.newPage(); await page.goto(`${base}/404.html`);
+      const cdp = await quotaContext.newCDPSession(page);
+      await cdp.send("Storage.overrideQuotaForOrigin", { origin: new URL(base).origin, quotaSize: 2 * 1024 * 1024 });
+      await page.evaluate(async () => {
+        const m = await import("/app/js/library.js");
+        const databaseName = `dhun-quota-${Math.random()}`, legacyKey = `${databaseName}-legacy`;
+        const adapter = await m.createIndexedDBStorage({ databaseName, legacyKey });
+        const before = { ...(await adapter.read()), likes: ["saved-before-quota"] };
+        await adapter.save(before);
+        try {
+          await adapter.save({ ...before, settings: { ...before.settings, extra: "x".repeat(6 * 1024 * 1024) } });
+          throw Error("quota-limited transaction unexpectedly succeeded");
+        } catch (error) {
+          if (error.code !== "ABORTED" || error.cause?.name !== "QuotaExceededError") throw error;
+        }
+        adapter.close();
+        const reopened = await m.createIndexedDBStorage({ databaseName, legacyKey });
+        if ((await reopened.read()).likes[0] !== "saved-before-quota") throw Error("quota abort lost committed record");
+        reopened.close();
+      });
+      await cdp.detach();
+      record("/app/ IndexedDB adapter quota", "Chromium quota override caused a real IndexedDB QuotaExceededError; the prior committed record survived reopen");
+    } finally { await quotaContext.close(); }
   } finally {
     await context.close();
   }
