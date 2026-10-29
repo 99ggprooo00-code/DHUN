@@ -378,6 +378,7 @@ test("settings warns that a corrupt startup fallback is incomplete and preserves
   const raw = '{not-json';
   const app = bootFixture(t, { hash: "#/settings", storageSeed: [[STORAGE_KEY, raw]] });
   assert.match(String(app.doc.querySelector("#dhun-view").innerHTML), /library shown may be incomplete.*do not delete browser data/i);
+  assert.doesNotMatch(String(app.doc.querySelector("#dhun-view").innerHTML), /Storage could not confirm saving\. Export a backup/);
   app.click("set-theme", "light");
   assert.equal(app.state.library.settings.theme, "light");
   assert.equal(app.saved.get(STORAGE_KEY), raw);
@@ -454,6 +455,7 @@ test("settings warns on parseable damaged data and leaves its original bytes int
   const app = bootFixture(t, { hash: "#/settings", storageSeed: [[STORAGE_KEY, raw]] });
   assert.deepEqual(app.state.library.likes, ["recoverable"]);
   assert.match(String(app.doc.querySelector("#dhun-view").innerHTML), /library shown may be incomplete.*do not delete browser data/i);
+  assert.doesNotMatch(String(app.doc.querySelector("#dhun-view").innerHTML), /Storage could not confirm saving\. Export a backup/);
   app.click("set-theme", "light");
   assert.equal(app.saved.get(STORAGE_KEY), raw);
   app.click("export-library");

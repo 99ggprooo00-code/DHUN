@@ -1561,6 +1561,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   function storageInfo() {
     return {
       persistent: storage.persistent,
+      incomplete: ["corrupt", "unreadable"].includes(storage.importGuard),
       note: ["corrupt", "unreadable"].includes(storage.importGuard)
         ? "Saved data could not be read safely. This tab will not write. The library shown may be incomplete; do not delete browser data or the original backup. Seek recovery help."
         : storage.importGuard
