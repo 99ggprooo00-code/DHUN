@@ -2025,6 +2025,35 @@ async function checkWebAppContrast(browser) {
   }
 }
 
+/** Real hash navigation through a saved track menu at a narrow viewport. */
+async function checkWebLibraryBack(browser) {
+  for (const tab of ["likes", "history"]) {
+    const label = `/app/ Library ${tab} Back`;
+    const context = await newAppContext(browser, { viewport: { width: 390, height: 844 } });
+    try {
+      const page = await context.newPage();
+      await page.goto(url("/app/#/settings"), { waitUntil: "load" });
+      await page.evaluate(async () => {
+        const { createStorage, emptyLibrary, toggleLike, rememberPlay } = await import("/app/js/library.js");
+        const song = { id: "navigation-fixture", title: "Navigation fixture", album: { id: "album-fixture", name: "Fixture album" } };
+        const library = rememberPlay(toggleLike(emptyLibrary(), song).library, song, 1234);
+        if (!createStorage().save(library)) throw new Error("browser fixture could not be saved");
+      });
+      await page.goto(url(`/app/#/library/${tab}`), { waitUntil: "load" });
+      await page.reload({ waitUntil: "load" });
+      await page.locator('[data-action="row-menu"]').first().click();
+      await page.locator('#dhun-sheet a[href="#/album/album-fixture"]').click();
+      await page.waitForURL(/#\/album\/album-fixture$/);
+      await page.locator('[data-action="back"]').click();
+      await page.waitForURL(new RegExp(`#\\/library\\/${tab}$`));
+      const selected = await page.locator(`[data-action="set-library-tab"][data-value="${tab}"]`).getAttribute("aria-selected");
+      const sheet = await page.locator('#dhun-sheet [role="dialog"]').count();
+      if (selected !== "true" || sheet) fail(label, `Back left selection ${selected} and ${sheet} open sheet(s)`);
+      else record(label, `track menu → album → app Back restores ${tab}; the sheet is closed`);
+    } finally { await context.close(); }
+  }
+}
+
 /**
  * The dialogs a keyboard has to live in.
  *
@@ -2886,6 +2915,7 @@ const CHECKS = [
   ["/app/ contrast", () => checkWebAppContrast(browser)],
   ["/app/ axe", () => checkWebAppAxe(browser)],
   ["/app/ dialog focus", () => checkWebAppDialogs(browser)],
+  ["/app/ Library Back", () => checkWebLibraryBack(browser)],
   ["/app/ legal and erase scope", () => checkWebLegal(browser)],
   ["/app/ storage failures", () => checkWebStorageFailures(browser)],
   ["/app/ synthetic media transport", () => checkWebSyntheticMedia(browser)],

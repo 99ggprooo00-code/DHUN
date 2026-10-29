@@ -100,8 +100,10 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
     },
   });
 
+  const initialRoute = parseRoute(win.location.hash);
   const state = {
-    route: parseRoute(win.location.hash),
+    route: initialRoute,
+    lastLibraryTab: initialRoute.name === "library" ? initialRoute.libTab : "playlists",
     library: storage.load(),
     source: { mode: "unknown", error: null },
     home: { status: "idle", rails: [], error: null },
@@ -988,6 +990,8 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
       (key) => (previous[key] ?? null) !== (route[key] ?? null),
     )) closeSheet();
     state.route = route;
+    if (route.name === "library") state.lastLibraryTab = route.libTab;
+    else if (route.name === "collection") state.lastLibraryTab = "playlists";
     state.tab = tabFor(route, state.tab) ?? state.tab;
     if (route.player !== "open") closeOverlayOnly();
 
@@ -1066,7 +1070,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
         const origin = { HOME: "home", SEARCH: "search", LIBRARY: "library" }[state.tab] ?? "home";
         const fallback = { collection: "library", settings: "home", about: "settings" };
         const name = catalogueDetail ? origin : fallback[state.route.name] ?? "home";
-        const extra = name === "library" ? { libTab: "playlists" } : name === "search" ? { query: state.search.query } : {};
+        const extra = name === "library" ? { libTab: catalogueDetail ? state.lastLibraryTab : "playlists" } : name === "search" ? { query: state.search.query } : {};
         go(routeFor(name, extra));
         return;
       }

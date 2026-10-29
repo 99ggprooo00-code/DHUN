@@ -58,3 +58,23 @@ test("the track menu omits the link to the album already on screen", (t) => {
   app.click("row-menu", "", { id: "s" });
   assert.doesNotMatch(String(app.doc.getElementById("dhun-sheet").innerHTML), /href="#\/album\//);
 });
+
+test("Back from a catalogue detail restores the Library subsection it came from", (t) => {
+  for (const tab of ["likes", "history", "playlists"]) {
+    const app = bootFixture(t, { hash: `#/library/${tab}` });
+    app.navigate("#/album/alb");
+    app.click("back");
+    assert.equal(app.win.location.hash, `#/library/${tab}`);
+  }
+});
+
+test("collection details return to playlists while a direct catalogue link defaults Home", (t) => {
+  const collection = bootFixture(t, { hash: "#/library/likes" });
+  collection.navigate("#/collection/mix");
+  collection.navigate("#/artist/a");
+  collection.click("back");
+  assert.equal(collection.win.location.hash, "#/library/playlists");
+  const direct = bootFixture(t, { hash: "#/album/alb" });
+  direct.click("back");
+  assert.equal(direct.win.location.hash, "#/home");
+});
