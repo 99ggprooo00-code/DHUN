@@ -1,5 +1,6 @@
 package dev.dhun.android.data
 
+import android.app.Application
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import dev.dhun.core.RepeatMode
@@ -15,9 +16,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /** Real Android SQLite driver, not the JDBC driver used by the shared JVM suite. */
 @RunWith(RobolectricTestRunner::class)
+@Config(sdk = [29], application = Application::class) // isolated DB: do not boot DhunApp/Koin
 class PlaylistDeletionAndroidTest {
     @Test
     fun abortRollsBackMembershipAndSuccessfulRetrySurvivesReopen(): Unit = runBlocking {
