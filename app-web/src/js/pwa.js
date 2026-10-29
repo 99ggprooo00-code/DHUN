@@ -3,11 +3,10 @@
  *
  * The three things a web app owes a visitor that a website does not:
  *
- *   1. **It opens offline.** A service worker caches the shell, so a reload on a
- *      train shows the app and its library instead of a dinosaur. Audio cannot
+ *   1. **It can open offline.** A service worker caches the shell on a best-effort
+ *      basis; missing cache entries can still prevent offline use. Audio cannot
  *      be cached (streams are signed and cross-origin, and caching them would
- *      be a download feature the app deliberately does not have) — the app says
- *      exactly that instead of failing silently.
+ *      be a download feature the app deliberately does not have).
  *   2. **It installs.** `beforeinstallprompt` is captured and surfaced as a
  *      button, not fired automatically: an install prompt that appears unbidden
  *      is the reason people distrust install prompts.
@@ -16,9 +15,8 @@
  *      asking the visitor to close and reopen; nothing reloads the page, because
  *      a reload would stop playback.
  *
- * When any of this is unavailable the module reports which part failed in
- * `state`; `main.js` turns that into one sentence on screen rather than a
- * silent no-op.
+ * This module exposes lifecycle and install state; `main.js` currently uses
+ * the update-ready flag to show a notice. It does not display offline readiness.
  */
 
 import { listen } from "./dom.js";

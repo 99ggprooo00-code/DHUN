@@ -31,7 +31,7 @@ table cannot quietly describe a build that has moved on.
 | axe reports no serious or critical violation on any route, in both themes, with the player and the sheets open | `website/tests/browser.mjs` (`/app/ axe`) |
 | Sheets are dialogs: focus enters, Tab wraps, Escape closes, focus returns to the button that opened it | `website/tests/browser.mjs` (`/app/ dialog focus`) |
 | A playlist made in the browser opens, keeps its rows across a reload, and renames through the same sheet | `website/tests/browser.mjs` (`local playlist`), `app-web/src/js/library.js` |
-| The shell opens with the network off, and says which catalogue answered | `website/tests/browser.mjs` (`offline`), `app-web/src/sw.js` |
+| The browser test checks one offline reload and its catalogue label; shell caching remains best-effort, not a guarantee for every install | `website/tests/browser.mjs` (`offline`), `app-web/src/sw.js` |
 | The player deep link says what it is waiting for, then opens the player when a track starts | `website/tests/browser.mjs` (`player deep link`) |
 | The appearance control themes the document, not just the chrome | `website/tests/browser.mjs` (`appearance`), `app-web/src/css/tokens.css` |
 | The catalogue seam turns a timeout, an offline browser and an HTTP error into distinct sentences, with the technical detail labelled | `app-web/src/js/api.js`, `app-web/tests/api.test.mjs` |
