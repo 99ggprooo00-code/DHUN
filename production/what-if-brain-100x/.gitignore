@@ -1,0 +1,5 @@
+# rebuild with make_audio.sh / assemble.sh
+audio/*.wav
+video_silent.mp4
+vlist.txt
+__pycache__/

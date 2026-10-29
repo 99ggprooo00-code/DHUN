@@ -1,0 +1,6 @@
+file 'fit01.wav'
+file 'fit02.wav'
+file 'fit03.wav'
+file 'fit04.wav'
+file 'fit05.wav'
+file 'fit06.wav'
