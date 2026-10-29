@@ -100,8 +100,11 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
     },
   });
 
+  const initialRoute = parseRoute(win.location.hash);
   const state = {
-    route: parseRoute(win.location.hash),
+    route: initialRoute,
+    lastLibraryTab: initialRoute.name === "library" ? initialRoute.libTab : "playlists",
+    detailSearchQuery: "",
     library: storage.load(),
     source: { mode: "unknown", error: null },
     home: { status: "idle", rails: [], error: null },
@@ -524,7 +527,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
     // The highlighted destination is a property of the screen you are on, not of
     // the last tab you pressed: Settings and About belong to no destination, and
     // leaving Library lit under them claimed otherwise.
-    const activeTab = tabFor(route) ?? "";
+    const activeTab = tabFor(route, state.tab) ?? "";
     setRegion("dhun-rail-region", navRail({ active: activeTab }));
     setRegion("dhun-nav-region", bottomNav({ active: activeTab }));
     // The dock carries the failure as well as the track. A playback error that
@@ -761,7 +764,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
             ? html`<button type="button" class="dhun-menu-row dhun-menu-row--danger" data-action="remove-from-playlist" data-id="${song.id}">${icon("Close", { size: 20 })}<span>Remove from this playlist</span></button>`
             : html``}
           <button type="button" class="dhun-menu-row" data-action="toggle-like" data-id="${song.id}">${icon(state.library.likes.includes(song.id) ? "Favorite" : "FavoriteBorder", { size: 20 })}<span>${state.library.likes.includes(song.id) ? "Remove from Liked songs" : "Save to Liked songs"}</span></button>
-          ${song.kind ? html`<a class="dhun-menu-row" href="${hrefFor(song)}">${icon("Album", { size: 20 })}<span>Open ${song.album?.name || "the album"}</span></a>` : html``}
+          ${song.album?.id && !(state.route.name === "album" && state.route.id === String(song.album.id)) ? html`<a class="dhun-menu-row" href="${hrefFor(song)}">${icon("Album", { size: 20 })}<span>Open ${song.album?.name || "the album"}</span></a>` : html``}
         `,
       });
     } else if (sheet?.kind === "add-to-playlist") {
@@ -982,8 +985,42 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
     if (!isActive()) return;
     const previous = state.route;
     const route = parseRoute(win.location.hash);
+    // A dialog belongs to the screen on which it was opened. Hash links,
+    // browser Back and primary navigation must not leave it covering the next one.
+    if (["name", "id", "query", "libTab", "doc", "player", "playerTab"].some(
+      (key) => (previous[key] ?? null) !== (route[key] ?? null),
+    )) closeSheet();
     state.route = route;
+    if (route.name === "library") state.lastLibraryTab = route.libTab;
+    else if (route.name === "collection") state.lastLibraryTab = "playlists";
     state.tab = tabFor(route, state.tab) ?? state.tab;
+    // Catalogue pages can be reached repeatedly from different tabs. Keep the
+    // origin on each browser history entry, not in a single global "last tab".
+    // A fresh deep link still defaults to Home; this is a destination fallback,
+    // not an attempt to replace or reconstruct the browser's history stack.
+    const isCatalogue = (name) => ["album", "artist", "playlist"].includes(name);
+    if (isCatalogue(route.name)) {
+      const saved = win.history.state?.dhunNavigation;
+      if (saved?.hash === win.location.hash && ["HOME", "SEARCH", "LIBRARY"].includes(saved.tab)
+        && ["playlists", "likes", "history"].includes(saved.libraryTab) && typeof saved.searchQuery === "string") {
+        state.tab = saved.tab;
+        state.lastLibraryTab = saved.libraryTab;
+        state.detailSearchQuery = saved.searchQuery;
+      } else if (!isCatalogue(previous.name)) {
+        state.detailSearchQuery = state.search.query;
+      }
+      // Do not overwrite a foreign primitive or array history state. Storage of
+      // this optional context can fail in restricted browsers; navigation still
+      // works with the existing in-memory fallback when it does.
+      const historyState = win.history.state;
+      if (historyState == null || (typeof historyState === "object" && !Array.isArray(historyState))) {
+        try {
+          win.history.replaceState({ ...historyState, dhunNavigation: {
+            hash: win.location.hash, tab: state.tab, libraryTab: state.lastLibraryTab, searchQuery: state.detailSearchQuery,
+          } }, "", win.location.hash);
+        } catch { /* retain the in-memory destination if history is unavailable */ }
+      }
+    }
     if (route.player !== "open") closeOverlayOnly();
 
     if (route.name !== "home") retireCatalogueRequest("home");
@@ -1057,9 +1094,12 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
         return;
       }
       if (DETAIL_ROUTES.includes(state.route.name)) {
-        const map = { album: "home", artist: "home", playlist: "search", collection: "library", settings: "home", about: "settings" };
-        const name = map[state.route.name] ?? "home";
-        go(name === "library" ? routeFor("library", { libTab: "playlists" }) : routeFor(name));
+        const catalogueDetail = ["album", "artist", "playlist"].includes(state.route.name);
+        const origin = { HOME: "home", SEARCH: "search", LIBRARY: "library" }[state.tab] ?? "home";
+        const fallback = { collection: "library", settings: "home", about: "settings" };
+        const name = catalogueDetail ? origin : fallback[state.route.name] ?? "home";
+        const extra = name === "library" ? { libTab: catalogueDetail ? state.lastLibraryTab : "playlists" } : name === "search" ? { query: state.detailSearchQuery } : {};
+        go(routeFor(name, extra));
         return;
       }
       go(routeFor("home"));

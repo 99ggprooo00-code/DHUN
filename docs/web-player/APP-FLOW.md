@@ -23,8 +23,18 @@ The app uses a **hash router**, so every route is served by the one static
 | `#/about`, `#/about/{document}` | About | Versions and the legal texts: `about`, `privacy` (default), `terms`, `licences`, `support`. |
 
 Any hash whose first segment is not a known name opens **Home**. The router has
-no separate not-found screen. The manifest's shortcuts open `#/search` and
-`#/library/playlists`.
+no separate not-found screen. A malformed encoded detail id is treated as
+missing rather than stopping the app; malformed About document ids use the
+default. Navigating to a different route dismisses an open sheet, and catalogue
+details retain the originating primary-tab highlight; their app-bar Back returns
+to that primary destination (and the originating committed Search query or Library
+subsection), not necessarily the immediately previous detail page. Catalogue
+entries remember their origin in browser history when history state is available,
+so browser Back, Forward and reload restore that entry's destination. If browser
+history state is unavailable, the current in-memory destination is used instead;
+a fresh direct detail link defaults to Home. A saved collection belongs to the
+Playlists subsection. The manifest's shortcuts
+open `#/search` and `#/library/playlists`.
 
 The player is not a route of its own. It opens over the current screen. The
 address may carry `player=open`, and `ptab` selects its Queue or Lyrics tab.

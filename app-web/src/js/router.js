@@ -14,7 +14,7 @@
 
 export const HOME = Object.freeze({ name: "home", id: null, query: "", libTab: null, doc: null, player: null, playerTab: "queue" });
 
-/** The five destinations in the app bar and the bottom navigation. */
+/** The three destinations in the app bar and the bottom navigation. */
 export const NAV_TABS = Object.freeze([
   { id: "HOME", label: "Home", icon: "Home", route: "home" },
   { id: "SEARCH", label: "Search", icon: "Search", route: "search" },
@@ -49,6 +49,12 @@ export function parseHash(hash) {
   return { segments, params };
 }
 
+// A bad percent escape must not prevent the entire app from booting.
+function decodeSegment(segment) {
+  if (!segment) return null;
+  try { return decodeURIComponent(segment); } catch { return null; }
+}
+
 export function parseRoute(hash) {
   const { segments, params } = parseHash(hash);
   const name = NAME_ALIASES[(segments[0] ?? "").toLowerCase()] ?? "home";
@@ -60,13 +66,13 @@ export function parseRoute(hash) {
   };
   if (name === "search") route.query = params.get("q") ?? "";
   if (name === "album" || name === "artist" || name === "playlist" || name === "collection") {
-    route.id = segments[1] ? decodeURIComponent(segments[1]) : null;
+    route.id = decodeSegment(segments[1]);
   }
   if (name === "library") {
     const tab = (segments[1] ?? "").toLowerCase();
     route.libTab = LIBRARY_TABS.includes(tab) ? tab : "playlists";
   }
-  if (name === "about") route.doc = segments[1] ? decodeURIComponent(segments[1]) : null;
+  if (name === "about") route.doc = decodeSegment(segments[1]);
   return route;
 }
 
@@ -89,7 +95,7 @@ export function formatRoute(route) {
       parts.push("settings");
       break;
     case "about":
-      parts.push("about", route.doc ?? "privacy");
+      parts.push("about", encodeURIComponent(route.doc ?? "privacy"));
       break;
     default:
       parts.push("home");

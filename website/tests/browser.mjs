@@ -2025,6 +2025,106 @@ async function checkWebAppContrast(browser) {
   }
 }
 
+/** Real hash navigation through a saved track menu at a narrow viewport. */
+async function checkWebLibraryBack(browser) {
+  for (const tab of ["likes", "history"]) {
+    const label = `/app/ Library ${tab} Back`;
+    const context = await newAppContext(browser, { viewport: { width: 390, height: 844 } });
+    try {
+      const page = await context.newPage();
+      await page.goto(url("/app/#/settings"), { waitUntil: "load" });
+      await page.evaluate(async () => {
+        const { createStorage, emptyLibrary, toggleLike, rememberPlay } = await import("/app/js/library.js");
+        const song = { id: "navigation-fixture", title: "Navigation fixture", album: { id: "album-fixture", name: "Fixture album" } };
+        const library = rememberPlay(toggleLike(emptyLibrary(), song).library, song, 1234);
+        if (!createStorage().save(library)) throw new Error("browser fixture could not be saved");
+      });
+      await page.goto(url(`/app/#/library/${tab}`), { waitUntil: "load" });
+      await page.reload({ waitUntil: "load" });
+      await page.locator('[data-action="row-menu"]').first().click();
+      await page.locator('#dhun-sheet a[href="#/album/album-fixture"]').click();
+      await page.waitForURL(/#\/album\/album-fixture$/);
+      await page.locator('[data-action="back"]').click();
+      await page.waitForURL(new RegExp(`#\\/library\\/${tab}$`));
+      const selected = await page.locator(`[data-action="set-library-tab"][data-value="${tab}"]`).getAttribute("aria-selected");
+      const sheet = await page.locator('#dhun-sheet [role="dialog"]').count();
+      if (selected !== "true" || sheet) fail(label, `Back left selection ${selected} and ${sheet} open sheet(s)`);
+      else record(label, `track menu → album → app Back restores ${tab}; the sheet is closed`);
+    } finally { await context.close(); }
+  }
+}
+
+/** Real browser history entries retain separate origins even for the same URL. */
+async function checkWebHistoryOrigins(browser) {
+  const context = await newAppContext(browser, { viewport: { width: 390, height: 844 } });
+  const label = "/app/ browser history origins";
+  try {
+    const page = await context.newPage();
+    await page.goto(url("/app/#/search?q=rain"), { waitUntil: "load" });
+    await page.evaluate(() => { location.hash = "#/album/album-fixture"; });
+    await page.locator('.dhun-tabs-nav [data-tab="SEARCH"][aria-current="page"]').waitFor();
+    await page.locator('.dhun-tabs-nav [data-tab="LIBRARY"]').click();
+    await page.locator('[data-action="set-library-tab"][data-value="likes"]').click();
+    await page.evaluate(() => { location.hash = "#/album/album-fixture"; });
+    await page.locator('.dhun-tabs-nav [data-tab="LIBRARY"][aria-current="page"]').waitFor();
+    // The second album entry came from Library. Traversing back twice returns
+    // to the first entry for the same URL, which came from Search.
+    await page.goBack();
+    await page.waitForURL(/#\/library\/likes$/);
+    await page.goBack(); // Library Playlists
+    await page.waitForURL(/#\/library\/playlists$/);
+    await page.goBack();
+    await page.waitForURL(/#\/album\/album-fixture$/);
+    await page.locator('.dhun-tabs-nav [data-tab="SEARCH"][aria-current="page"]').waitFor();
+    await page.goForward();
+    await page.waitForURL(/#\/library\/playlists$/);
+    await page.goForward();
+    await page.waitForURL(/#\/library\/likes$/);
+    await page.goForward();
+    await page.waitForURL(/#\/album\/album-fixture$/);
+    await page.locator('.dhun-tabs-nav [data-tab="LIBRARY"][aria-current="page"]').waitFor();
+    await page.goBack(); await page.goBack(); await page.goBack();
+    await page.waitForURL(/#\/album\/album-fixture$/);
+    await page.locator('.dhun-tabs-nav [data-tab="SEARCH"][aria-current="page"]').waitFor();
+    await page.reload({ waitUntil: "load" });
+    await page.locator('.dhun-tabs-nav [data-tab="SEARCH"][aria-current="page"]').waitFor();
+    await page.locator('[data-action="back"]').click();
+    await page.waitForURL(/#\/search\?q=rain$/);
+    record(label, "Back, Forward and reload restore each album entry's origin; app Back returns to the original Search query");
+  } finally { await context.close(); }
+}
+
+/** Different detail entries must not lose their shared Search origin. */
+async function checkWebConsecutiveDetails(browser) {
+  const context = await newAppContext(browser, { viewport: { width: 390, height: 844 } });
+  try {
+    const page = await context.newPage();
+    const selectedSearch = '.dhun-tabs-nav [data-tab="SEARCH"][aria-current="page"]';
+    await page.goto(url("/app/#/search?q=rain"), { waitUntil: "load" });
+    for (const id of ["first", "second"]) {
+      await page.evaluate((id) => { location.hash = `#/album/${id}`; }, id);
+      await page.waitForURL(new RegExp(`#\\/album\\/${id}$`));
+      await page.locator(selectedSearch).waitFor();
+    }
+    await page.locator('.dhun-tabs-nav [data-tab="LIBRARY"]').click();
+    await page.waitForURL(/#\/library\/playlists$/);
+    await page.goBack();
+    await page.waitForURL(/#\/album\/second$/);
+    await page.locator(selectedSearch).waitFor();
+    await page.goBack();
+    await page.waitForURL(/#\/album\/first$/);
+    await page.locator(selectedSearch).waitFor();
+    await page.goForward();
+    await page.waitForURL(/#\/album\/second$/);
+    await page.locator(selectedSearch).waitFor();
+    await page.reload({ waitUntil: "load" });
+    await page.locator(selectedSearch).waitFor();
+    await page.locator('[data-action="back"]').click();
+    await page.waitForURL(/#\/search\?q=rain$/);
+    record("/app/ consecutive catalogue history", "different albums retain the Search origin across Back, Forward, reload and app Back");
+  } finally { await context.close(); }
+}
+
 /**
  * The dialogs a keyboard has to live in.
  *
@@ -2886,6 +2986,9 @@ const CHECKS = [
   ["/app/ contrast", () => checkWebAppContrast(browser)],
   ["/app/ axe", () => checkWebAppAxe(browser)],
   ["/app/ dialog focus", () => checkWebAppDialogs(browser)],
+  ["/app/ Library Back", () => checkWebLibraryBack(browser)],
+  ["/app/ browser history origins", () => checkWebHistoryOrigins(browser)],
+  ["/app/ consecutive catalogue history", () => checkWebConsecutiveDetails(browser)],
   ["/app/ legal and erase scope", () => checkWebLegal(browser)],
   ["/app/ storage failures", () => checkWebStorageFailures(browser)],
   ["/app/ synthetic media transport", () => checkWebSyntheticMedia(browser)],

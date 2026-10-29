@@ -143,7 +143,7 @@ export function bootFixture(t, { hash = "#/search", replaceSearchFields = false,
   const transport = fetchDouble(fetchOptions);
   const win = new Events(); win.self = win; win.top = win;
   win.location = { hash };
-  win.history = { length: 1, replaceState(_state, _title, url) { win.location.hash = String(url); }, back() {} };
+  win.history = { length: 1, state: null, replaceState(state, _title, url) { this.state = state; win.location.hash = String(url); }, back() {} };
   const mediaQueries = new Map();
   win.matchMedia = (query) => {
     if (!mediaQueries.has(query)) {
@@ -192,7 +192,7 @@ export function bootFixture(t, { hash = "#/search", replaceSearchFields = false,
   return {
     ...app, win, doc: dom.doc, root: dom.root, calls: transport.calls, audio: dom.audio,
     timers, mediaQueries, mount,
-    navigate(next) { win.location.hash = next; win.emit("hashchange"); },
+    navigate(next, { historyState = null } = {}) { win.location.hash = next; win.history.state = historyState; win.emit("hashchange"); },
     submit(query) {
       const form = new NodeElement("FORM", dom.doc); form.dataset.action = "search-submit";
       const input = new NodeElement("INPUT", dom.doc); input.value = query;
