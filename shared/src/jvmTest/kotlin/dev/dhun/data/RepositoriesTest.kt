@@ -1,11 +1,14 @@
 package dev.dhun.data
 
 import dev.dhun.core.RepeatMode
+import dev.dhun.core.DownloadedTrack
+import dev.dhun.core.DownloadState
 import dev.dhun.core.Track
 import dev.dhun.database.DhunDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -109,6 +112,44 @@ class RepositoriesTest {
         repo.delete("pl1")
         assertNull(repo.observePlaylist("pl1").first())
         assertTrue(repo.observeTracks("pl1").first().isEmpty())
+    }
+
+    @Test
+    fun deletingPlaylistPreservesRelatedDataAcrossDatabaseReopen(): Unit = runBlocking {
+        val dir = Files.createTempDirectory("dhun-playlist-delete").toFile()
+        val dbFile = dir.resolve("library.db")
+        val audio = dir.resolve("track.webm").apply { writeText("synthetic audio") }
+        var driver = DatabaseDriverFactory(dbFile).createDriver()
+        try {
+            var data = DataLayer(DatabaseFactory.create(driver))
+            val first = data.playlists.create("Delete")
+            val second = data.playlists.create("Keep")
+            val song = track("shared")
+            data.playlists.addTrack(first.id, song)
+            data.playlists.addTrack(second.id, song)
+            data.library.addFavorite(song)
+            data.history.recordPlay(song, PlayContext.PLAYLIST)
+            data.downloads.upsert(DownloadedTrack(
+                trackId = song.id, title = song.title, artistName = song.artistName,
+                localAudioPath = audio.absolutePath, mimeType = "audio/webm",
+                downloadState = DownloadState.COMPLETED,
+            ))
+            data.playlists.delete(first.id)
+            data.playlists.delete("missing") // idempotent, cannot affect other rows
+            driver.close()
+            driver = DatabaseDriverFactory(dbFile).createDriver()
+            data = DataLayer(DatabaseFactory.create(driver))
+            assertNull(data.playlists.observePlaylist(first.id).first())
+            assertEquals(listOf(song.id), data.playlists.observeTracks(second.id).first().map { it.id })
+            assertNotNull(data.tracks.get(song.id))
+            assertTrue(data.library.isFavorite(song.id))
+            assertEquals(listOf(song.id), data.history.observeHistory(10).first().map { it.track.id })
+            assertTrue(data.downloads.isDownloaded(song.id))
+            assertEquals("synthetic audio", audio.readText())
+        } finally {
+            driver.close()
+            dir.deleteRecursively()
+        }
     }
 
     @Test

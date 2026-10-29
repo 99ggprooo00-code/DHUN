@@ -1,0 +1,15 @@
+# Playlist deletion audit (2026-10-29)
+
+## Research baseline
+
+| Surface | Actual path and storage | Copies and lifecycle |
+| --- | --- | --- |
+| Android | Shared `PlaylistScreen` → `PlaylistViewModel` → `PlaylistRepository.delete`; SQLDelight transaction deletes `PlaylistTrack` rows and the `Playlist` row. It does not call the `DeletePlaylistUseCase`; `LibraryViewModel.deletePlaylist` has no UI callers. | `dhun.db` is app-private; the manifest sets `allowBackup=false`. SQL deletion is not secure erasure: database/journal pages or independent device backups may retain data. Android device-transfer/backup behavior varies by OS and vendor; no device verification here. Normal app data persists through process death/restart; uninstall normally removes app-private data. |
+| Desktop/JVM (including Windows) | The same shared UI, ViewModel and SQL transaction, with the JDBC SQLite driver. | Packaged data is under install `userdata`; unpackaged data is in the OS user-data directory. Files persist across process restarts. Packaged uninstall is designed to remove managed data, while unpackaged and independent backups may remain. No secure-erasure guarantee or physical Windows test. |
+| Browser `/app/` | The web confirmation commits an IndexedDB current-library transaction. The `previous` record and legacy `dhun.web.v3` key are retained for recovery; an older tab may still write legacy storage. | Deleting a playlist or clearing the current library is not secure deletion. Recovery copies and independent exports can retain it. |
+
+The native detail screen previously dismissed confirmation immediately after launching an asynchronous delete; errors were not surfaced and repeat submissions could race. The unused library ViewModel entry point swallowed exceptions. The database operation explicitly removes playlist membership and playlist rows atomically; it does not delete Track, Favorite, History, DownloadedTrack, downloaded files, or the playback queue. Track metadata is not pruned by this delete. A missing ID is a SQL no-op. A playlist's queue is already held separately as tracks, not a live reference to the playlist row.
+
+The web follow-up `9363567` corrects the false assertion that the playlist is removed from the browser, and exercises the dialog and retained current/previous/legacy records. Native changes must expose pending/failure, preserve the confirmation while awaiting the commit, guard duplicate submissions, and report cancellation rather than swallowing it. Tests belong in the shared JVM ViewModel and real SQLDelight repository suites; Compose/device verification is separate.
+
+CI defines `:shared:jvmTest`, `:app-android:testDebugUnitTest`, Android debug build/bundle and NewApi lint, and `:app-desktop:compileKotlinJvm` / `:app-desktop:jvmTest`. A main push touching `shared/**` also triggers the rolling test-release workflow, which replaces its private draft assets. That side effect is not authorized for this task; do not merge a native change while that trigger would replace assets.
