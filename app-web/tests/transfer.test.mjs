@@ -86,7 +86,7 @@ test("legacy numeric strings are rejected when conversion would round, underflow
     await assert.rejects(() => handleFileImport(fakeFile(text), storage), /would change during import|would be discarded/i);
     assert.deepEqual(storage.library, before);
   }
-}
+});
 
 test("a real export imports, and the library comes back", async () => {
   const source = createStorage(
