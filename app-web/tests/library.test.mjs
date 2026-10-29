@@ -309,7 +309,9 @@ test("blocked localStorage property access does not crash library startup", () =
     const storage = createStorage();
     assert.equal(storage.persistent, false);
     assert.deepEqual(storage.load(), emptyLibrary());
+    assert.equal(storage.importGuard, "unreadable");
     assert.equal(storage.save(emptyLibrary()), false);
+    assert.throws(() => storage.importAll("{}"), /could not be read safely/);
   } finally {
     if (previous) Object.defineProperty(globalThis, "localStorage", previous);
     else delete globalThis.localStorage;

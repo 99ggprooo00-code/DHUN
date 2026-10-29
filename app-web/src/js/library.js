@@ -528,14 +528,15 @@ export function historySongs(library) {
 export function createStorage(backing, key = STORAGE_KEY) {
   // Accessing the property itself can throw under browser storage policies.
   // A failed write probe is not a reason to discard still-readable saved data.
+  let accessDenied = false;
   if (backing === undefined) {
-    try { backing = globalThis.localStorage; } catch { backing = null; }
+    try { backing = globalThis.localStorage; } catch { backing = null; accessDenied = true; }
   }
   let memory = null;
   let persistent = false;
   let observed = null;
   let observedKnown = false;
-  let importGuard = null;
+  let importGuard = accessDenied ? "unreadable" : null;
 
   function probe() {
     if (!backing) return false;

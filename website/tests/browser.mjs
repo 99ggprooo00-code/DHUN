@@ -2732,8 +2732,9 @@ async function checkWebStorageFailures(browser) {
     page.on("pageerror", error => errors.push(error.message));
     await page.goto(url("/app/#/settings"));
     await page.locator('[data-action="clear-library"]').waitFor();
+    await page.getByText(/library shown may be incomplete.*do not delete browser data/i).waitFor();
     if (errors.length) fail("/app/ storage getter", errors.join(" | "));
-    else record("/app/ storage getter", "blocked localStorage property does not crash Settings startup; no persistence is claimed");
+    else record("/app/ storage getter", "blocked localStorage property does not crash Settings startup; the incomplete fallback is not presented as recovered data");
 
     context = await fresh(); await prepare(context, true); page = watch(await context.newPage());
     await page.goto(url("/app/#/library/likes"));
