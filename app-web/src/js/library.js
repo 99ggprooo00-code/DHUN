@@ -199,12 +199,65 @@ export function normaliseLibrary(raw) {
   return pruneSnapshots({ likes, playlists, history, snapshots, recentSearches, settings });
 }
 
+/** Canonicalise a decimal without converting it through binary floating point. */
+function decimalValue(token) {
+  const match = /^(-?)(\\d+)(?:\\.(\\d+))?(?:[eE]([+-]?\\d+))?$/.exec(token);
+  if (!match) return null;
+  const negative = match[1] === "-";
+  const fraction = match[3] ?? "";
+  let digits = `${match[2]}${fraction}`.replace(/^0+/, "");
+  if (!digits) return { negative, digits: "0", exponent: 0 };
+  let exponent = Number(match[4] ?? 0) - fraction.length;
+  if (!Number.isSafeInteger(exponent)) return null;
+  while (digits.length > 1 && digits.endsWith("0")) {
+    digits = digits.slice(0, -1);
+    exponent += 1;
+  }
+  return { negative, digits, exponent };
+}
+
+function sameDecimalValue(left, right) {
+  const a = decimalValue(left);
+  const b = decimalValue(right);
+  return Boolean(a && b && a.negative === b.negative && a.digits === b.digits && a.exponent === b.exponent);
+}
+
+/**
+ * JSON.parse converts numeric tokens to IEEE-754 before validation. Reject any
+ * token whose exact decimal value differs from the resulting Number, including
+ * overflow, precision loss, underflow and negative zero. JSON syntax is checked
+ * first, so this scanner only needs to skip strings and inspect number tokens.
+ */
+function assertLosslessJSONNumbers(text) {
+  for (let i = 0; i < text.length; i += 1) {
+    if (text[i] === '"') {
+      i += 1;
+      while (i < text.length) {
+        if (text[i] === "\\\\") { i += 2; continue; }
+        if (text[i] === '"') break;
+        i += 1;
+      }
+      continue;
+    }
+    if (text[i] !== "-" && (text[i] < "0" || text[i] > "9")) continue;
+    const match = /^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?/.exec(text.slice(i));
+    if (!match) continue;
+    const token = match[0];
+    const number = Number(token);
+    if (!Number.isFinite(number) || !sameDecimalValue(token, String(number))) {
+      throw new Error("the file contains a number JavaScript cannot preserve exactly; no library was replaced");
+    }
+    i += token.length - 1;
+  }
+}
+
 /** Parse valid JSON while rejecting duplicate object keys (including escapes).
  * JSON.parse alone silently keeps the last occurrence. The iterative scan runs
  * only after syntax validation and does not recurse on an untrusted document. */
 export function parseImportJSON(text) {
   let parsed;
   try { parsed = JSON.parse(text); } catch { throw new Error("the file is not JSON"); }
+  assertLosslessJSONNumbers(text);
   const stack = [];
   for (let i = 0; i < text.length; i += 1) {
     const char = text[i];
@@ -300,7 +353,7 @@ export function validateImport(raw) {
   function compare(input, output, path) {
     if (input === output) return;
     if (typeof input === "number" && typeof output === "string" && String(input) === output) return;
-    if (typeof input === "string" && typeof output === "number" && input.trim() && Number.isFinite(Number(input)) && Number(input) === output) return;
+    if (typeof input === "string" && typeof output === "number" && input.trim() && Number.isFinite(Number(input)) && sameDecimalValue(input.trim(), String(output))) return;
     if (typeof input === "string" && typeof output === "string" && input.trim() === output) return;
     if (Array.isArray(input) && Array.isArray(output)) {
       if (input.length !== output.length) invalid(path, "would lose entries during import");
