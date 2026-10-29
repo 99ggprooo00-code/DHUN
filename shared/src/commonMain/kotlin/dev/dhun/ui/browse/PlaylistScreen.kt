@@ -178,7 +178,9 @@ fun PlaylistScreen(
             isDeleting = deletion.isDeleting,
             errorMessage = deletion.errorMessage,
             onDismiss = {
-                if (!deletion.isDeleting) {
+                // A back press can race Compose's next StateFlow recomposition.
+                // Check the synchronous ViewModel gate, not the collected snapshot.
+                if (!viewModel.deletion.value.isDeleting) {
                     deletingName = null
                     viewModel.clearDeletionError()
                 }
