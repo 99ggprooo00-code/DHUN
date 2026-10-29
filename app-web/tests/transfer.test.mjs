@@ -60,6 +60,38 @@ test("a JSON file that this app did not write is refused", async () => {
   );
 });
 
+test("numeric JSON tokens that would change meaning are rejected before replacing the library", async () => {
+  const storage = fakeStorage(toggleLike(emptyLibrary(), { id: "preserve-me" }).library);
+  const tokens = ["1e400", "9007199254740993", "1e-400", "-0", "0.8000000000000001"];
+  for (const token of tokens) {
+    const text = `{"app":"DHUN web","version":3,"likes":[],"playlists":[],"history":[],"snapshots":{},"recentSearches":[],"settings":{"extra":${token}}}`;
+    const before = structuredClone(storage.library);
+    await assert.rejects(
+      () => handleFileImport(fakeFile(text), storage),
+      /number JavaScript cannot preserve exactly/i,
+      `token ${token} must not be silently rounded or normalised`,
+    );
+    assert.deepEqual(storage.library, before, `token ${token} must not replace the current library`);
+  }
+});
+
+test("legacy numeric strings are rejected when conversion would round, underflow or erase negative zero", async () => {
+  for (const value of ["9007199254740993", "1e-400", "-0"]) {
+    const backing = new Map();
+    const storage = createStorage({ setItem: (k, v) => backing.set(k, String(v)), getItem: (k) => backing.get(k) ?? null, removeItem: (k) => backing.delete(k) });
+    const previous = toggleLike(emptyLibrary(), { id: "preserve-me" }).library;
+    assert.equal(storage.save(previous), true);
+    const before = new Map(backing);
+    const text = JSON.stringify({
+      app: "DHUN web", version: 3, likes: [], playlists: [], history: [], snapshots: {},
+      recentSearches: [], settings: { volume: value },
+    });
+    await assert.rejects(() => handleFileImport(fakeFile(text), storage), /would change during import|would be discarded/i);
+    assert.deepEqual(backing, before);
+    assert.deepEqual(storage.load(), previous);
+  }
+});
+
 test("a real export imports, and the library comes back", async () => {
   const source = createStorage(
     (() => {

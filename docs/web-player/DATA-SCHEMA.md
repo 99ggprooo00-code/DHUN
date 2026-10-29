@@ -130,7 +130,8 @@ uploaded.
 
 **Import** a file that Export library wrote (Settings → This browser → Import library):
 
-1. The file must be at most **8 MB**, valid JSON with no duplicate object keys,
+1. The file must be at most **8 MB**, valid JSON with no duplicate object keys and no numeric tokens that would
+   change value when parsed and re-exported (including negative zero),
    `app: "DHUN web"`, and `version: 3` (`FORMAT_VERSION`).
 2. All six library fields in §2 must be present with the documented array/object
    shapes. Playlists need an id, nonempty name and track-id array; snapshot ids
@@ -145,7 +146,7 @@ uploaded.
    than silently discarding them. Keep the original file and inspect it if refused.
 4. Compatibility conversions already used by the storage reader are accepted when
    they preserve the supplied values: numeric ids to strings, numeric strings to
-   numbers, whitespace trim,
+   numbers (only when their decimal value survives conversion), whitespace trim,
    historical string history entries, and defaults for missing optional nested
    fields/settings. Missing snapshots for referenced ids are permitted for older
    libraries; such rows may not be visible until their metadata is recovered.
