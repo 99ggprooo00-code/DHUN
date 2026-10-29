@@ -172,6 +172,10 @@ test("equivalent decimal spellings and safe legacy numeric strings round trip", 
   const imported = await handleFileImport(file(text), f.storage);
   assert.deepEqual(imported.settings.extra, [0.1, 1, -12.5, 5e-324, 9007199254740992]);
   assert.deepEqual((await handleFileImport(file(f.storage.exportAll(imported)), f.storage)).settings.extra, imported.settings.extra);
+  // Numeric-looking text and escaped quotes inside strings are not JSON numbers.
+  const quoted = structuredClone(f.valid);
+  quoted.settings.extra = ['text "1e400" and \\ -0 9007199254740993'];
+  assert.deepEqual((await handleFileImport(file(JSON.stringify(quoted)), f.storage)).settings.extra, quoted.settings.extra);
   for (const value of ["+0.5", ".5", "0.500", "5e-1", "000.50", "1."]) {
     const candidate = structuredClone(f.valid); candidate.settings.volume = value;
     assert.equal((await handleFileImport(file(JSON.stringify(candidate)), f.storage)).settings.volume, Number(value));
