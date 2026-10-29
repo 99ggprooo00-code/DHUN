@@ -95,14 +95,16 @@ test("safe legacy normalization and exact list boundaries are accepted", async (
   assert.equal(imported.playlists[0].createdAt, 12);
 });
 
-test("a failed write keeps the prior library and permits retry", async () => {
+test("a simulated quota refusal keeps the prior library and permits retry in a fresh adapter", async () => {
   const f = setup(); const candidate = f.storage.exportAll(emptyLibrary());
   f.control.deny = true;
-  await assert.rejects(handleFileImport(file(candidate), f.storage), /could not confirm/i);
+  await assert.rejects(handleFileImport(file(candidate), f.storage), error => error.code === "IMPORT_UNCERTAIN");
   assert.equal(f.map.get(STORAGE_KEY), f.original);
   assert.deepEqual(f.storage.load(), f.previous);
   f.control.deny = false;
-  assert.deepEqual((await handleFileImport(file(candidate), f.storage)).likes, []);
+  await assert.rejects(handleFileImport(file(candidate), f.storage), /will not write again/i);
+  const reopened = createStorage({ setItem(k, v) { f.map.set(k, String(v)); }, getItem(k) { return f.map.get(k) ?? null; }, removeItem(k) { f.map.delete(k); } });
+  assert.deepEqual((await handleFileImport(file(candidate), reopened)).likes, []);
 });
 
 test("unreadable storage is rejected before a write", async () => {
@@ -311,4 +313,20 @@ test("corrupt existing storage cannot be overwritten by an import", async () => 
   const storage = createStorage(backing); storage.load();
   await assert.rejects(handleFileImport(file(storage.exportAll(emptyLibrary())), storage), /nothing was written/i);
   assert.equal(map.get(STORAGE_KEY), '{not-json');
+});
+
+test("a write that mutates then throws with stale readback remains unconfirmed", async () => {
+  const map = new Map(); let stale = null, failing = false;
+  const backing = {
+    getItem(k) { return failing && k === STORAGE_KEY ? stale : map.get(k) ?? null; },
+    setItem(k, value) { if (failing && k === STORAGE_KEY) { map.set(k, String(value)); throw Error("write failed after mutation"); } map.set(k, String(value)); },
+    removeItem(k) { map.delete(k); },
+  };
+  const storage = createStorage(backing), before = toggleLike(emptyLibrary(), { id: "old" }).library;
+  assert.equal(storage.save(before), true); stale = map.get(STORAGE_KEY); failing = true;
+  await assert.rejects(handleFileImport(file(storage.exportAll(emptyLibrary())), storage), error => error.code === "IMPORT_UNCERTAIN");
+  assert.notEqual(map.get(STORAGE_KEY), stale);
+  assert.deepEqual(storage.load().likes, ["old"]);
+  assert.equal(storage.importGuard, "unconfirmed");
+  assert.equal(storage.save(before), false);
 });

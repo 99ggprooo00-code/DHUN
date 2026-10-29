@@ -622,21 +622,15 @@ export function createStorage(backing, key = STORAGE_KEY) {
       const unconfirmed = () => {
         importGuard = "unconfirmed";
         persistent = false;
-        const error = new Error("The saved library may have changed, but the import could not be confirmed. This tab will not write again. Export the in-tab library, keep the original backup, and open a fresh tab to review saved data.");
+        const error = new Error("The saved library may have changed, but the import could not be confirmed (storage may be full or unavailable). This tab will not write again. Export the in-tab library, keep the original backup, and open a fresh tab to review saved data.");
         error.code = "IMPORT_UNCERTAIN";
         return error;
       };
       try {
         backing.setItem(key, serialized);
       } catch {
-        // A conforming quota failure leaves the old key intact. Read it before
-        // saying so: unusual adapters can mutate and then throw.
-        let unchanged = false;
-        try { unchanged = backing.getItem(key) === previous; } catch { /* outcome unknown */ }
-        if (unchanged) {
-          persistent = false;
-          throw new Error("This browser could not confirm saving the imported library; the saved library was unchanged. Keep the backup and allow storage or free space before retrying.");
-        }
+        // A broken adapter can mutate then throw or return a stale read. Do not
+        // infer that durable data is unchanged or allow this tab to retry writes.
         throw unconfirmed();
       }
       let confirmed;

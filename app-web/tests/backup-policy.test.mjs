@@ -63,7 +63,7 @@ test("complexity guards run before JSON parsing and preserve stored data", async
 
 test("quota refusal preserves durable and in-tab data and reports no success", async () => {
   const f = setup(), candidate = f.storage.exportAll(emptyLibrary()); f.control.failWrite = true;
-  await assert.rejects(handleFileImport(file(candidate), f.storage), /could not confirm/);
+  await assert.rejects(handleFileImport(file(candidate), f.storage), error => error.code === "IMPORT_UNCERTAIN");
   assert.equal(f.map.get(STORAGE_KEY), f.original);
   assert.deepEqual(f.storage.load(), f.previous);
 });

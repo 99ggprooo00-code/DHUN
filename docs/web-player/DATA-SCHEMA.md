@@ -159,9 +159,8 @@ truncated. Serialization failures are reported without a success message.
 5. Validation and serialization finish before any library write. A pre-write
    read rejects a library already changed since this tab last observed it. A
    candidate is then written to the single storage key and read back before
-   replacing in-tab data. If a write throws and readback confirms the previous
-   value, the saved library is unchanged. If readback fails or differs after
-   an attempted write, the durable outcome is **unconfirmed**: it may contain
+   replacing in-tab data. If the write throws, or readback fails or differs
+   after an attempted write, the durable outcome is **unconfirmed**: it may contain
    the import or another tab's data while this tab retains its previous library.
    After an unconfirmed outcome or detected conflict, this tab will not write
    again; ordinary edits are visit-only. Export the in-tab library, keep the
