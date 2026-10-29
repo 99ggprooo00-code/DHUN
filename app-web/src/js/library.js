@@ -206,7 +206,8 @@ export function toggleLike(library, song) {
   const id = String(song?.id ?? "");
   if (!id) return { library, liked: false, changed: false };
   const liked = !library.likes.includes(id);
-  const likes = liked ? [id, ...library.likes].slice(0, LIBRARY_LIMITS.likes) : library.likes.filter((entry) => entry !== id);
+  if (liked && library.likes.length >= LIBRARY_LIMITS.likes) return { library, liked: false, changed: false, reason: "limit" };
+  const likes = liked ? [id, ...library.likes] : library.likes.filter((entry) => entry !== id);
   const snapshots = liked && song ? { ...library.snapshots, [id]: snapshot(song) ?? library.snapshots[id] } : library.snapshots;
   return { library: { ...library, likes, snapshots }, liked, changed: true };
 }
@@ -232,7 +233,8 @@ export function newPlaylistId(now = Date.now(), random = Math.random) {
 
 export function createPlaylist(library, name, now = Date.now()) {
   const trimmed = String(name ?? "").trim();
-  if (!trimmed) return { library, playlist: null };
+  if (!trimmed) return { library, playlist: null, reason: "name" };
+  if (library.playlists.length >= LIBRARY_LIMITS.playlists) return { library, playlist: null, reason: "limit" };
   const playlist = {
     id: newPlaylistId(now),
     name: trimmed.slice(0, 120),
@@ -241,7 +243,7 @@ export function createPlaylist(library, name, now = Date.now()) {
     createdAt: now,
     updatedAt: now,
   };
-  return { library: { ...library, playlists: [playlist, ...library.playlists].slice(0, LIBRARY_LIMITS.playlists) }, playlist };
+  return { library: { ...library, playlists: [playlist, ...library.playlists] }, playlist };
 }
 
 export function renamePlaylist(library, id, name, now = Date.now()) {
@@ -262,19 +264,16 @@ export function deletePlaylist(library, id) {
 /** Add a track to a playlist. A second add is a no-op, not a duplicate row. */
 export function addToPlaylist(library, playlistId, song, now = Date.now()) {
   const id = String(song?.id ?? "");
-  if (!id) return { library, added: false };
-  let added = false;
-  const playlists = library.playlists.map((playlist) => {
-    if (playlist.id !== playlistId || playlist.trackIds.includes(id)) return playlist;
-    added = true;
-    return {
-      ...playlist,
-      trackIds: [...playlist.trackIds, id].slice(0, LIBRARY_LIMITS.playlistTracks),
-      updatedAt: now,
-    };
-  });
-  const snapshots = added ? { ...library.snapshots, [id]: snapshot(song) ?? library.snapshots[id] } : library.snapshots;
-  return { library: { ...library, playlists, snapshots }, added };
+  if (!id) return { library, added: false, reason: "invalid" };
+  const playlist = library.playlists.find((entry) => entry.id === playlistId);
+  if (!playlist) return { library, added: false, reason: "missing" };
+  if (playlist.trackIds.includes(id)) return { library, added: false, reason: "duplicate" };
+  if (playlist.trackIds.length >= LIBRARY_LIMITS.playlistTracks) return { library, added: false, reason: "limit" };
+  const playlists = library.playlists.map((entry) => entry.id === playlistId
+    ? { ...entry, trackIds: [...entry.trackIds, id], updatedAt: now }
+    : entry);
+  const snapshots = { ...library.snapshots, [id]: snapshot(song) ?? library.snapshots[id] };
+  return { library: { ...library, playlists, snapshots }, added: true };
 }
 
 export function removeFromPlaylist(library, playlistId, songId, now = Date.now()) {

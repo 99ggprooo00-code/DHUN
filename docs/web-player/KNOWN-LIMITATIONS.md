@@ -112,5 +112,6 @@ for executable failure coverage; this is not a blanket “everything works” cl
 When storage cannot acknowledge a write, destructive changes and replacement
 import stay failed rather than pretending to erase/replace durable data. Ordinary
 edits can still work for the visit with warnings. Multi-tab lost updates,
-corrupt-record recovery/backup, real stream lifetime/stalls and non-Chromium/device
+corrupt-record recovery/backup and silent truncation of over-limit imported or
+stored lists during normalization, real stream lifetime/stalls and non-Chromium/device
 acceptance remain follow-ups. No actual provider audio was heard in this task.
