@@ -191,8 +191,10 @@ current key is truly missing and the previous record is valid, recovery offers
 a validated previous backup and an explicit restore. It rechecks absence, the
 previous record and legacy baseline transactionally before installing it. A
 fresh random epoch prevents an old tab from matching a reused revision. A
-previous record may omit newer changes. If current is corrupt rather than missing,
-no automatic replacement is offered; preserve copies and seek recovery help.
+previous record may omit newer changes. For a corrupt current record that can be
+safely represented as JSON, the visitor can explicitly restore the validated
+previous library while archiving both records atomically after rechecking them.
+Unrepresentable corruption remains guarded; preserve copies and seek help.
 Browser eviction, device failure, quota, memory pressure and unrepresentable
 corrupt records remain outside the transaction guarantee.
 

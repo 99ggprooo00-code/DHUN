@@ -26,6 +26,21 @@ function createEpoch() {
   } catch (error) { throw failure("UNAVAILABLE", "A safe library generation cannot be created. Keep all copies and seek recovery help.", error); }
 }
 
+// Only representations whose JSON encoding preserves the complete structured
+// clone can be compared/recovered this way. Unsupported values stay guarded.
+function recoveryRecordJSON(value) {
+  const seen = new Set();
+  function safe(item) {
+    if (item === null || typeof item === "string" || typeof item === "boolean") return true;
+    if (typeof item === "number") return Number.isFinite(item) && !Object.is(item, -0);
+    if (!item || typeof item !== "object" || seen.has(item) || (!Array.isArray(item) && Object.getPrototypeOf(item) !== Object.prototype)) return false;
+    if (Array.isArray(item) && (Object.keys(item).length !== item.length || Object.keys(item).some((key, i) => key !== String(i)))) return false;
+    seen.add(item); const result = Object.values(item).every(safe); seen.delete(item); return result;
+  }
+  if (!safe(value)) throw failure("CORRUPT", "The damaged record cannot be compared safely. Keep browser data and seek recovery help.");
+  return JSON.stringify(value);
+}
+
 function validateLibraryText(text) {
   const raw = parseImportJSON(text);
   if (!raw || typeof raw !== "object" || Array.isArray(raw) ||
@@ -410,5 +425,53 @@ export async function restoreMissingCurrent({ expectedPrevious, expectedLegacy, 
     });
     try { if (readLegacy() !== expectedLegacy) throw new Error("legacy changed"); }
     catch (error) { throw failure("COMMIT_UNCERTAIN", "The recovery may have committed, but legacy data changed or cannot be checked. Keep all copies and review again.", error); }
+  } finally { db.close(); }
+}
+
+/** Explicit recovery of a JSON-representable damaged current record. Both the
+ * reviewed damaged record and previous record are archived before replacement;
+ * all checks and writes occur in one IndexedDB transaction. */
+export async function restoreCorruptCurrent({ expectedCurrent, expectedPrevious, expectedLegacy, indexedDB, legacyStorage, databaseName = LIBRARY_DATABASE, legacyKey = STORAGE_KEY } = {}) {
+  const reviewedCurrent = recoveryRecordJSON(expectedCurrent);
+  validateRecord(expectedPrevious);
+  if (expectedPrevious.revision === Number.MAX_SAFE_INTEGER) throw failure("CORRUPT", "The recovery revision cannot be advanced safely.");
+  try { if (indexedDB === undefined) indexedDB = globalThis.indexedDB; if (legacyStorage === undefined) legacyStorage = globalThis.localStorage; }
+  catch (error) { throw failure("UNAVAILABLE", "Storage is unavailable; no recovery was saved.", error); }
+  const readLegacy = () => {
+    try { if (!legacyStorage) throw new Error("unavailable"); return legacyStorage.getItem(legacyKey); }
+    catch (error) { throw failure("LEGACY_UNREADABLE", "Legacy data cannot be checked; no recovery was saved.", error); }
+  };
+  if (readLegacy() !== expectedLegacy || expectedPrevious.legacyBaseline !== expectedLegacy) throw failure("LEGACY_DIVERGED", "Legacy data differs from this recovery record. Keep all copies and seek recovery help.");
+  const newEpoch = createEpoch();
+  const db = await openDatabase(indexedDB, databaseName);
+  try {
+    await new Promise((resolve, reject) => {
+      let reason;
+      const tx = db.transaction(STORE, "readwrite"), store = tx.objectStore(STORE);
+      const current = store.get(CURRENT), key = store.getKey(CURRENT), prev = store.get(PREVIOUS);
+      let remaining = 3;
+      const abort = error => { reason = error; try { tx.abort(); } catch { /* completion is uncertain */ } };
+      tx.oncomplete = () => reason ? reject(failure("COMMIT_UNCERTAIN", "Review saved data before retrying.", reason)) : resolve();
+      tx.onabort = () => reject(reason ?? failure("ABORTED", "Recovery transaction aborted; no changes were committed.", tx.error));
+      const finish = () => {
+        if (--remaining) return;
+        try {
+          if (key.result === undefined || recoveryRecordJSON(current.result) !== reviewedCurrent) throw failure("CONFLICT", "The current record changed. Reload and review it before recovery.");
+          const previous = prev.result;
+          validateRecord(previous);
+          if (previous.schema !== expectedPrevious.schema || previous.revision !== expectedPrevious.revision || previous.library !== expectedPrevious.library ||
+              previous.legacyBaseline !== expectedPrevious.legacyBaseline || (previous.epoch ?? null) !== (expectedPrevious.epoch ?? null)) {
+            throw failure("CONFLICT", "The previous record changed. Reload and review it before recovery.");
+          }
+          if (readLegacy() !== expectedLegacy) throw failure("LEGACY_DIVERGED", "Legacy data changed during review. Keep all copies and retry recovery.");
+          const id = `legacy-recovery:${Date.now()}:${createEpoch()}`;
+          store.add({ kind: "corrupt-current", current: current.result, previous }, id);
+          store.put({ ...previous, revision: previous.revision + 1, epoch: newEpoch }, CURRENT);
+        } catch (error) { abort(error); }
+      };
+      current.onsuccess = finish; key.onsuccess = finish; prev.onsuccess = finish;
+    });
+    try { if (readLegacy() !== expectedLegacy) throw new Error("legacy changed"); }
+    catch (error) { throw failure("COMMIT_UNCERTAIN", "Recovery may have committed, but legacy data changed or cannot be checked. Keep all copies and review again.", error); }
   } finally { db.close(); }
 }

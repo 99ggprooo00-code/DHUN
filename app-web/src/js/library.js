@@ -690,4 +690,4 @@ export function createStorage(backing, key = STORAGE_KEY) {
 }
 
 // Production transactional adapter and explicit recovery inspection.
-export { createIndexedDBStorage, inspectIndexedDBRecovery, acknowledgeLegacyDivergence, restoreMissingCurrent } from "./indexeddb-storage.js";
+export { createIndexedDBStorage, inspectIndexedDBRecovery, acknowledgeLegacyDivergence, restoreMissingCurrent, restoreCorruptCurrent } from "./indexeddb-storage.js";

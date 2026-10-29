@@ -34,6 +34,7 @@ import {
   inspectIndexedDBRecovery,
   acknowledgeLegacyDivergence,
   restoreMissingCurrent,
+  restoreCorruptCurrent,
   parseImportJSON,
   validateImport,
   deletePlaylist,
@@ -113,7 +114,7 @@ export function boot({ win = globalThis, doc = globalThis.document, storage = nu
           if (typeof item === "number") return Number.isFinite(item) && !Object.is(item, -0);
           if (!item || typeof item !== "object" || seen.has(item) || (!Array.isArray(item) && Object.getPrototypeOf(item) !== Object.prototype)) return false;
           seen.add(item);
-          const valid = Object.values(item).every(representable);
+          const valid = (!Array.isArray(item) || (Object.keys(item).length === item.length && Object.keys(item).every((key, i) => key === String(i)))) && Object.values(item).every(representable);
           seen.delete(item);
           return valid;
         }
@@ -134,7 +135,7 @@ export function boot({ win = globalThis, doc = globalThis.document, storage = nu
         }
       }
       for (const [index, item] of (diagnostic.database.archived ?? []).entries()) {
-        try { addFile(`Download archived legacy record ${index + 1}`, `dhun-archived-legacy-${index + 1}.json`, recoveryJson(item)); }
+        try { addFile(`Download archived recovery record ${index + 1}`, `dhun-archived-recovery-${index + 1}.json`, recoveryJson(item)); }
         catch { unavailableRecord(); }
       }
       const backup = (label, name, text) => {
@@ -165,6 +166,25 @@ export function boot({ win = globalThis, doc = globalThis.document, storage = nu
           }
         });
         files.appendChild(restore);
+      }
+      if (error?.code === "CORRUPT" && diagnostic.database.hasCurrent && diagnostic.database.hasPrevious && validPrevious && diagnostic.legacy.status !== "unavailable" && files) {
+        let comparable = false;
+        try { recoveryJson(diagnostic.database.current); comparable = true; } catch { /* keep unsupported records untouched */ }
+        if (comparable) {
+          const restore = doc.createElement("button"); restore.type = "button"; restore.textContent = "Restore previous library and archive damaged current record";
+          restore.addEventListener("click", async () => {
+            if (!win.confirm("Download and review both records first. The previous library may omit newer changes. Replace the damaged current record with the previous library and archive both records?")) return;
+            restore.disabled = true;
+            try {
+              await restoreCorruptCurrent({ expectedCurrent: diagnostic.database.current, expectedPrevious: diagnostic.database.previous, expectedLegacy: diagnostic.legacy.text });
+              win.location.reload();
+            } catch (failure) {
+              if (reason) reason.textContent = failure?.message ?? "Recovery could not be confirmed; keep all copies and retry.";
+              restore.disabled = false;
+            }
+          });
+          files.appendChild(restore);
+        }
       }
       if (["LEGACY_DIVERGED", "COMMIT_UNCERTAIN"].includes(error?.code) && diagnostic.database.current && files) {
         let adopt = null;

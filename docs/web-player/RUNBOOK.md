@@ -89,7 +89,9 @@ element's own state is the first thing to check.
   sides but cannot atomically lock localStorage. There is no automatic merge.
   When current is missing, a validated previous backup can be downloaded or
   explicitly restored after review; it may omit newer changes. A corrupt current
-  record is not automatically overwritten.
+  record is not automatically overwritten: a JSON-representable damaged record
+  can be archived while explicitly restoring validated previous data; otherwise
+  keep all copies and seek recovery help.
 - "Import unconfirmed" or a saved-library conflict: the tab stops writing.
   Export the explicitly labelled visit-only copy and keep the original backup;
   open a fresh tab to review the saved library before attempting another import.

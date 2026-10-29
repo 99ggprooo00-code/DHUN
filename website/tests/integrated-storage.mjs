@@ -220,6 +220,31 @@ export async function checkIntegratedStorage(browser, { base, record }) {
     assert.equal(JSON.parse((await raw(initialNew)).records.current.library).settings.theme, "dark");
     record("/app/ missing initial database record", "a reinitialized revision one receives a new generation; an older revision-one tab cannot overwrite it");
 
+    context = await fresh(); const recoverCorrupt = await context.newPage();
+    await recoverCorrupt.goto(`${base}/app/#/settings`); await waitSettings(recoverCorrupt);
+    await recoverCorrupt.locator('[data-action="set-theme"][data-value="light"]').click(); await waitSaved(recoverCorrupt);
+    const validBeforeCorruption = (await raw(recoverCorrupt)).records.current;
+    const staleCorrupt = await context.newPage(); await staleCorrupt.goto(`${base}/app/#/settings`); await waitSettings(staleCorrupt);
+    const damagedRecord = { ...validBeforeCorruption, library: "{broken current" };
+    await changeCurrent(recoverCorrupt, damagedRecord); await recoverCorrupt.reload();
+    await recoverCorrupt.getByRole("button", { name: "Download validated previous backup" }).waitFor();
+    await changeCurrent(recoverCorrupt, validBeforeCorruption);
+    recoverCorrupt.once("dialog", d => d.accept());
+    await recoverCorrupt.getByRole("button", { name: "Restore previous library and archive damaged current record" }).click();
+    await recoverCorrupt.getByText(/The current record changed/).waitFor();
+    assert.equal((await raw(recoverCorrupt)).records.current.library, validBeforeCorruption.library);
+    await changeCurrent(recoverCorrupt, damagedRecord); await recoverCorrupt.reload();
+    recoverCorrupt.once("dialog", d => d.accept());
+    await recoverCorrupt.getByRole("button", { name: "Restore previous library and archive damaged current record" }).click();
+    await waitSettings(recoverCorrupt); state = await raw(recoverCorrupt);
+    assert.equal(JSON.parse(state.records.current.library).settings.theme, "dark");
+    const damagedArchive = Object.values(state.records).find(r => r?.kind === "corrupt-current");
+    assert.equal(damagedArchive.current.library, "{broken current");
+    await staleCorrupt.locator('[data-action="set-theme"][data-value="system"]').click();
+    await staleCorrupt.getByText(/cannot write until saved data is reviewed/i).first().waitFor();
+    assert.equal(JSON.parse((await raw(staleCorrupt)).records.current.library).settings.theme, "dark");
+    record("/app/ corrupt current recovery", "explicit recovery compares the reviewed corrupt record, archives it atomically, restores previous, and blocks a stale tab");
+
     context = await fresh(); const damagedWhileOpen = await context.newPage();
     await damagedWhileOpen.goto(`${base}/app/#/settings`); await waitSettings(damagedWhileOpen);
     await damagedWhileOpen.evaluate(async () => {
