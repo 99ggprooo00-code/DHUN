@@ -139,3 +139,19 @@ test("unavailable history state falls back to the in-memory detail destination",
   app.click("back");
   assert.equal(app.win.location.hash, "#/library/likes");
 });
+
+test("consecutive different catalogue details retain the original Search entry across history", (t) => {
+  const app = bootFixture(t, { hash: "#/search?q=rain" });
+  app.navigate("#/album/one");
+  const first = structuredClone(app.win.history.state);
+  app.navigate("#/album/two");
+  const second = structuredClone(app.win.history.state);
+  app.navigate("#/library/playlists");
+  for (const [hash, entry] of [["#/album/two", second], ["#/album/one", first], ["#/album/two", second]]) {
+    app.navigate(hash, { historyState: entry });
+    assert.equal(app.state.tab, "SEARCH");
+    assert.equal(app.state.detailSearchQuery, "rain");
+  }
+  app.click("back");
+  assert.equal(app.win.location.hash, "#/search?q=rain");
+});

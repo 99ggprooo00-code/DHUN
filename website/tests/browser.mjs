@@ -2094,6 +2094,37 @@ async function checkWebHistoryOrigins(browser) {
   } finally { await context.close(); }
 }
 
+/** Different detail entries must not lose their shared Search origin. */
+async function checkWebConsecutiveDetails(browser) {
+  const context = await newAppContext(browser, { viewport: { width: 390, height: 844 } });
+  try {
+    const page = await context.newPage();
+    const selectedSearch = '.dhun-tabs-nav [data-tab="SEARCH"][aria-current="page"]';
+    await page.goto(url("/app/#/search?q=rain"), { waitUntil: "load" });
+    for (const id of ["first", "second"]) {
+      await page.evaluate((id) => { location.hash = `#/album/${id}`; }, id);
+      await page.waitForURL(new RegExp(`#\\/album\\/${id}$`));
+      await page.locator(selectedSearch).waitFor();
+    }
+    await page.locator('.dhun-tabs-nav [data-tab="LIBRARY"]').click();
+    await page.waitForURL(/#\/library\/playlists$/);
+    await page.goBack();
+    await page.waitForURL(/#\/album\/second$/);
+    await page.locator(selectedSearch).waitFor();
+    await page.goBack();
+    await page.waitForURL(/#\/album\/first$/);
+    await page.locator(selectedSearch).waitFor();
+    await page.goForward();
+    await page.waitForURL(/#\/album\/second$/);
+    await page.locator(selectedSearch).waitFor();
+    await page.reload({ waitUntil: "load" });
+    await page.locator(selectedSearch).waitFor();
+    await page.locator('[data-action="back"]').click();
+    await page.waitForURL(/#\/search\?q=rain$/);
+    record("/app/ consecutive catalogue history", "different albums retain the Search origin across Back, Forward, reload and app Back");
+  } finally { await context.close(); }
+}
+
 /**
  * The dialogs a keyboard has to live in.
  *
@@ -2957,6 +2988,7 @@ const CHECKS = [
   ["/app/ dialog focus", () => checkWebAppDialogs(browser)],
   ["/app/ Library Back", () => checkWebLibraryBack(browser)],
   ["/app/ browser history origins", () => checkWebHistoryOrigins(browser)],
+  ["/app/ consecutive catalogue history", () => checkWebConsecutiveDetails(browser)],
   ["/app/ legal and erase scope", () => checkWebLegal(browser)],
   ["/app/ storage failures", () => checkWebStorageFailures(browser)],
   ["/app/ synthetic media transport", () => checkWebSyntheticMedia(browser)],
