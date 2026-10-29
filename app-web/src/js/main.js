@@ -104,6 +104,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
   const state = {
     route: initialRoute,
     lastLibraryTab: initialRoute.name === "library" ? initialRoute.libTab : "playlists",
+    detailSearchQuery: "",
     library: storage.load(),
     source: { mode: "unknown", error: null },
     home: { status: "idle", rails: [], error: null },
@@ -993,6 +994,33 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
     if (route.name === "library") state.lastLibraryTab = route.libTab;
     else if (route.name === "collection") state.lastLibraryTab = "playlists";
     state.tab = tabFor(route, state.tab) ?? state.tab;
+    // Catalogue pages can be reached repeatedly from different tabs. Keep the
+    // origin on each browser history entry, not in a single global "last tab".
+    // A fresh deep link still defaults to Home; this is a destination fallback,
+    // not an attempt to replace or reconstruct the browser's history stack.
+    const isCatalogue = (name) => ["album", "artist", "playlist"].includes(name);
+    if (isCatalogue(route.name)) {
+      const saved = win.history.state?.dhunNavigation;
+      if (saved?.hash === win.location.hash && ["HOME", "SEARCH", "LIBRARY"].includes(saved.tab)
+        && ["playlists", "likes", "history"].includes(saved.libraryTab) && typeof saved.searchQuery === "string") {
+        state.tab = saved.tab;
+        state.lastLibraryTab = saved.libraryTab;
+        state.detailSearchQuery = saved.searchQuery;
+      } else if (!isCatalogue(previous.name)) {
+        state.detailSearchQuery = state.search.query;
+      }
+      // Do not overwrite a foreign primitive or array history state. Storage of
+      // this optional context can fail in restricted browsers; navigation still
+      // works with the existing in-memory fallback when it does.
+      const historyState = win.history.state;
+      if (historyState == null || (typeof historyState === "object" && !Array.isArray(historyState))) {
+        try {
+          win.history.replaceState({ ...historyState, dhunNavigation: {
+            hash: win.location.hash, tab: state.tab, libraryTab: state.lastLibraryTab, searchQuery: state.detailSearchQuery,
+          } }, "", win.location.hash);
+        } catch { /* retain the in-memory destination if history is unavailable */ }
+      }
+    }
     if (route.player !== "open") closeOverlayOnly();
 
     if (route.name !== "home") retireCatalogueRequest("home");
@@ -1070,7 +1098,7 @@ export function boot({ win = globalThis, doc = globalThis.document } = {}) {
         const origin = { HOME: "home", SEARCH: "search", LIBRARY: "library" }[state.tab] ?? "home";
         const fallback = { collection: "library", settings: "home", about: "settings" };
         const name = catalogueDetail ? origin : fallback[state.route.name] ?? "home";
-        const extra = name === "library" ? { libTab: catalogueDetail ? state.lastLibraryTab : "playlists" } : name === "search" ? { query: state.search.query } : {};
+        const extra = name === "library" ? { libTab: catalogueDetail ? state.lastLibraryTab : "playlists" } : name === "search" ? { query: state.detailSearchQuery } : {};
         go(routeFor(name, extra));
         return;
       }

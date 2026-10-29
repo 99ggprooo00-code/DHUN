@@ -78,3 +78,64 @@ test("collection details return to playlists while a direct catalogue link defau
   direct.click("back");
   assert.equal(direct.win.location.hash, "#/home");
 });
+
+
+test("browser history restores the detail entry's Search origin and query", (t) => {
+  const app = bootFixture(t, { hash: "#/search?q=rain" });
+  app.navigate("#/album/alb");
+  const albumEntry = structuredClone(app.win.history.state);
+  app.navigate("#/library/likes");
+  app.navigate("#/album/alb", { historyState: albumEntry });
+  assert.match(String(app.doc.getElementById("dhun-nav-region").innerHTML), /dhun-nav-item is-active" data-action="nav" data-tab="SEARCH"/);
+  app.click("back");
+  assert.equal(app.win.location.hash, "#/search?q=rain");
+});
+
+test("the same catalogue URL opened from different tabs owns independent origins", (t) => {
+  const app = bootFixture(t, { hash: "#/search?q=rain" });
+  app.navigate("#/album/alb");
+  const searchEntry = structuredClone(app.win.history.state);
+  app.navigate("#/library/history");
+  app.navigate("#/album/alb");
+  const libraryEntry = structuredClone(app.win.history.state);
+  app.navigate("#/album/alb", { historyState: searchEntry });
+  app.click("back");
+  assert.equal(app.win.location.hash, "#/search?q=rain");
+  app.navigate("#/album/alb", { historyState: libraryEntry });
+  app.click("back");
+  assert.equal(app.win.location.hash, "#/library/history");
+});
+
+test("restored detail retains its original search even after a later query and reload", (t) => {
+  const app = bootFixture(t, { hash: "#/search?q=rain" });
+  app.navigate("#/album/alb");
+  const entry = structuredClone(app.win.history.state);
+  app.navigate("#/search?q=sun");
+  app.navigate("#/album/alb", { historyState: entry });
+  app.destroy();
+  const reloaded = app.mount();
+  assert.equal(reloaded.state.tab, "SEARCH");
+  app.click("back");
+  assert.equal(app.win.location.hash, "#/search?q=rain");
+});
+
+test("foreign or mismatched history state never replaces the in-memory fallback", (t) => {
+  const app = bootFixture(t, { hash: "#/library/likes" });
+  const foreign = { owner: "someone-else", dhunNavigation: { hash: "#/album/other", tab: "SEARCH", libraryTab: "likes", searchQuery: "wrong" } };
+  app.navigate("#/album/alb", { historyState: foreign });
+  assert.equal(app.win.history.state.owner, "someone-else");
+  app.click("back");
+  assert.equal(app.win.location.hash, "#/library/likes");
+  app.navigate("#/album/alb", { historyState: "foreign-state" });
+  assert.equal(app.win.history.state, "foreign-state");
+  app.click("back");
+  assert.equal(app.win.location.hash, "#/library/likes");
+});
+
+test("unavailable history state falls back to the in-memory detail destination", (t) => {
+  const app = bootFixture(t, { hash: "#/library/likes" });
+  app.win.history.replaceState = () => { throw new Error("history unavailable"); };
+  app.navigate("#/album/alb");
+  app.click("back");
+  assert.equal(app.win.location.hash, "#/library/likes");
+});
