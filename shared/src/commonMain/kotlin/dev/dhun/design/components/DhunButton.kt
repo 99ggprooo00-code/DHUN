@@ -14,7 +14,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import dev.dhun.design.VisualPart
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
@@ -84,6 +87,15 @@ fun DhunTonalButton(
     )
 }
 
+/**
+ * The secondary action: a frosted pill, not Material's hollow outline.
+ *
+ * `OutlinedButton` with a DHUN border colour is still an *outlined button* —
+ * an empty pill with a 1dp stroke, which on a glass page reads as the one
+ * unstyled control in the row. It carries the chip's glass body instead
+ * (translucent fill, lifted top, sheen, soft edge), so "Rename"/"Shuffle"
+ * belong to the surface they sit on.
+ */
 @Composable
 fun DhunOutlinedButton(
     onClick: () -> Unit,
@@ -91,14 +103,21 @@ fun DhunOutlinedButton(
     enabled: Boolean = true,
     content: @Composable RowScope.() -> Unit,
 ) {
+    val body = if (enabled) {
+        modifier.clip(DhunShapes.button).dhunGlassBody(contentRowFill(VisualPart.CHIPS), DhunShapes.button)
+    } else {
+        modifier
+    }
     OutlinedButton(
         onClick = onClick,
-        modifier = modifier,
+        modifier = body,
         enabled = enabled,
         shape = DhunShapes.button,
-        border = BorderStroke(DhunSpacing.border, DhunColors.borderStrong),
+        border = BorderStroke(DhunSpacing.border, DhunColors.glassEdge),
         colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = Color.Transparent,
             contentColor = DhunColors.textPrimary,
+            disabledContentColor = DhunColors.textDisabled,
         ),
         content = content,
     )
