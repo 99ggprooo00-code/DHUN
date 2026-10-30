@@ -46,6 +46,24 @@ class SettingsPersistenceTest {
     private fun data() =
         DataLayer(DatabaseFactory.create(DatabaseDriverFactory.inMemory().createDriver()))
 
+    /**
+     * A store whose writes all fail, the way a full disk fails. Every typed
+     * write is overridden: [SettingsRepository.putBoolean] and `putInt`
+     * delegate to [SettingsRepository.putString] *inside the real object*, so
+     * overriding only `putString` would let `UpdateSettingUseCase.boolean/int`
+     * succeed through the delegate and hide the rollback under test.
+     */
+    private fun readOnly(settings: SettingsRepository) = object : SettingsRepository by settings {
+        override suspend fun putString(key: String, value: String) = error("disk full")
+        override suspend fun putBoolean(key: String, value: Boolean) = error("disk full")
+        override suspend fun putInt(key: String, value: Int) = error("disk full")
+    }
+
+    /** A store whose deletes all fail (a read-only database). */
+    private fun immutable(settings: SettingsRepository) = object : SettingsRepository by settings {
+        override suspend fun remove(key: String): Unit = error("database is read-only")
+    }
+
     private class Harness {
         val uncaught = mutableListOf<Throwable>()
         val scope = CoroutineScope(
@@ -139,11 +157,7 @@ class SettingsPersistenceTest {
         val d = data()
         val h = Harness()
         d.settings.putString(SettingsKeys.THEME, "black")
-        val readOnlySettings = object : SettingsRepository by d.settings {
-            override suspend fun putString(key: String, value: String) {
-                error("disk full")
-            }
-        }
+        val readOnlySettings = readOnly(d.settings)
         val vm = SettingsViewModel(GetSettingUseCase(readOnlySettings), UpdateSettingUseCase(readOnlySettings), h.scope)
         try {
             eventually { vm.loaded.value }
@@ -166,11 +180,7 @@ class SettingsPersistenceTest {
     fun aFailedWriteWithNothingStoredFallsBackToTheDocumentedDefault(): Unit = runBlocking {
         val d = data()
         val h = Harness()
-        val readOnlySettings = object : SettingsRepository by d.settings {
-            override suspend fun putString(key: String, value: String) {
-                error("disk full")
-            }
-        }
+        val readOnlySettings = readOnly(d.settings)
         val vm = SettingsViewModel(GetSettingUseCase(readOnlySettings), UpdateSettingUseCase(readOnlySettings), h.scope)
         try {
             eventually { vm.loaded.value }
@@ -192,11 +202,7 @@ class SettingsPersistenceTest {
         val h = Harness()
         d.settings.putInt(SettingsKeys.CACHE_SIZE_MB, 512)
         d.settings.putBoolean(SettingsKeys.RESUME_ON_LAUNCH, true)
-        val readOnlySettings = object : SettingsRepository by d.settings {
-            override suspend fun putString(key: String, value: String) {
-                error("disk full")
-            }
-        }
+        val readOnlySettings = readOnly(d.settings)
         val vm = SettingsViewModel(GetSettingUseCase(readOnlySettings), UpdateSettingUseCase(readOnlySettings), h.scope)
         try {
             eventually { vm.loaded.value }
@@ -271,11 +277,7 @@ class SettingsPersistenceTest {
         val h = Harness()
         d.settings.putString(SettingsKeys.THEME, "light")
         d.settings.putInt(SettingsKeys.CACHE_SIZE_MB, 4096)
-        val immutableSettings = object : SettingsRepository by d.settings {
-            override suspend fun remove(key: String) {
-                error("database is read-only")
-            }
-        }
+        val immutableSettings = immutable(d.settings)
         val vm = SettingsViewModel(GetSettingUseCase(immutableSettings), UpdateSettingUseCase(immutableSettings), h.scope)
         try {
             eventually { vm.loaded.value }
@@ -364,11 +366,7 @@ class SettingsPersistenceTest {
         val h = Harness()
         val part = VisualPart.LIST_ROWS
         d.settings.putInt(part.key, 70)
-        val readOnlySettings = object : SettingsRepository by d.settings {
-            override suspend fun putInt(key: String, value: Int) {
-                error("disk full")
-            }
-        }
+        val readOnlySettings = readOnly(d.settings)
         val vm = SettingsViewModel(GetSettingUseCase(readOnlySettings), UpdateSettingUseCase(readOnlySettings), h.scope)
         try {
             eventually { vm.loaded.value }
@@ -392,11 +390,7 @@ class SettingsPersistenceTest {
         // A value written by an older build (or a corrupt row) must not reach
         // the UI as-is; the documented budget ladder clamps it.
         d.settings.putInt(SettingsKeys.CACHE_SIZE_MB, 999_999)
-        val readOnlySettings = object : SettingsRepository by d.settings {
-            override suspend fun putString(key: String, value: String) {
-                error("disk full")
-            }
-        }
+        val readOnlySettings = readOnly(d.settings)
         val vm = SettingsViewModel(GetSettingUseCase(readOnlySettings), UpdateSettingUseCase(readOnlySettings), h.scope)
         try {
             eventually { vm.loaded.value }
