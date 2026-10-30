@@ -2282,6 +2282,43 @@ What this round did **not** prove:
   the caller, *under* the artwork layer, where it could never be seen). Unit
   tests assert the call structure, not the pixels.
 
+## 2026-10-30 — session `arena/83a7841b-dhun`: finalization pass (repository audit, no hardware)
+
+**Environment.** The agent sandbox for this pass had no Java/Gradle, no Android
+SDK, no emulator image, no `/dev/kvm`, no display and no Android device: 2 vCPUs,
+3 GB RAM, and outbound network limited to GitHub/PyPI/npm. The MSI and APK cannot
+be *run* here, only downloaded from CI. So this pass is a repository audit plus
+gates, not device validation. The procedure for a human is
+[`docs/verification/35-background-visual-validation.md`](../docs/verification/35-background-visual-validation.md).
+
+- **Bug found and fixed by audit: detail pages ignored the active section.**
+  `AlbumScreen`, `ArtistScreen` and `PlaylistScreen` call `PageArtworkBackdrop`
+  without a section, and its default was `BackgroundSection.HOME`. With Library
+  set to sharp and Home frosted, an album opened from Library stayed frosted —
+  the switch the user set did not control the surface they were looking at, and
+  the cause was invisible in Settings. `NowPlayingBackdrop`,
+  `AmbientBackdrop`, `PageArtworkBackdrop` and `LyricsArtworkLayer` now take a
+  nullable section resolving to `LocalBackgroundSection.current`. Regression
+  guard: `test_page_backdrops_follow_the_page_they_are_composed_on` in
+  `scripts/test_design_system.py` (fails if any backdrop defaults to a literal
+  section or if a detail page pins `BackgroundSection.HOME`).
+- **Audited in code, still unseen on a screen:** exactly one artwork-seed writer
+  (the shell's `LaunchedEffect(artworkSeed)`), so no palette ping-pong between
+  surfaces; the palette animation path never passes through the default palette
+  on a track change (`setArtworkSeed` installs the new palette in one update, and
+  only a genuinely absent track clears it); `MiniPlayer` and `FullPlayer` read
+  their own sections; the pre-API-31 branch skips `Modifier.blur` entirely and
+  keeps the veil. Code review is not observation.
+- **Still owed to a device, unchanged from the entry below:** bloom quality
+  behind real covers, settings legibility over bright artwork, the visible
+  sharp/frosted contrast between neighbouring sections, palette crossfade feel,
+  the API 30 fallback, and layer order. None of these is described as verified
+  anywhere in this repository, and CI cannot upgrade any of them.
+- **Nothing was "fixed" for the five documented limitations** (seed-derived
+  colours, unprofiled 70–100 band, extraction failure → default, unseen layer
+  order, veil-based readability). Each needs an observation to justify a change;
+  §5 of the validation page states what observation would qualify.
+
 ## 2026-10-30 — what the background feature still does not prove
 
 - **CI proves it compiles and its unit tests pass on both target platforms** —

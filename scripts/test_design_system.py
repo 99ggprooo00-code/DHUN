@@ -310,6 +310,43 @@ class GlassDesignSystemTest(unittest.TestCase):
                 f"{path} must wire its own background section",
             )
 
+    def test_page_backdrops_follow_the_page_they_are_composed_on(self):
+        """A backdrop inherits the section of the surface it is composed on.
+
+        Album, artist and playlist pages paint their own artwork backdrop, and
+        they are reachable from Home, Search *and* Library. Defaulting those
+        backdrops to `HOME` meant an album opened from Library kept Home's
+        switches: set Library to sharp, open a playlist and it was still
+        frosted for a reason nothing in Settings explained. The section is
+        therefore a nullable parameter resolved from `LocalBackgroundSection`,
+        never a hardcoded literal.
+        """
+        text = (
+            ROOT / "shared/src/commonMain/kotlin/dev/dhun/design/components/NowPlayingBackdrop.kt"
+        ).read_text()
+        for name in ("NowPlayingBackdrop", "AmbientBackdrop", "PageArtworkBackdrop"):
+            self.assertTrue(
+                re.search(
+                    rf"fun {name}\([\s\S]{{0,240}}?section: BackgroundSection\? = null",
+                    text,
+                ),
+                f"{name} must take an optional section instead of defaulting to one section",
+            )
+        self.assertGreaterEqual(
+            text.count("LocalBackgroundSection.current"),
+            3,
+            "every backdrop must fall back to the section it is composed on",
+        )
+        for screen in ("AlbumScreen", "ArtistScreen", "PlaylistScreen"):
+            body = (
+                ROOT / f"shared/src/commonMain/kotlin/dev/dhun/ui/browse/{screen}.kt"
+            ).read_text()
+            self.assertNotIn(
+                "section = BackgroundSection.HOME",
+                body,
+                f"{screen} must not pin its backdrop to Home",
+            )
+
     def test_the_glass_docs_are_reachable_from_the_agent_instructions(self):
         for doc in (".ai/MASTER_PROMPT.md", "docs/ui-ux-design.md"):
             text = (ROOT / doc).read_text()

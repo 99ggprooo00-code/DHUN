@@ -33,6 +33,7 @@ import dev.dhun.design.DhunVisualTuning
 import dev.dhun.design.VisualPart
 import dev.dhun.design.background.BackgroundSection
 import dev.dhun.design.background.DhunBackgrounds
+import dev.dhun.design.background.LocalBackgroundSection
 import dev.dhun.design.supportsRealtimeBlur
 
 /**
@@ -49,9 +50,10 @@ import dev.dhun.design.supportsRealtimeBlur
 fun NowPlayingBackdrop(
     artworkUrl: String?,
     modifier: Modifier = Modifier,
-    section: BackgroundSection = BackgroundSection.HOME,
+    section: BackgroundSection? = null,
 ) {
     if (!NowPlayingBackdropPolicy.shouldRenderBackdrop(artworkUrl)) return
+    val resolvedSection = section ?: LocalBackgroundSection.current
     val url = remember(artworkUrl) { NowPlayingBackdropPolicy.resolveUrl(artworkUrl) } ?: return
 
     // Blur is resolved per section and per the two switches: master off means
@@ -59,7 +61,7 @@ fun NowPlayingBackdrop(
     // master on + dynamic off means one steady radius. Colour is untouched by
     // any of this — it lives in AmbientBackdrop.
     val blurPercent = DhunBackgrounds.blurPercentFor(
-        section = section,
+        section = resolvedSection,
         strengthPercent = DhunAppearance.backdropBlurPercent,
     )
     val brightnessPercent = DhunAppearance.backdropBrightnessPercent
@@ -140,13 +142,14 @@ fun NowPlayingBackdrop(
 @Composable
 fun AmbientBackdrop(
     modifier: Modifier = Modifier,
-    section: BackgroundSection = BackgroundSection.HOME,
+    section: BackgroundSection? = null,
 ) {
+    val resolvedSection = section ?: LocalBackgroundSection.current
     val tokens = DhunAppearance.tokens
     // The resolved palette is the whole colour feature in one call: artwork
     // when both dynamic switches are on, otherwise this section's manual
     // palette or its default (see BackgroundPalettePolicy.resolve).
-    val palette = DhunBackgrounds.paletteFor(section)
+    val palette = DhunBackgrounds.paletteFor(resolvedSection)
     // Track changes crossfade instead of snapping: the palette is derived from
     // the artwork, so it changes exactly when the song does.
     val primary by animateColorAsState(palette.primary, DhunAnimations.slowTween(), label = "bgPrimary")
@@ -234,13 +237,25 @@ object AmbientBackdropPolicy {
     ): List<AmbientBloom> = layers(size, accent, secondary, bloomAlpha)
 }
 
+/**
+ * A detail page's own artwork backdrop (album, artist, playlist).
+ *
+ * The section is the one the page is composed *on*, not a hardcoded Home:
+ * opening an album from Library must frost with Library's switches, otherwise
+ * switching Library to sharp while Home stays frosted would leave the album
+ * page frosted for a reason the user cannot see in Settings.
+ */
 @Composable
 fun PageArtworkBackdrop(
     artworkUrl: String?,
     modifier: Modifier = Modifier,
-    section: BackgroundSection = BackgroundSection.HOME,
+    section: BackgroundSection? = null,
 ) {
-    NowPlayingBackdrop(artworkUrl = artworkUrl, modifier = modifier, section = section)
+    NowPlayingBackdrop(
+        artworkUrl = artworkUrl,
+        modifier = modifier,
+        section = section ?: LocalBackgroundSection.current,
+    )
 }
 
 enum class NowPlayingBackdropPhase { Idle, Loading, Loaded, Failed }

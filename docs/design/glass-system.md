@@ -153,6 +153,15 @@ over a page follow that page, and the expanded player publishes `FULL_PLAYER` fo
 everything inside it, including its own dialogs. A surface that reads the raw
 slider instead ignores the user's switches, so that is a design gate now.
 
+**A backdrop is never pinned to a section.** `NowPlayingBackdrop`,
+`AmbientBackdrop`, `PageArtworkBackdrop` and `LyricsArtworkLayer` all take a
+*nullable* section that defaults to `LocalBackgroundSection.current`. That is why
+album, artist and playlist pages - which paint their own cover backdrop and are
+reachable from Home, Search and Library alike - frost with the tab they were
+opened from instead of always with Home's switches. Passing a section explicitly
+is still the rule where a surface owns one (the dock is `MINI_PLAYER`, the player
+is `FULL_PLAYER`).
+
 **Manual colours use the same recipe as the artwork.** A pick in Settings runs
 through `BackgroundPalettePolicy.manualFrom`, and the swatch rows render the
 result of that derivation — what the user taps is what the surface will paint,

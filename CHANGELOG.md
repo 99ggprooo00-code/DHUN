@@ -79,12 +79,24 @@ painted by the surfaces that own them.
   Version 0 imports the legacy `backdrop_blur = 0` as "blur off" exactly once, so
   an existing install keeps the behaviour it had. Hosts apply the state before
   the first frame (Android `MainActivity`, desktop `Main`).
+- **Detail pages inherit the section they were opened from.** Album, artist and
+  playlist pages paint their own cover backdrop and are reachable from Home,
+  Search and Library, but all three pinned it to `BackgroundSection.HOME`: with
+  Library set to sharp and Home frosted, a playlist opened from Library was still
+  frosted, for a reason nothing in Settings explained. Every backdrop
+  (`NowPlayingBackdrop`, `AmbientBackdrop`, `PageArtworkBackdrop`,
+  `LyricsArtworkLayer`) now takes a nullable section that resolves to
+  `LocalBackgroundSection.current`, so menus, panels and detail pages follow the
+  surface they float over. The rule is enforced by a design gate rather than a
+  convention, and the on-device checks are written down in
+  `docs/verification/35-background-visual-validation.md`.
 - **Tests.** `BackgroundSettingsTest` covers the full precedence table on every
   section, the master/section blur combinations, dynamic-blur availability,
   colour/blur independence, manual palettes, resets, persistence across a
   restart, the version-0 migration, palette encoding, missing artwork and the
   contrast band; `scripts/test_design_system.py` now also forbids coupling the
-  two features or starting a second image pipeline.
+  two features, starting a second image pipeline, or pinning a backdrop to one
+  hardcoded section.
 
 ### The glass was in the names, not in the pixels (2026-10-30, session `arena/97df3ebc-dhun`)
 
