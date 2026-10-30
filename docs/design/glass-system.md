@@ -79,6 +79,22 @@ Two rules follow from that and are enforced mechanically
    `TrackMenuSurface` be what you see. A Material `containerColor` in a menu is
    a flat plate inside the glass.
 
+### What Material is still allowed to be
+
+A census of the app after the correction, so nobody mistakes the remainder for
+drift — or re-opens it as work:
+
+| Left in `shared/.../ui`, `app-android`, `app-desktop` | Why it is not the Material look |
+| --- | --- |
+| `Text` | A text primitive. It renders `LocalTextStyle`, which `DhunTheme` fills from `DhunTypographyTokens` — DHUN's family, sizes, tracking and colours. |
+| `MaterialTheme.typography` (215 reads) | Reads DHUN's own scale through Material's holder (`DhunTypography` is built from `DhunTypographyTokens`). There is no `MaterialTheme.colorScheme` read left in `shared/ui`: colour always comes from `DhunColors`. |
+| `DropdownMenu` (3 sites) | The anchor only: transparent container, zero tonal/shadow elevation, `TrackMenuSurface` + `MenuActionRow` draw the glass. |
+| `Scaffold` (1 site) | Slot layout in the shell, container transparent, so the ambient + artwork backdrops show through. |
+| Wrappers in `design/components/` | `Button`, `Switch`, `Slider`, `Checkbox`, `FilterChip`, `IconButton`, `Scaffold`-free progress, `PullToRefreshBox` — used as *mechanics*; every colour, shape, size and indicator is DHUN's, and screens may not call them. |
+
+That is the whole list. Anything else from Material reaching a screen fails
+`scripts/test_design_system.py`.
+
 ## 3. Numbers (do not re-invent per screen)
 
 All glass constants live in `GlassMaterialPolicy` and `LyricsMaterialPolicy`.
