@@ -16,6 +16,8 @@ import dev.dhun.domain.GetHistoryUseCase
 import dev.dhun.domain.HistoryDay
 import dev.dhun.player.DhunPlayer
 import dev.dhun.player.NowPlayingPersistence
+import dev.dhun.presentation.MutationState
+import dev.dhun.presentation.MutationTracker
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -196,6 +198,20 @@ data class ClearDownloadsUiState(
     val errorMessage: String? = null,
 )
 
+/*
+ * User-facing copy for a failed single-row mutation, in one place so the
+ * banner always says what did not happen rather than a generic error.
+ */
+private const val DOWNLOAD_START_FAILED = "Could not start that download. Check free space and try again."
+private const val DOWNLOAD_PAUSE_FAILED = "Could not pause that download. Try again."
+private const val DOWNLOAD_RESUME_FAILED = "Could not resume that download. Try again."
+private const val DOWNLOAD_CANCEL_FAILED = "Could not cancel that download. Try again."
+private const val DOWNLOAD_REMOVE_FAILED = "Could not delete that download. The file may still be on disk."
+private const val PLAYLIST_RENAME_FAILED = "Could not rename that playlist. Try again."
+private const val PLAYLIST_PLAY_FAILED = "Could not read that playlist to start playing it. Try again."
+private const val FAVORITE_FAILED = "Could not update Liked Songs. Try again."
+private const val HISTORY_REMOVE_FAILED = "Could not remove that play from history. Try again."
+
 class LibraryViewModel(
     private val playlists: PlaylistRepository,
     private val library: LibraryRepository,
@@ -233,6 +249,19 @@ class LibraryViewModel(
 
     private val _clearDownloadsUiState = MutableStateFlow(ClearDownloadsUiState())
     val clearDownloadsUiState: StateFlow<ClearDownloadsUiState> = _clearDownloadsUiState.asStateFlow()
+
+    /**
+     * Pending/failure state for the single-row mutations this screen runs
+     * (history removal, like/unlike, download enqueue/pause/resume/cancel/remove,
+     * playlist rename). Before this existed each of them was a bare
+     * `scope.launch { runCatching { … } }`: a failure changed nothing on screen
+     * and said nothing, so the tap looked like it had worked when it had not.
+     */
+    private val mutations = MutationTracker(scope)
+    val mutation: StateFlow<MutationState> = mutations.state
+
+    /** Dismiss the banner after the user has read a failure. */
+    fun dismissMutationError() = mutations.dismissError()
 
     /** Consume the one-shot success result after the UI closes its confirmation. */
     fun consumeClearDownloadsResult() {
@@ -352,29 +381,29 @@ class LibraryViewModel(
 
     fun download(track: Track) {
         val dm = downloadManager ?: return
-        scope.launch { runCatching { dm.enqueue(track) } }
+        mutations.run("download:${track.id}", DOWNLOAD_START_FAILED) { dm.enqueue(track) }
     }
 
     fun pauseDownload(trackId: String) {
         val dm = downloadManager ?: return
-        scope.launch { runCatching { dm.pause(trackId) } }
+        mutations.run("download-pause:$trackId", DOWNLOAD_PAUSE_FAILED) { dm.pause(trackId) }
     }
 
     /** Resume a PAUSED download or retry a FAILED one (both re-queue from state). */
     fun resumeDownload(trackId: String) {
         val dm = downloadManager ?: return
-        scope.launch { runCatching { dm.resume(trackId) } }
+        mutations.run("download-resume:$trackId", DOWNLOAD_RESUME_FAILED) { dm.resume(trackId) }
     }
 
     /** Cancel an in-flight/queued download and drop its `.part` file. */
     fun cancelDownload(trackId: String) {
         val dm = downloadManager ?: return
-        scope.launch { runCatching { dm.cancel(trackId) } }
+        mutations.run("download-cancel:$trackId", DOWNLOAD_CANCEL_FAILED) { dm.cancel(trackId) }
     }
 
     fun removeDownload(trackId: String) {
         val dm = downloadManager ?: return
-        scope.launch { runCatching { dm.remove(trackId) } }
+        mutations.run("download-remove:$trackId", DOWNLOAD_REMOVE_FAILED) { dm.remove(trackId) }
     }
 
     /**
@@ -442,7 +471,7 @@ class LibraryViewModel(
 
     fun renamePlaylist(id: String, newName: String) {
         if (newName.isBlank()) return
-        scope.launch { runCatching { playlists.rename(id, newName) } }
+        mutations.run("playlist-rename:$id", PLAYLIST_RENAME_FAILED) { playlists.rename(id, newName) }
     }
 
     // No current UI caller. Keep failures and cancellation observable to any future caller.
@@ -450,21 +479,19 @@ class LibraryViewModel(
 
     // ---- Favorite actions ----
     fun removeFavorite(trackId: String) {
-        scope.launch { runCatching { library.removeFavorite(trackId) } }
+        mutations.run("unlike:$trackId", FAVORITE_FAILED) { library.removeFavorite(trackId) }
     }
 
     fun toggleFavorite(track: Track) {
-        scope.launch {
-            runCatching {
-                if (library.isFavorite(track.id)) library.removeFavorite(track.id)
-                else library.addFavorite(track)
-            }
+        mutations.run("like:${track.id}", FAVORITE_FAILED) {
+            if (library.isFavorite(track.id)) library.removeFavorite(track.id)
+            else library.addFavorite(track)
         }
     }
 
     // ---- History actions ----
     fun removeHistoryEntry(entryId: Long) {
-        scope.launch { runCatching { history.remove(entryId) } }
+        mutations.run("history-remove:$entryId", HISTORY_REMOVE_FAILED) { history.remove(entryId) }
     }
 
     suspend fun clearHistory() {
@@ -507,11 +534,12 @@ class LibraryViewModel(
     }
 
     fun playPlaylist(playlistId: String, startIndex: Int = 0) {
-        scope.launch {
-            val tracks = runCatching {
-                playlists.observeTracks(playlistId).first()
-            }.getOrNull() ?: emptyList()
-            if (tracks.isEmpty()) return@launch
+        // Reading the playlist could fail (database busy/locked) and the old
+        // `runCatching { … }.getOrNull() ?: emptyList()` made that look like an
+        // empty playlist: the Play button did nothing and said nothing.
+        mutations.run("play-playlist:$playlistId", PLAYLIST_PLAY_FAILED) {
+            val tracks = playlists.observeTracks(playlistId).first()
+            if (tracks.isEmpty()) return@run
             val safe = startIndex.coerceIn(0, tracks.size - 1)
             setPlayContext(PlayContext.PLAYLIST)
             player.prepareQueue(tracks, safe, playWhenReady = true)

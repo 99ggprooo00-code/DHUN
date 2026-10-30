@@ -1,4 +1,32 @@
-# CURRENT ACTIVE TASK — 2026-10-29: mobile Search/IME verification
+# CURRENT ACTIVE TASK — 2026-10-29: native mutation feedback
+
+**Branch/base:** `arena/8b985cde-dhun` / `main` `1ec8c06` (merge of PR #211).
+Starting tree clean. Owner authorises scoped native implementation, tests,
+commit/push/PR and merge after every applicable gate; no public app release and
+no provider change.
+
+**Why this task:** the playlist-deletion cycle (PR #210 closed as superseded,
+PR #211 merged) fixed one instance of "the UI confirms before the write does".
+The native audit found the same class across Settings, Library, the playlist page
+and the Like control — including two crash paths, because those call sites had no
+error handling at all. Evidence table:
+[verification 31](../docs/verification/31-native-mutation-feedback.md).
+
+**Work:** shared `MutationTracker`/`MutationState`; result-driven Settings
+dialogs (pending, failure, retry, success-gated close); banner feedback for
+row-level mutations; create-playlist and rename dialogs that stay open on
+failure; add-to-playlist sheet with in-sheet failures. New `MutationTrackerTest`
+and `SettingsMaintenanceActionsTest` plus regressions in the Library, downloads,
+Home and playlist suites.
+
+**Verification limits:** this sandbox has no JDK, Gradle distribution, Android
+SDK/emulator, ADB or interactive Windows session, so compilation, unit tests and
+lint are CI-only here and no device interaction is claimed. Local: the Python
+repository-hygiene suite.
+
+---
+
+## Previous task snapshot — 2026-10-29: mobile Search/IME verification
 
 **Branch/base:** `arena/3f9f6220-dhun` / `46885ce` (merged PR #198). Starting tree
 was clean. Current authority permits scoped implementation/tests, commit/push/PR

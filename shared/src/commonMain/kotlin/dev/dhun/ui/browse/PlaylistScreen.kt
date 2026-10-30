@@ -26,6 +26,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -55,7 +56,10 @@ import dev.dhun.design.components.LoadingShimmer
 import dev.dhun.design.components.PageArtworkBackdrop
 import dev.dhun.presentation.browse.PlaylistUiState
 import dev.dhun.presentation.browse.PlaylistViewModel
+import dev.dhun.ui.components.ActionErrorBanner
 import dev.dhun.ui.components.DragHandleGrip
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import dev.dhun.ui.components.ReorderableList
 
 /**
@@ -84,6 +88,7 @@ fun PlaylistScreen(
     val state by viewModel.state.collectAsState()
     val deleted by viewModel.deleted.collectAsState()
     val deletion by viewModel.deletion.collectAsState()
+    val mutation by viewModel.mutation.collectAsState()
     // Own the dialog above LocalPlaylistContent: the DB observer can emit a
     // missing row before delete() returns, and must not dismiss a pending dialog.
     var deletingName by remember(viewModel) { mutableStateOf<String?>(null) }
@@ -147,6 +152,18 @@ fun PlaylistScreen(
                     )
                 }
             }
+        }
+
+        // Row-edit failures (swipe-remove, drag-reorder) have no dialog, so
+        // they are reported here; the row itself stays for a retry.
+        mutation.errorMessage?.let { message ->
+            ActionErrorBanner(
+                message = message,
+                onDismiss = viewModel::dismissMutationError,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = DhunSpacing.touchTarget + DhunSpacing.sm),
+            )
         }
 
         // Floating frosted back chip
@@ -299,6 +316,9 @@ private fun LocalPlaylistContent(
     onDelete: () -> Unit,
 ) {
     var showRename by remember { mutableStateOf(false) }
+    var isRenaming by remember { mutableStateOf(false) }
+    var renameError by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     Column(modifier = Modifier.fillMaxSize()) {
         PlaylistHeader(
@@ -369,10 +389,32 @@ private fun LocalPlaylistContent(
     if (showRename) {
         RenameDialog(
             current = title,
-            onDismiss = { showRename = false },
+            isSaving = isRenaming,
+            errorMessage = renameError,
+            onDismiss = {
+                if (!isRenaming) {
+                    showRename = false
+                    renameError = null
+                }
+            },
             onConfirm = { newName ->
-                viewModel.rename(newName)
-                showRename = false
+                if (!isRenaming) {
+                    isRenaming = true
+                    renameError = null
+                    scope.launch {
+                        try {
+                            viewModel.rename(newName)
+                            // Closes only for a write that returned normally.
+                            showRename = false
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            renameError = "Could not rename this playlist. Try again."
+                        } finally {
+                            isRenaming = false
+                        }
+                    }
+                }
             },
         )
     }
@@ -465,9 +507,11 @@ private fun RenameDialog(
     current: String,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
+    isSaving: Boolean = false,
+    errorMessage: String? = null,
 ) {
     var name by remember(current) { mutableStateOf(current) }
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(onDismissRequest = { if (!isSaving) onDismiss() }) {
         GlassCard(
             modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
             shape = DhunShapes.large,
@@ -485,12 +529,25 @@ private fun RenameDialog(
                 DhunTextField(
                     value = name,
                     onValueChange = { name = it },
+                    isError = errorMessage != null,
                 )
+                if (errorMessage != null) {
+                    Spacer(modifier = Modifier.height(DhunSpacing.xs))
+                    Text(
+                        text = errorMessage,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DhunColors.error,
+                    )
+                }
                 Spacer(modifier = Modifier.height(DhunSpacing.md))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    DhunTextButton(onClick = onDismiss) { Text("Cancel") }
+                    DhunTextButton(onClick = onDismiss, enabled = !isSaving) { Text("Cancel") }
                     Spacer(modifier = Modifier.weight(1f))
-                    DhunButton(onClick = { onConfirm(name) }, enabled = name.isNotBlank()) { Text("Save") }
+                    DhunButton(
+                        onClick = { onConfirm(name) },
+                        enabled = name.isNotBlank() && !isSaving,
+                        loading = isSaving,
+                    ) { Text(if (errorMessage != null) "Try again" else "Save") }
                 }
             }
         }
