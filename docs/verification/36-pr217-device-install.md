@@ -12,21 +12,26 @@
 | | |
 |---|---|
 | Pull request | #217, branch `arena/09e5238e-dhun` |
-| Commit | `125a4c78c0a3fa3ee65bbabc5d5bc7250c823549` |
-| CI on that commit | `CI` 41044202480 (Ubuntu + Windows), `Build APK` 41044210173, `test-release` 41044210169 — all green |
-| APK artifact | `apk` on run **41044210169**, artifact id `12970818781`, artifact digest `sha256:9feaabde158cef8ee15c26267a57a3ac4210dc6ecb0994156d2b2bf15b152c73` |
-| Same APKs, other name | artifact `debug-apk` on run 41044210173, id `12970749912`, digest `sha256:cb47fcdf9216496cdae24d402a43a8bd927268e5641214e5151e2dfeb0c776b4` |
-| Inside the zip | `dhun-test.apk` (universal), `dhun-test-arm64-v8a.apk`, `dhun-test-armeabi-v7a.apk`, each with a `.sha256` and a `.provenance.txt` |
+| **Take the APK from** | the **`Build APK`** (artifact `debug-apk`) or **`test-release` → `apk`** run whose commit is **the PR head shown on the PR page**. Any older run is a different build; a docs-only commit still moves the head, so check the commit, not the date. |
+| Artifact contents | `dhun-test.apk` (universal), `dhun-test-arm64-v8a.apk`, `dhun-test-armeabi-v7a.apk`, each with a `.sha256` and a `.provenance.txt`. The `debug-apk` artifact holds the same three files under Gradle names (`app-android-universal-debug.apk`, …). |
 | Package name | `dev.dhun.android` |
 | Version shown by Android | `1.00.002`, version code `7` |
 | Minimum Android | 8.0 (API 24) |
+| Signing | `app-android/keystores/dhun-test.p12`, the committed test key — the same one every CI build uses |
 
-The agent could not fetch the artifact bytes: this sandbox may only reach
+The procedure deliberately names no run number: PR artifacts expire after 14
+days and every push produces new ones, so a hard-coded run id is how a
+validation ends up testing a build that is not the head. Open the pull request,
+click the green tick on the top commit, and pick the `Build APK` run for **that**
+commit. Record the run id, the artifact name and the `.sha256` value you
+installed in §7.
+
+The agent could not fetch any artifact bytes: this sandbox may only reach
 `github.com`, `api.github.com`, `codeload.github.com`, npm and PyPI, and artifact
-downloads redirect to Azure Blob storage, which is blocked here. The identity
-above therefore comes from the workflow, the run metadata and `app-android/build.gradle.kts`
-— not from opening the APK. Compare the `.sha256` inside the zip with
-`sha256sum` if you want to confirm the bytes yourself.
+downloads redirect to Azure Blob storage, which is blocked here. So the identity
+above comes from the workflow and `app-android/build.gradle.kts`, not from
+opening an APK. Confirm the bytes yourself: the zip carries a `.sha256` next to
+each APK, and `sha256sum dhun-test.apk` must print the same value.
 
 **Which file to install:** `dhun-test.apk` (the universal one). It works on every
 phone that can run DHUN. The per-ABI files are only smaller.
