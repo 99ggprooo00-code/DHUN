@@ -53,6 +53,13 @@ object BackgroundPreferences {
     /** Version-1 section ids that owned a palette. */
     private val LEGACY_SECTIONS = listOf("home", "search", "library", "mini", "player")
 
+    /**
+     * The version-1 sections that are now one surface. Home/Search/Library each
+     * had their own rows, but they are the same page background physically, so
+     * the first one the user actually saved becomes *Main pages*.
+     */
+    private val LEGACY_PAGE_SECTIONS = listOf("home", "search", "library")
+
     private val LEGACY_FIELDS = listOf(
         SettingsKeys.BACKGROUND_FIELD_BLUR,
         SettingsKeys.BACKGROUND_FIELD_DYNAMIC_BLUR,
@@ -203,12 +210,21 @@ object BackgroundPreferences {
             ),
         )
 
-        val pages = listOf("home", "search", "library").firstOrNull(::saved)
-        return buildMap {
-            pages?.let { put(BackgroundComponent.PAGES, prefs(it)) }
-            if (saved("mini")) put(BackgroundComponent.MINI_PLAYER, prefs("mini"))
-            if (saved("player")) put(BackgroundComponent.FULL_PLAYER, prefs("player"))
+        // Explicit loops, not `firstOrNull(::saved)`/`buildMap { }`: a suspend
+        // function reference is not a `(String) -> Boolean`, and these reads are
+        // suspend. Two lines of loop are cheaper to read than the workaround.
+        var pages: String? = null
+        for (section in LEGACY_PAGE_SECTIONS) {
+            if (saved(section)) {
+                pages = section
+                break
+            }
         }
+        val components = mutableMapOf<BackgroundComponent, ComponentBackgrounds>()
+        pages?.let { components[BackgroundComponent.PAGES] = prefs(it) }
+        if (saved("mini")) components[BackgroundComponent.MINI_PLAYER] = prefs("mini")
+        if (saved("player")) components[BackgroundComponent.FULL_PLAYER] = prefs("player")
+        return components
     }
 
     /**

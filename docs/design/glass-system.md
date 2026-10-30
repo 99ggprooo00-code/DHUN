@@ -43,9 +43,9 @@ dark-first, layered, with soft blur behind sharp content. Material 3 is an
 | Multi-select box (offline selection) | `DhunCheckbox` | `design/components/DhunControls.kt` |
 | Progress bar (download, storage) | `DhunProgressBar` | `design/components/DhunControls.kt` |
 | Loading spinner (buttons, pagination) | `DhunSpinner` (thin accent arc in a faint glass track) | `design/components/DhunSpinner.kt` |
-| Page base under the artwork backdrop | `AmbientBackdrop(section)` (the section palette) | `design/components/NowPlayingBackdrop.kt` |
-| Surface tint for dock / miniplayer / player chrome | `Modifier.backgroundSectionTint(section)` | `design/background/BackgroundSurface.kt` |
-| Background blur and colour resolution | `DhunBackgrounds`, `BackgroundSection`, `BackgroundPalette`, `BackgroundPalettePolicy` | `design/background/` |
+| Page base under the artwork backdrop | `AmbientBackdrop(component)` (that surface's palette) | `design/components/NowPlayingBackdrop.kt` |
+| Surface tint for dock / navigation / player chrome | `Modifier.backgroundComponentTint(component)` | `design/background/BackgroundSurface.kt` |
+| Background blur and colour resolution | `DhunBackgrounds`, `BackgroundComponent`, `BackgroundPalette`, `BackgroundPalettePolicy` | `design/background/` |
 | Anchored menu (provider picker, mode picker, overflow) | `DropdownMenu(containerColor = Color.Transparent)` + `TrackMenuSurface` + `MenuActionRow` | `ui/components/TrackOverflowDialog.kt` |
 | Collapsible page toolbar / any chrome strip | `Modifier.dhunGlassBody(fill)` | `design/components/GlassCard.kt` |
 | Bottom tab bar (glass band + tabs) | `DhunNavigationBar` + `DhunNavigationBarItem` | `design/components/DhunNavigation.kt` |
