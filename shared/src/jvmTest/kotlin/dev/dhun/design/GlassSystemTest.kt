@@ -31,6 +31,15 @@ import kotlin.test.assertTrue
  */
 class GlassSystemTest {
 
+    companion object {
+        /**
+         * Compose stores colours at 8 bits per channel, so 0.91 round-trips as
+         * 0.9098 and a 0.5 blend of 0.4 lands on 0.702. Assertions on channels
+         * have to allow that quantisation; the *policy* numbers are exact.
+         */
+        const val CHANNEL_TOLERANCE = 0.01f
+    }
+
     @BeforeTest
     fun resetBefore() = DhunAppearance.reset()
 
@@ -63,7 +72,7 @@ class GlassSystemTest {
             )
             // The whole gradient stays within a narrow band of the readable fill:
             // this is depth, not a wash.
-            (stops.map { it.second }).forEach {
+            stops.map { it.second }.forEach {
                 assertTrue(
                     abs(luminance(it) - luminance(mid)) < 0.12f,
                     "light=$light: body stop drifted too far from the readable fill",
@@ -126,7 +135,9 @@ class GlassSystemTest {
             } else {
                 GlassMaterialPolicy.DIALOG_BODY_ALPHA_DARK
             }
-            assertEquals(floor, body.alpha, "the dialog floor is a documented number, not a per-call choice")
+            // Compose packs alpha to 8 bits, so 0.91 comes back as 0.9098…
+            assertEquals(floor, body.alpha, CHANNEL_TOLERANCE,
+                "the dialog floor is a documented number, not a per-call choice")
             assertTrue(body.alpha < 1f, "a dialog is still glass: it may not become an opaque plate")
             assertTrue(body.alpha > 0.85f, "a dialog must stay readable over artwork")
         }
@@ -136,15 +147,20 @@ class GlassSystemTest {
     fun theBlendHelperMovesTowardsTheTargetAndKeepsAlpha() {
         val base = Color(0.2f, 0.3f, 0.4f, 0.5f)
         val lifted = GlassMaterialPolicy.blend(base, Color.White, 0.5f)
-        assertEquals(0.6f, lifted.red, 0.001f)
-        assertEquals(0.65f, lifted.green, 0.001f)
-        assertEquals(0.7f, lifted.blue, 0.001f)
-        assertEquals(0.5f, lifted.alpha, "alpha is the caller's decision, never the blend's")
+        assertEquals(0.6f, lifted.red, CHANNEL_TOLERANCE)
+        assertEquals(0.65f, lifted.green, CHANNEL_TOLERANCE)
+        assertEquals(0.7f, lifted.blue, CHANNEL_TOLERANCE)
+        assertEquals(0.5f, lifted.alpha, CHANNEL_TOLERANCE, "alpha is the caller's decision, never the blend's")
+        // A zero fraction is a no-op, so a bad constant cannot shift a surface.
+        val unchanged = GlassMaterialPolicy.blend(base, Color.White, 0f)
+        assertEquals(base.red, unchanged.red, CHANNEL_TOLERANCE)
+        assertEquals(base.green, unchanged.green, CHANNEL_TOLERANCE)
+        assertEquals(base.blue, unchanged.blue, CHANNEL_TOLERANCE)
+        assertEquals(base.alpha, unchanged.alpha, CHANNEL_TOLERANCE)
         // Out-of-range fractions are clamped, so a bad constant cannot invert a surface.
-        assertEquals(base, GlassMaterialPolicy.blend(base, Color.White, 0f))
         val full = GlassMaterialPolicy.blend(base, Color.Black, 2f)
-        assertEquals(0f, full.red, 0.001f)
-        assertEquals(0.5f, full.alpha)
+        assertEquals(0f, full.red, CHANNEL_TOLERANCE)
+        assertEquals(0.5f, full.alpha, CHANNEL_TOLERANCE)
     }
 
     @Test
