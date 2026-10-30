@@ -2262,3 +2262,29 @@ What this round did **not** prove:
   is selected by `(min-width: 480px) and (min-aspect-ratio: 1/1)` and the case has
   not been captured.
 
+
+## 2026-10-30 — session `arena/83a7841b-dhun`: background blur / dynamic blur / dynamic colours, and what is still unproven
+
+- **CI proves it compiles and its unit tests pass on both target platforms.**
+  `build-and-test` runs `:shared:jvmTest` (which now includes
+  `BackgroundSettingsTest`), `Build APK` produces the Android artifact and
+  `test-release` / `msi` builds the Windows desktop package. That is compile +
+  logic coverage, not appearance.
+- **No emulator, device or interactive desktop ran.** Specifically unverified:
+  whether the two palette blooms read as artwork behind real covers on a phone,
+  whether a bright cover keeps the settings rows legible, whether a section with
+  blur off looks *deliberately* sharp next to a frosted neighbour, and whether
+  the crossfade between track palettes feels slow rather than laggy on a
+  low-end device. Someone has to look at it.
+- **The pre-API-31 fallback is unchanged and still un-eyeballed.** `Modifier.blur`
+  remains a no-op below API 31; the master switch adds no CPU blur path, so
+  Android 8–11 shows the dimmed cover, now also with per-section colours.
+  Whether that combination is *good* below API 31 is a hardware question this
+  sandbox cannot answer.
+- **Desktop Skiko blur with the palette behind it has not been seen.** The msi
+  job proves the desktop package builds and its JVM tests pass; nobody has
+  watched a Windows window paint the artwork palette and the frost together.
+- **The palette picker offers swatches, not a colour wheel.** That is deliberate
+  (every swatch is inside the measured luminance band) and it is the reason a
+  user cannot pick an unreadable base — but it also means "any colour" is not a
+  promise this build makes.
