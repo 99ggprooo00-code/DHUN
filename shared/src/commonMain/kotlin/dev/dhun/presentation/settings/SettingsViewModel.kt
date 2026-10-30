@@ -33,6 +33,13 @@ class SettingsViewModel(
     private val clearSearchHistoryAction: (suspend () -> Unit)? = null,
     private val clearPlayHistoryAction: (suspend () -> Unit)? = null,
     private val clearAudioCacheAction: (suspend () -> Long)? = null,
+    /**
+     * Puts the live equalizer engine back to its documented defaults. The EQ
+     * rows are ordinary settings, so [reset] removes them — but its state lives
+     * in a platform engine session, which would otherwise keep the old preset
+     * and write it straight back on the next change.
+     */
+    private val resetEqualizerAction: (suspend () -> Unit)? = null,
     private val onCountryCodeChange: (String) -> Unit = {},
 ) {
     // Settings controls write asynchronously, but rapid changes (especially
@@ -594,6 +601,10 @@ class SettingsViewModel(
             },
         ) {
             writeMutex.withLock { SettingsKeys.all.forEach { update.remove(it) } }
+            // Run after the rows are gone: the engine's defaults then persist
+            // through the shell's own observer, and a reset only reports
+            // success once the panel the user sees is back to defaults too.
+            resetEqualizerAction?.invoke()
         }
     }
 

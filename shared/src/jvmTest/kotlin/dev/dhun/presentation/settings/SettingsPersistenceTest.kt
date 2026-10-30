@@ -297,6 +297,68 @@ class SettingsPersistenceTest {
     }
 
     @Test
+    fun resetAlsoRestoresTheLiveEqualizerAfterTheRowsAreGone(): Unit = runBlocking {
+        val d = data()
+        val h = Harness()
+        d.settings.putBoolean(SettingsKeys.EQUALIZER_ENABLED, true)
+        d.settings.putString(SettingsKeys.EQUALIZER_PRESET, "bass_boost")
+        var engineResets = 0
+        var presetStillStoredWhenEngineReset: Boolean? = null
+        val vm = SettingsViewModel(
+            GetSettingUseCase(d.settings),
+            UpdateSettingUseCase(d.settings),
+            h.scope,
+            resetEqualizerAction = {
+                engineResets++
+                presetStillStoredWhenEngineReset = d.settings.getString(SettingsKeys.EQUALIZER_PRESET) != null
+            },
+        )
+        try {
+            eventually { vm.loaded.value }
+            vm.reset()
+            eventually { vm.lastCompletedKey.value == SettingsViewModel.KEY_RESET }
+            // The EQ rows are settings, but the engine keeps its own state: a
+            // reset that only deleted the rows left the panel on the old preset
+            // and the next slider move wrote it straight back.
+            assertEquals(1, engineResets, "reset must restore the live engine exactly once")
+            assertEquals(
+                false,
+                presetStillStoredWhenEngineReset,
+                "the saved rows are gone before the engine is reset, so its defaults are what persists",
+            )
+            assertNull(d.settings.getString(SettingsKeys.EQUALIZER_PRESET))
+            assertNull(vm.maintenanceState.value.errorMessage)
+        } finally {
+            h.close()
+        }
+    }
+
+    @Test
+    fun aFailedEqualizerResetIsReportedAndNotCountedAsDone(): Unit = runBlocking {
+        val d = data()
+        val h = Harness()
+        val vm = SettingsViewModel(
+            GetSettingUseCase(d.settings),
+            UpdateSettingUseCase(d.settings),
+            h.scope,
+            resetEqualizerAction = { error("equalizer engine unavailable") },
+        )
+        try {
+            eventually { vm.loaded.value }
+            vm.reset()
+            eventually { vm.maintenanceState.value.errorFor(SettingsViewModel.KEY_RESET) != null }
+            assertEquals(
+                SettingsViewModel.RESET_FAILED,
+                vm.maintenanceState.value.errorFor(SettingsViewModel.KEY_RESET),
+            )
+            assertNull(vm.lastCompletedKey.value, "a half-applied reset must not close its dialog")
+            assertTrue(h.uncaught.isEmpty(), "the failure must not escape the coroutine: ${h.uncaught}")
+        } finally {
+            h.close()
+        }
+    }
+
+    @Test
     fun aFailedVisualTuningSavePutsBackTheStoredExperiment(): Unit = runBlocking {
         val d = data()
         val h = Harness()

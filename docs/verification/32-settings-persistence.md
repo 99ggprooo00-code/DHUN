@@ -54,12 +54,23 @@ would set a theme or cache budget, see it applied, and lose it on restart.
   load path (a corrupt stored value cannot reach the UI through either door).
 - **One defaults list.** `reset()` and any future caller share `applyDefaults()`
   instead of a third copy of the 23 assignments.
+- **Reset reaches the live equalizer.** `reset()` removes *every*
+  `SettingsKeys` row — including `EQUALIZER_ENABLED/PRESET/PREAMP/GAINS` — but
+  the equalizer's state lives in a platform engine session, not in a row. The
+  panel kept the old preset, the shell's own persistence observer wrote it
+  straight back on the next slider move, and the "Restore all preferences"
+  action was therefore neither applied nor durable. `reset()` now takes a
+  `resetEqualizerAction` that the shell wires to
+  `EqualizerSession.restore(EqualizerState())`, run after the rows are removed
+  and inside the same mutation, so a failure is `RESET_FAILED` instead of a
+  silent half-reset. (The shell's comment already claimed this behaviour; the
+  code did not.)
 - `setCountryCode` re-notifies the provider only when the rollback actually
   changes the effective country.
 
 No schema, dependency, provider, navigation or visual change.
 
-## 3. Tests — `:shared:jvmTest`, `SettingsPersistenceTest` (new, 8 tests)
+## 3. Tests — `:shared:jvmTest`, `SettingsPersistenceTest` (new, 12 tests)
 
 | Test | Property |
 | --- | --- |
@@ -70,6 +81,8 @@ No schema, dependency, provider, navigation or visual change.
 | `failedIntAndBooleanWritesRollBackToo` | Cache budget (int) and resume-on-launch (boolean) roll back |
 | `aSuccessfulWriteKeepsTheNewValueAndPersistsIt` | Positive control: value kept and readable from the database |
 | `resetRestoresEveryDocumentedDefault` | After changing four settings, `reset()` clears the rows and republishes every default |
+| `resetAlsoRestoresTheLiveEqualizerAfterTheRowsAreGone` | The engine is reset exactly once, after the rows are gone, and reset still completes cleanly |
+| `aFailedEqualizerResetIsReportedAndNotCountedAsDone` | A failing engine reset is `RESET_FAILED`, the dialog stays open, nothing escapes |
 | `anInvalidStoredCacheBudgetIsClampedOnLoadAndOnRollback` | A corrupt/legacy value is clamped on both paths |
 
 Every one of them fails on the previous implementation (the first two on the
