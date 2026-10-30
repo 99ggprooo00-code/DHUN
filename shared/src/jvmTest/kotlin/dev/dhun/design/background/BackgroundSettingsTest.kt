@@ -782,7 +782,7 @@ class BackgroundSettingsTest {
     fun versionOneSectionPalettesMigrateIntoTheSurfaceModel(): Unit = runBlocking {
         val d = data()
         val s = d.settings
-        fun legacy(section: String, field: String, value: String) =
+        suspend fun legacy(section: String, field: String, value: String) =
             s.putString(SettingsKeys.backgroundKey(section, field), value)
 
         // Home: artwork colours off, blur on, and a violet bloom the user chose.
