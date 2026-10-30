@@ -898,13 +898,15 @@ class BackgroundSettingsTest {
             // The surface's colour reaches the veil...
             assertNotEquals(themeVeil, first, "a picked colour must tint the veil")
             assertNotEquals(first, second, "two picks must not produce the same veil")
-            // ...without moving it out of the luminance band the text ladder was
-            // measured against (`BASE_LUMINANCE_DRIFT` around the theme veil).
+            // ...without moving its luminance at all: the veil is the theme
+            // veil's luminance carrying the surface's hue, which is what keeps
+            // every measured text contrast valid for any pick. The only slack is
+            // the packing precision of `Color`.
             for (tinted in listOf(first, second)) {
                 val drift = abs(tinted.luminance() - themeVeil.luminance())
                 assertTrue(
-                    drift <= BackgroundPalettePolicy.BASE_LUMINANCE_DRIFT + BackgroundPalettePolicy.CLAMP_TOLERANCE,
-                    "veil luminance drift $drift must stay inside the band",
+                    drift <= BackgroundPalettePolicy.CLAMP_TOLERANCE,
+                    "veil luminance drift $drift must be zero bar Color packing",
                 )
             }
         }

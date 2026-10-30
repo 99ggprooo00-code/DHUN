@@ -341,17 +341,21 @@ object BackgroundPalettePolicy {
      * wrong in one direction is how a "clamped" base quietly ends up twice as
      * far from the theme as documented.
      */
-    fun clampBase(color: Color, background: Color): Color {
+    fun clampBase(
+        color: Color,
+        background: Color,
+        drift: Float = BASE_LUMINANCE_DRIFT,
+    ): Color {
         val target = background.luminance()
         val lum = color.luminance()
-        val drift = lum - target
+        val delta = lum - target
         // The epsilon matters: clamping lands the colour exactly on the band
         // edge, and without it a second pass (sanitise runs on the way in *and*
         // on the way out of storage) would nudge an already-safe palette again,
         // drifting a little further every read.
-        if (abs(drift) <= BASE_LUMINANCE_DRIFT + CLAMP_EPSILON) return color
-        val excess = abs(drift) - BASE_LUMINANCE_DRIFT
-        val towardBlack = drift > 0f
+        if (abs(delta) <= drift + CLAMP_EPSILON) return color
+        val excess = abs(delta) - drift
+        val towardBlack = delta > 0f
         val span = if (towardBlack) lum else 1f - lum
         val mix = if (span <= 0.0001f) 1f else (excess / span).coerceIn(0f, 1f)
         return color.blend(if (towardBlack) Color.Black else Color.White, mix)
@@ -373,16 +377,21 @@ object BackgroundPalettePolicy {
      * carrying [palette]'s colour.
      *
      * Every artwork layer paints this veil (page backdrop, the player's scrim and
-     * dim), which is why one function decides it. It is luminance-clamped to
-     * [veilTint] exactly like a base wash is clamped to the theme background, so
-     * a row's measured contrast over the veil is unchanged by which colour the
-     * user picked — only the hue is theirs.
+     * dim), which is why one function decides it. Its luminance is pinned to
+     * [veilTint] exactly, so a row's measured contrast over the veil is unchanged
+     * by whichever colour the user picked — only the hue is theirs.
      */
     fun veilTintFor(palette: BackgroundPalette, veilTint: Color): Color =
-        keepLuminance(
-            source = palette.mainGlow,
-            base = veilTint,
-            tint = VEIL_SURFACE_SHARE,
+        // drift = 0 on purpose: the veil's luminance *is* the theme veil's, so
+        // every contrast measurement the ladder was built on still applies to
+        // whatever colour the user picks. Only the hue is theirs. (An earlier
+        // draft allowed ±BASE_LUMINANCE_DRIFT here; in light mode the light end
+        // of that band let content rows read as white tiles, which is exactly
+        // what the contrast gate refuses.)
+        clampBase(
+            color = veilTint.blend(palette.mainGlow, VEIL_SURFACE_SHARE),
+            background = veilTint,
+            drift = 0f,
         )
 
     /**

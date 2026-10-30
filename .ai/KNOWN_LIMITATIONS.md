@@ -2278,10 +2278,11 @@ on Ubuntu and Windows. **Nothing in this feature has been seen rendered.**
   backdrop — so with blur on, "blur + my colour" and "blur + artwork colour" looked
   identical in the player. Both now use
   `BackgroundPalettePolicy.veilTintFor(palette, veilTint)`: the surface's hue at the
-  theme veil's luminance, clamped to `BASE_LUMINANCE_DRIFT` so the measured contrast
-  is unchanged. `DhunThemeContrastTest` now measures rows over the theme veil *and*
-  both ends of that band, and the design gate fails if either backdrop goes back to
-  a theme-only veil.
+  theme veil's luminance, pinned exactly (`drift = 0`) so the measured contrast is
+  unchanged for any pick. A first attempt allowed the veil to drift
+  `±BASE_LUMINANCE_DRIFT`; `DhunThemeContrastTest` caught the light end of that band
+  turning content rows into white tiles, which is why the drift is zero. The design
+  gate fails if either backdrop goes back to a theme-only veil.
 - **The two globals had a third switch between them.** *Adaptive blur* sat between
   *Background blur* and *Dynamic colours*, which reads as a three-switch model. It is
   a detail of an enabled blur, so it now lives with *Blur strength* under **Backdrop

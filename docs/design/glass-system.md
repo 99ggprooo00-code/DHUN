@@ -172,11 +172,11 @@ presence there as well (`AmbientBackdropPolicy.SOLID_BLOOM_SCALE`).
 **The veil carries the surface's colour.** Where artwork is painted, a translucent
 veil sits between it and the rows. `BackgroundPalettePolicy.veilTintFor(palette,
 veilTint)` gives that veil the surface's hue at the theme's own veil luminance
-(clamped to `BASE_LUMINANCE_DRIFT`, so the measured text contrast is unchanged).
-Both artwork backdrops call it — the page backdrop and the player's scrim/dim — so
-"blur on, my colours" is visible on the full player too, not just on the pages.
-`DhunThemeContrastTest` measures rows over the theme veil *and* both ends of that
-band, which is the worst case a picked colour can produce.
+pinned exactly (`drift = 0`), so the measured text contrast is unchanged by
+whichever colour the user picked. Both artwork backdrops call it — the page
+backdrop and the player's scrim/dim — so "blur on, my colours" is visible on the
+full player too, not just on the pages. The contrast gate measures rows over that
+one veil, which is now literally the veil every surface paints.
 
 **Blur off means no image layer.** `BackgroundBlurPolicy.paintsArtwork(percent)`
 is the single answer every artwork layer asks for: `NowPlayingBackdrop`,

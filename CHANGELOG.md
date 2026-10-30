@@ -32,10 +32,9 @@ regression test or a design gate:
   artwork backdrop, so "blur + my colour" and "blur + artwork colour" looked the
   same in the player — the one surface made of artwork was the one surface a
   manual colour could not reach. `BackgroundPalettePolicy.veilTintFor` gives the
-  veil the surface's hue at the theme veil's luminance (clamped to
-  `BASE_LUMINANCE_DRIFT`), both backdrops use it, and `DhunThemeContrastTest` now
-  measures text over the theme veil *and* both ends of the band a picked colour
-  can reach.
+  veil the surface's hue at the theme veil's luminance, pinned exactly, so every
+  contrast number the ladder was built on still holds for any colour; both
+  backdrops use it.
 - **A third switch sat between the two globals.** *Adaptive blur* now lives with
   *Blur strength* under **Backdrop detail**: it is a detail of an enabled blur,
   not a third global, and the two-switch block reads as exactly two decisions.
