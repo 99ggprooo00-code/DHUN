@@ -361,6 +361,46 @@ class GlassDesignSystemTest(unittest.TestCase):
         for word in ("PaletteLayer", "Primary (base wash)", "Secondary (main glow)", "Companion glow"):
             self.assertNotIn(word, settings, "the surface picker must not expose palette layers")
 
+    def test_the_two_global_switches_are_the_whole_global_model(self):
+        """Background blur and Dynamic colours are the only global decisions.
+
+        The previous pass had three globals in one block, which read as "blur,
+        something, colour". Adaptive blur is a *detail of an enabled blur*, so it
+        belongs with the strength slider, not between the two switches; and every
+        surface's colour has to reach the veil over its own artwork, or picking a
+        colour for the player silently does nothing while blur is on.
+        """
+        settings = (
+            ROOT / "shared/src/commonMain/kotlin/dev/dhun/ui/settings/BackgroundSettings.kt"
+        ).read_text()
+        self.assertNotIn(
+            "Adaptive blur",
+            settings,
+            "the two-switch block must not grow a third global; keep blur detail in Backdrop detail",
+        )
+        for global_switch in ("Background blur", "Dynamic colours"):
+            self.assertIn(global_switch, settings, f"{global_switch} must stay a global switch")
+        detail = (ROOT / "shared/src/commonMain/kotlin/dev/dhun/ui/settings/SettingsScreen.kt").read_text()
+        self.assertIn("Adaptive blur", detail, "adaptive blur belongs to the Backdrop detail group")
+
+        # Every artwork layer's veil carries its own surface's colour.
+        for rel in (
+            "shared/src/commonMain/kotlin/dev/dhun/design/components/NowPlayingBackdrop.kt",
+            "shared/src/commonMain/kotlin/dev/dhun/ui/player/FullPlayer.kt",
+        ):
+            text = (ROOT / rel).read_text()
+            self.assertIn(
+                "veilTintFor(",
+                text,
+                f"{rel} paints a theme-grey veil, so a picked colour cannot tint its own artwork",
+            )
+        player = (ROOT / "shared/src/commonMain/kotlin/dev/dhun/ui/player/FullPlayer.kt").read_text()
+        self.assertRegex(
+            player,
+            r"veilTintFor\(\s*palette = DhunBackgrounds\.paletteFor\(BackgroundComponent\.FULL_PLAYER\)",
+            "the full player's veil must use the full player's own palette",
+        )
+
     def test_page_backdrops_follow_the_surface_they_are_composed_on(self):
         """A backdrop inherits the component of the surface it is composed on.
 

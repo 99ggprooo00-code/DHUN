@@ -358,6 +358,34 @@ object BackgroundPalettePolicy {
     }
 
     /**
+     * Share of a surface's colour in the veil painted *over* its blurred
+     * artwork.
+     *
+     * The veil exists for legibility, so it cannot simply be the surface colour:
+     * its luminance is the theme's own veil and only its hue changes. A little
+     * over half is enough for "this surface is green" to read at 0.3-0.6 alpha
+     * without moving the measured veil luminance anywhere.
+     */
+    const val VEIL_SURFACE_SHARE = 0.55f
+
+    /**
+     * The veil over a surface's own blurred artwork: [veilTint]'s luminance,
+     * carrying [palette]'s colour.
+     *
+     * Every artwork layer paints this veil (page backdrop, the player's scrim and
+     * dim), which is why one function decides it. It is luminance-clamped to
+     * [veilTint] exactly like a base wash is clamped to the theme background, so
+     * a row's measured contrast over the veil is unchanged by which colour the
+     * user picked — only the hue is theirs.
+     */
+    fun veilTintFor(palette: BackgroundPalette, veilTint: Color): Color =
+        keepLuminance(
+            source = palette.mainGlow,
+            base = veilTint,
+            tint = VEIL_SURFACE_SHARE,
+        )
+
+    /**
      * A colour that carries [source]'s hue and [base]'s luminance. Used for the
      * base wash: recognisably the chosen colour, provably inside the contrast
      * band the text ladder was measured against.

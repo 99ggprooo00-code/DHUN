@@ -587,6 +587,23 @@ private fun BackdropControls(viewModel: SettingsViewModel) {
     ) {
         if (supportsRealtimeBlur) {
             val blurOn = backgrounds.blurEnabled
+            // A detail of blur, not a third global switch: it only changes *how
+            // much* an enabled frost blurs, is suspended (not cleared) while
+            // Background blur is off, and lives next to the strength it scales.
+            // Keeping it out of the two-switch block is what lets the user read
+            // that block as exactly two independent decisions.
+            BackgroundSwitchRow(
+                title = "Adaptive blur",
+                subtitle = when {
+                    !blurOn -> "Paused while Background blur is off. Your choice is remembered."
+                    backgrounds.adaptiveBlur ->
+                        "Bright, busy covers keep the full frost; dark, calm ones are blurred a little less so they stay recognisable."
+                    else -> "One steady frost for every cover, at the strength below."
+                },
+                checked = backgrounds.adaptiveBlur,
+                enabled = blurOn,
+                onCheckedChange = viewModel::setBackgroundAdaptiveBlur,
+            )
             // The master switch is the off switch, so the strength slider has no
             // zero: a slider that could reach it would let "Background blur: on"
             // and "nothing is frosted" both be true, which reads as a bug.

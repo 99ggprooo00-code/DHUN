@@ -9,6 +9,7 @@ import dev.dhun.data.SettingsKeys
 import dev.dhun.data.SettingsRepository
 import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunTokens
+import dev.dhun.design.components.NowPlayingBackdropPolicy
 import dev.dhun.design.luminance
 import dev.dhun.domain.GetSettingUseCase
 import dev.dhun.domain.UpdateSettingUseCase
@@ -870,5 +871,141 @@ class BackgroundSettingsTest {
             BackgroundPalettePolicy.defaultPalette(BackgroundComponent.PAGES, DhunAppearance.tokens),
             DhunBackgrounds.paletteFor(BackgroundComponent.PAGES),
         )
+    }
+    /* ------------------------------------------------------- the veil */
+
+    /**
+     * The veil over a surface's own artwork carries that surface's colour at the
+     * theme's veil luminance.
+     *
+     * This is what makes "blur on + dynamic colours off" visible on the full
+     * player: before it, the player's scrim and dim were the theme's neutral
+     * rung, so a colour the user picked for the player had no effect at all
+     * while artwork was behind it.
+     */
+    @Test
+    fun theVeilCarriesItsSurfaceColourAtTheThemeVeilLuminance() {
+        for (tokens in listOf(dark, light)) {
+            val themeVeil = NowPlayingBackdropPolicy.veilTint(tokens)
+            val first = BackgroundPalettePolicy.veilTintFor(
+                BackgroundPalettePolicy.paletteFrom(pickColor, tokens, solid = false),
+                themeVeil,
+            )
+            val second = BackgroundPalettePolicy.veilTintFor(
+                BackgroundPalettePolicy.paletteFrom(Color(0xFFFF7A45), tokens, solid = false),
+                themeVeil,
+            )
+            // The surface's colour reaches the veil...
+            assertNotEquals(themeVeil, first, "a picked colour must tint the veil")
+            assertNotEquals(first, second, "two picks must not produce the same veil")
+            // ...without moving it out of the luminance band the text ladder was
+            // measured against (`BASE_LUMINANCE_DRIFT` around the theme veil).
+            for (tinted in listOf(first, second)) {
+                val drift = abs(tinted.luminance() - themeVeil.luminance())
+                assertTrue(
+                    drift <= BackgroundPalettePolicy.BASE_LUMINANCE_DRIFT + BackgroundPalettePolicy.CLAMP_TOLERANCE,
+                    "veil luminance drift $drift must stay inside the band",
+                )
+            }
+        }
+    }
+
+    /* ----------------------------------------- global switch independence */
+
+    /**
+     * Requirement, verbatim: turning either switch must not change the other.
+     * Asserted at the storage level, in both directions, including a restart.
+     */
+    @Test
+    fun turningOneGlobalSwitchNeverChangesTheOther(): Unit = runBlocking {
+        val d = data()
+        val v = loaded(vm(d, this))
+
+        v.setBackgroundBlurEnabled(false)
+        settled(this)
+        assertFalse(v.backgrounds.value.blurEnabled)
+        assertTrue(v.backgrounds.value.dynamicColors, "blur off must not touch Dynamic colours")
+        assertTrue(d.settings.getBoolean(SettingsKeys.BACKGROUND_DYNAMIC_COLORS, true))
+
+        v.setBackgroundDynamicColors(false)
+        settled(this)
+        assertFalse(d.settings.getBoolean(SettingsKeys.BACKGROUND_BLUR_ENABLED, true), "the blur row must be untouched")
+        assertFalse(v.backgrounds.value.blurEnabled)
+
+        // And back on again: blur returning must not resurrect Dynamic colours.
+        v.setBackgroundBlurEnabled(true)
+        settled(this)
+        assertTrue(v.backgrounds.value.blurEnabled)
+        assertFalse(d.settings.getBoolean(SettingsKeys.BACKGROUND_DYNAMIC_COLORS, true))
+
+        val restarted = reloaded(d, this).backgrounds.value
+        assertTrue(restarted.blurEnabled)
+        assertFalse(restarted.dynamicColors)
+    }
+
+    /* ------------------------------------------ migration data preservation */
+
+    /**
+     * The version-1 rows are read, never rewritten or deleted.
+     *
+     * That is what makes "no user data discarded" true even where the new model
+     * cannot *show* the old shape (three layers per section, one colour per
+     * surface): the original rows still hold the values, and a build that reads
+     * the old shape still finds them.
+     */
+    @Test
+    fun migrationLeavesTheVersionOneRowsInPlace(): Unit = runBlocking {
+        val d = data()
+        val s = d.settings
+        suspend fun legacy(section: String, field: String, value: String) =
+            s.putString(SettingsKeys.backgroundKey(section, field), value)
+
+        legacy("home", SettingsKeys.BACKGROUND_FIELD_SECONDARY, "#FFBB86FC")
+        legacy("home", SettingsKeys.BACKGROUND_FIELD_PRIMARY, "#FF141118")
+        legacy("home", SettingsKeys.BACKGROUND_FIELD_TERTIARY, "#FF9C7BE8")
+        s.putInt(SettingsKeys.BACKGROUND_PROFILE_VERSION, 1)
+
+        BackgroundPreferences.read(GetSettingUseCase(s), UpdateSettingUseCase(s))
+
+        assertEquals(
+            "#FFBB86FC",
+            s.getString(SettingsKeys.backgroundComponentKey(BackgroundComponent.PAGES.id, SettingsKeys.BACKGROUND_FIELD_COLOR)),
+            "the chosen colour is imported",
+        )
+        assertEquals("#FFBB86FC", s.getString(SettingsKeys.backgroundKey("home", SettingsKeys.BACKGROUND_FIELD_SECONDARY)))
+        assertEquals("#FF141118", s.getString(SettingsKeys.backgroundKey("home", SettingsKeys.BACKGROUND_FIELD_PRIMARY)))
+        assertEquals("#FF9C7BE8", s.getString(SettingsKeys.backgroundKey("home", SettingsKeys.BACKGROUND_FIELD_TERTIARY)))
+    }
+
+    /**
+     * A page colour is never lost to a Home row that only carried a blur toggle.
+     */
+    @Test
+    fun aPageColourSurvivesWhenOnlyAnotherPageSectionHeldIt(): Unit = runBlocking {
+        val d = data()
+        val s = d.settings
+        s.putString(SettingsKeys.backgroundKey("home", SettingsKeys.BACKGROUND_FIELD_BLUR), "false")
+        s.putString(SettingsKeys.backgroundKey("search", SettingsKeys.BACKGROUND_FIELD_SECONDARY), "#FF4FC3A1")
+        s.putInt(SettingsKeys.BACKGROUND_PROFILE_VERSION, 1)
+
+        val pages = BackgroundPreferences
+            .read(GetSettingUseCase(s), UpdateSettingUseCase(s))
+            .component(BackgroundComponent.PAGES)
+        assertEquals(Color(0xFF4FC3A1), pages.color, "Search's colour must not be dropped for a Home blur row")
+        assertFalse(pages.blurEnabled, "the flags still come from the first saved section (Home)")
+    }
+
+    /** A section that only ever saved a base wash still keeps a colour. */
+    @Test
+    fun aSectionWithOnlyAPrimaryColourStillMigratesIt(): Unit = runBlocking {
+        val d = data()
+        val s = d.settings
+        s.putString(SettingsKeys.backgroundKey("player", SettingsKeys.BACKGROUND_FIELD_PRIMARY), "#FF7FB3FF")
+        s.putInt(SettingsKeys.BACKGROUND_PROFILE_VERSION, 1)
+
+        val player = BackgroundPreferences
+            .read(GetSettingUseCase(s), UpdateSettingUseCase(s))
+            .component(BackgroundComponent.FULL_PLAYER)
+        assertEquals(Color(0xFF7FB3FF), player.color)
     }
 }

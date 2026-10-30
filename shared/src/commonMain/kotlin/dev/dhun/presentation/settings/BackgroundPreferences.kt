@@ -60,6 +60,12 @@ object BackgroundPreferences {
      */
     private val LEGACY_PAGE_SECTIONS = listOf("home", "search", "library")
 
+    /** The version-1 rows that could carry a colour a user picked. */
+    private val LEGACY_COLOUR_FIELDS = listOf(
+        SettingsKeys.BACKGROUND_FIELD_SECONDARY,
+        SettingsKeys.BACKGROUND_FIELD_PRIMARY,
+    )
+
     private val LEGACY_FIELDS = listOf(
         SettingsKeys.BACKGROUND_FIELD_BLUR,
         SettingsKeys.BACKGROUND_FIELD_DYNAMIC_BLUR,
@@ -205,23 +211,42 @@ object BackgroundPreferences {
                 SettingsKeys.backgroundKey(section, SettingsKeys.BACKGROUND_FIELD_DYNAMIC_COLORS),
                 true,
             ),
+            // Version 1 stored three layers per section. The one the user
+            // actually chose is `secondary` (the main bloom); `primary` was the
+            // derived wash sitting over their colour. So `secondary` becomes the
+            // surface colour, and `primary` is only a fallback for a section that
+            // somehow saved a wash but no bloom — a colour is never dropped just
+            // because it was stored in the other row.
             color = BackgroundColorCodec.decode(
                 get.string(SettingsKeys.backgroundKey(section, SettingsKeys.BACKGROUND_FIELD_SECONDARY), ""),
+            ) ?: BackgroundColorCodec.decode(
+                get.string(SettingsKeys.backgroundKey(section, SettingsKeys.BACKGROUND_FIELD_PRIMARY), ""),
             ),
         )
 
-        // Explicit loops, not `firstOrNull(::saved)`/`buildMap { }`: a suspend
-        // function reference is not a `(String) -> Boolean`, and these reads are
-        // suspend. Two lines of loop are cheaper to read than the workaround.
-        var pages: String? = null
-        for (section in LEGACY_PAGE_SECTIONS) {
-            if (saved(section)) {
-                pages = section
-                break
-            }
+        // Home/Search/Library become one surface, so at most one of their
+        // colours can survive. Two rules, in this order:
+        //
+        //  1. the surface's *flags* (does it blur, does it follow artwork) come
+        //     from the first section the user saved - Home if it was ever
+        //     touched, which is the common case;
+        //  2. its *colour* comes from the first saved section that actually has
+        //     one, so a user whose only colour lived under Search does not lose
+        //     it to a Home row that merely carried a blur toggle.
+        //
+        // The version-1 rows themselves are left untouched, so nothing is
+        // destroyed - see `allKeys()` and the "legacy rows survive" test.
+        val savedPages = LEGACY_PAGE_SECTIONS.filter { saved(it) }
+        val colourPage = savedPages.firstOrNull { section ->
+            LEGACY_COLOUR_FIELDS.any { field -> get.has(SettingsKeys.backgroundKey(section, field)) }
         }
         val components = mutableMapOf<BackgroundComponent, ComponentBackgrounds>()
-        pages?.let { components[BackgroundComponent.PAGES] = prefs(it) }
+        savedPages.firstOrNull()?.let { flags ->
+            val flagsPrefs = prefs(flags)
+            val colour = colourPage?.let { prefs(it).color }
+            components[BackgroundComponent.PAGES] =
+                if (flagsPrefs.color == null && colour != null) flagsPrefs.copy(color = colour) else flagsPrefs
+        }
         if (saved("mini")) components[BackgroundComponent.MINI_PLAYER] = prefs("mini")
         if (saved("player")) components[BackgroundComponent.FULL_PLAYER] = prefs("player")
         return components

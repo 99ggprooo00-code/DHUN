@@ -95,18 +95,6 @@ internal fun BackgroundSettingsSection(viewModel: SettingsViewModel) {
             )
         }
         BackgroundSwitchRow(
-            title = "Adaptive blur",
-            subtitle = when {
-                !backgrounds.blurEnabled -> "Paused while Background blur is off. Your choice is remembered."
-                backgrounds.adaptiveBlur ->
-                    "The frost follows the cover: bright, busy artwork keeps the full frost, dark and calm artwork is blurred a little less so it stays recognisable."
-                else -> "One steady frost for every cover, at the strength set below."
-            },
-            checked = backgrounds.adaptiveBlur,
-            enabled = backgrounds.blurEnabled,
-            onCheckedChange = viewModel::setBackgroundAdaptiveBlur,
-        )
-        BackgroundSwitchRow(
             title = "Dynamic colours",
             subtitle = if (backgrounds.dynamicColors) {
                 "Surface colours come from the playing track's artwork. Works with or without background blur."
@@ -125,7 +113,8 @@ internal fun BackgroundSettingsSection(viewModel: SettingsViewModel) {
         )
         Text(
             text = "A colour for each part of the interface. With background blur on it tints the blurred artwork; " +
-                "with blur off it is the surface itself.",
+                "with blur off it is the surface itself. The two switches above are global; each surface below can " +
+                "also opt out of artwork colour or drop its own blur.",
             style = MaterialTheme.typography.bodySmall,
             color = DhunColors.textSecondary,
         )
@@ -190,7 +179,7 @@ internal fun BackgroundSettingsSection(viewModel: SettingsViewModel) {
 /* --------------------------------------------------------------- rows */
 
 @Composable
-private fun BackgroundSwitchRow(
+internal fun BackgroundSwitchRow(
     title: String,
     subtitle: String,
     checked: Boolean,
@@ -315,29 +304,9 @@ private fun BackgroundComponentDialog(
                 color = if (source.isOverridden) DhunColors.warning else DhunColors.textSecondary,
             )
 
-            BackgroundSwitchRow(
-                title = "Background blur here",
-                subtitle = if (state.blurEnabled) {
-                    "Turn it off to keep this surface solid while the rest of DHUN shows artwork."
-                } else {
-                    "Background blur is off, so no surface shows artwork right now."
-                },
-                checked = prefs.blurEnabled,
-                enabled = state.blurEnabled,
-                onCheckedChange = { viewModel.setComponentBlurEnabled(component, it) },
-            )
-            BackgroundSwitchRow(
-                title = "Take colour from artwork",
-                subtitle = when {
-                    !state.dynamicColors -> "Dynamic colours is off, so every surface uses its own colour."
-                    !prefs.followArtwork -> "This surface uses your colour while the others follow the artwork."
-                    else -> "This surface follows the playing cover on its own."
-                },
-                checked = prefs.followArtwork,
-                enabled = state.dynamicColors,
-                onCheckedChange = { viewModel.setComponentFollowArtwork(component, it) },
-            )
-
+            // The colour comes first: it is what this dialog is for, and what
+            // the two global switches above act on. Everything below it is an
+            // override for this one surface.
             Text(
                 text = "Colour for ${component.label.lowercase()}",
                 style = MaterialTheme.typography.titleSmall,
@@ -379,6 +348,41 @@ private fun BackgroundComponentDialog(
                     }
                 }
             }
+
+            /*
+             * Overrides for this surface only - not a second copy of the global
+             * settings. They sit *after* the colour the user came here to pick,
+             * they are disabled while their global is off, and their captions
+             * name the global that suspends them, so the two switches at the top
+             * of the screen stay the two decisions that govern the app.
+             */
+            Text(
+                text = "Overrides for this surface",
+                style = MaterialTheme.typography.titleSmall,
+                color = DhunColors.textPrimary,
+            )
+            BackgroundSwitchRow(
+                title = "Background blur here",
+                subtitle = if (state.blurEnabled) {
+                    "Only this surface. Turn Background blur off above to remove artwork everywhere."
+                } else {
+                    "Background blur is off above, so no surface shows artwork. This choice is remembered."
+                },
+                checked = prefs.blurEnabled,
+                enabled = state.blurEnabled,
+                onCheckedChange = { viewModel.setComponentBlurEnabled(component, it) },
+            )
+            BackgroundSwitchRow(
+                title = "Take colour from artwork",
+                subtitle = when {
+                    !state.dynamicColors -> "Dynamic colours is off above, so every surface uses its own colour."
+                    !prefs.followArtwork -> "Only this surface: the others still follow the cover."
+                    else -> "This surface follows the playing cover."
+                },
+                checked = prefs.followArtwork,
+                enabled = state.dynamicColors,
+                onCheckedChange = { viewModel.setComponentFollowArtwork(component, it) },
+            )
 
             Row(
                 modifier = Modifier.fillMaxWidth(),

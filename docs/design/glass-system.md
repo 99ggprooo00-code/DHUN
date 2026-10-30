@@ -142,11 +142,16 @@ customisation unit is the thing the user recognises
 | `MINI_PLAYER` | the docked now-playing bar |
 | `FULL_PLAYER` | the immersive player |
 
-Each one saves a colour (or "DHUN default") and its own blur switch, and each has
-its own "take colour from artwork" switch so one surface can keep a manual colour
-while the rest follow the cover. This replaced the earlier five-section,
-`primary`/`secondary`/`tertiary` model: asking a user to assemble a palette was
-asking them to think like the renderer.
+Each one saves **one colour** (or "DHUN default"). That colour is the feature;
+the two switches inside a surface — *Background blur here* and *Take colour from
+artwork* — are **overrides for that surface only**, they sit after the colour in
+the dialog, they are disabled while their global is off, and their captions name
+the global that suspends them. They exist for "keep the dock solid while the pages
+show the cover"; they are not a second copy of the two global switches, and a
+surface that has never been opened behaves exactly as the globals say.
+
+This replaced the earlier five-section, `primary`/`secondary`/`tertiary` model:
+asking a user to assemble a palette was asking them to think like the renderer.
 
 **The palette is derived, never assembled.** `BackgroundPalettePolicy.paletteFrom`
 turns one colour into the three layers the background is painted from — a base
@@ -164,6 +169,15 @@ of the hue to be visible at all, so `SOLID_BASE_TINT_ALPHA` (0.55) is used inste
 still holds in the "blur off, my colours" state. The two glows get a little more
 presence there as well (`AmbientBackdropPolicy.SOLID_BLOOM_SCALE`).
 
+**The veil carries the surface's colour.** Where artwork is painted, a translucent
+veil sits between it and the rows. `BackgroundPalettePolicy.veilTintFor(palette,
+veilTint)` gives that veil the surface's hue at the theme's own veil luminance
+(clamped to `BASE_LUMINANCE_DRIFT`, so the measured text contrast is unchanged).
+Both artwork backdrops call it — the page backdrop and the player's scrim/dim — so
+"blur on, my colours" is visible on the full player too, not just on the pages.
+`DhunThemeContrastTest` measures rows over the theme veil *and* both ends of that
+band, which is the worst case a picked colour can produce.
+
 **Blur off means no image layer.** `BackgroundBlurPolicy.paintsArtwork(percent)`
 is the single answer every artwork layer asks for: `NowPlayingBackdrop`,
 `LyricsArtworkLayer` (dock, lyrics card, dialogs, queue sheet), `GlassCard`'s
@@ -179,11 +193,16 @@ and detail pages inherit the surface they are composed on; surfaces that own one
 (the dock is `MINI_PLAYER`, the player is `FULL_PLAYER`, the tab band is
 `NAVIGATION`) pass it explicitly.
 
+**Two globals, and only two.** *Background blur* and *Dynamic colours* are the
+whole global model and neither reads the other's switch. `Adaptive blur` is not a
+third global: it is a detail of an enabled blur (a bright, busy cover keeps the
+full frost; a dark, calm one is blurred slightly less), it is suspended while blur
+is off, and it lives with the strength slider in *Backdrop detail* rather than
+between the two switches.
+
 **Blur strength cannot impersonate the switch.** The slider scales the radius and
 is floored at `MIN_EFFECTIVE_STRENGTH` (20%) for an enabled blur; the switch is
-the only off control. `Adaptive blur` is a sub-choice of an enabled blur (a bright,
-busy cover keeps the full frost; a dark, calm one is blurred slightly less), never
-a third feature.
+the only off control.
 
 **One image pipeline.** `DhunBackgrounds.setArtworkSeed(...)` is the only artwork
 input: it reuses `ArtworkColorExtractor` (the palette the player tint already

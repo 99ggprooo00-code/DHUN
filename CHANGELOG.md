@@ -22,6 +22,40 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Audit of the background controls: the surface colour now reaches every surface (2026-10-30, session `arena/09e5238e-dhun`)
+
+Four defects found reading the shipped feature against the brief, each with a
+regression test or a design gate:
+
+- **The full player ignored its own colour while blur was on.** Its scrim and dim
+  used the theme's neutral rung, and its palette layer sits *underneath* the
+  artwork backdrop, so "blur + my colour" and "blur + artwork colour" looked the
+  same in the player — the one surface made of artwork was the one surface a
+  manual colour could not reach. `BackgroundPalettePolicy.veilTintFor` gives the
+  veil the surface's hue at the theme veil's luminance (clamped to
+  `BASE_LUMINANCE_DRIFT`), both backdrops use it, and `DhunThemeContrastTest` now
+  measures text over the theme veil *and* both ends of the band a picked colour
+  can reach.
+- **A third switch sat between the two globals.** *Adaptive blur* now lives with
+  *Blur strength* under **Backdrop detail**: it is a detail of an enabled blur,
+  not a third global, and the two-switch block reads as exactly two decisions.
+- **The component dialog led with overrides instead of the colour.** Swatches come
+  first; *Background blur here* and *Take colour from artwork* sit under "Overrides
+  for this surface", disabled while their global is off and naming it in the
+  caption.
+- **Migration could prefer a section with no colour.** *Main pages* takes its
+  flags from the first saved section and its colour from the first section that
+  actually saved one, and a section that only saved a `primary` wash still
+  migrates a colour. Version-1 rows are read once, never rewritten or removed, so
+  nothing is destroyed — only Home/Search/Library's *differences* cannot be shown
+  by one surface, which is documented rather than silently dropped.
+
+Verified: `python3 -m unittest discover -s scripts -p 'test_*.py'` (509 tests, 12
+design gates) and CI `:shared:jvmTest` on Ubuntu and Windows. **Not** visually
+verified: no device, emulator or interactive desktop in this environment; the
+eight manual checks are in
+`docs/verification/35-background-visual-validation.md` (OPEN).
+
 ### Background blur and dynamic colours: two switches, four surfaces (2026-10-30, session `arena/09e5238e-dhun`)
 
 The controls from #216 asked the user to assemble a palette (`primary`,

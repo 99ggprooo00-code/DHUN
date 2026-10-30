@@ -33,6 +33,7 @@ import dev.dhun.design.DhunVisualTuning
 import dev.dhun.design.VisualPart
 import dev.dhun.design.background.BackgroundBlurPolicy
 import dev.dhun.design.background.BackgroundComponent
+import dev.dhun.design.background.BackgroundPalettePolicy
 import dev.dhun.design.background.DhunBackgrounds
 import dev.dhun.design.background.LocalBackgroundComponent
 import dev.dhun.design.supportsRealtimeBlur
@@ -80,7 +81,10 @@ fun NowPlayingBackdrop(
     // curve as the palette, so a track change crossfades the tint instead of
     // snapping it a beat before the blooms catch up.
     val veilTint by animateColorAsState(
-        targetValue = DhunBackgrounds.paletteFor(resolvedComponent).base,
+        targetValue = BackgroundPalettePolicy.veilTintFor(
+            palette = DhunBackgrounds.paletteFor(resolvedComponent),
+            veilTint = NowPlayingBackdropPolicy.veilTint(tokens),
+        ),
         animationSpec = DhunAnimations.slowTween(),
         label = "pageVeilTint",
     )

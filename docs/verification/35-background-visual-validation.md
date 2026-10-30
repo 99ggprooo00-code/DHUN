@@ -58,26 +58,35 @@ old DHUN first (that also erases saved settings — note that you did it).
 
 In order:
 
-- **Background blur** — the artwork switch.
+- **Background blur** — global switch, first.
   - On: "The playing track's artwork is used as a blurred background, tinted with
     each surface's colour."
   - Off: "No artwork behind the app at all. Every surface uses its own solid
     colour."
-- **Adaptive blur** — greyed out while Background blur is off ("Paused while
-  Background blur is off. Your choice is remembered.").
-- **Dynamic colours** — "Surface colours come from the playing track's artwork.
-  Works with or without background blur."
+- **Dynamic colours** — global switch, directly under it. "Surface colours come
+  from the playing track's artwork. Works with or without background blur."
 - **Surface colours** — one row each for **Main pages**, **Navigation bar**,
   **Miniplayer**, **Full player**. Each row shows a colour preview and a line like
   "From the current artwork · artwork behind it", "Your colour · solid colour" or
   "DHUN default · blur paused".
-- Tapping a row opens that surface's dialog: preview strip, "Showing: …", a
-  **Background blur here** switch, a **Take colour from artwork** switch, the
-  colour swatches (**DHUN default** plus Violet, Azure, Jade, Amber, Rose, Cyan),
-  and **Restore defaults**.
-- **Blur strength** lives in the **Backdrop detail** group below.
+- Tapping a row opens that surface's dialog, in this order: preview strip,
+  "Showing: …", **Colour for …** with the swatches (**DHUN default** plus Violet,
+  Azure, Jade, Amber, Rose, Cyan), then **Overrides for this surface** — a
+  **Background blur here** switch and a **Take colour from artwork** switch — then
+  **Restore defaults**.
+- **Backdrop detail** (below) holds **Adaptive blur** (disabled while Background
+  blur is off: "Paused while Background blur is off. Your choice is remembered.")
+  and **Blur strength**.
 
-Play something first: with no track there is no artwork colour to judge.
+The two switches at the top are the whole global model; the two switches inside a
+surface only affect that surface. If *that* reads ambiguously to you on a real
+screen, it is a finding — say so in §4 rather than editing the copy yourself.
+
+Play something first: with no track there is no artwork colour to judge. For the
+checks below you need **three covers**: a bright/busy one, a very dark one, and a
+highly saturated one. Put them next to each other in the queue (the album of a
+colourful record is usually enough), because every check below is about what
+changes when the cover does.
 
 ## 3. Environment record — fill this in
 
@@ -141,6 +150,22 @@ untouched.
 Fails if: two surfaces always share a colour, changing one changes another, or the
 navigation bar shows no colour of its own.
 
+### Check 3b — The full player's own colour is visible while blur is on
+
+This is the combination that used to fail silently: with the artwork behind the
+player, the scrim was the theme's grey, so a colour picked for the player did
+nothing.
+
+1. Open one surface dialog at a time and give **Full player** a strong colour
+   (Jade, then Rose).
+2. Turn **Dynamic colours** off, leave **Background blur** on.
+3. Open the full player. Then close it and compare Home.
+
+Passes if: the player's blurred artwork is visibly tinted with the chosen colour
+(not grey), and the pages use the *pages'* colour, not the player's.
+Fails if: the player looks neutral/grey, the pages change with the player, or the
+controls' text contrast visibly drops.
+
 ### Check 4 — Palette transitions
 
 1. Queue two tracks whose covers are very different in hue (for example warm
@@ -197,6 +222,30 @@ Fails if: a veil/tint is drawn on top of text, the dock is clipped by the tab ba
 a menu appears behind a surface, or a menu opened in the player is coloured like a
 page.
 
+### Check 8 — Upgrading does not lose your colours
+
+Needs two builds on one device: the **previous `test` draft** (the build that had
+the old palette picker) and the build under test. Installing the second over the
+first keeps app data.
+
+1. On the old build, give **Home** one colour, **Search** a different one, and the
+   **miniplayer** a third; turn *Dynamic colours* off so they are what you see.
+2. Install the new build over it (do **not** clear data). Open Settings →
+   Backgrounds.
+3. Also test the older public pre-release if you have it: those builds predate the
+   switches entirely and only stored a blur strength. Set the strength slider to
+   its minimum there, then upgrade.
+
+Passes if: *Main pages* shows one of the two page colours (Home's, if Home had
+one), the miniplayer keeps its colour, the two global switches keep their values,
+and the app starts without a crash or a reset to defaults.
+Fails if: every surface comes back at "DHUN default", the miniplayer loses its
+colour, or the switches flip back on by themselves.
+
+Expected and documented, not a failure: Home and Search can no longer have
+*different* colours, because they are one surface now. The old rows are left in
+the database rather than deleted.
+
 ### Record your results
 
 | Check | Result | Note | Screenshot |
@@ -204,10 +253,12 @@ page.
 | 1. Blur off removes the thumbnail | | | |
 | 2. Four combinations | | | |
 | 3. One colour per surface | | | |
+| 3b. Full player colour visible with blur on | | | |
 | 4. Palette transitions | | | |
 | 5. Settings readability + preview | | | |
 | 6. Pre-Android-12 fallback | | | |
 | 7. Layer ordering | | | |
+| 8. Upgrade keeps colours | | | |
 
 ## 5. Known limitations to confirm rather than "find"
 
@@ -222,7 +273,8 @@ under which it would deserve code.
 | Solid surfaces use a stronger tint (0.55 vs 0.30) with the same luminance clamp | Picked colours read as deep coloured surfaces, not bright ones | Colours look like mud, or text contrast visibly degrades |
 | The colour picker is named swatches, not a wheel | You cannot choose an arbitrary hex | The six hues feel too limiting in normal use |
 | Layer order is reasoned from the composition, never seen | See Check 7 | Any layer is visibly in the wrong place |
-| Version-1 installs lose per-tab colours | Home/Search/Library keep one colour after upgrading | You relied on Home and Search having *different* colours |
+| Version-1 installs lose per-tab colours | Home/Search/Library keep one colour after upgrading; the old rows stay in the database | You relied on Home and Search having *different* colours |
+| Version-1 palettes had three layers; version 2 keeps one | The imported colour is the one you picked (the old `secondary`); the derived wash and companion glow are re-derived | A surface looks flatter than it did before upgrading |
 
 ## 6. What was verified without a device (this session)
 

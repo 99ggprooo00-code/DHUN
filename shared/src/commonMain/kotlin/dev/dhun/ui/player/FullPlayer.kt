@@ -116,6 +116,7 @@ import dev.dhun.design.FullPlayerLayoutMode
 import dev.dhun.design.VisualPart
 import dev.dhun.design.background.BackgroundBlurPolicy
 import dev.dhun.design.background.BackgroundComponent
+import dev.dhun.design.background.BackgroundPalettePolicy
 import dev.dhun.design.background.DhunBackgrounds
 import dev.dhun.design.components.AmbientBackdrop
 import dev.dhun.design.components.ArtworkImage
@@ -1472,8 +1473,17 @@ private fun ArtworkBackdrop(
     // own colour (AmbientBackdrop, just above) is the background instead.
     if (!DhunBackgrounds.showsArtwork(BackgroundComponent.FULL_PLAYER)) return
     val brightnessShift = (55 - DhunAppearance.backdropBrightnessPercent) / 100f * 0.12f
+    // The dim and the scrim below are the *player's* colour over its own
+    // artwork, not the theme's neutral rung: with Dynamic colours off that is
+    // the colour the user picked for the full player, which otherwise had no
+    // visible effect at all while blur was on. Luminance stays the theme's veil
+    // luminance, so the measured contrast of the controls is unchanged.
+    val playerVeilTint = BackgroundPalettePolicy.veilTintFor(
+        palette = DhunBackgrounds.paletteFor(BackgroundComponent.FULL_PLAYER),
+        veilTint = NowPlayingBackdropPolicy.veilTint(DhunAppearance.tokens),
+    )
     val dimColor by animateColorAsState(
-        targetValue = NowPlayingBackdropPolicy.veilTint(DhunAppearance.tokens).copy(alpha =
+        targetValue = playerVeilTint.copy(alpha =
             DhunVisualTuning.veilAlpha(VisualPart.PLAYER,
                 ((if (lyricsDominant) PLAYER_BACKDROP_DIM_LYRICS else PLAYER_BACKDROP_DIM) + brightnessShift)
                     .coerceIn(0.02f, 0.54f))),
@@ -1500,7 +1510,7 @@ private fun ArtworkBackdrop(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(ambientScrimBrush()),
+                .background(ambientScrimBrush(playerVeilTint)),
         )
         Box(
             modifier = Modifier
@@ -1549,9 +1559,8 @@ internal fun playerAmbientScrimStops(isLight: Boolean = false): List<Pair<Float,
 
 /** [playerAmbientScrimStops] as the brush the backdrop actually paints. */
 @Composable
-private fun ambientScrimBrush(): Brush {
+private fun ambientScrimBrush(tint: Color): Brush {
     val tokens = DhunAppearance.tokens
-    val tint = NowPlayingBackdropPolicy.veilTint(tokens)
     return Brush.verticalGradient(
         colorStops = playerAmbientScrimStops(tokens.isLight)
             .map { (offset, alpha) -> offset to tint.copy(alpha =

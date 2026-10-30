@@ -59,18 +59,25 @@ Blur and colour are two independent decisions, not one setting
   copy, and it never turns colour customisation off.
 - *Dynamic colours* — do the surfaces take their colour from that artwork? This works
   with the artwork removed, so "artwork colours, no thumbnail" is a real state.
-- *Adaptive blur* is a sub-choice of an enabled blur, not a third feature: bright,
-  busy covers keep the full frost; dark, calm covers are blurred slightly less.
+- These two are the **whole** global model, and neither changes the other. *Adaptive
+  blur* is a detail of an enabled blur (bright, busy covers keep the full frost; dark,
+  calm covers are blurred slightly less) and lives with the strength slider under
+  *Backdrop detail*, not between the two switches.
 
-Four surfaces carry their own colour and blur switch: **Main pages** (Home, Search,
-Library and the pages opened from them), **Navigation bar** (tab band or side rail),
-**Miniplayer** and **Full player**. A surface's colour is used on its own when the
-artwork is removed and as the tint over the blurred artwork when it is present, and
-each surface can also opt out of artwork colour while the others follow the cover.
-Settings shows the four surfaces, the colour in effect and why ("From the current
-artwork", "Your colour", "DHUN default"), and never asks the user to assemble
-palette layers. One resolution policy and one blur policy serve all four surfaces —
-never a per-screen rule.
+Four surfaces carry their own colour: **Main pages** (Home, Search, Library and the
+pages opened from them), **Navigation bar** (tab band or side rail), **Miniplayer**
+and **Full player**. A surface's colour is used on its own when the artwork is
+removed and as the tint over the blurred artwork when it is present — including the
+full player's scrim, which previously stayed theme-grey and made a picked player
+colour invisible.
+
+Inside a surface, two *overrides* sit below the colour picker: *Background blur here*
+and *Take colour from artwork*. They affect that surface alone, are disabled while
+their global is off, and say so; they are for "keep the dock solid while the pages
+show the cover", not a second copy of the global switches. Settings shows the four
+surfaces, the colour in effect and why ("From the current artwork", "Your colour",
+"DHUN default"), and never asks the user to assemble palette layers. One resolution
+policy and one blur policy serve all four surfaces — never a per-screen rule.
 
 ### Fallbacks
 - Android versions where real blur is unavailable: gradient/tint/opaque material fallback.

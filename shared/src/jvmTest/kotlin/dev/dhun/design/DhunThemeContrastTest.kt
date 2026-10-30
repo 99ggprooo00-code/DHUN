@@ -3,6 +3,7 @@ package dev.dhun.design
 import androidx.compose.ui.graphics.Color
 import dev.dhun.design.components.contentRowFill
 import dev.dhun.design.components.readingSurfaceFill
+import dev.dhun.design.background.BackgroundPalettePolicy
 import dev.dhun.design.components.NowPlayingBackdropPolicy
 import kotlin.math.max
 import kotlin.math.min
@@ -228,22 +229,35 @@ class DhunThemeContrastTest {
                 // BLACK is the deliberately OLED-black variant; do not silently
                 // turn it into the standard lifted dark theme.
             }
+            // Three veils, not one: the theme's own rung, plus the two ends of
+            // the band a component colour can pull it to
+            // (`BackgroundPalettePolicy.veilTintFor` clamps to
+            // BASE_LUMINANCE_DRIFT of this rung). The dark end is the adverse
+            // one for text (a darker page drags the translucent row down with
+            // it); the light end is the adverse one for "rows must not become
+            // white tiles".
+            val veilCandidates = listOf(
+                NowPlayingBackdropPolicy.veilTint(tokens),
+                BackgroundPalettePolicy.paletteFrom(Color.Black, tokens, solid = false).base,
+                BackgroundPalettePolicy.paletteFrom(Color.White, tokens, solid = false).base,
+            )
             listOf(Color.Black, Color.White).forEach { artwork ->
-                val pageTint = NowPlayingBackdropPolicy.veilTint(tokens)
+              veilCandidates.forEach { pageTint ->
                 val lowestVeil = NowPlayingBackdropPolicy.veilStops(tokens.isLight, 55)
                     .minOf { it.second }
                 val page = pageTint.copy(alpha = lowestVeil).compositedOver(artwork)
                 val row = fill.compositedOver(page)
                 if (mode == DhunThemeMode.LIGHT && artwork == Color.White) {
                     assertTrue(row.red < 0.95f,
-                        "light rows over the veiled page must not turn into white tiles")
+                        "light rows over the veiled page must not turn into white tiles (veil $pageTint)")
                 }
-                assertAtLeast(contrast(tokens.textPrimary.compositedOver(row), row), 4.5f, "$mode primary on row over $artwork")
-                assertAtLeast(contrast(tokens.textSecondary.compositedOver(row), row), 4.5f, "$mode secondary on row over $artwork")
+                assertAtLeast(contrast(tokens.textPrimary.compositedOver(row), row), 4.5f, "$mode primary on row over $artwork at veil $pageTint")
+                assertAtLeast(contrast(tokens.textSecondary.compositedOver(row), row), 4.5f, "$mode secondary on row over $artwork at veil $pageTint")
                 val reading = readingSurfaceFill().compositedOver(page)
-                assertAtLeast(contrast(tokens.textPrimary.compositedOver(reading), reading), 4.5f, "$mode primary on legal reader over $artwork")
-                assertAtLeast(contrast(tokens.textSecondary.compositedOver(reading), reading), 4.5f, "$mode secondary on legal reader over $artwork")
-                assertAtLeast(contrast(tokens.textTertiary.compositedOver(reading), reading), 3f, "$mode tertiary on legal reader over $artwork")
+                assertAtLeast(contrast(tokens.textPrimary.compositedOver(reading), reading), 4.5f, "$mode primary on legal reader over $artwork at veil $pageTint")
+                assertAtLeast(contrast(tokens.textSecondary.compositedOver(reading), reading), 4.5f, "$mode secondary on legal reader over $artwork at veil $pageTint")
+                assertAtLeast(contrast(tokens.textTertiary.compositedOver(reading), reading), 3f, "$mode tertiary on legal reader over $artwork at veil $pageTint")
+              }
             }
         }
     }

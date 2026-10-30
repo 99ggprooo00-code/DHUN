@@ -2263,6 +2263,64 @@ What this round did **not** prove:
   not been captured.
 
 
+## 2026-10-30 — final audit of #217 (session `arena/09e5238e-dhun`): what it found, what it fixed, what it still cannot show
+
+**Environment, again.** No JDK, Gradle, Android SDK, emulator image, `/dev/kvm`,
+display or device; no interactive Windows session. The only executable checks
+here are `scripts/test_*.py` (12 design gates, 509 total) and CI's `:shared:jvmTest`
+on Ubuntu and Windows. **Nothing in this feature has been seen rendered.**
+
+### Fixed in the audit
+
+- **A picked full-player colour was invisible while blur was on.** The player's
+  scrim and dim used `NowPlayingBackdropPolicy.veilTint(tokens)`, the theme's
+  neutral rung, and the player's `AmbientBackdrop` sits *under* the artwork
+  backdrop — so with blur on, "blur + my colour" and "blur + artwork colour" looked
+  identical in the player. Both now use
+  `BackgroundPalettePolicy.veilTintFor(palette, veilTint)`: the surface's hue at the
+  theme veil's luminance, clamped to `BASE_LUMINANCE_DRIFT` so the measured contrast
+  is unchanged. `DhunThemeContrastTest` now measures rows over the theme veil *and*
+  both ends of that band, and the design gate fails if either backdrop goes back to
+  a theme-only veil.
+- **The two globals had a third switch between them.** *Adaptive blur* sat between
+  *Background blur* and *Dynamic colours*, which reads as a three-switch model. It is
+  a detail of an enabled blur, so it now lives with *Blur strength* under **Backdrop
+  detail**, and a gate fails if the two-switch block grows it back.
+- **The component dialog led with overrides, not with the colour.** *Background blur
+  here* and *Take colour from artwork* came before the swatches, so the thing the
+  user opened the dialog for was third. The colour comes first now; the two switches
+  sit under an explicit "Overrides for this surface" heading with captions naming the
+  global that suspends them.
+- **Migration could prefer a section that had no colour.** Home/Search/Library
+  collapse into *Main pages*: flags came from the first saved section, and so did the
+  colour — so a Home row that only carried a blur toggle could beat a Search row that
+  held the only colour. Flags and colour are now chosen separately, and a section
+  that saved only a `primary` wash still migrates its colour.
+
+### What is truly lost, and what is not
+
+- **Shown differently, not deleted.** Version-1 rows (`background_<section>_*`) are
+  read once and never rewritten or removed; the import writes the new
+  `background_component_*` rows beside them. A build that reads the old shape still
+  finds the old values, and "reset everything" clears both shapes. Tested by
+  `migrationLeavesTheVersionOneRowsInPlace`.
+- **Home/Search/Library keep one colour.** Two different page colours cannot both be
+  represented by one *Main pages* surface. Expected, documented in the changelog, the
+  design doc and §5 of the validation page, and listed as a limitation to confirm
+  rather than "find".
+- **Three palette layers become one.** The user's chosen colour (`secondary`) is
+  imported; the derived wash and companion glow are re-derived from it, so a surface
+  can look slightly flatter than it did before the upgrade.
+
+### Still unverified (do not read as accepted)
+
+Blur-off truly leaving no thumbnail on a real frame, the four combinations by eye,
+the navigation bar's own colour beside the dock, the settings screen over a bright
+cover, crossfade feel on a low-end device, the API 30 fallback, layer order, and the
+upgrade path on a real install. The procedure is
+[`docs/verification/35-background-visual-validation.md`](../docs/verification/35-background-visual-validation.md)
+(OPEN, 8 checks, with the environment record to fill in).
+
 ## 2026-10-30 — session `arena/09e5238e-dhun`: backgrounds rebuilt as two switches + four surfaces
 
 - **No hardware in this pass either.** No JDK/Gradle, no Android SDK, no emulator
