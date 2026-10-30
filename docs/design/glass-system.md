@@ -128,12 +128,16 @@ threading a URL. Call sites that know better pass `artworkUrl` explicitly.
   fails the repo gate when a banned Material-default composable appears in
   `shared/.../ui/`, `app-android` or `app-desktop` outside the design system,
   unless it is listed with a reason in `scripts/design_system_allowlist.txt`; it
-  also fails when a Material layout container is left with a default
-  `containerColor` or when a screen re-invents the glass gradient.
+  also fails when a menu anchor is left with a default `containerColor` or when a
+  screen re-invents the glass gradient. Navigation is covered by the same list:
+  `NavigationBar`/`NavigationRail` and their items are banned outright, because
+  what looked wrong was inside them, not their container.
 - `shared/src/jvmTest/.../design/GlassSystemTest.kt` asserts the material
   numbers (gradient ordered, sheen capped, edge fading, dialog floor above the
-  row fill, light/dark asymmetry), the control palette, the spinner geometry and
-  the ambient bloom bounds.
+  row fill, light/dark asymmetry), the control palette, the spinner geometry, the
+  ambient bloom bounds, the navigation pill (never a solid accent, rim stronger
+  than the fill, fades to nothing) and the fact that the rail is exactly the
+  width `DhunShellPolicy.railAllowance` reserves for it.
 - Screens are reviewed visually on hardware when hardware exists; a lack of
   device access is recorded in `.ai/KNOWN_LIMITATIONS.md`, not used to justify a
   flat build.

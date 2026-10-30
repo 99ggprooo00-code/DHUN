@@ -246,7 +246,7 @@ data class DhunTokens(
     val surfaceHighest: Color = Color(0xFF363636),
     val surfaceCard: Color = Color(0xFF2A2A2A),
 
-    // Glass-morphism (M3 translucent atmosphere — not Liquid Glass).
+    // The glass tokens (translucent, frosted, artwork-led — not a platform Acrylic API).
     val glassHighlight: Color = Color(0x5E20202A),
     val glass: Color = Color(0x7016161E),
     val glassDeep: Color = Color(0x8A0E0E14),

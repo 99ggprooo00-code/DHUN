@@ -7,7 +7,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 /**
- * Material 3 type scale — **clean sans-serif only** for product UI.
+ * DHUN's type scale — **clean sans-serif only** for product UI. The sizes are
+ * exposed to Material as `Typography` because text primitives read it, but the
+ * numbers are DHUN's: Material's default ramp is not the design.
  *
  * Family: [FontFamily.SansSerif] (Roboto on Android, system UI sans on
  * desktop). No decorative / display face is used for titles, metadata,
@@ -95,7 +97,7 @@ object DhunTypographyTokens {
     val compactLetterSpacing = 1.sp
 }
 
-/** Material3 Typography wired to Dhun tokens — used by DhunTheme. */
+/** DHUN's scale as a Material `Typography`, so `LocalTextStyle` defaults follow it. */
 val DhunTypography = Typography(
     displayLarge = DhunTypographyTokens.displayLarge,
     displayMedium = DhunTypographyTokens.displayMedium,
