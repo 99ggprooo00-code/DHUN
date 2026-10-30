@@ -1,5 +1,20 @@
 # HANDOFF — current multi-source alignment (2026-10-28)
 
+> **Read first if you touch UI (2026-10-30, `arena/97df3ebc-dhun`):** the native
+> interface is **translucent frosted glass**, and Material 3 is never the visual
+> target. Read [`docs/design/glass-system.md`](../docs/design/glass-system.md)
+> (normative: cues, component map, numbers, legibility floor) and
+> [`docs/verification/34-glass-design-system.md`](../docs/verification/34-glass-design-system.md)
+> before editing a screen. Consequences for new work: use the DHUN components
+> (`GlassCard`, `GlassDialog`, `DhunTextField`, `DhunSwitch`, `DhunSlider`,
+> `DhunCheckbox`, `DhunProgressBar`, `DhunSpinner`, `DhunPullToRefresh`,
+> `DhunNavigationBar`/`DhunNavigationRail`, `DhunDivider`, `dhunContentRowSurface`)
+> instead of the Material widget of the same name; `scripts/test_design_system.py`
+> fails the build if a raw one reaches a screen. The report of that session is
+> honest about evidence: Kotlin compilation came from CI, nothing was run on an
+> emulator, device or Windows desktop.
+
+
 Read [PRD §1](../docs/PRD.md#1-product-definition-and-source-of-truth), ROADMAP's
 current task, [matrix 05](../docs/research/05-source-capability-matrix.md),
 [ADR-010's latest amendment](../docs/decisions/ADR-010-multi-source-provider-direction.md)

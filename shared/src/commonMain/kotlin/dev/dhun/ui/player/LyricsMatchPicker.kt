@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,11 +21,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import dev.dhun.core.Track
-import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.GlassCard
 import dev.dhun.design.components.DhunTextField
 import dev.dhun.design.components.DhunTextButton
+import dev.dhun.design.components.DhunDivider
 import dev.dhun.lyrics.TtmlParser
 import dev.dhun.presentation.player.LyricsMatchController
 
@@ -90,7 +89,7 @@ internal fun LyricsMatchPicker(track: Track, controller: LyricsMatchController, 
                         style = MaterialTheme.typography.bodySmall,
                     )
                     state.matches.forEach { match ->
-                        HorizontalDivider(color = DhunColors.border)
+                        DhunDivider()
                         Text("${match.title} — ${match.artist}", style = MaterialTheme.typography.titleMedium)
                         val timing = if (match.synced) "Synced" else "Unsynced"
                         val wordTimed = (match.lyrics as? dev.dhun.core.Lyrics.Synced)?.lines?.any { it.words.isNotEmpty() } == true

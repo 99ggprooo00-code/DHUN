@@ -62,6 +62,9 @@ BANNED = {
     "NavigationBarItem": "use DhunNavigationBarItem",
     "NavigationRail": "use DhunNavigationRail (same material as the dock, width from the policy)",
     "NavigationRailItem": "use DhunNavigationRailItem",
+    "HorizontalDivider": "use DhunDivider (tapered glass hairline)",
+    "Divider": "use DhunDivider (tapered glass hairline)",
+    "PullToRefreshBox": "use DhunPullToRefresh (glass disc + accent arc, not Material's ring)",
 }
 
 # Layout containers Material renders *around* content. They may be used, but only
@@ -177,6 +180,8 @@ class GlassDesignSystemTest(unittest.TestCase):
             "DhunSlider",
             "DhunCheckbox",
             "DhunSpinner",
+            "DhunDivider",
+            "DhunPullToRefresh",
             "DhunNavigationBar",
             "DhunNavigationRail",
             "AmbientBackdrop",

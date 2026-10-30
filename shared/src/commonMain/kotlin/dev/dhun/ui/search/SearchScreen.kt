@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -75,6 +74,7 @@ import dev.dhun.design.components.PlaylistCard
 import dev.dhun.design.components.SectionHeader
 import dev.dhun.design.components.TrackRow
 import dev.dhun.design.components.TrackRowShimmer
+import dev.dhun.design.components.DhunDivider
 import dev.dhun.download.DownloadManager
 import dev.dhun.innertube.SearchFilter
 import dev.dhun.presentation.search.SearchResultsUiState
@@ -317,7 +317,7 @@ private fun SuggestionsList(
                     modifier = Modifier.weight(1f),
                 )
             }
-            HorizontalDivider(color = DhunColors.border)
+            DhunDivider()
         }
     }
 }
@@ -388,7 +388,7 @@ private fun RecentSearchesSection(
                         )
                     }
                 }
-                HorizontalDivider(color = DhunColors.border)
+                DhunDivider()
             }
         }
 

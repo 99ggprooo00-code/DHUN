@@ -20,7 +20,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -73,6 +72,7 @@ import dev.dhun.design.components.SectionHeader
 import dev.dhun.design.components.SectionShimmer
 import dev.dhun.design.components.TrackCard
 import dev.dhun.design.components.DhunTextButton
+import dev.dhun.design.components.DhunPullToRefresh
 import dev.dhun.domain.HomeMood
 import dev.dhun.domain.GetHomeFeedUseCase
 import dev.dhun.domain.HomeShelfKind
@@ -167,7 +167,7 @@ fun HomeScreen(
                 )
             }
         }
-        PullToRefreshBox(
+        DhunPullToRefresh(
             isRefreshing = isRefreshing,
             onRefresh = viewModel::refresh,
             modifier = Modifier.fillMaxWidth().weight(1f),

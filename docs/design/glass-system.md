@@ -50,6 +50,8 @@ dark-first, layered, with soft blur behind sharp content. Material 3 is an
 | Desktop navigation rail | `DhunNavigationRail` + `DhunNavigationRailItem` | `design/components/DhunNavigation.kt` |
 | Button family | `DhunButton`, `DhunTextButton`, `DhunOutlinedButton`, `DhunIconButton` | `design/components/DhunButton.kt` |
 | Chips | `DhunFilterChip` / `FrostedChipSurface` | `design/components/Chip.kt` |
+| Separator line | `DhunDivider` (tapered hairline, not a full-width rule) | `design/components/DhunDivider.kt` |
+| Pull-to-refresh | `DhunPullToRefresh` (glass disc + accent arc) | `design/components/DhunPullToRefresh.kt` |
 | Bottom dock | `GlassDock` | `design/components/GlassCard.kt` |
 | Error strip at screen level | `ActionErrorBanner` (glass + error tint) | `ui/components/ActionErrorBanner.kt` |
 

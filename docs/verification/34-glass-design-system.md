@@ -63,6 +63,9 @@ Settings, an offline device — is still artwork-led instead of one flat colour.
 | `design/components/ContentRowSurface.kt` | `dhunContentSurface` = body gradient + 32% sheen |
 | `design/components/Chip.kt` | chips paint the glass body (selected stays the accent) |
 | `design/components/NowPlayingBackdrop.kt` | `AmbientBackdrop` + `AmbientBackdropPolicy` |
+| `design/components/DhunNavigation.kt` | `DhunNavigationPolicy`, `DhunNavigationBar`, `DhunNavigationBarItem`, `DhunNavigationRail`, `DhunNavigationRailItem` — the shell's tab bar and rail, replacing Material's |
+| `design/components/DhunPullToRefresh.kt` | `DhunPullToRefresh` — Material's gesture mechanics, DHUN's glass disc and accent arc |
+| `design/components/DhunDivider.kt` | `DhunDivider` — the tapered hairline that replaced `HorizontalDivider` |
 | `design/DhunIcons.kt` | new `Check` glyph for the glass checkbox (web icon mirror regenerated) |
 
 ### Screens and shells
@@ -83,6 +86,12 @@ Settings, an offline device — is still artwork-led instead of one flat colour.
   cover instead of a flat background.
 - Every `CircularProgressIndicator` → `DhunSpinner` (Home pagination, Artist
   radio, button loading states).
+- Navigation: Material's `NavigationBar`/`NavigationRail` and their items →
+  `DhunNavigationBar`/`DhunNavigationRail`. The last `HorizontalDivider`s
+  (Search suggestions, lyrics controls, lyrics matches) → `DhunDivider`. Home's
+  `PullToRefreshBox` indicator → `DhunPullToRefresh`.
+- The component catalogue now shows the checkbox, progress bar, spinner,
+  divider and a rendered tab bar, so the spec cannot drift from the widgets.
 
 ## 4. Docs and guardrails
 

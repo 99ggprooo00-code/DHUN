@@ -22,6 +22,56 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### The glass was in the names, not in the pixels (2026-10-30, session `arena/97df3ebc-dhun`)
+
+The owner kept reporting the same thing: DHUN renders as an ordinary Material
+interface even though every token is called glass. The cause was the *material*,
+not the words. `GlassCard` — the surface behind every dialog, settings group and
+notice — painted one flat fill with a uniform 1dp border and ignored the blur
+radius it was handed; `dhunContentSurface` did the same for rows; the page base
+was a single `DhunColors.background`; and raw Material widgets (an `AlertDialog`
+for diagnostics, `OutlinedTextField`s, switches, sliders, checkboxes, spinners,
+`PullToRefreshBox`, `NavigationBar`/`NavigationRail` with Material's own accent
+pill) kept reaching shipped screens. So a screen could be "built with the glass
+system" and still look stock.
+
+- **One material, painted in layers.** `GlassMaterialPolicy` now owns the recipe —
+  body gradient (lifted top, deepened bottom), a specular sheen, a gradient
+  hairline edge and a milky dialog floor (0.91 dark / 0.93 light) — and
+  `GlassCard` composites it in order: shadow, edge, frosted artwork, body, capped
+  tint (≤0.20), sheen, sharp content. Rows carry a third of the sheen
+  (`ROW_SHEEN_SCALE`), so a list stays scannable. Text is never placed on blur.
+- **Every page has artwork colour under it.** New `AmbientBackdrop` paints two
+  accent-derived blooms over the theme base, so first run, Library, Settings and
+  an offline device are artwork-led instead of one flat colour.
+- **Dialogs are glass over the app's own artwork.** `GlassDialog` frosts the
+  currently playing cover (provided once by the shell via
+  `LocalNowPlayingArtwork`); the playback-diagnostics `AlertDialog` is gone.
+- **The control family stops calling Material's defaults.** `DhunSwitch`,
+  `DhunSlider`, `DhunCheckbox`, `DhunProgressBar`, `DhunTextField` (now a
+  `BasicTextField` with label, error hairline, IME action and focus registry),
+  `DhunSpinner` (a thin accent arc in a faint glass track, replacing every
+  `CircularProgressIndicator`) and `DhunPullToRefresh` (glass disc + accent arc,
+  replacing `PullToRefreshBox`'s ring). Chips and inputs paint the glass body
+  instead of a flat fill.
+- **Navigation is DHUN's.** `DhunNavigationBar` / `DhunNavigationRail` replace
+  Material's `NavigationBar`/`NavigationRail`: a translucent accent pill with a
+  lit rim fades in over 160 ms, the band paints the glass body over the dock's
+  frosted artwork, and the rail's width is the same number the pane split
+  reserves for it (asserted). `DhunDivider` replaces flat dividers with a tapered
+  hairline. The shell no longer imports `MaterialTheme` at all.
+- **Enforced, not requested.** New `docs/design/glass-system.md` is the normative
+  contract (cues, component map, numbers, legibility floor, fallbacks, and a table
+  of superseded instructions). `scripts/test_design_system.py` runs in CI and
+  fails when a banned default-Material composable is called from a screen, when a
+  menu anchor is left with a Material container colour, or when a screen
+  re-invents the glass gradient; `GlassSystemTest` pins the numbers. The design
+  contract in `.ai/MASTER_PROMPT.md`, `docs/ui-ux-design.md` and the ADR let no
+  future session read Material 3 as the direction.
+- **Not verified:** no emulator, device or Windows desktop in this environment;
+  blur fallback below API 31 and the rendered look remain hardware checks
+  (`docs/verification/34-glass-design-system.md`).
+
 ### The catalogue answered, and the browser refused its pictures (2026-10-20, session `arena/a9390ecb-dhun`)
 
 The three-instance build deployed, the CI runner reached a catalogue — real rows,

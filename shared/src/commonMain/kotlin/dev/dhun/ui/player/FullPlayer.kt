@@ -113,6 +113,7 @@ import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.DhunVisualTuning
 import dev.dhun.design.VisualPart
+import dev.dhun.design.components.AmbientBackdrop
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.DhunSlider
@@ -366,7 +367,10 @@ fun FullPlayer(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(DhunColors.background)
+            // No flat fill: the ambient base below paints the theme background
+            // *and* the accent blooms, so a player with no cover (or a device
+            // that cannot blur) is still artwork-coloured rather than one
+            // black rectangle.
             .clipToBounds()
             // Swallow gestures so taps don't fall through to the library below.
             .clickable(
@@ -374,6 +378,11 @@ fun FullPlayer(
                 indication = null,
             ) {},
     ) {
+        // ---- ambient base --------------------------------------------------
+        // Under the cover: the page's own colour, so the fallback state is not
+        // a void (docs/design/glass-system.md §1).
+        AmbientBackdrop(modifier = Modifier.fillMaxSize())
+
         // ---- artwork backdrop (runs under the status bar) -------------------
         // Blurred once per track, darkened towards the bottom so the control
         // cluster reads over it; the sharp thumbnail never reaches down here.

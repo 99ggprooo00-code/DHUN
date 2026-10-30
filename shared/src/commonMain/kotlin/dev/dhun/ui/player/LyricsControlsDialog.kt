@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,6 +21,7 @@ import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.DhunTextButton
 import dev.dhun.design.components.GlassCard
+import dev.dhun.design.components.DhunDivider
 import dev.dhun.lyrics.LyricsTiming
 import dev.dhun.presentation.player.LyricsUiState
 import dev.dhun.presentation.player.PlayerViewModel
@@ -54,7 +54,7 @@ internal fun LyricsControlsDialog(
             ) {
                 Text("Lyrics controls", style = MaterialTheme.typography.titleLarge, color = DhunColors.textPrimary)
                 Text(track.title, style = MaterialTheme.typography.bodySmall, color = DhunColors.textSecondary)
-                HorizontalDivider(color = DhunColors.border)
+                DhunDivider()
                 LyricsRomanizationControls(viewModel.lyricsRomanization)
                 LyricsProviderPicker(
                     selectedProvider = preferredProvider,
@@ -62,7 +62,7 @@ internal fun LyricsControlsDialog(
                     accent = DhunColors.accent,
                 )
                 if (lyricsState is LyricsUiState.Synced) {
-                    HorizontalDivider(color = DhunColors.border)
+                    DhunDivider()
                     Text("Timing offset: ${timing.offsetMs} ms",
                         style = MaterialTheme.typography.labelLarge, color = DhunColors.textSecondary)
                     Row(horizontalArrangement = Arrangement.spacedBy(DhunSpacing.xs)) {
@@ -78,7 +78,7 @@ internal fun LyricsControlsDialog(
                     }
                 }
                 if (onFindMatches != null) {
-                    HorizontalDivider(color = DhunColors.border)
+                    DhunDivider()
                     DhunTextButton(onClick = onFindMatches) { Text("Find lyrics matches for this song") }
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
