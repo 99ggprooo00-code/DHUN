@@ -58,12 +58,16 @@ BANNED = {
     "IconButton": "use DhunIconButton (glass circle, not a bare Material icon button)",
     "LinearProgressIndicator": "use DhunProgressBar / the shimmer loading states",
     "CircularProgressIndicator": "use DhunSpinner (thin accent arc in a glass track)",
+    "NavigationBar": "use DhunNavigationBar (DHUN glass band + accent pill, not Material's pill)",
+    "NavigationBarItem": "use DhunNavigationBarItem",
+    "NavigationRail": "use DhunNavigationRail (same material as the dock, width from the policy)",
+    "NavigationRailItem": "use DhunNavigationRailItem",
 }
 
 # Layout containers Material renders *around* content. They may be used, but only
 # with a transparent container so the DHUN glass behind them is what you see —
 # a default `containerColor` is a flat Material plate inside the glass shell.
-TRANSPARENT_ONLY = ("NavigationBar", "NavigationRail", "DropdownMenu")
+TRANSPARENT_ONLY = ("DropdownMenu",)
 
 
 def call_span(text, name, start_line):
@@ -173,6 +177,8 @@ class GlassDesignSystemTest(unittest.TestCase):
             "DhunSlider",
             "DhunCheckbox",
             "DhunSpinner",
+            "DhunNavigationBar",
+            "DhunNavigationRail",
             "AmbientBackdrop",
             "dhunGlassBody",
             "TrackMenuSurface",

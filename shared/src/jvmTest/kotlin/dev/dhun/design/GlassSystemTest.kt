@@ -1,11 +1,13 @@
 package dev.dhun.design
 
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import dev.dhun.design.components.AmbientBackdropPolicy
+import dev.dhun.design.components.DhunControlPolicy
+import dev.dhun.design.components.DhunNavigationPolicy
 import dev.dhun.design.components.DhunSpinnerPolicy
 import dev.dhun.design.components.GlassMaterialPolicy
-import dev.dhun.design.components.DhunControlPolicy
+import dev.dhun.ui.shell.DhunShellPolicy
 import kotlin.math.abs
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -267,6 +269,66 @@ class GlassSystemTest {
         assertTrue(
             blooms.first().color.alpha > blooms.last().color.alpha,
             "the accent bloom leads; the cool one is a faint companion",
+        )
+    }
+
+    @Test
+    fun theNavigationChromeNeverFallsBackToMaterialsPill() {
+        // The selected tab is a translucent accent pill, never a solid block:
+        // the filled accent belongs to buttons, not to chrome.
+        for (light in listOf(true, false)) {
+            val top = DhunNavigationPolicy.pillTopAlpha(light)
+            val bottom = DhunNavigationPolicy.pillBottomAlpha(light)
+            assertTrue(top > 0f && top < 0.5f, "pill top alpha $top (light=$light)")
+            assertTrue(bottom > 0f && bottom < top, "the pill must fade downward: $bottom vs $top")
+            // The rim is the strongest part of the pill, or the edge disappears
+            // over a pale cover.
+            assertTrue(
+                DhunNavigationPolicy.rimAlpha(light) > bottom,
+                "rim must out-read the fill: ${DhunNavigationPolicy.rimAlpha(light)}",
+            )
+            assertTrue(DhunNavigationPolicy.rimAlpha(light) <= 0.6f)
+        }
+        // White-on-white needs a weaker pill than the dark theme; the same
+        // numbers in both themes is how chrome washes out in light mode.
+        assertTrue(
+            DhunNavigationPolicy.pillTopAlpha(light = true) <
+                DhunNavigationPolicy.pillTopAlpha(light = false),
+        )
+
+        val accent = Color(0xFF7A5CC4)
+        // At progress 0 nothing is painted, so an unselected tab has no outline.
+        assertEquals(
+            0f,
+            DhunNavigationPolicy.rimColor(accent, light = false, progress = 0f).alpha,
+        )
+        // …and it fades monotonically as the tab is left.
+        assertEquals(
+            DhunNavigationPolicy.rimAlpha(light = false) * 0.5f,
+            DhunNavigationPolicy.rimColor(accent, light = false, progress = 0.5f).alpha,
+            0.01f,
+        )
+        // The glyph follows the same curve: tertiary until the pill arrives.
+        assertEquals(
+            DhunNavigationPolicy.tint(selected = false, progress = 1f),
+            DhunNavigationPolicy.tint(selected = false, progress = 0f),
+        )
+
+        // The pill has to fit the glyph plus a hair of padding, and the rail has
+        // to fit the pill.
+        assertTrue(DhunNavigationPolicy.pillWidth > DhunNavigationPolicy.iconSize)
+        assertTrue(DhunNavigationPolicy.pillHeight > DhunNavigationPolicy.iconSize)
+        assertTrue(DhunNavigationPolicy.railWidth > DhunNavigationPolicy.pillWidth)
+    }
+
+    @Test
+    fun theRailIsExactlyTheWidthThePaneSplitReserves() {
+        // Two places decide the rail's width: the shell's layout arithmetic and
+        // the rail itself. If they disagree by even a few dp, the master pane
+        // overflows at the two-pane breakpoint.
+        assertEquals(
+            DhunShellPolicy.railAllowance(hasRail = true),
+            DhunNavigationPolicy.railWidth,
         )
     }
 }

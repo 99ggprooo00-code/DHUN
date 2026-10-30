@@ -45,7 +45,9 @@ dark-first, layered, with soft blur behind sharp content. Material 3 is an
 | Loading spinner (buttons, pagination) | `DhunSpinner` (thin accent arc in a faint glass track) | `design/components/DhunSpinner.kt` |
 | Page base under the artwork backdrop | `AmbientBackdrop` (artwork-coloured blooms) | `design/components/NowPlayingBackdrop.kt` |
 | Anchored menu (provider picker, mode picker, overflow) | `DropdownMenu(containerColor = Color.Transparent)` + `TrackMenuSurface` + `MenuActionRow` | `ui/components/TrackOverflowDialog.kt` |
-| Collapsible page toolbar / navigation rail fill | `Modifier.dhunGlassBody(fill)` | `design/components/GlassCard.kt` |
+| Collapsible page toolbar / any chrome strip | `Modifier.dhunGlassBody(fill)` | `design/components/GlassCard.kt` |
+| Bottom tab bar (glass band + tabs) | `DhunNavigationBar` + `DhunNavigationBarItem` | `design/components/DhunNavigation.kt` |
+| Desktop navigation rail | `DhunNavigationRail` + `DhunNavigationRailItem` | `design/components/DhunNavigation.kt` |
 | Button family | `DhunButton`, `DhunTextButton`, `DhunOutlinedButton`, `DhunIconButton` | `design/components/DhunButton.kt` |
 | Chips | `DhunFilterChip` / `FrostedChipSurface` | `design/components/Chip.kt` |
 | Bottom dock | `GlassDock` | `design/components/GlassCard.kt` |
@@ -65,14 +67,15 @@ Two rules follow from that and are enforced mechanically
    `LinearProgressIndicator(...)`, `CircularProgressIndicator(...)`,
    `DropdownMenuItem(...)` outside `design/` is a defect; the wrapper exists so
    the palette, shape and metrics are defined once (`DhunControlPolicy`,
-   `DhunSpinnerPolicy`).
-2. **Layout containers stay transparent.** `NavigationBar` / `NavigationRail` /
-   `Scaffold` / `DropdownMenu` are only layout or anchoring: they must pass
+   `DhunSpinnerPolicy`, `DhunNavigationPolicy`).
+   Navigation is not an exception: `NavigationBar` / `NavigationRail` and their
+   items are banned too. Their *container* was never the problem — the selection
+   pill, item metrics and label type inside them are Material's, so the tab bar
+   and the rail are DHUN components now.
+2. **Anchors stay transparent.** `DropdownMenu` is only an anchor: it must pass
    `containerColor = Color.Transparent` (and zero tonal/shadow elevation) and let
-   the DHUN glass be what you see — `GlassDock` for the bar,
-   `Modifier.dhunGlassBody(fill)` for the rail and the collapsed page toolbar,
-   `TrackMenuSurface` for a menu. A Material `containerColor` in the shell is a
-   flat plate inside the glass.
+   `TrackMenuSurface` be what you see. A Material `containerColor` in a menu is
+   a flat plate inside the glass.
 
 ## 3. Numbers (do not re-invent per screen)
 
