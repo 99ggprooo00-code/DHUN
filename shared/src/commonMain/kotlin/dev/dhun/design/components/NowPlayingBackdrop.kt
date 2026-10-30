@@ -27,7 +27,6 @@ import coil3.request.crossfade
 import dev.dhun.design.ArtworkUrls
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunAppearance
-import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTokens
 import dev.dhun.design.DhunVisualTuning

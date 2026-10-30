@@ -47,6 +47,7 @@ import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunSpacing
+import dev.dhun.design.background.BackgroundBlurPolicy
 import dev.dhun.design.DhunThemeMode
 import dev.dhun.design.DhunVisualTuning
 import dev.dhun.design.VisualPart
@@ -579,35 +580,47 @@ private fun CountryRegionPicker(viewModel: SettingsViewModel) {
 private fun BackdropControls(viewModel: SettingsViewModel) {
     val blur by viewModel.backdropBlurPercent.collectAsState()
     val brightness by viewModel.backdropBrightnessPercent.collectAsState()
+    val backgrounds by viewModel.backgrounds.collectAsState()
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = DhunSpacing.screenPadding),
         verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
     ) {
         if (supportsRealtimeBlur) {
+            val blurOn = backgrounds.blurEnabled
+            // The master switch is the off switch, so the strength slider has no
+            // zero: a slider that could reach it would let "Background blur: on"
+            // and "nothing is frosted" both be true, which reads as a bug.
+            val floor = BackgroundBlurPolicy.MIN_EFFECTIVE_STRENGTH
+            val effective = BackgroundBlurPolicy.effectiveStrength(blur)
             Text(
                 text = "Blur strength",
                 style = MaterialTheme.typography.bodyLarge,
-                color = DhunColors.textPrimary,
+                color = if (blurOn) DhunColors.textPrimary else DhunColors.textDisabled,
             )
             Text(
-                text = "How heavily the cover is frosted while background blur is on. Turn blur off above to remove it entirely.",
+                text = if (blurOn) {
+                    "How heavily the cover is frosted. Turn Background blur off above to remove it entirely."
+                } else {
+                    "Background blur is off above, so nothing is frosted. Your strength is kept for when it is back on."
+                },
                 style = MaterialTheme.typography.bodySmall,
-                color = DhunColors.textSecondary,
+                color = if (blurOn) DhunColors.textSecondary else DhunColors.textTertiary,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 DhunSlider(
-                    value = blur.toFloat(),
+                    value = effective.toFloat(),
                     onValueChange = { value ->
-                        val percent = value.toInt().coerceIn(0, 100)
+                        val percent = value.toInt().coerceIn(floor, 100)
                         viewModel.setBackdropBlurPercent(percent)
                         DhunAppearance.setBackdropPrefs(blurPercent = percent)
                     },
-                    valueRange = 0f..100f,
+                    valueRange = floor.toFloat()..100f,
+                    enabled = blurOn,
                     modifier = Modifier.weight(1f),
                 )
                 Spacer(modifier = Modifier.width(DhunSpacing.sm))
                 Text(
-                    text = "$blur%",
+                    text = "$effective%",
                     style = MaterialTheme.typography.bodySmall,
                     color = DhunColors.textSecondary,
                 )

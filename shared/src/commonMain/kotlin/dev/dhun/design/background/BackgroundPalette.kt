@@ -139,30 +139,44 @@ object BackgroundPalettePolicy {
         }
 
     /**
-     * The artwork palette for a section, or `null` when there is no artwork to
-     * derive one from.
+     * The artwork palette, or `null` when there is no artwork to derive one
+     * from.
      *
-     * [ArtworkColors] is the *existing* extraction result — this function never
-     * decodes or samples an image, it only reshapes a palette that the app has
-     * already computed. That is the "one image pipeline" rule.
+     * One palette serves all five sections: they are coloured by the same cover,
+     * so a per-section derivation would only let two surfaces drift apart for a
+     * reason the user never asked for. [ArtworkColors] is the *existing*
+     * extraction result — this function never decodes or samples an image, it
+     * only reshapes a palette the app has already computed. That is the "one
+     * image pipeline" rule.
      */
     fun artworkPalette(
-        section: BackgroundSection,
         art: ArtworkColors?,
         tokens: DhunTokens,
-    ): BackgroundPalette? {
-        if (art == null) return null
-        val hue = art.primary
-        val base = tokens.background
-        return BackgroundPalette(
-            // The base keeps the theme's own luminance and only borrows a
-            // little of the artwork's colour, so rows over it keep their
-            // measured contrast.
-            primary = keepLuminance(hue, base, BASE_TINT_ALPHA),
-            secondary = hue.desaturated(SECONDARY_DESATURATION),
-            tertiary = hue.shifted(TERTIARY_HUE_SHIFT).desaturated(TERTIARY_DESATURATION),
-        )
-    }
+    ): BackgroundPalette? = art?.let { derive(it.primary, tokens) }
+
+    /**
+     * The three layers one source hue produces. Shared by the artwork palette
+     * and a manual pick so the two cannot drift into different recipes, and so
+     * a picked swatch lands in exactly the palette the cover would have made.
+     */
+    private fun derive(hue: Color, tokens: DhunTokens): BackgroundPalette = BackgroundPalette(
+        // The base keeps the theme's own luminance and only borrows a little of
+        // the source colour, so rows over it keep their measured contrast.
+        primary = keepLuminance(hue, tokens.background, BASE_TINT_ALPHA),
+        secondary = hue.desaturated(SECONDARY_DESATURATION),
+        tertiary = hue.shifted(TERTIARY_HUE_SHIFT).desaturated(TERTIARY_DESATURATION),
+    )
+
+    /**
+     * The palette a manual pick of [primary] produces.
+     *
+     * Deliberately the same derivation as [artworkPalette]: pick the same hue in
+     * each of the three layers in Settings and you get exactly the palette the
+     * artwork would have produced for that hue. It is also what keeps the
+     * settings swatches related to each other instead of three unrelated
+     * colours, and why every offered swatch is already inside the contrast band.
+     */
+    fun manualFrom(primary: Color, tokens: DhunTokens): BackgroundPalette = derive(primary, tokens)
 
     /**
      * Resolve what a section paints. Pure function of saved preferences plus
@@ -327,6 +341,18 @@ object BackgroundBlurPolicy {
     const val NEUTRAL_SATURATION = 0.5f
 
     /**
+     * The weakest frost an *enabled* blur is allowed to reach.
+     *
+     * The master switch is the only control that turns blur off. Before this
+     * feature the intensity slider was also the off switch, and the version-0
+     * migration still maps a stored `backdrop_blur = 0` to "master off" — so a
+     * slider that could reach zero would let the master switch say "on" while
+     * nothing blurred, which reads as a broken switch rather than a light
+     * frost. An enabled blur therefore keeps at least this share of its radius.
+     */
+    const val MIN_EFFECTIVE_STRENGTH = 20
+
+    /**
      * The blur percentage a section should render, or 0 for "no blur".
      *
      * The master switch wins over everything, then the section's own switch,
@@ -367,14 +393,22 @@ object BackgroundBlurPolicy {
     /**
      * The user's blur *strength* (the existing slider) applied to the resolved
      * kind. Strength is a preference about intensity; on/off belongs to the
-     * master switch, so strength is only allowed to reduce, never to resurrect,
-     * a disabled blur.
+     * master switch, so strength can only reduce a blur — never resurrect a
+     * disabled one, and never silently reproduce "off" either (see
+     * [MIN_EFFECTIVE_STRENGTH]).
      */
     fun applyStrength(percent: Int, strengthPercent: Int): Int {
         if (percent <= 0) return 0
-        val strength = strengthPercent.coerceIn(0, 100)
-        return (percent * strength / 100f).toInt().coerceIn(0, 100)
+        return (percent * effectiveStrength(strengthPercent) / 100f).toInt().coerceIn(0, 100)
     }
+
+    /**
+     * The strength actually used for an enabled blur: the slider, clamped into
+     * the documented band. The one place both the per-section surfaces and the
+     * single-surface ones (lyrics card, menus) agree on it.
+     */
+    fun effectiveStrength(strengthPercent: Int): Int =
+        strengthPercent.coerceIn(MIN_EFFECTIVE_STRENGTH, 100)
 }
 
 /* ---------------------------------------------------------------- colours */

@@ -6,6 +6,7 @@ import dev.dhun.design.VisualPart
 import dev.dhun.design.background.BackgroundPalette
 import dev.dhun.design.background.BackgroundSection
 import dev.dhun.design.background.BackgroundState
+import dev.dhun.design.background.DhunBackgrounds
 import dev.dhun.design.background.SectionBackgrounds
 import dev.dhun.domain.GetSettingUseCase
 import dev.dhun.domain.UpdateSettingUseCase
@@ -407,9 +408,17 @@ class SettingsViewModel(
      * Publishes a background snapshot to the settings flows **and** to the live
      * holder, so a switch is visible on the app behind the settings page
      * immediately, before the row is written.
+     *
+     * The snapshot this ViewModel owns is the *settings* half of the background
+     * state; the artwork palette is runtime and belongs to
+     * [dev.dhun.design.background.DhunBackgrounds], which extracted it from the
+     * playing track. Publishing a settings-only snapshot must therefore keep
+     * whatever artwork the holder already has instead of dropping to "nothing
+     * playing" every time a switch is tapped.
      */
     private fun publishBackgrounds(state: BackgroundState) {
-        _backgrounds.value = state
+        val artwork = DhunBackgrounds.current
+        _backgrounds.value = state.withArtwork(artwork)
         BackgroundPreferences.apply(state)
     }
 
@@ -777,6 +786,17 @@ class SettingsViewModel(
         }
     }
 }
+
+/**
+ * The runtime half of the background state, copied from the live holder onto a
+ * settings snapshot. Keeps the settings copy honest for the section previews
+ * without making the artwork a persisted preference.
+ */
+private fun BackgroundState.withArtwork(live: BackgroundState): BackgroundState = copy(
+    artwork = live.artwork,
+    artworkLuminance = live.artworkLuminance,
+    artworkSaturation = live.artworkSaturation,
+)
 
 /** Same section, one field changed, with the defaults materialised for the rest. */
 private fun BackgroundState.withSection(

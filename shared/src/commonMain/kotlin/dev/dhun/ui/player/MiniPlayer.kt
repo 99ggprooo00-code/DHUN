@@ -52,7 +52,6 @@ import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.background.BackgroundSection
-import dev.dhun.design.background.backgroundSectionTint
 import dev.dhun.design.components.AcrylicSurface
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunIconButton
@@ -260,15 +259,13 @@ fun MiniPlayer(
         // The dock owns the blurred artwork and veils this row with acrylic.
         Box(modifier = modifier.fillMaxWidth()) { miniContent() }
     } else {
+        // The standalone card is the miniplayer background section: the surface
+        // itself carries that section's palette tint and frost, so a manual
+        // palette or the artwork colours reach the floating card too.
         AcrylicSurface(
             artworkUrl = track.thumbnailUrl,
-            // The standalone card is the miniplayer background section: its
-            // palette tint sits over the acrylic, so a manual palette or the
-            // artwork colours reach the floating card too.
-            modifier = modifier.fillMaxWidth().backgroundSectionTint(
-                section = BackgroundSection.MINI_PLAYER,
-                shape = DhunShapes.large,
-            ),
+            section = BackgroundSection.MINI_PLAYER,
+            modifier = modifier.fillMaxWidth(),
             shape = DhunShapes.large,
         ) {
             miniContent()

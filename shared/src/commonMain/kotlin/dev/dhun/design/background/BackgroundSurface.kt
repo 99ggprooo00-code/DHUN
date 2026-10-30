@@ -4,11 +4,24 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import dev.dhun.design.DhunAnimations
+
+/**
+ * Which background section the content being composed belongs to.
+ *
+ * The page backdrop knows its section because the shell computes it; a dialog or
+ * a panel that floats over that page does not, and threading the value through
+ * every call site would only invite drift. The shell provides it once (Home,
+ * Search or Library) and the player provides its own while it is expanded, so
+ * `GlassCard`/`GlassDialog` frost with the switches of the surface actually
+ * behind them.
+ */
+val LocalBackgroundSection = staticCompositionLocalOf { BackgroundSection.HOME }
 
 /**
  * Tints a surface with its section's palette.

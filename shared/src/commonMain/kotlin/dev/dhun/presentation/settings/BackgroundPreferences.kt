@@ -208,6 +208,10 @@ object BackgroundPreferences {
      * Applies a snapshot to the live holder. Called after every change and from
      * the host before the first frame, so what the settings screen previews is
      * exactly what the app paints.
+     *
+     * The snapshot is the *settings* half of the state; [DhunBackgrounds.restore]
+     * keeps the runtime artwork palette (re-deriving it from the playing track)
+     * so saving a switch never blanks the background for a frame.
      */
     fun apply(state: BackgroundState) {
         DhunBackgrounds.restore(state)

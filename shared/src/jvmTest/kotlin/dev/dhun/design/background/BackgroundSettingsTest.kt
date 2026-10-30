@@ -6,6 +6,7 @@ import dev.dhun.data.DatabaseDriverFactory
 import dev.dhun.data.DatabaseFactory
 import dev.dhun.data.EpochClock
 import dev.dhun.data.SettingsKeys
+import dev.dhun.data.SettingsRepository
 import dev.dhun.design.ArtworkColors
 import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunTokens
@@ -235,10 +236,16 @@ class BackgroundSettingsTest {
     }
 
     @Test
-    fun theStrengthSliderCanOnlyReduceABlurItCannotSwitchOneOn() {
+    fun theStrengthSliderCanOnlyReduceNeverSwitchBlurOnOrOff() {
         assertEquals(0, BackgroundBlurPolicy.applyStrength(percent = 0, strengthPercent = 100))
         assertEquals(50, BackgroundBlurPolicy.applyStrength(percent = 100, strengthPercent = 50))
-        assertEquals(0, BackgroundBlurPolicy.applyStrength(percent = 80, strengthPercent = 0))
+        // The slider cannot reproduce "off": an enabled blur keeps the
+        // documented floor, because the master switch is the off switch.
+        assertEquals(
+            BackgroundBlurPolicy.applyStrength(percent = 80, strengthPercent = 0),
+            (80 * BackgroundBlurPolicy.MIN_EFFECTIVE_STRENGTH / 100f).toInt(),
+        )
+        assertTrue(BackgroundBlurPolicy.applyStrength(percent = 80, strengthPercent = 0) > 0)
         assertEquals(80, BackgroundBlurPolicy.applyStrength(percent = 80, strengthPercent = 100))
     }
 
@@ -250,7 +257,6 @@ class BackgroundSettingsTest {
         for (hue in listOf(Color(0xFFFF0000), Color(0xFF00FF00), Color(0xFF0000FF), Color(0xFFFF00FF))) {
             for (tokens in listOf(dark, light)) {
                 val palette = BackgroundPalettePolicy.artworkPalette(
-                    BackgroundSection.HOME,
                     ArtworkColors.fromPrimary(hue),
                     tokens,
                 )!!
@@ -277,10 +283,10 @@ class BackgroundSettingsTest {
     @Test
     fun theArtworkPaletteKeepsTheThreeLayersRelated() {
         val art = ArtworkColors.fromPrimary(Color(0xFF8A4FBF))
-        val palette = BackgroundPalettePolicy.artworkPalette(BackgroundSection.HOME, art, dark)!!
+        val palette = BackgroundPalettePolicy.artworkPalette(art, dark)!!
         assertNotEquals(palette.secondary, palette.tertiary, "the companion layer must be a different layer")
         assertTrue(palette.secondary.luminance() > palette.primary.luminance(), "the glow reads over the base")
-        assertNull(BackgroundPalettePolicy.artworkPalette(BackgroundSection.HOME, null, dark))
+        assertNull(BackgroundPalettePolicy.artworkPalette(null, dark))
     }
 
     /* ---------------------------------------------------- live holder */
@@ -349,6 +355,68 @@ class BackgroundSettingsTest {
         )
         // Blur is unaffected by a missing palette: it is a separate feature.
         assertTrue(DhunBackgrounds.blurPercentFor(BackgroundSection.HOME, strengthPercent = 100) > 0)
+    }
+
+    @Test
+    fun theStrengthFloorKeepsAnEnabledBlurVisible() {
+        // The master switch is the off switch: an enabled blur can be faint, but
+        // not zero, or the switch reads as broken.
+        for (percent in listOf(1, 40, 70, 100)) {
+            for (strength in 0..100) {
+                val effective = BackgroundBlurPolicy.applyStrength(percent, strength)
+                assertTrue(effective > 0, "percent=$percent strength=$strength produced no blur")
+                assertTrue(effective <= percent, "strength must only ever reduce the kind's radius")
+            }
+        }
+        // A disabled blur can never be resurrected by the slider.
+        assertEquals(0, BackgroundBlurPolicy.applyStrength(0, 100))
+        assertEquals(
+            BackgroundBlurPolicy.MIN_EFFECTIVE_STRENGTH,
+            BackgroundBlurPolicy.effectiveStrength(-20),
+        )
+        assertEquals(100, BackgroundBlurPolicy.effectiveStrength(250))
+    }
+
+    @Test
+    fun aManualPickIsDerivedTheSameWayArtworkIs() {
+        // Selecting a swatch must produce the palette the artwork would have
+        // produced for that hue — one recipe, no "hand-picked colours" variant.
+        val picks = listOf(Color(0xFFBB86FC), Color(0xFF4FC3A1), Color(0xFFE0A458))
+        for (pick in picks) {
+            val manual = BackgroundPalettePolicy.manualFrom(pick, dark)
+            val asArtwork = BackgroundPalettePolicy.artworkPalette(ArtworkColors.fromPrimary(pick), dark)!!
+            assertEquals(asArtwork, manual)
+            // And it is already safe: nothing to clamp on the way in.
+            assertEquals(manual, BackgroundPalettePolicy.sanitize(manual, dark))
+        }
+    }
+
+    @Test
+    fun restoringASettingsSnapshotKeepsTheArtworkThatIsAlreadyPlaying() {
+        // The settings half of the state is persisted; the artwork half is
+        // runtime. Saving a switch must not blank the palette for a frame.
+        DhunBackgrounds.setArtworkSeed("https://example.test/live.jpg")
+        val artworkPalette = DhunBackgrounds.paletteFor(BackgroundSection.HOME)
+
+        DhunBackgrounds.restore(BackgroundState(blurEnabled = false))
+        assertEquals(artworkPalette, DhunBackgrounds.paletteFor(BackgroundSection.HOME))
+        assertFalse(DhunBackgrounds.current.blurEnabled)
+
+        // A snapshot that carries its own artwork palette wins outright.
+        val other = BackgroundPalette(Color(0xFF101010), Color(0xFF336699), Color(0xFF663399))
+        DhunBackgrounds.restore(BackgroundState(artwork = other))
+        assertEquals(other, DhunBackgrounds.current.artwork)
+    }
+
+    @Test
+    fun clearingTheArtworkAlsoForgetsTheSeed() {
+        DhunBackgrounds.setArtworkSeed("https://example.test/gone.jpg")
+        DhunBackgrounds.setArtworkSeed(null)
+        assertNull(DhunBackgrounds.current.artwork)
+        // A theme change re-derives from the *current* seed; a cleared seed must
+        // not resurrect the previous track's palette.
+        DhunBackgrounds.refreshArtworkPalette()
+        assertNull(DhunBackgrounds.current.artwork)
     }
 
     @Test
@@ -443,6 +511,73 @@ class BackgroundSettingsTest {
     }
 
     @Test
+    fun aSwitchTapDoesNotBlankTheArtworkOnTheLiveHolder(): Unit = runBlocking {
+        // The settings snapshot is the persisted half; the artwork is runtime.
+        // Writing a switch used to republish a settings-only snapshot, which
+        // dropped the palette (and with it the page colour) for a frame.
+        val d = data()
+        val v = loaded(vm(d, this))
+        DhunBackgrounds.setArtworkSeed("https://example.test/playing.jpg")
+        val painted = DhunBackgrounds.paletteFor(BackgroundSection.HOME)
+        assertEquals(PaletteSource.ARTWORK, DhunBackgrounds.sourceFor(BackgroundSection.HOME))
+
+        v.setBackgroundDynamicColors(false)
+        assertEquals(SectionBackgrounds.default, v.backgrounds.value.section(BackgroundSection.HOME))
+        // The screenshot the user would see: manual/default colours, but the
+        // artwork palette is still known, so switching back needs no re-extract.
+        assertEquals(PaletteSource.DEFAULT, DhunBackgrounds.sourceFor(BackgroundSection.HOME))
+        assertEquals(
+            BackgroundPalettePolicy.defaultPalette(BackgroundSection.HOME, DhunAppearance.tokens),
+            DhunBackgrounds.paletteFor(BackgroundSection.HOME),
+        )
+        v.setBackgroundDynamicColors(true)
+
+        // …and turning it back on restores the *same* cover palette without a
+        // re-extraction (the seed was never lost).
+        assertEquals(painted, DhunBackgrounds.paletteFor(BackgroundSection.HOME))
+        assertEquals(PaletteSource.ARTWORK, DhunBackgrounds.sourceFor(BackgroundSection.HOME))
+    }
+
+    @Test
+    fun aHandEditedPaletteRowIsUnsetRatherThanRendered(): Unit = runBlocking {
+        val d = data()
+        loaded(vm(d, this))
+        // A row written by an older build, by hand, or half-finished: one layer
+        // missing must read as "no manual palette", not as a black hole.
+        d.settings.putString(
+            SettingsKeys.backgroundKey(BackgroundSection.HOME.id, SettingsKeys.BACKGROUND_FIELD_PRIMARY),
+            "not-a-colour",
+        )
+        val restarted = reloaded(d, this)
+        assertNull(restarted.backgrounds.value.section(BackgroundSection.HOME).manual)
+        assertEquals(
+            BackgroundPalettePolicy.defaultPalette(BackgroundSection.HOME, DhunAppearance.tokens),
+            DhunBackgrounds.paletteFor(BackgroundSection.HOME),
+        )
+        // The settings flow reads the same thing the renderer does.
+        assertEquals(PaletteSource.DEFAULT, DhunBackgrounds.sourceFor(BackgroundSection.HOME))
+        assertEquals(SectionBackgrounds.default, restarted.backgrounds.value.section(BackgroundSection.HOME))
+    }
+
+    @Test
+    fun anAnimatedResetLeavesEveryOtherSectionAlone(): Unit = runBlocking {
+        val d = data()
+        val v = loaded(vm(d, this))
+        val manual = BackgroundPalette(Color(0xFF111111), Color(0xFF334455), Color(0xFF554433))
+        v.setSectionBlurEnabled(BackgroundSection.HOME, false)
+        v.setSectionManualPalette(BackgroundSection.HOME, manual)
+        v.setSectionBlurEnabled(BackgroundSection.SEARCH, false)
+        v.setSectionManualPalette(BackgroundSection.SEARCH, manual)
+
+        v.resetSectionBackgrounds(BackgroundSection.HOME)
+        settled(this)
+        val state = reloaded(d, this).backgrounds.value
+        assertEquals(SectionBackgrounds.default, state.section(BackgroundSection.HOME))
+        assertFalse(state.section(BackgroundSection.SEARCH).blurEnabled, "Search keeps its own switch")
+        assertEquals(manual, state.section(BackgroundSection.SEARCH).manual)
+    }
+
+    @Test
     fun everyBackgroundPreferenceSurvivesARestart(): Unit = runBlocking {
         val d = data()
         val v = loaded(vm(d, this))
@@ -466,6 +601,54 @@ class BackgroundSettingsTest {
         // And the live holder was restored too, not just the settings copy.
         assertEquals(PaletteSource.MANUAL_OVERRIDDEN, DhunBackgrounds.sourceFor(BackgroundSection.LIBRARY))
         assertEquals(0, DhunBackgrounds.blurPercentFor(BackgroundSection.HOME, strengthPercent = 100))
+    }
+
+    @Test
+    fun anUnwritableDatabaseStillLoadsTheStoredBackgrounds(): Unit = runBlocking {
+        val d = data()
+        UpdateSettingUseCase(d.settings).boolean(SettingsKeys.BACKGROUND_BLUR_ENABLED, false)
+        // A full disk: the version-0 marker cannot be written. That must not make
+        // the load fail — the previous implementation turned "cannot save" into
+        // "cannot read anything", which reverted every setting in the app.
+        val readOnly = object : SettingsRepository by d.settings {
+            override suspend fun putString(key: String, value: String): Unit = error("disk full")
+            override suspend fun putBoolean(key: String, value: Boolean): Unit = error("disk full")
+            override suspend fun putInt(key: String, value: Int): Unit = error("disk full")
+        }
+        val state = BackgroundPreferences.read(
+            GetSettingUseCase(readOnly),
+            UpdateSettingUseCase(readOnly),
+        )
+        assertFalse(state.blurEnabled, "the stored value must survive an unwritable database")
+        assertNull(
+            d.settings.getString(SettingsKeys.BACKGROUND_PROFILE_VERSION),
+            "nothing was written, so the import retries next launch",
+        )
+    }
+
+    @Test
+    fun restoringBeforeTheFirstFrameNeverTakesTheLaunchDown(): Unit = runBlocking {
+        val d = data()
+        // The happy path stores the user's values on the live holder.
+        UpdateSettingUseCase(d.settings).boolean(SettingsKeys.BACKGROUND_DYNAMIC_COLORS, false)
+        BackgroundPreferences.restoreBeforeFirstFrame(
+            GetSettingUseCase(d.settings),
+            UpdateSettingUseCase(d.settings),
+        )
+        assertFalse(DhunBackgrounds.current.dynamicColors)
+
+        // A database that is not ready yet falls back to the documented defaults
+        // instead of throwing inside the Activity/window creation.
+        DhunBackgrounds.clear()
+        val broken = object : SettingsRepository by d.settings {
+            override suspend fun getString(key: String): String? = error("database not ready")
+        }
+        BackgroundPreferences.restoreBeforeFirstFrame(
+            GetSettingUseCase(broken),
+            UpdateSettingUseCase(broken),
+        )
+        assertTrue(DhunBackgrounds.current.blurEnabled)
+        assertTrue(DhunBackgrounds.current.dynamicColors)
     }
 
     @Test
@@ -584,8 +767,8 @@ class BackgroundSettingsTest {
         assertNotEquals(darkDefault.primary, lightDefault.primary)
         // The artwork base follows the theme it will be painted on.
         val art = ArtworkColors.fromPrimary(Color(0xFFB060A0))
-        val darkArt = BackgroundPalettePolicy.artworkPalette(BackgroundSection.HOME, art, dark)!!
-        val lightArt = BackgroundPalettePolicy.artworkPalette(BackgroundSection.HOME, art, light)!!
+        val darkArt = BackgroundPalettePolicy.artworkPalette(art, dark)!!
+        val lightArt = BackgroundPalettePolicy.artworkPalette(art, light)!!
         assertTrue(lightArt.primary.luminance() > darkArt.primary.luminance())
     }
 }

@@ -32,10 +32,13 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
+import dev.dhun.design.DhunTokens
 import dev.dhun.design.background.BackgroundPalette
+import dev.dhun.design.background.BackgroundPalettePolicy
 import dev.dhun.design.background.BackgroundSection
 import dev.dhun.design.background.BackgroundState
 import dev.dhun.design.background.DhunBackgrounds
@@ -43,6 +46,7 @@ import dev.dhun.design.components.DhunButton
 import dev.dhun.design.components.DhunSwitch
 import dev.dhun.design.components.DhunTextButton
 import dev.dhun.design.components.GlassDialog
+import dev.dhun.design.supportsRealtimeBlur
 import dev.dhun.presentation.settings.SettingsViewModel
 
 /**
@@ -62,6 +66,7 @@ import dev.dhun.presentation.settings.SettingsViewModel
 internal fun BackgroundSettingsSection(viewModel: SettingsViewModel) {
     val backgrounds by viewModel.backgrounds.collectAsState()
     var openSection by remember { mutableStateOf<BackgroundSection?>(null) }
+    var confirmResetAll by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = DhunSpacing.screenPadding),
@@ -77,6 +82,16 @@ internal fun BackgroundSettingsSection(viewModel: SettingsViewModel) {
             checked = backgrounds.blurEnabled,
             onCheckedChange = viewModel::setBackgroundBlurEnabled,
         )
+        // Honest, not silent: on a device without real blur (Android < 12) the
+        // switches still save the preference, but nothing is frosted here — the
+        // cover is dimmed instead, which is the documented fallback.
+        if (!supportsRealtimeBlur) {
+            Text(
+                text = "This device cannot render real blur. Your choices are saved, and the cover is dimmed instead of frosted.",
+                style = MaterialTheme.typography.bodySmall,
+                color = DhunColors.textTertiary,
+            )
+        }
         BackgroundSwitchRow(
             title = "Dynamic blur",
             subtitle = when {
@@ -118,7 +133,10 @@ internal fun BackgroundSettingsSection(viewModel: SettingsViewModel) {
                 onClick = { openSection = section },
             )
         }
-        DhunTextButton(onClick = viewModel::resetAllSectionBackgrounds) {
+        // Confirmed, because it clears all five sections at once and there is
+        // no undo — a single tap next to five per-section rows is too easy to
+        // hit while reaching for one of them.
+        DhunTextButton(onClick = { confirmResetAll = true }) {
             Text("Restore all section defaults")
         }
     }
@@ -129,6 +147,40 @@ internal fun BackgroundSettingsSection(viewModel: SettingsViewModel) {
             viewModel = viewModel,
             onDismiss = { openSection = null },
         )
+    }
+
+    if (confirmResetAll) {
+        GlassDialog(onDismissRequest = { confirmResetAll = false }) {
+            Column(
+                modifier = Modifier.fillMaxWidth().widthIn(max = DhunSpacing.dialogMaxWidth),
+                verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
+            ) {
+                Text(
+                    text = "Restore every section?",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = DhunColors.textPrimary,
+                )
+                Text(
+                    text = "Home, Search, Library, Miniplayer and Full player go back to their default colours and blur. " +
+                        "The three switches above keep their current settings.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DhunColors.textSecondary,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    DhunTextButton(onClick = { confirmResetAll = false }) { Text("Cancel") }
+                    Spacer(modifier = Modifier.width(DhunSpacing.sm))
+                    DhunButton(
+                        onClick = {
+                            viewModel.resetAllSectionBackgrounds()
+                            confirmResetAll = false
+                        },
+                    ) { Text("Restore") }
+                }
+            }
+        }
     }
 }
 
@@ -182,8 +234,14 @@ private fun BackgroundSectionRow(
     val palette = DhunBackgrounds.paletteFor(section)
     val source = DhunBackgrounds.sourceFor(section)
     // What this surface will actually render right now (0 = sharp), so the row
-    // can say so instead of making the user open the dialog to find out.
+    // can say so instead of making the user open the dialog to find out — and
+    // whether that frost is the steady one or the artwork-responsive one.
     val blur = DhunBackgrounds.blurPercentFor(section)
+    val blurLabel = when {
+        blur == 0 -> "no blur"
+        state.blurEnabled && state.dynamicBlur && prefs.dynamicBlur -> "artwork blur"
+        else -> "steady blur"
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -200,7 +258,7 @@ private fun BackgroundSectionRow(
                 text = buildString {
                     append(source.label)
                     append(" · ")
-                    append(if (blur > 0) "blur on" else "no blur")
+                    append(blurLabel)
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = if (source.isOverridden) DhunColors.warning else DhunColors.textSecondary,
@@ -227,6 +285,13 @@ private fun BackgroundSectionDialog(
     // Same live read as the row: the dialog previews what the app paints.
     val palette = DhunBackgrounds.paletteFor(section)
     val source = DhunBackgrounds.sourceFor(section)
+    // What the swatch rows mark as selected: the saved palette when there is
+    // one, otherwise the layer colours currently in effect (so "not picked yet"
+    // still shows a selection instead of an empty row). A saved palette is either
+    // a derived pick or a sanitised row from storage, so it may not match a
+    // swatch exactly — the rows then show no selection, which is the honest
+    // reading of "this colour is not one of the picks".
+    val pickedPalette = prefs.manual ?: palette
 
     GlassDialog(onDismissRequest = onDismiss) {
         Column(
@@ -259,7 +324,12 @@ private fun BackgroundSectionDialog(
             )
             BackgroundSwitchRow(
                 title = "Dynamic blur here",
-                subtitle = "Blur that follows the artwork on this surface only.",
+                subtitle = when {
+                    !state.blurEnabled -> "Background blur is off globally, so nothing is blurred right now."
+                    !state.dynamicBlur -> "Dynamic blur is off globally, so every surface uses the steady frost."
+                    !prefs.blurEnabled -> "This surface is sharp, so there is no frost to adapt."
+                    else -> "Blur that follows the artwork on this surface only."
+                },
                 checked = prefs.dynamicBlur,
                 enabled = state.blurEnabled && state.dynamicBlur && prefs.blurEnabled,
                 onCheckedChange = { viewModel.setSectionDynamicBlur(section, it) },
@@ -286,13 +356,19 @@ private fun BackgroundSectionDialog(
                 style = MaterialTheme.typography.bodySmall,
                 color = DhunColors.textSecondary,
             )
+            // Picking *sets* the whole palette from that layer's swatch through
+            // the same derivation the artwork uses (BackgroundPalettePolicy.manualFrom),
+            // so the three layers can never end up as three unrelated colours and
+            // every selection is already inside the measured contrast band.
             for (layer in PaletteLayer.entries) {
                 ColorLayerPicker(
                     layer = layer,
-                    selected = prefs.manual?.get(layer) ?: palette.get(layer),
+                    selected = pickedPalette.get(layer),
                     onPick = { color ->
-                        val current = prefs.manual ?: palette
-                        viewModel.setSectionManualPalette(section, current.with(layer, color))
+                        viewModel.setSectionManualPalette(
+                            section,
+                            BackgroundPalettePolicy.manualFrom(color, DhunAppearance.tokens),
+                        )
                     },
                 )
             }
@@ -343,7 +419,7 @@ private fun ColorLayerPicker(
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm)) {
-            for (swatch in PaletteLayer.swatches(layer)) {
+            for (swatch in PaletteLayer.swatches(layer, DhunAppearance.tokens)) {
                 val isSelected = swatch == selected
                 Box(
                     modifier = Modifier
@@ -372,25 +448,41 @@ private enum class PaletteLayer(val label: String) {
 
     companion object {
         /**
-         * The picks offered for a layer. Kept short: three rows of twelve is a
-         * chooser, three rows of forty is a colour picker the user has to learn.
+         * The picks offered for one layer.
+         *
+         * Each swatch is *derived* through
+         * [dev.dhun.design.background.BackgroundPalettePolicy.manualFrom], not
+         * hand-picked: what the user sees (and taps) is exactly the layer colour
+         * picking that source produces, in the current theme. Hand-written
+         * swatch lists meant tapping a swatch painted a different colour, and a
+         * light theme was offered near-black "base" choices that could never be
+         * shown.
+         *
+         * Kept short on purpose: three rows of twelve is a chooser, three rows of
+         * forty is a colour picker the user has to learn.
          */
-        fun swatches(layer: PaletteLayer): List<Color> = when (layer) {
-            PRIMARY -> baseSwatches
-            SECONDARY -> accentSwatches
-            TERTIARY -> accentSwatches
-        }
+        fun swatches(layer: PaletteLayer, tokens: DhunTokens): List<Color> =
+            sources.getValue(layer).map {
+                BackgroundPalettePolicy.manualFrom(it, tokens).get(layer)
+            }
 
-        private val baseSwatches = listOf(
-            Color(0xFF101014), Color(0xFF161616), Color(0xFF1B1E24), Color(0xFF221C2A),
-            Color(0xFF16211F), Color(0xFF241A1A), Color(0xFF1A2230), Color(0xFF2A2418),
-            Color(0xFF0B0B0F), Color(0xFF23262B), Color(0xFF2B2135), Color(0xFF12232B),
-        )
-
-        private val accentSwatches = listOf(
-            Color(0xFFBB86FC), Color(0xFF7C9CF5), Color(0xFF4FC3A1), Color(0xFFE0A458),
-            Color(0xFFE07A9B), Color(0xFF8AD8E8), Color(0xFFA0D468), Color(0xFFC79BF0),
-            Color(0xFF80CBC4), Color(0xFFF2C14E), Color(0xFF9FA8DA), Color(0xFFD98880),
+        /** Source hues, one per pick. Base sources are biased to near-neutral. */
+        private val sources: Map<PaletteLayer, List<Color>> = mapOf(
+            PRIMARY to listOf(
+                Color(0xFF141118), Color(0xFF101A1B), Color(0xFF1B1420), Color(0xFF1A1A1A),
+                Color(0xFF101820), Color(0xFF201A12), Color(0xFF101F17), Color(0xFF1E1016),
+                Color(0xFF171A24), Color(0xFF201C28), Color(0xFF12222A), Color(0xFF241E14),
+            ),
+            SECONDARY to listOf(
+                Color(0xFFBB86FC), Color(0xFF7C9CF5), Color(0xFF4FC3A1), Color(0xFFE0A458),
+                Color(0xFFE07A9B), Color(0xFF8AD8E8), Color(0xFFA0D468), Color(0xFFC79BF0),
+                Color(0xFF80CBC4), Color(0xFFF2C14E), Color(0xFF9FA8DA), Color(0xFFD98880),
+            ),
+            TERTIARY to listOf(
+                Color(0xFF9C7BE8), Color(0xFF6FA8DC), Color(0xFF7FD1B9), Color(0xFFF0B86E),
+                Color(0xFFE794AE), Color(0xFF73C7D6), Color(0xFFB7DA84), Color(0xFFAE8FE0),
+                Color(0xFF95C9C2), Color(0xFFE0B85F), Color(0xFFB3BEEA), Color(0xFFD9A08F),
+            ),
         )
     }
 }
@@ -399,12 +491,6 @@ private fun BackgroundPalette.get(layer: PaletteLayer): Color = when (layer) {
     PaletteLayer.PRIMARY -> primary
     PaletteLayer.SECONDARY -> secondary
     PaletteLayer.TERTIARY -> tertiary
-}
-
-private fun BackgroundPalette.with(layer: PaletteLayer, color: Color): BackgroundPalette = when (layer) {
-    PaletteLayer.PRIMARY -> copy(primary = color)
-    PaletteLayer.SECONDARY -> copy(secondary = color)
-    PaletteLayer.TERTIARY -> copy(tertiary = color)
 }
 
 /** The palette as the user will meet it: base behind, two glows in front. */
@@ -426,9 +512,20 @@ private fun PalettePreview(palette: BackgroundPalette, modifier: Modifier = Modi
     )
 }
 
-private fun blend(a: Color, b: Color, t: Float): Color = Color(
-    red = a.red + (b.red - a.red) * t,
-    green = a.green + (b.green - a.green) * t,
-    blue = a.blue + (b.blue - a.blue) * t,
-    alpha = 1f,
-)
+/**
+ * Preview blend of two palette layers.
+ *
+ * The alpha is blended too, not forced to 1: the bloom layers are deliberately
+ * translucent (and floored, never opaque), and painting them solid in the
+ * preview made a bright palette look more saturated here than it ever looks
+ * behind the app.
+ */
+private fun blend(a: Color, b: Color, t: Float): Color {
+    val k = t.coerceIn(0f, 1f)
+    return Color(
+        red = a.red + (b.red - a.red) * k,
+        green = a.green + (b.green - a.green) * k,
+        blue = a.blue + (b.blue - a.blue) * k,
+        alpha = a.alpha + (b.alpha - a.alpha) * k,
+    )
+}

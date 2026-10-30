@@ -61,6 +61,7 @@ import dev.dhun.design.DhunVisualTuning
 import dev.dhun.design.VisualPart
 import dev.dhun.design.background.BackgroundSection
 import dev.dhun.design.background.DhunBackgrounds
+import dev.dhun.design.background.LocalBackgroundSection
 import dev.dhun.design.background.backgroundSectionTint
 import dev.dhun.design.catalog.ComponentCatalogScreen
 import dev.dhun.design.components.AmbientBackdrop
@@ -312,9 +313,19 @@ fun DhunAppShell(
     // glass over the app's own artwork instead of a flat plate over a scrim.
     // Null when nothing plays: the documented fallback (gradient + sheen).
     val nowPlayingArtworkForGlass = currentTrack?.thumbnailUrl
+    // Home, Search and Library each have their own saved background
+    // preferences: the page backdrop is painted for the section the user is
+    // actually on, and every panel or dialog floating above it frosts with that
+    // same section's switches (LocalBackgroundSection).
+    val pageSection = when (nav.selectedTab) {
+        AppTab.SEARCH -> BackgroundSection.SEARCH
+        AppTab.LIBRARY -> BackgroundSection.LIBRARY
+        else -> BackgroundSection.HOME
+    }
     CompositionLocalProvider(
         LocalTextInputFocusRegistry provides textInputFocusRegistry,
         LocalNowPlayingArtwork provides nowPlayingArtworkForGlass,
+        LocalBackgroundSection provides pageSection,
     ) {
         BoxWithConstraints(
             modifier = modifier
@@ -385,14 +396,8 @@ fun DhunAppShell(
         // artwork (first run, Library, Settings, offline) still has depth and
         // colour instead of a plain Material background
         // (docs/design/glass-system.md §1).
-        // Home, Search and Library each have their own saved background
-        // preferences, so the shared page backdrop is painted for the section
-        // the user is actually on and re-resolves when the tab changes.
-        val pageSection = when (nav.selectedTab) {
-            AppTab.SEARCH -> BackgroundSection.SEARCH
-            AppTab.LIBRARY -> BackgroundSection.LIBRARY
-            else -> BackgroundSection.HOME
-        }
+        // The page backdrop for the section the user is on (see pageSection
+        // above); it re-resolves when the tab changes.
         Box(modifier = Modifier.fillMaxSize()) {
             AmbientBackdrop(modifier = Modifier.fillMaxSize(), section = pageSection)
             NowPlayingBackdrop(
@@ -634,31 +639,38 @@ fun DhunAppShell(
                     fadeOut(DhunAnimations.fastTween()),
                 modifier = Modifier.fillMaxSize(),
             ) {
-                FullPlayer(
-                    modifier = Modifier.fillMaxSize(),
-                    viewModel = playerViewModel,
-                    isDesktop = isDesktop,
-                    onCollapse = { nav.playerExpanded = false },
-                    preferredLyricsProvider = preferredLyricsProvider,
-                    onPreferredLyricsProviderChange = { id ->
-                        settingsVm.setPreferredProvider(id) {
-                            playerViewModel.refreshLyrics()
-                        }
-                    },
-                    onOverflowTrack = { overflowTrack = it },
-                    favoriteIds = favoriteIds,
-                    onToggleFavorite = { homeViewModel.toggleFavorite(it) },
-                    onOpenArtist = { track ->
-                        nav.playerExpanded = false
-                        nav.detailStack.clear()
-                        openArtist(track)
-                    },
-                    onOpenAlbum = { track ->
-                        nav.playerExpanded = false
-                        nav.detailStack.clear()
-                        openAlbum(track)
-                    },
-                )
+                // The expanded player is its own background section; providing it
+                // here (not inside FullPlayer) means the player's own dialogs and
+                // sheets frost with the player's switches too.
+                CompositionLocalProvider(
+                    LocalBackgroundSection provides BackgroundSection.FULL_PLAYER,
+                ) {
+                    FullPlayer(
+                        modifier = Modifier.fillMaxSize(),
+                        viewModel = playerViewModel,
+                        isDesktop = isDesktop,
+                        onCollapse = { nav.playerExpanded = false },
+                        preferredLyricsProvider = preferredLyricsProvider,
+                        onPreferredLyricsProviderChange = { id ->
+                            settingsVm.setPreferredProvider(id) {
+                                playerViewModel.refreshLyrics()
+                            }
+                        },
+                        onOverflowTrack = { overflowTrack = it },
+                        favoriteIds = favoriteIds,
+                        onToggleFavorite = { homeViewModel.toggleFavorite(it) },
+                        onOpenArtist = { track ->
+                            nav.playerExpanded = false
+                            nav.detailStack.clear()
+                            openArtist(track)
+                        },
+                        onOpenAlbum = { track ->
+                            nav.playerExpanded = false
+                            nav.detailStack.clear()
+                            openAlbum(track)
+                        },
+                    )
+                }
             }
         }
         // The Scaffold's top bar is behind the immersive player. Re-layer the

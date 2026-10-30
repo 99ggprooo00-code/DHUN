@@ -249,6 +249,49 @@ class GlassDesignSystemTest(unittest.TestCase):
                     f"{path.name} starts its own image pipeline ({forbidden}); reuse ArtworkColorExtractor",
                 )
 
+    def test_every_frosted_surface_asks_its_section_for_the_radius(self):
+        """One blur rule for the whole app.
+
+        Every place that frosts artwork has to resolve its radius through
+        `DhunBackgrounds.blurPercentFor(section)`: the master switch, the
+        section switch and static-vs-dynamic blur all live in that one call.
+        A surface that reads the raw slider (`DhunAppearance.backdropBlurPercent`)
+        directly silently ignores the user's switches — which is exactly the bug
+        the feature exists to fix, so it is a gate now.
+        """
+        sources = [
+            ROOT / "shared/src/commonMain/kotlin/dev/dhun/design/components/NowPlayingBackdrop.kt",
+            ROOT / "shared/src/commonMain/kotlin/dev/dhun/design/components/LyricsMaterial.kt",
+            ROOT / "shared/src/commonMain/kotlin/dev/dhun/design/components/GlassCard.kt",
+            ROOT / "shared/src/commonMain/kotlin/dev/dhun/ui/player/FullPlayer.kt",
+        ]
+        for path in sources:
+            text = path.read_text()
+            for line in text.splitlines():
+                if "Modifier.blur(" not in line and ".blur(" not in line:
+                    continue
+                self.assertNotIn(
+                    "DhunAppearance.backdropBlurPercent",
+                    line,
+                    f"{path.name} builds a blur from the raw slider; use DhunBackgrounds.blurPercentFor(section)",
+                )
+        # The surfaces that paint their own artwork layer must hand it a section
+        # (MiniPlayer reaches it through AcrylicSurface, which passes its own).
+        mini = (ROOT / "shared/src/commonMain/kotlin/dev/dhun/ui/player/MiniPlayer.kt").read_text()
+        self.assertTrue(
+            re.search(r"AcrylicSurface\([\s\S]{0,200}?section\s*=\s*BackgroundSection\.MINI_PLAYER", mini),
+            "MiniPlayer must paint the miniplayer section",
+        )
+        lyrics = (ROOT / "shared/src/commonMain/kotlin/dev/dhun/design/components/LyricsMaterial.kt").read_text()
+        self.assertIn("section: BackgroundSection", lyrics)
+        for caller in (
+            ROOT / "shared/src/commonMain/kotlin/dev/dhun/design/components/GlassCard.kt",
+        ):
+            self.assertTrue(
+                re.search(r"LyricsArtworkLayer\([\s\S]{0,240}?section\s*=", caller.read_text()),
+                f"{caller.name} must tell the artwork layer which section it belongs to",
+            )
+
     def test_every_background_section_is_persisted_and_wired(self):
         sections = (ROOT / "shared/src/commonMain/kotlin/dev/dhun/design/background/BackgroundPalette.kt").read_text()
         for section in ("HOME", "SEARCH", "LIBRARY", "MINI_PLAYER", "FULL_PLAYER"):

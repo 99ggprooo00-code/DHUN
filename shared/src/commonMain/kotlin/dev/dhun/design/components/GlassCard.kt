@@ -27,6 +27,8 @@ import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.VisualPart
+import dev.dhun.design.background.BackgroundSection
+import dev.dhun.design.background.LocalBackgroundSection
 
 /**
  * The numbers of the DHUN glass material — the one recipe every translucent
@@ -200,6 +202,13 @@ fun GlassCard(
      * in-page card does not need a second blur of the same cover.
      */
     frostArtwork: Boolean = opaqueBase,
+    /**
+     * Which background section this panel's frost obeys. A dialog floats over
+     * whatever page is behind it, so it defaults to the page section; a card
+     * inside the player passes `FULL_PLAYER` and one in the dock passes
+     * `MINI_PLAYER`.
+     */
+    section: BackgroundSection? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
     @Suppress("UNUSED_VARIABLE")
@@ -212,6 +221,7 @@ fun GlassCard(
         subtle -> DhunColors.overlayFocus
         else -> readingSurfaceFill()
     }
+    val resolvedSection = section ?: LocalBackgroundSection.current
     val frostUrl = if (frostArtwork) resolveGlassArtwork(artworkUrl) else null
     val bodyStops = GlassMaterialPolicy.bodyStops(body, light).toTypedArray()
     val sheen = sheenStops(light)
@@ -229,7 +239,11 @@ fun GlassCard(
         // 1. Frosted artwork under everything (frost cut only). Painted as a
         //    child — not a modifier background — so it sits *behind* the body.
         if (frostUrl != null) {
-            LyricsArtworkLayer(artworkUrl = frostUrl, modifier = Modifier.matchParentSize())
+            LyricsArtworkLayer(
+                artworkUrl = frostUrl,
+                modifier = Modifier.matchParentSize(),
+                section = resolvedSection,
+            )
         }
         // 2. Body: a gradient, never one flat colour.
         Box(
@@ -302,8 +316,10 @@ fun GlassDialog(
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
     artworkUrl: String? = null,
+    section: BackgroundSection? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val resolvedSection = section ?: LocalBackgroundSection.current
     Dialog(onDismissRequest = onDismissRequest) {
         GlassCard(
             modifier = modifier.widthIn(
@@ -314,6 +330,7 @@ fun GlassDialog(
             opaqueBase = true,
             artworkUrl = artworkUrl ?: LocalNowPlayingArtwork.current,
             frostArtwork = true,
+            section = resolvedSection,
         ) {
             Column(modifier = Modifier.padding(DhunSpacing.lg), content = content)
         }
@@ -335,6 +352,7 @@ fun GlassDock(
     artworkUrl: String?,
     modifier: Modifier = Modifier,
     shape: Shape = DhunShapes.bottomSheet,
+    section: BackgroundSection = BackgroundSection.MINI_PLAYER,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val light = DhunAppearance.tokens.isLight
@@ -347,7 +365,11 @@ fun GlassDock(
         // One blur for the whole dock. Each band veils itself so the
         // mini-player can be acrylic and the tabs below it can be the
         // lyrics material, instead of one near-black slab over both.
-        LyricsArtworkLayer(artworkUrl = artworkUrl, modifier = Modifier.matchParentSize())
+        LyricsArtworkLayer(
+            artworkUrl = artworkUrl,
+            modifier = Modifier.matchParentSize(),
+            section = section,
+        )
         Column(modifier = Modifier.fillMaxWidth(), content = content)
     }
 }

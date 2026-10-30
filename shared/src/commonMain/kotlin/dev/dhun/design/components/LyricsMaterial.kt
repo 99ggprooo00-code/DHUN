@@ -34,7 +34,9 @@ import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunVisualTuning
 import dev.dhun.design.VisualPart
+import dev.dhun.design.background.BackgroundSection
 import dev.dhun.design.background.DhunBackgrounds
+import dev.dhun.design.background.backgroundSectionTint
 import dev.dhun.design.supportsRealtimeBlur
 
 /**
@@ -157,6 +159,7 @@ fun LyricsMaterial(
     modifier: Modifier = Modifier,
     shape: Shape = DhunShapes.large,
     drawBorder: Boolean = true,
+    section: BackgroundSection = BackgroundSection.HOME,
     content: @Composable BoxScope.() -> Unit,
 ) {
     Box(
@@ -170,7 +173,7 @@ fun LyricsMaterial(
                 },
             ),
     ) {
-        LyricsArtworkLayer(artworkUrl = artworkUrl, modifier = Modifier.matchParentSize())
+        LyricsArtworkLayer(artworkUrl = artworkUrl, modifier = Modifier.matchParentSize(), section = section)
         Box(modifier = Modifier.matchParentSize().lyricsVeil())
         Box(modifier = Modifier.fillMaxSize(), content = content)
     }
@@ -200,6 +203,7 @@ fun LyricsArtworkSheet(
     modifier: Modifier = Modifier,
     shape: Shape = DhunShapes.bottomSheet,
     drawBorder: Boolean = true,
+    section: BackgroundSection = BackgroundSection.FULL_PLAYER,
     content: @Composable BoxScope.() -> Unit,
 ) {
     Box(
@@ -221,7 +225,7 @@ fun LyricsArtworkSheet(
                 },
             ),
     ) {
-        LyricsArtworkLayer(artworkUrl = artworkUrl, modifier = Modifier.matchParentSize())
+        LyricsArtworkLayer(artworkUrl = artworkUrl, modifier = Modifier.matchParentSize(), section = section)
         Box(modifier = Modifier.matchParentSize().lyricsVeil(part = VisualPart.QUEUE_SHEET))
         Box(modifier = Modifier.fillMaxSize(), content = content)
     }
@@ -237,6 +241,7 @@ fun AcrylicSurface(
     artworkUrl: String?,
     modifier: Modifier = Modifier,
     shape: Shape = DhunShapes.large,
+    section: BackgroundSection = BackgroundSection.MINI_PLAYER,
     content: @Composable BoxScope.() -> Unit,
 ) {
     Box(
@@ -250,8 +255,13 @@ fun AcrylicSurface(
             .clip(shape)
             .border(BorderStroke(DhunSpacing.border, DhunColors.glassEdge), shape),
     ) {
-        LyricsArtworkLayer(artworkUrl = artworkUrl, modifier = Modifier.matchParentSize())
+        LyricsArtworkLayer(artworkUrl = artworkUrl, modifier = Modifier.matchParentSize(), section = section)
         Box(modifier = Modifier.matchParentSize().acrylicGlass())
+        // The section's palette over the acrylic: this is the one surface that
+        // has to *carry* the mini-player colours rather than sit on a page that
+        // paints them, so the tint belongs inside the surface — a caller-side
+        // modifier would be painted under the artwork layer and never seen.
+        Box(modifier = Modifier.matchParentSize().backgroundSectionTint(section))
         Box(modifier = Modifier.fillMaxSize(), content = content)
     }
 }
@@ -265,6 +275,12 @@ fun AcrylicSurface(
 internal fun LyricsArtworkLayer(
     artworkUrl: String?,
     modifier: Modifier = Modifier,
+    /**
+     * Which background section this surface belongs to, so its frost obeys that
+     * section's switches (the dock is the miniplayer, a dialog floats over the
+     * page, the player card is the player). One layer type, one blur rule.
+     */
+    section: BackgroundSection = BackgroundSection.HOME,
 ) {
     val resolved = remember(artworkUrl) { NowPlayingBackdropPolicy.resolveUrl(artworkUrl) }
     if (!LyricsMaterialPolicy.shouldPaintArtwork(resolved)) return
@@ -277,6 +293,12 @@ internal fun LyricsArtworkLayer(
     val context = LocalPlatformContext.current
     val canBlur = supportsRealtimeBlur
     val brightnessPercent = DhunAppearance.backdropBrightnessPercent
+    // Resolved per section: 0 means this surface is sharp (its master switch or
+    // its own switch is off), 45..100 means frosted at that share of the radius.
+    val blurPercent = DhunBackgrounds.blurPercentFor(
+        section = section,
+        strengthPercent = DhunAppearance.backdropBlurPercent,
+    )
     key(cacheKey) {
         LaunchedEffect(cacheKey) {
             if (cacheKey.isNotBlank()) BlurredArtworkCache.markPrepared(cacheKey)
@@ -296,14 +318,13 @@ internal fun LyricsArtworkLayer(
                         scaleY = NowPlayingBackdropPolicy.OVERSCAN
                     }
                     .then(
-                        // Master gate: the lyrics card blurs with the rest of
-                        // the app, and stops when the user switches blur off.
-                        if (canBlur && DhunBackgrounds.strengthPercent() > 0) {
+                        // Section gate: this card blurs with the rest of the app,
+                        // stops when the master or its own switch is off, and
+                        // follows the artwork when dynamic blur is on.
+                        if (canBlur && blurPercent > 0) {
                             Modifier.blur(
                                 DhunSpacing.glassBlur * LyricsMaterialPolicy.BLUR_SCALE *
-                                    NowPlayingBackdropPolicy.blurMultiplier(
-                                        DhunBackgrounds.strengthPercent(),
-                                    ),
+                                    NowPlayingBackdropPolicy.blurMultiplier(blurPercent),
                             )
                         } else {
                             Modifier

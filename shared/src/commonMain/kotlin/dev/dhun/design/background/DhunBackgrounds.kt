@@ -151,15 +151,14 @@ object DhunBackgrounds {
         }
         // The one extraction pass, using the palette the app already computes.
         val colors = ArtworkColorExtractor.extractFromSeed(key)
-        val palette = BackgroundPalettePolicy.artworkPalette(
-            section = BackgroundSection.HOME,
-            art = colors,
-            tokens = DhunAppearance.tokens,
-        )
         // An "artwork" that extracts to the brand fallback is not artwork
-        // colour: treat it as absent so the section keeps its own palette
+        // colour: treat it as absent so each section keeps its own palette
         // instead of silently painting the accent twice.
-        val derived = palette.takeIf { colors != ArtworkColors.fallback }
+        val derived = if (colors == ArtworkColors.fallback) {
+            null
+        } else {
+            BackgroundPalettePolicy.artworkPalette(art = colors, tokens = DhunAppearance.tokens)
+        }
         update {
             it.copy(
                 artwork = derived,
@@ -231,15 +230,6 @@ object DhunBackgrounds {
         return BackgroundBlurPolicy.applyStrength(kind, strengthPercent)
     }
 
-    /**
-     * The strength every *blur* surface should use: the slider value while the
-     * master switch is on, zero while it is off. Used by the surfaces that are
-     * not one of the five sections (the lyrics card, menus) so the master
-     * switch really does mean "no blur anywhere".
-     */
-    fun strengthPercent(strength: Int = DhunAppearance.backdropBlurPercent): Int =
-        if (state.value.blurEnabled) strength.coerceIn(0, 100) else 0
-
     /** Effective dynamic-colour availability for a section (both switches on). */
     fun usesArtworkColors(section: BackgroundSection): Boolean =
         state.value.dynamicColors && state.value.section(section).dynamicColors
@@ -249,23 +239,29 @@ object DhunBackgrounds {
     /**
      * Replace the whole state. Used by the host to apply persisted values
      * before the first frame, and by tests.
+     *
+     * The snapshot is the settings half of the state; the artwork half is
+     * *runtime* (a cover is not a preference), so it is handled explicitly:
+     *
+     * - a restored snapshot that carries an artwork palette keeps it;
+     * - otherwise a track that is already playing keeps its colour, because its
+     *   seed is re-derived instead of dropped — that is what stops a settings
+     *   load from washing the background back to the theme default mid-song;
+     * - and with no artwork and no seed the stale seed is cleared, so "nothing
+     *   playing" is a real state rather than a palette that reappears on the
+     *   next theme change.
      */
     fun restore(snapshot: BackgroundState) {
-        // The restored snapshot carries no artwork (it is not persisted), so a
-        // track that was already playing keeps its colour: the seed is
-        // re-derived rather than dropped, which is what stops a settings load
-        // from washing the background back to the theme default mid-song.
         val seed = lastSeed
-        state.value = snapshot.copy(
-            artwork = null,
-            artworkLuminance = null,
-            artworkSaturation = null,
-            revision = state.value.revision + 1,
-        )
-        if (seed != null) {
+        val restoredArtwork = snapshot.artwork
+        state.value = snapshot.copy(revision = state.value.revision + 1)
+        if (restoredArtwork != null) return
+        if (seed == null) {
             lastSeed = null
-            setArtworkSeed(seed)
+            return
         }
+        lastSeed = null
+        setArtworkSeed(seed)
     }
 
     /** Resets to documented defaults. Used by "reset all settings". */
