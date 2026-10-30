@@ -272,6 +272,42 @@ class SettingsMaintenanceActionsTest {
      * defaults, still reports loaded, and says what happened.
      */
     @Test
+    fun aMidLoadFailureDiscardsEarlierValuesInsteadOfPublishingAMixedSnapshot(): Unit = runBlocking {
+        val d = data()
+        val h = Harness()
+        // The first persisted key succeeds, then a later read fails. A failed
+        // load must not expose the earlier value alongside defaults for the
+        // remaining keys.
+        d.settings.putString(SettingsKeys.THEME, "light")
+        d.settings.putString(SettingsKeys.ACCENT, "violet")
+        val brokenSettings = object : SettingsRepository by d.settings {
+            override suspend fun getString(key: String): String? {
+                if (key == SettingsKeys.ACCENT) error("database became unavailable")
+                return d.settings.getString(key)
+            }
+        }
+        val vm = SettingsViewModel(
+            GetSettingUseCase(brokenSettings),
+            UpdateSettingUseCase(brokenSettings),
+            h.scope,
+        )
+        try {
+            eventually { vm.loaded.value }
+            assertEquals(SettingsKeys.THEME_DEFAULT, vm.themeId.value,
+                "a value read before the failure must be rolled back to its default")
+            assertEquals(SettingsKeys.ACCENT_DEFAULT, vm.accentId.value)
+            assertEquals(SettingsKeys.CACHE_SIZE_MB_DEFAULT, vm.cacheSizeMb.value)
+            assertEquals(
+                SettingsViewModel.SETTINGS_LOAD_FAILED,
+                vm.maintenanceState.value.screenErrorMessage,
+            )
+            assertTrue(h.uncaught.isEmpty(), "the failure must not escape the coroutine: ${h.uncaught}")
+        } finally {
+            h.close()
+        }
+    }
+
+    @Test
     fun aFailedSettingsReadFallsBackToDefaultsAndStillLoads(): Unit = runBlocking {
         val d = data()
         val h = Harness()
