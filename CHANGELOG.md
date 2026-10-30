@@ -47,7 +47,9 @@ makes **individual interface areas** customisable.
   the surface paints. With no artwork behind it the base uses a stronger tint
   (`SOLID_BASE_TINT_ALPHA`) so the chosen colour is visible rather than a 30% wash
   over near-black; the luminance clamp still holds the surface inside the
-  measured contrast band.
+  measured contrast band (to `CLAMP_TOLERANCE`, 0.002 — a `Color` packs its
+  components, so a colour clamped exactly onto the band edge reads back a
+  fraction off it).
 - **"Blur off" is a paint gate, not a radius of zero.** Every artwork layer
   (`NowPlayingBackdrop`, `LyricsArtworkLayer`, `GlassCard` frost,
   `PlayerBackdrop`, the player's `ArtworkBackdrop` and lyrics card) returns

@@ -209,7 +209,8 @@ class BackgroundSettingsTest {
                     val palette = BackgroundPalettePolicy.paletteFrom(color, tokens, solid)
                     val drift = abs(palette.base.luminance() - themeBase)
                     assertTrue(
-                        drift <= BackgroundPalettePolicy.BASE_LUMINANCE_DRIFT + 1e-3f,
+                        drift <= BackgroundPalettePolicy.BASE_LUMINANCE_DRIFT +
+                            BackgroundPalettePolicy.CLAMP_TOLERANCE,
                         "base drift $drift for $color (solid=$solid) exceeds the measured band",
                     )
                 }
@@ -229,7 +230,10 @@ class BackgroundSettingsTest {
         assertTrue(solidTint > washTint)
         // Both stay in the band: the extra is chroma, not brightness.
         val base = dark.background.luminance()
-        assertTrue(abs(solid.base.luminance() - base) <= BackgroundPalettePolicy.BASE_LUMINANCE_DRIFT + 1e-3f)
+        assertTrue(
+            abs(solid.base.luminance() - base) <= BackgroundPalettePolicy.BASE_LUMINANCE_DRIFT +
+                BackgroundPalettePolicy.CLAMP_TOLERANCE,
+        )
     }
 
     @Test

@@ -213,6 +213,18 @@ object BackgroundPalettePolicy {
     const val CLAMP_EPSILON = 1e-4f
 
     /**
+     * How far past [BASE_LUMINANCE_DRIFT] a clamped base can still read.
+     *
+     * The clamp lands on the band edge, but a `Color` is not arbitrary-precision:
+     * its components are packed, so a colour that was mixed exactly onto the
+     * edge measures slightly off it when read back. Measured worst case on the
+     * accent swatches in both themes is 1.3e-3, so this is the honest bound the
+     * tests assert ("inside the band, to storage precision") while the ladder's
+     * own margin — the reason the band exists — is an order of magnitude larger.
+     */
+    const val CLAMP_TOLERANCE = 2e-3f
+
+    /**
      * The palette a component uses when nothing else applies.
      *
      * Every component starts from the theme, except that the player leans on

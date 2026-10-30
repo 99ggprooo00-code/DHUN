@@ -156,7 +156,9 @@ colour and a manual pick therefore cannot drift into different recipes.
 
 **The base is luminance-clamped, not contrast-clamped by eye.**
 `BASE_LUMINANCE_DRIFT` (0.05) keeps the base inside the band the text ladder was
-measured against in both themes. With no artwork behind it the surface needs more
+measured against in both themes; a clamped colour reads back within
+`CLAMP_TOLERANCE` (0.002) of that edge because `Color` packs its components, and
+the tests assert exactly that bound. With no artwork behind it the surface needs more
 of the hue to be visible at all, so `SOLID_BASE_TINT_ALPHA` (0.55) is used instead of
 `BASE_TINT_ALPHA` (0.30) — chroma, not brightness, which is why the contrast band
 still holds in the "blur off, my colours" state. The two glows get a little more
