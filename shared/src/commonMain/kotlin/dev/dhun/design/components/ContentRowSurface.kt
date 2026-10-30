@@ -58,10 +58,12 @@ fun Modifier.dhunContentSurface(
 ): Modifier {
     val light = DhunAppearance.tokens.isLight
     val fill = if (reading) readingSurfaceFill() else contentRowFill()
+    val bodyStops = GlassMaterialPolicy.bodyStops(fill, light).toTypedArray()
+    val sheen = rowSheenStops(light)
     return this
         .clip(shape)
-        .background(Brush.verticalGradient(GlassMaterialPolicy.bodyStops(fill, light)), shape)
-        .background(Brush.verticalGradient(rowSheenStops(light)), shape)
+        .background(Brush.verticalGradient(*bodyStops), shape)
+        .background(Brush.verticalGradient(*sheen), shape)
 }
 
 /** A row carries a fraction of the panel's specular highlight. */

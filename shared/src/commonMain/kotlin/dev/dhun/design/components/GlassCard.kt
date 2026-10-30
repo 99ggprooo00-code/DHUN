@@ -207,6 +207,8 @@ fun GlassCard(
         else -> readingSurfaceFill()
     }
     val frostUrl = if (frostArtwork) resolveGlassArtwork(artworkUrl) else null
+    val bodyStops = GlassMaterialPolicy.bodyStops(body, light).toTypedArray()
+    val sheen = sheenStops(light)
     val outer = if (elevated) {
         modifier.shadow(DhunSpacing.sm, shape, clip = false, ambientColor = Color.Black.copy(alpha = 0.18f))
     } else {
@@ -226,7 +228,7 @@ fun GlassCard(
         // 2. Body: a gradient, never one flat colour.
         Box(
             modifier = Modifier.matchParentSize()
-                .background(Brush.verticalGradient(GlassMaterialPolicy.bodyStops(body, light)), shape),
+                .background(Brush.verticalGradient(*bodyStops), shape),
         )
         // 3. Optional caller tint, capped so it can only ever tint glass.
         if (tint.alpha > 0.01f) {
@@ -238,7 +240,7 @@ fun GlassCard(
         // 4. Specular sheen across the top.
         Box(
             modifier = Modifier.matchParentSize()
-                .background(Brush.verticalGradient(sheenStops(light)), shape),
+                .background(Brush.verticalGradient(*sheen), shape),
         )
         // 5. Content, sharp, at the caller's padding.
         if (contentPadding != null) {
@@ -266,19 +268,20 @@ private fun sheenStops(light: Boolean): Array<Pair<Float, Color>> =
 @Composable
 fun Modifier.dhunGlassBody(fill: Color, shape: Shape = RectangleShape): Modifier {
     val light = DhunAppearance.tokens.isLight
+    val bodyStops = GlassMaterialPolicy.bodyStops(fill, light).toTypedArray()
+    val sheen = sheenStops(light)
     return this
-        .background(Brush.verticalGradient(GlassMaterialPolicy.bodyStops(fill, light)), shape)
-        .background(Brush.verticalGradient(sheenStops(light)), shape)
+        .background(Brush.verticalGradient(*bodyStops), shape)
+        .background(Brush.verticalGradient(*sheen), shape)
 }
 
 /** The gradient hairline: the edge token, fading down the panel. */
 private fun edgeBrush(light: Boolean, edge: Color): Brush {
     val tokenAlpha = edge.alpha.takeIf { it > 0f } ?: 0.22f
-    return Brush.verticalGradient(
-        colorStops = GlassMaterialPolicy.edgeStops(light)
-            .map { (offset, factor) -> offset to edge.copy(alpha = (tokenAlpha * factor).coerceIn(0f, 1f)) }
-            .toTypedArray(),
-    )
+    val stops = GlassMaterialPolicy.edgeStops(light)
+        .map { (offset, factor) -> offset to edge.copy(alpha = (tokenAlpha * factor).coerceIn(0f, 1f)) }
+        .toTypedArray()
+    return Brush.verticalGradient(*stops)
 }
 
 /**
@@ -358,16 +361,18 @@ fun FrostedChipSurface(
 ) {
     val light = DhunAppearance.tokens.isLight
     val fill = if (selected) DhunColors.accent else contentRowFill(VisualPart.CHIPS)
+    val bodyStops = GlassMaterialPolicy.bodyStops(fill, light).toTypedArray()
     Box(
         modifier = modifier
             .clip(shape)
-            .background(
+            // Selected chips are the accent (flat on purpose: a gradient under
+            // the label would fight it); unselected ones carry the glass body.
+            .then(
                 if (selected) {
-                    Brush.verticalGradient(arrayOf(fill, fill))
+                    Modifier.background(fill, shape)
                 } else {
-                    Brush.verticalGradient(GlassMaterialPolicy.bodyStops(fill, light))
+                    Modifier.background(Brush.verticalGradient(*bodyStops), shape)
                 },
-                shape,
             )
             .border(
                 DhunSpacing.border,
