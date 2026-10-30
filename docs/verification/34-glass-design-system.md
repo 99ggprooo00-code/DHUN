@@ -124,8 +124,8 @@ Settings, an offline device — is still artwork-led instead of one flat colour.
 | --- | --- |
 | Static audit | Every default-Material widget removed from `shared/.../ui`, `app-android` and `app-desktop` (the gate is the audit). |
 | Repo Python gate | `python3 -m unittest discover -s scripts -p 'test_*.py'` — 504 tests OK (includes the six design-system tests). |
-| Web mirror | `npm --prefix app-web run check:icons` and `npm --prefix app-web test` — 340 tests OK after the new icon. |
-| Kotlin compile + unit tests | CI (`build-and-test`, `Build APK`, `test-release`) — see the PR checks; this sandbox has no JDK, Gradle or Maven egress, so nothing was compiled locally. |
+| Web mirror | `npm --prefix app-web run check:icons` — `up to date (38 icons)`, art matches; `npm --prefix app-web test` — 340 tests, 340 pass, 0 fail. |
+| Kotlin compile + unit tests | CI only — this sandbox has no JDK, Gradle or Maven egress. `Build APK` compiled the shared module for the navigation change; `CI`'s Gradle job caught the one real compile error in the follow-up commit (Material's pull-to-refresh is experimental API and the build promotes that warning to an error) — fixed by confining `@file:OptIn(ExperimentalMaterial3Api::class)` to `DhunPullToRefresh.kt` and dropping the Material `state` parameter from its public signature. |
 | Emulator / physical device | **NOT RUN.** No emulator, no Windows desktop, no device in this environment: contrast, blur fallback on API < 31, and the actual rendered look on Android and Windows remain unverified and must be reviewed on hardware. |
 
 The legibility floor is unchanged and still enforced by
