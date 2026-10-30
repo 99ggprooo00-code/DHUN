@@ -39,6 +39,22 @@ process-death queue restore, the foreground download service, libVLC error
 surfacing and MSI install-over are unchanged and remain CI-packaging-only or
 unverified evidence.
 
+## 2026-10-30 — settings persistence (branch `arena/c270ff9d-dhun`)
+
+`SettingsViewModel` now loads preferences as **one snapshot** (nothing is
+published until every key has been read, so a mid-load failure cannot leave a
+mixed state that silently reverts on the next launch) and **puts a value back
+when its write fails** instead of leaving the screen showing a preference the
+database never stored. `reset()`, a failed visual-tuning save and a failed reset
+republish what is actually stored, through the same atomic read path. Details:
+[verification 32](../docs/verification/32-settings-persistence.md).
+
+**Still unverified by this change:** the appearance/visual-tuning commits now
+also happen off the load coroutine and on rollback; that is `:shared:jvmTest`
+covered but the recomposition timing on a real device/frame is source-reviewed
+only (no emulator, device or JDK in this sandbox). Nothing here was observed on
+an Android device or an interactive Windows session.
+
 ## Current provider/legal/architecture reconciliation — 2026-10-28
 
 See [PRD §1](../docs/PRD.md#1-product-definition-and-source-of-truth),
