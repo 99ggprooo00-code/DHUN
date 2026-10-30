@@ -32,7 +32,7 @@ preferences, and they now exist — resolved in one place, saved per section, an
 painted by the surfaces that own them.
 
 - **Three globals, independent by construction.** *Background blur* is the
-  master (`0` seconds: off means no blur anywhere, including the lyrics card and
+  master (off means no blur anywhere, including the lyrics card and
   the dialog frost). *Dynamic blur* chooses artwork-responsive frost versus one
   steady radius, is disabled rather than hidden while the master is off, and is
   suspended — not forgotten — by it. *Dynamic colors* is a colour switch that
@@ -51,12 +51,28 @@ painted by the surfaces that own them.
   `BASE_LUMINANCE_DRIFT` (0.05) of the theme background, manual palettes are
   sanitised on the way in *and* on the way out of storage, and artwork identity
   lives in the two alpha-limited blooms under the rows.
+- **Every frosted surface follows its own section.** `LyricsArtworkLayer` takes a
+  `BackgroundSection` and resolves through `blurPercentFor`, so the dock, the
+  mini player, the lyrics card, dialogs and the player's queue sheet obey the
+  switches of the surface they belong to (the shell provides
+  `LocalBackgroundSection` for pages, the player provides `FULL_PLAYER`), instead
+  of all reading the same raw slider.
+- **Manual picks are derived, not hand-picked.** A swatch runs through
+  `BackgroundPalettePolicy.manualFrom` — the same recipe as the artwork palette —
+  and the swatch rows render that result, so tapping a swatch paints exactly that
+  colour and the three layers stay related. Swatches are derived per theme.
+- **The strength slider cannot fake "off".** An enabled blur keeps a 20% floor
+  (`MIN_EFFECTIVE_STRENGTH`); the master switch is the only off switch. The
+  slider is disabled with an explanation while blur is off, and a device without
+  real blur says so instead of silently doing nothing.
 - **Settings in the glass design.** `Backgrounds` group with the three switches,
   a per-section row showing a live palette preview and what is actually in
   effect ("From the current artwork", "Your colours · Dynamic Colors is off"),
-  a section dialog with three colour layers and restore-defaults, and
-  "Restore all section defaults". The old slider is now "Blur strength", which
-  scales a blur rather than switching one on.
+  a section dialog with three colour layers and restore-defaults, and a
+  confirmed "Restore all section defaults". Captions name the frost in effect
+  ("artwork blur" / "steady blur") and which switch is holding a disabled row.
+  The old slider is now "Blur strength", which scales a blur rather than
+  switching one on.
 - **Storage.** `background_blur_enabled`, `background_dynamic_blur`,
   `background_dynamic_colors`, `background_profile_version` and
   `background_<section>_<field>` rows (`#AARRGGBB` for colours, empty = unset).

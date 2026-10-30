@@ -212,8 +212,15 @@ class BackgroundSettingsTest {
 
         val bright = BackgroundBlurPolicy.adaptivePercent(0.95f, 0.95f)
         val dark = BackgroundBlurPolicy.adaptivePercent(0.05f, 0.05f)
-        assertTrue(bright > static, "pale, busy artwork needs more frost: $bright vs $static")
+        val neutral = BackgroundBlurPolicy.adaptivePercent(0.5f, 0.5f)
+        // A neutral cover is the shipped frost exactly, in *both* modes: choosing
+        // the steady radius must never be a quiet downgrade of the app's look.
+        assertEquals(static, neutral)
+        // A pale, busy cover keeps the full radius…
+        assertEquals(BackgroundBlurPolicy.DYNAMIC_MAX_PERCENT, bright)
+        // …and a dark, muted one gives some back so the art survives the frost.
         assertTrue(dark < static, "a dark, moody cover keeps its detail: $dark vs $static")
+        assertTrue(dark >= BackgroundBlurPolicy.DYNAMIC_MIN_PERCENT)
         assertNotEquals(bright, dark)
     }
 
@@ -233,6 +240,9 @@ class BackgroundSettingsTest {
             BackgroundBlurPolicy.STATIC_PERCENT,
             BackgroundBlurPolicy.adaptivePercent(null, null),
         )
+        // Extreme statistics clamp, they never escape the band.
+        assertEquals(BackgroundBlurPolicy.DYNAMIC_MAX_PERCENT, BackgroundBlurPolicy.adaptivePercent(1f, 1f))
+        assertEquals(BackgroundBlurPolicy.DYNAMIC_MIN_PERCENT, BackgroundBlurPolicy.adaptivePercent(0f, 0f))
     }
 
     @Test

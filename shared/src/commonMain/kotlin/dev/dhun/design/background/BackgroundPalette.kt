@@ -320,23 +320,36 @@ enum class PaletteSource {
 object BackgroundBlurPolicy {
 
     /**
-     * The radius used when blur is on but not dynamic. Chosen so a moving
-     * phone gets the frosted look without the 100% radius, which costs the
-     * most GPU time on low-end devices.
+     * The radius used when blur is on but not dynamic: the shipped frost, i.e.
+     * the full radius of the user's strength setting.
+     *
+     * "Dynamic blur off" means *the normal blur* — not a different, weaker one.
+     * Anything less here would make choosing the steady frost a quiet downgrade
+     * of the app's own look.
      */
-    const val STATIC_PERCENT = 70
+    const val STATIC_PERCENT = 100
 
-    /** Adaptive range. Never zero: "dynamic blur" must not mean "sometimes none". */
-    const val DYNAMIC_MIN_PERCENT = 45
+    /**
+     * Adaptive range, in percent of the strength radius.
+     *
+     * The adaptive radius starts at [DYNAMIC_BASE_PERCENT] (the shipped frost,
+     * so a neutral cover looks exactly like it did) and only ever moves *down*
+     * for artwork that does not need that much: a dark, muted cover at the full
+     * radius is just a grey smear, and letting it stay recognisable is the whole
+     * point of following the artwork. It never reaches zero — "dynamic blur"
+     * must not mean "sometimes none".
+     */
+    const val DYNAMIC_MIN_PERCENT = 70
     const val DYNAMIC_MAX_PERCENT = 100
+    const val DYNAMIC_BASE_PERCENT = 100
 
-    /** How far artwork luminance can push the radius, in percent. */
-    const val DYNAMIC_LUMINANCE_SPREAD = 26
+    /** How far artwork luminance can pull the radius, in percent. */
+    const val DYNAMIC_LUMINANCE_SPREAD = 18
 
-    /** Saturated artwork needs more frost to keep text legible over it. */
-    const val DYNAMIC_SATURATION_LIFT = 12
+    /** Saturated artwork keeps more frost; muted artwork gives some back. */
+    const val DYNAMIC_SATURATION_SPREAD = 12
 
-    /** Neutral artwork statistics: the radius falls back to [STATIC_PERCENT]. */
+    /** Neutral artwork statistics: the radius is [DYNAMIC_BASE_PERCENT]. */
     const val NEUTRAL_LUMINANCE = 0.5f
     const val NEUTRAL_SATURATION = 0.5f
 
@@ -374,16 +387,17 @@ object BackgroundBlurPolicy {
     }
 
     /**
-     * The artwork-responsive radius. Bright artwork gets more frost (white text
-     * over a pale cover is the hard case), saturated artwork gets a little more
-     * again; dark, muted artwork gets less so the cover is still recognisable.
+     * The artwork-responsive radius. Bright, saturated artwork keeps the full
+     * frost (pale, busy covers are the hard case for white text, and the full
+     * radius is already the ceiling); dark, muted artwork gives some back so the
+     * cover is still recognisable instead of dissolving into grey.
      */
     fun adaptivePercent(luminance: Float?, saturation: Float?): Int {
         val lum = (luminance ?: NEUTRAL_LUMINANCE).coerceIn(0f, 1f)
         val sat = (saturation ?: NEUTRAL_SATURATION).coerceIn(0f, 1f)
         val fromLuminance = (lum - NEUTRAL_LUMINANCE) * 2f * DYNAMIC_LUMINANCE_SPREAD
-        val fromSaturation = (sat - NEUTRAL_SATURATION) * 2f * DYNAMIC_SATURATION_LIFT
-        val percent = STATIC_PERCENT + fromLuminance + fromSaturation
+        val fromSaturation = (sat - NEUTRAL_SATURATION) * 2f * DYNAMIC_SATURATION_SPREAD
+        val percent = DYNAMIC_BASE_PERCENT + fromLuminance + fromSaturation
         return percent.toInt().coerceIn(DYNAMIC_MIN_PERCENT, DYNAMIC_MAX_PERCENT)
     }
 

@@ -132,13 +132,34 @@ Saved preferences are **suspended**, never erased, by a global switch: turning
 | `DhunBackgrounds.blurPercentFor(section)` | Meaning |
 | --- | --- |
 | master *Background blur* off | `0` - no blur anywhere, including the lyrics card and menus |
-| master on, *Dynamic blur* off (or the section's off) | `BackgroundBlurPolicy.STATIC_PERCENT` - one steady radius |
-| master on, dynamic on | `adaptivePercent(...)` - brighter and busier artwork gets more frost, bounded to 45..100 |
+| master on, *Dynamic blur* off (or the section's off) | `BackgroundBlurPolicy.STATIC_PERCENT` (100) - one steady radius, the shipped frost |
+| master on, dynamic on | `adaptivePercent(...)` - a neutral cover keeps that same full frost, pale/busy artwork stays at it, dark and muted artwork gives some back (bounded to 70..100) |
 
 The blur-strength slider scales the result (`applyStrength`) and can only reduce
-it. `BackgroundBlurPolicy` never reads a colour switch and
-`BackgroundPalettePolicy.resolve` never reads a blur switch: the two features
-are independent by construction, and `scripts/test_design_system.py` asserts it.
+it — never to zero: an enabled blur keeps a documented floor
+(`MIN_EFFECTIVE_STRENGTH`, 20%), because the master switch is the *only* off
+switch. A slider that could reach 0 would let "Background blur: on" and "nothing
+is frosted" both be true, which reads as a bug. `BackgroundBlurPolicy` never
+reads a colour switch and `BackgroundPalettePolicy.resolve` never reads a blur
+switch: the two features are independent by construction, and
+`scripts/test_design_system.py` asserts it.
+
+**Every frosted surface asks its own section.** `LyricsArtworkLayer` — the one
+artwork layer behind the page backdrop, the dock, the mini player, the lyrics
+card, dialogs and the player's queue sheet — takes a `BackgroundSection` and
+resolves through `blurPercentFor(section)`. The shell publishes
+`LocalBackgroundSection` (Home / Search / Library) so panels and dialogs floating
+over a page follow that page, and the expanded player publishes `FULL_PLAYER` for
+everything inside it, including its own dialogs. A surface that reads the raw
+slider instead ignores the user's switches, so that is a design gate now.
+
+**Manual colours use the same recipe as the artwork.** A pick in Settings runs
+through `BackgroundPalettePolicy.manualFrom`, and the swatch rows render the
+result of that derivation — what the user taps is what the surface will paint,
+the three layers stay a palette rather than three unrelated hues, and every
+offered swatch is already inside the measured contrast band. Swatches are
+derived per theme, so the light theme is not offered near-black "base" choices
+that it could never display.
 
 `DhunBackgrounds.setArtworkSeed(...)` is the **only** artwork input. It reuses
 `ArtworkColorExtractor` (the palette the player tint already computes), caches

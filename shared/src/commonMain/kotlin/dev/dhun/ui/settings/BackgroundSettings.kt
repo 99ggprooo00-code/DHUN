@@ -96,8 +96,9 @@ internal fun BackgroundSettingsSection(viewModel: SettingsViewModel) {
             title = "Dynamic blur",
             subtitle = when {
                 !backgrounds.blurEnabled -> "Paused while Background blur is off. Your choice is remembered."
-                backgrounds.dynamicBlur -> "The frost adapts to each cover: brighter, busier artwork gets more blur."
-                else -> "One steady frost for every cover."
+                backgrounds.dynamicBlur ->
+                    "The frost adapts to each cover: bright, busy artwork keeps the full frost, dark and calm artwork is blurred less so it stays recognisable."
+                else -> "One steady frost for every cover — the full strength you set below."
             },
             checked = backgrounds.dynamicBlur,
             enabled = backgrounds.blurEnabled,
