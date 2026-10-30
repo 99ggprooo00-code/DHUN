@@ -1,3 +1,8 @@
+// Material's pull-to-refresh is still experimental API, and the build treats
+// that annotation as an error. The opt-in is confined to this file: the public
+// surface is DHUN's own and exposes no Material state type.
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package dev.dhun.design.components
 
 import androidx.compose.foundation.Canvas
@@ -9,6 +14,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshState
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -43,9 +49,11 @@ fun DhunPullToRefresh(
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
-    state: PullToRefreshState = rememberPullToRefreshState(),
     content: @Composable BoxScope.() -> Unit,
 ) {
+    // No `state` parameter on purpose: it would put an experimental Material
+    // type into DHUN's public API and force every caller to opt in.
+    val state = rememberPullToRefreshState()
     PullToRefreshBox(
         isRefreshing = isRefreshing,
         onRefresh = onRefresh,
