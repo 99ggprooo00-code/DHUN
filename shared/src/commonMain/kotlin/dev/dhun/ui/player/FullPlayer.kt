@@ -23,7 +23,6 @@ import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -68,6 +67,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
@@ -112,17 +112,19 @@ import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.DhunVisualTuning
+import dev.dhun.design.FullPlayerLayoutMode
 import dev.dhun.design.VisualPart
+import dev.dhun.design.background.BackgroundSection
+import dev.dhun.design.background.DhunBackgrounds
 import dev.dhun.design.components.AmbientBackdrop
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.DhunSlider
 import dev.dhun.design.components.DhunTextButton
-import dev.dhun.design.components.dhunMouseDragScroll
 import dev.dhun.design.components.LyricsArtworkSheet
 import dev.dhun.design.components.NowPlayingBackdropPolicy
+import dev.dhun.design.components.dhunMouseDragScroll
 import dev.dhun.design.components.lyricsVeilBrush
-import dev.dhun.design.FullPlayerLayoutMode
 import dev.dhun.design.fittedPlayerArtworkSize
 import dev.dhun.design.fullPlayerLayoutMode
 import dev.dhun.design.playerWideControlsWidth
@@ -381,7 +383,10 @@ fun FullPlayer(
         // ---- ambient base --------------------------------------------------
         // Under the cover: the page's own colour, so the fallback state is not
         // a void (docs/design/glass-system.md §1).
-        AmbientBackdrop(modifier = Modifier.fillMaxSize())
+        AmbientBackdrop(
+            modifier = Modifier.fillMaxSize(),
+            section = BackgroundSection.FULL_PLAYER,
+        )
 
         // ---- artwork backdrop (runs under the status bar) -------------------
         // Blurred once per track, darkened towards the bottom so the control
@@ -1700,7 +1705,12 @@ private fun PlayerBackdrop(
     if (!shouldRenderPlayerBackdrop(artworkUrl)) return
 
     val canBlur = supportsRealtimeBlur
-    val blurPercent = DhunAppearance.backdropBlurPercent
+    // The player is its own background section: it has its own blur switch and
+    // its own colour palette, independent of the page behind it.
+    val blurPercent = DhunBackgrounds.blurPercentFor(
+        section = BackgroundSection.FULL_PLAYER,
+        strengthPercent = DhunAppearance.backdropBlurPercent,
+    )
 
     var prepared by remember {
         mutableStateOf(cacheKey.isNotBlank() && BlurredArtworkCache.isPrepared(cacheKey))
@@ -1756,6 +1766,12 @@ private fun LyricsCard(
     accent: Color,
     modifier: Modifier = Modifier,
 ) {
+    // The card's frost follows the player's own section switches, so the master
+    // switch and the player's static/dynamic choice both reach it.
+    val blurPercent = DhunBackgrounds.blurPercentFor(
+        section = BackgroundSection.FULL_PLAYER,
+        strengthPercent = DhunAppearance.backdropBlurPercent,
+    )
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -1774,11 +1790,11 @@ private fun LyricsCard(
                     modifier = Modifier
                         .fillMaxSize()
                         .then(
-                            if (supportsRealtimeBlur && DhunAppearance.backdropBlurPercent > 0) {
+                            if (supportsRealtimeBlur && blurPercent > 0) {
                                 Modifier.blur(
                                     DhunSpacing.glassBlur * 2 *
                                         NowPlayingBackdropPolicy.blurMultiplier(
-                                            DhunAppearance.backdropBlurPercent,
+                                            blurPercent,
                                         ),
                                 )
                             } else {

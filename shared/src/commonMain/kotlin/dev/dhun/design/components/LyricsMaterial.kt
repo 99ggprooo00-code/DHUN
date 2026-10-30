@@ -34,6 +34,7 @@ import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunVisualTuning
 import dev.dhun.design.VisualPart
+import dev.dhun.design.background.DhunBackgrounds
 import dev.dhun.design.supportsRealtimeBlur
 
 /**
@@ -295,11 +296,13 @@ internal fun LyricsArtworkLayer(
                         scaleY = NowPlayingBackdropPolicy.OVERSCAN
                     }
                     .then(
-                        if (canBlur && DhunAppearance.backdropBlurPercent > 0) {
+                        // Master gate: the lyrics card blurs with the rest of
+                        // the app, and stops when the user switches blur off.
+                        if (canBlur && DhunBackgrounds.strengthPercent() > 0) {
                             Modifier.blur(
                                 DhunSpacing.glassBlur * LyricsMaterialPolicy.BLUR_SCALE *
                                     NowPlayingBackdropPolicy.blurMultiplier(
-                                        DhunAppearance.backdropBlurPercent,
+                                        DhunBackgrounds.strengthPercent(),
                                     ),
                             )
                         } else {

@@ -22,6 +22,54 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Background blur, dynamic blur and dynamic colours are real settings (2026-10-30, session `arena/83a7841b-dhun`)
+
+The Settings screen had one slider named "background blur" that changed a
+percentage, and nothing else: no way to turn blur off, no way to say whether the
+frost should follow the cover, and no way to give Home, Search, Library, the
+miniplayer and the full player different colours. Those are three separate
+preferences, and they now exist — resolved in one place, saved per section, and
+painted by the surfaces that own them.
+
+- **Three globals, independent by construction.** *Background blur* is the
+  master (`0` seconds: off means no blur anywhere, including the lyrics card and
+  the dialog frost). *Dynamic blur* chooses artwork-responsive frost versus one
+  steady radius, is disabled rather than hidden while the master is off, and is
+  suspended — not forgotten — by it. *Dynamic colors* is a colour switch that
+  never reads a blur switch and is never read by one.
+- **Five sections, one precedence.** `BackgroundSection` (Home, Search, Library,
+  Miniplayer, Full player) each save blur / dynamic blur / dynamic colours and a
+  manual three-layer palette. `BackgroundPalettePolicy.resolve` is the only
+  precedence: global off → manual-or-default; global on + section off → the
+  same; both on → artwork, else manual, else default. Global switches suspend a
+  section's saved choice and restore it when re-enabled.
+- **One image pipeline.** `DhunBackgrounds.setArtworkSeed` reuses the existing
+  `ArtworkColorExtractor` palette (hash-keyed, cached per seed, one pass per
+  track) — no second decode, no new bitmap work, no per-frame blur. Palette
+  changes crossfade on `DhunAnimations.slowTween`.
+- **Readable over any cover.** The base wash is clamped to
+  `BASE_LUMINANCE_DRIFT` (0.05) of the theme background, manual palettes are
+  sanitised on the way in *and* on the way out of storage, and artwork identity
+  lives in the two alpha-limited blooms under the rows.
+- **Settings in the glass design.** `Backgrounds` group with the three switches,
+  a per-section row showing a live palette preview and what is actually in
+  effect ("From the current artwork", "Your colours · Dynamic Colors is off"),
+  a section dialog with three colour layers and restore-defaults, and
+  "Restore all section defaults". The old slider is now "Blur strength", which
+  scales a blur rather than switching one on.
+- **Storage.** `background_blur_enabled`, `background_dynamic_blur`,
+  `background_dynamic_colors`, `background_profile_version` and
+  `background_<section>_<field>` rows (`#AARRGGBB` for colours, empty = unset).
+  Version 0 imports the legacy `backdrop_blur = 0` as "blur off" exactly once, so
+  an existing install keeps the behaviour it had. Hosts apply the state before
+  the first frame (Android `MainActivity`, desktop `Main`).
+- **Tests.** `BackgroundSettingsTest` covers the full precedence table on every
+  section, the master/section blur combinations, dynamic-blur availability,
+  colour/blur independence, manual palettes, resets, persistence across a
+  restart, the version-0 migration, palette encoding, missing artwork and the
+  contrast band; `scripts/test_design_system.py` now also forbids coupling the
+  two features or starting a second image pipeline.
+
 ### The glass was in the names, not in the pixels (2026-10-30, session `arena/97df3ebc-dhun`)
 
 The owner kept reporting the same thing: DHUN renders as an ordinary Material

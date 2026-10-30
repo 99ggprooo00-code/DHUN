@@ -65,12 +65,15 @@ import dev.dhun.design.components.DhunButton
 import dev.dhun.design.components.DhunTextButton
 import dev.dhun.design.components.GlassCard
 import dev.dhun.design.components.GlassDialog
+import dev.dhun.domain.GetSettingUseCase
+import dev.dhun.domain.UpdateSettingUseCase
 import dev.dhun.legal.DhunAppInfo
 import dev.dhun.lyrics.LyricsRepository
 import dev.dhun.player.NowPlayingPersistence
 import dev.dhun.presentation.home.HomeViewModel
 import dev.dhun.presentation.player.PlayerViewModel
 import dev.dhun.presentation.search.SearchViewModel
+import dev.dhun.presentation.settings.BackgroundPreferences
 import dev.dhun.provider.MusicProvider
 import dev.dhun.ui.shell.AppNavState
 import dev.dhun.ui.shell.AppTab
@@ -166,6 +169,16 @@ class MainActivity : ComponentActivity() {
                     settings.getString(SettingsKeys.ACCENT_MODE),
                     systemDark = (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
                         android.content.res.Configuration.UI_MODE_NIGHT_YES,
+                )
+                // Background blur / dynamic colours, applied before the first
+                // frame for the same reason as the theme: the launch frame must
+                // already be the user's background, not a default one that
+                // fades into the stored one.
+                BackgroundPreferences.apply(
+                    BackgroundPreferences.read(
+                        GetSettingUseCase(settings),
+                        UpdateSettingUseCase(settings),
+                    ),
                 )
             }
         }

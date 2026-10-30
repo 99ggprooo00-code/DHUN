@@ -1,5 +1,6 @@
 package dev.dhun.design.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -31,6 +32,8 @@ import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTokens
 import dev.dhun.design.DhunVisualTuning
 import dev.dhun.design.VisualPart
+import dev.dhun.design.background.BackgroundSection
+import dev.dhun.design.background.DhunBackgrounds
 import dev.dhun.design.supportsRealtimeBlur
 
 /**
@@ -47,11 +50,19 @@ import dev.dhun.design.supportsRealtimeBlur
 fun NowPlayingBackdrop(
     artworkUrl: String?,
     modifier: Modifier = Modifier,
+    section: BackgroundSection = BackgroundSection.HOME,
 ) {
     if (!NowPlayingBackdropPolicy.shouldRenderBackdrop(artworkUrl)) return
     val url = remember(artworkUrl) { NowPlayingBackdropPolicy.resolveUrl(artworkUrl) } ?: return
 
-    val blurPercent = DhunAppearance.backdropBlurPercent
+    // Blur is resolved per section and per the two switches: master off means
+    // 0 (no blur, artwork still shown sharp, translucent styling intact);
+    // master on + dynamic off means one steady radius. Colour is untouched by
+    // any of this — it lives in AmbientBackdrop.
+    val blurPercent = DhunBackgrounds.blurPercentFor(
+        section = section,
+        strengthPercent = DhunAppearance.backdropBlurPercent,
+    )
     val brightnessPercent = DhunAppearance.backdropBrightnessPercent
     val canBlur = supportsRealtimeBlur
     val tokens = DhunAppearance.tokens
@@ -128,19 +139,29 @@ fun NowPlayingBackdrop(
  * they are painted under the rows and under the artwork veil.
  */
 @Composable
-fun AmbientBackdrop(modifier: Modifier = Modifier) {
+fun AmbientBackdrop(
+    modifier: Modifier = Modifier,
+    section: BackgroundSection = BackgroundSection.HOME,
+) {
     val tokens = DhunAppearance.tokens
-    val accent = DhunColors.accent
-    val secondary = DhunColors.accentContainer
+    // The resolved palette is the whole colour feature in one call: artwork
+    // when both dynamic switches are on, otherwise this section's manual
+    // palette or its default (see BackgroundPalettePolicy.resolve).
+    val palette = DhunBackgrounds.paletteFor(section)
+    // Track changes crossfade instead of snapping: the palette is derived from
+    // the artwork, so it changes exactly when the song does.
+    val primary by animateColorAsState(palette.primary, DhunAnimations.slowTween(), label = "bgPrimary")
+    val secondary by animateColorAsState(palette.secondary, DhunAnimations.slowTween(), label = "bgSecondary")
+    val tertiary by animateColorAsState(palette.tertiary, DhunAnimations.slowTween(), label = "bgTertiary")
     val bloom = AmbientBackdropPolicy.bloomAlpha(tokens.isLight)
     Canvas(modifier = modifier.fillMaxSize()) {
-        drawRect(color = tokens.background)
-        AmbientBackdropPolicy.blooms(this.size, accent, secondary, bloom).forEach { bloomLayer ->
+        drawRect(color = primary)
+        AmbientBackdropPolicy.layers(this.size, secondary, tertiary, bloom).forEach { layer ->
             drawRect(
                 brush = Brush.radialGradient(
-                    colors = listOf(bloomLayer.color, Color.Transparent),
-                    center = bloomLayer.center,
-                    radius = bloomLayer.radius,
+                    colors = listOf(layer.color, Color.Transparent),
+                    center = layer.center,
+                    radius = layer.radius,
                 ),
             )
         }
@@ -156,34 +177,38 @@ data class AmbientBloom(
 
 object AmbientBackdropPolicy {
 
-    /** Accent bloom alpha in the dark theme. Subtle on purpose. */
+    /** The main bloom's alpha in the dark theme. Subtle on purpose. */
     const val ACCENT_BLOOM_ALPHA_DARK = 0.16f
 
     /** Light glass needs less of it; white-on-white turns into a smear. */
     const val ACCENT_BLOOM_ALPHA_LIGHT = 0.11f
 
-    /** The cool secondary bloom is weaker than the accent one. */
+    /** The companion bloom is weaker than the main one. */
     const val SECONDARY_SCALE = 0.55f
 
     /** Bloom radius as a fraction of the shorter viewport edge. */
     const val BLOOM_RADIUS = 0.85f
 
-    /** Where the accent bloom sits, as fractions of width/height. */
+    /** Where the main bloom sits, as fractions of width/height. */
     const val ACCENT_CENTER_X = 0.18f
     const val ACCENT_CENTER_Y = 0.06f
 
-    /** Where the secondary bloom sits. */
+    /** Where the companion bloom sits. */
     const val SECONDARY_CENTER_X = 0.92f
     const val SECONDARY_CENTER_Y = 0.78f
 
     fun bloomAlpha(light: Boolean): Float =
         if (light) ACCENT_BLOOM_ALPHA_LIGHT else ACCENT_BLOOM_ALPHA_DARK
 
-    /** Both blooms, sized from the viewport so they scale with the window. */
-    fun blooms(
+    /**
+     * The two blooms for a palette's secondary and tertiary layers, sized from
+     * the viewport so they scale with the window (a desktop window gets a
+     * window-sized bloom, not a phone-sized dot).
+     */
+    fun layers(
         size: Size,
-        accent: Color,
         secondary: Color,
+        tertiary: Color,
         bloomAlpha: Float,
     ): List<AmbientBloom> {
         val radius = BLOOM_RADIUS * minOf(size.width, size.height)
@@ -191,15 +216,23 @@ object AmbientBackdropPolicy {
             AmbientBloom(
                 center = Offset(size.width * ACCENT_CENTER_X, size.height * ACCENT_CENTER_Y),
                 radius = radius,
-                color = accent.copy(alpha = bloomAlpha),
+                color = secondary.copy(alpha = bloomAlpha),
             ),
             AmbientBloom(
                 center = Offset(size.width * SECONDARY_CENTER_X, size.height * SECONDARY_CENTER_Y),
                 radius = radius,
-                color = secondary.copy(alpha = bloomAlpha * SECONDARY_SCALE),
+                color = tertiary.copy(alpha = bloomAlpha * SECONDARY_SCALE),
             ),
         )
     }
+
+    /** Kept for callers/tests that name the two source colours. */
+    fun blooms(
+        size: Size,
+        accent: Color,
+        secondary: Color,
+        bloomAlpha: Float,
+    ): List<AmbientBloom> = layers(size, accent, secondary, bloomAlpha)
 }
 
 @Composable

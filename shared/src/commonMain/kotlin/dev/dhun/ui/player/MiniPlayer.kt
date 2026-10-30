@@ -44,13 +44,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import dev.dhun.core.PlaybackState
 import dev.dhun.design.ArtworkColorExtractor
 import dev.dhun.design.ArtworkColors
-import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunAnimations
+import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
+import dev.dhun.design.background.BackgroundSection
+import dev.dhun.design.background.backgroundSectionTint
 import dev.dhun.design.components.AcrylicSurface
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunIconButton
@@ -260,7 +262,13 @@ fun MiniPlayer(
     } else {
         AcrylicSurface(
             artworkUrl = track.thumbnailUrl,
-            modifier = modifier.fillMaxWidth(),
+            // The standalone card is the miniplayer background section: its
+            // palette tint sits over the acrylic, so a manual palette or the
+            // artwork colours reach the floating card too.
+            modifier = modifier.fillMaxWidth().backgroundSectionTint(
+                section = BackgroundSection.MINI_PLAYER,
+                shape = DhunShapes.large,
+            ),
             shape = DhunShapes.large,
         ) {
             miniContent()

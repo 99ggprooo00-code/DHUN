@@ -182,6 +182,9 @@ class GlassDesignSystemTest(unittest.TestCase):
             "DhunSpinner",
             "DhunDivider",
             "DhunPullToRefresh",
+            "DhunBackgrounds",
+            "BackgroundSection",
+            "BackgroundPalette",
             "DhunNavigationBar",
             "DhunNavigationRail",
             "AmbientBackdrop",
@@ -213,6 +216,55 @@ class GlassDesignSystemTest(unittest.TestCase):
                 "Brush.verticalGradient(listOf(0f to",
                 text,
                 f"{rel} builds its own glass gradient — use GlassMaterialPolicy",
+            )
+
+    def test_blur_and_colour_stay_separate_features(self):
+        """The background feature's two switches must not be wired together.
+
+        Dynamic blur may not consult the colour switch and vice versa: they are
+        independent by requirement, and "one call that does both" is exactly how
+        that independence rots.
+        """
+        policy = (ROOT / "shared/src/commonMain/kotlin/dev/dhun/design/background/BackgroundPalette.kt").read_text()
+        blur = policy[policy.index("object BackgroundBlurPolicy"):]
+        self.assertNotIn(
+            "dynamicColors",
+            blur,
+            "BackgroundBlurPolicy must not read the colour switch",
+        )
+        self.assertNotIn(
+            "blurEnabled",
+            policy[policy.index("fun resolve("):policy.index("fun source(")],
+            "palette resolution must not read any blur switch",
+        )
+        # One extraction pipeline: the backgrounds derive from the existing
+        # extractor, and never decode an image of their own.
+        backgrounds = (ROOT / "shared/src/commonMain/kotlin/dev/dhun/design/background").rglob("*.kt")
+        for path in backgrounds:
+            text = path.read_text()
+            for forbidden in ("AsyncImage", "readPixels", "ImageBitmap", "BitmapFactory"):
+                self.assertNotIn(
+                    forbidden,
+                    text,
+                    f"{path.name} starts its own image pipeline ({forbidden}); reuse ArtworkColorExtractor",
+                )
+
+    def test_every_background_section_is_persisted_and_wired(self):
+        sections = (ROOT / "shared/src/commonMain/kotlin/dev/dhun/design/background/BackgroundPalette.kt").read_text()
+        for section in ("HOME", "SEARCH", "LIBRARY", "MINI_PLAYER", "FULL_PLAYER"):
+            self.assertIn(f'{section}("', sections, f"BackgroundSection.{section} must exist")
+        # The mini player and the full player must actually paint their own
+        # section, not inherit the page's.
+        for path, section in (
+            ("shared/src/commonMain/kotlin/dev/dhun/ui/player/MiniPlayer.kt", "MINI_PLAYER"),
+            ("shared/src/commonMain/kotlin/dev/dhun/ui/player/FullPlayer.kt", "FULL_PLAYER"),
+            ("shared/src/commonMain/kotlin/dev/dhun/ui/shell/DhunAppShell.kt", "MINI_PLAYER"),
+        ):
+            text = (ROOT / path).read_text()
+            self.assertIn(
+                f"BackgroundSection.{section}",
+                text,
+                f"{path} must wire its own background section",
             )
 
     def test_the_glass_docs_are_reachable_from_the_agent_instructions(self):

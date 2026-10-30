@@ -190,6 +190,11 @@ fun SettingsScreen(
                     color = DhunColors.textSecondary,
                     modifier = Modifier.padding(horizontal = DhunSpacing.screenPadding),
                 )
+            }
+            if (category == SettingsCategory.APPEARANCE) SettingsGroup("Backgrounds") {
+                BackgroundSettingsSection(viewModel)
+            }
+            if (category == SettingsCategory.APPEARANCE) SettingsGroup("Backdrop detail") {
                 BackdropControls(viewModel)
             }
             if (category == SettingsCategory.APPEARANCE && showThemeCatalogue) SettingsGroup("Test build · UI tuning") {
@@ -580,12 +585,12 @@ private fun BackdropControls(viewModel: SettingsViewModel) {
     ) {
         if (supportsRealtimeBlur) {
             Text(
-                text = "Background blur",
+                text = "Blur strength",
                 style = MaterialTheme.typography.bodyLarge,
                 color = DhunColors.textPrimary,
             )
             Text(
-                text = "How heavily the now-playing cover is frosted behind the app.",
+                text = "How heavily the cover is frosted while background blur is on. Turn blur off above to remove it entirely.",
                 style = MaterialTheme.typography.bodySmall,
                 color = DhunColors.textSecondary,
             )

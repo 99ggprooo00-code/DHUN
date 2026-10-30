@@ -3,6 +3,10 @@ package dev.dhun.presentation.settings
 import dev.dhun.data.SettingsKeys
 import dev.dhun.design.DhunVisualTuning
 import dev.dhun.design.VisualPart
+import dev.dhun.design.background.BackgroundPalette
+import dev.dhun.design.background.BackgroundSection
+import dev.dhun.design.background.BackgroundState
+import dev.dhun.design.background.SectionBackgrounds
 import dev.dhun.domain.GetSettingUseCase
 import dev.dhun.domain.UpdateSettingUseCase
 import dev.dhun.player.AudioCacheBudget
@@ -12,13 +16,13 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /** Persisted preferences for the grouped Settings screen. Writes remain in
  * [UpdateSettingUseCase]; UI-facing flows update optimistically while runtime
@@ -149,6 +153,14 @@ class SettingsViewModel(
 
     private val _accentMode = MutableStateFlow(SettingsKeys.ACCENT_MODE_DEFAULT)
     val accentMode: StateFlow<String> = _accentMode.asStateFlow()
+
+    /**
+     * Background blur + dynamic colours. One snapshot rather than a dozen
+     * flows: the settings screen previews a whole section at once, and the
+     * precedence rules are evaluated against one coherent state.
+     */
+    private val _backgrounds = MutableStateFlow(BackgroundState())
+    val backgrounds: StateFlow<BackgroundState> = _backgrounds.asStateFlow()
     private val _audioQuality = MutableStateFlow(SettingsKeys.AUDIO_QUALITY_DEFAULT)
     val audioQuality: StateFlow<String> = _audioQuality.asStateFlow()
     private val _seekStepSeconds = MutableStateFlow(SettingsKeys.SEEK_STEP_SECONDS_DEFAULT)
@@ -270,6 +282,9 @@ class SettingsViewModel(
         val pauseOnMute = get.boolean(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME, SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME_DEFAULT)
         val persistShuffleRepeat = get.boolean(SettingsKeys.PERSIST_SHUFFLE_REPEAT, SettingsKeys.PERSIST_SHUFFLE_REPEAT_DEFAULT)
         val recordListeningHistory = get.boolean(SettingsKeys.RECORD_LISTENING_HISTORY, SettingsKeys.RECORD_LISTENING_HISTORY_DEFAULT)
+        // Includes the one-off import of the pre-switch `backdrop_blur` row, so
+        // it runs under the same write mutex as every other preference write.
+        val backgrounds = writeMutex.withLock { BackgroundPreferences.read(get, update) }
 
         // Commit — every read above succeeded, so this is one coherent snapshot.
         _themeId.value = themeId
@@ -295,6 +310,7 @@ class SettingsViewModel(
         _pauseOnMute.value = pauseOnMute
         _persistShuffleRepeat.value = persistShuffleRepeat
         _recordListeningHistory.value = recordListeningHistory
+        publishBackgrounds(backgrounds)
     }
 
     /**
@@ -382,6 +398,123 @@ class SettingsViewModel(
             // A failed reset must not leave the app on a baseline it did not
             // persist: re-read the stored experiments and reapply them.
             publishTuning(readStoredTuning())
+        }
+    }
+
+    /* ------------------------------------------------------- backgrounds */
+
+    /**
+     * Publishes a background snapshot to the settings flows **and** to the live
+     * holder, so a switch is visible on the app behind the settings page
+     * immediately, before the row is written.
+     */
+    private fun publishBackgrounds(state: BackgroundState) {
+        _backgrounds.value = state
+        BackgroundPreferences.apply(state)
+    }
+
+    /**
+     * One background write: publish now, persist, and put the previous snapshot
+     * back if the write fails. The previous snapshot *is* the stored state —
+     * only the published copy was changed — so a rollback needs no re-read.
+     */
+    private fun writeBackgrounds(
+        previous: BackgroundState,
+        next: BackgroundState,
+        write: suspend () -> Unit,
+    ) {
+        publishBackgrounds(next)
+        enqueueWrite(write, onFailure = { publishBackgrounds(previous) })
+    }
+
+    /**
+     * The master blur switch. Switching it off suspends every section's blur
+     * without touching a single saved per-section preference, so switching it
+     * back on restores exactly the configuration the user had.
+     */
+    fun setBackgroundBlurEnabled(enabled: Boolean) {
+        val previous = _backgrounds.value
+        if (previous.blurEnabled == enabled) return
+        writeBackgrounds(previous, previous.copy(blurEnabled = enabled)) {
+            BackgroundPreferences.writeGlobalBlur(update, enabled)
+        }
+    }
+
+    /** Dynamic (artwork-responsive) vs static blur. Never touches colour. */
+    fun setBackgroundDynamicBlur(enabled: Boolean) {
+        val previous = _backgrounds.value
+        if (previous.dynamicBlur == enabled) return
+        writeBackgrounds(previous, previous.copy(dynamicBlur = enabled)) {
+            BackgroundPreferences.writeGlobalDynamicBlur(update, enabled)
+        }
+    }
+
+    /** Artwork colours, independent of every blur switch. */
+    fun setBackgroundDynamicColors(enabled: Boolean) {
+        val previous = _backgrounds.value
+        if (previous.dynamicColors == enabled) return
+        writeBackgrounds(previous, previous.copy(dynamicColors = enabled)) {
+            BackgroundPreferences.writeGlobalDynamicColors(update, enabled)
+        }
+    }
+
+    fun setSectionBlurEnabled(section: BackgroundSection, enabled: Boolean) {
+        val previous = _backgrounds.value
+        val next = previous.withSection(section) { it.copy(blurEnabled = enabled) }
+        if (next == previous) return
+        writeBackgrounds(previous, next) { BackgroundPreferences.writeSectionBlur(update, section, enabled) }
+    }
+
+    fun setSectionDynamicBlur(section: BackgroundSection, enabled: Boolean) {
+        val previous = _backgrounds.value
+        val next = previous.withSection(section) { it.copy(dynamicBlur = enabled) }
+        if (next == previous) return
+        writeBackgrounds(previous, next) { BackgroundPreferences.writeSectionDynamicBlur(update, section, enabled) }
+    }
+
+    fun setSectionDynamicColors(section: BackgroundSection, enabled: Boolean) {
+        val previous = _backgrounds.value
+        val next = previous.withSection(section) { it.copy(dynamicColors = enabled) }
+        if (next == previous) return
+        writeBackgrounds(previous, next) { BackgroundPreferences.writeSectionDynamicColors(update, section, enabled) }
+    }
+
+    fun setSectionManualPalette(section: BackgroundSection, palette: BackgroundPalette?) {
+        val previous = _backgrounds.value
+        val next = previous.withSection(section) { it.copy(manual = palette) }
+        if (next == previous) return
+        writeBackgrounds(previous, next) { BackgroundPreferences.writeSectionPalette(update, section, palette) }
+    }
+
+    /**
+     * Restores one section to its defaults: blur, both dynamic switches and the
+     * manual palette. Global switches are deliberately untouched — they are not
+     * this section's setting.
+     */
+    fun resetSectionBackgrounds(section: BackgroundSection) {
+        val previous = _backgrounds.value
+        val next = previous.withSection(section) { SectionBackgrounds.default }
+        if (next == previous) return
+        writeBackgrounds(previous, next) {
+            BackgroundPreferences.writeSectionBlur(update, section, true)
+            BackgroundPreferences.writeSectionDynamicBlur(update, section, true)
+            BackgroundPreferences.writeSectionDynamicColors(update, section, true)
+            BackgroundPreferences.writeSectionPalette(update, section, null)
+        }
+    }
+
+    /** Restores every section, leaving the three global switches alone. */
+    fun resetAllSectionBackgrounds() {
+        val previous = _backgrounds.value
+        val next = previous.copy(sections = emptyMap())
+        if (next == previous) return
+        writeBackgrounds(previous, next) {
+            for (section in BackgroundSection.entries) {
+                BackgroundPreferences.writeSectionBlur(update, section, true)
+                BackgroundPreferences.writeSectionDynamicBlur(update, section, true)
+                BackgroundPreferences.writeSectionDynamicColors(update, section, true)
+                BackgroundPreferences.writeSectionPalette(update, section, null)
+            }
         }
     }
 
@@ -582,6 +715,7 @@ class SettingsViewModel(
         _pauseOnMute.value = SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME_DEFAULT
         _persistShuffleRepeat.value = SettingsKeys.PERSIST_SHUFFLE_REPEAT_DEFAULT
         _recordListeningHistory.value = SettingsKeys.RECORD_LISTENING_HISTORY_DEFAULT
+        publishBackgrounds(BackgroundState())
     }
 
     fun reset() {
@@ -600,7 +734,12 @@ class SettingsViewModel(
                 loadPersistedValues()
             },
         ) {
-            writeMutex.withLock { SettingsKeys.all.forEach { update.remove(it) } }
+            writeMutex.withLock {
+                SettingsKeys.all.forEach { update.remove(it) }
+                // Per-section background keys are built from a section id, so
+                // they are not in SettingsKeys.all; they are still ours to clear.
+                for (key in BackgroundPreferences.allKeys()) update.remove(key)
+            }
             // Run after the rows are gone: the engine's defaults then persist
             // through the shell's own observer, and a reset only reports
             // success once the panel the user sees is back to defaults too.
@@ -637,4 +776,14 @@ class SettingsViewModel(
             else -> "${mb / 1024} GB"
         }
     }
+}
+
+/** Same section, one field changed, with the defaults materialised for the rest. */
+private fun BackgroundState.withSection(
+    section: BackgroundSection,
+    transform: (SectionBackgrounds) -> SectionBackgrounds,
+): BackgroundState {
+    val next = resolvedSections().toMutableMap()
+    next[section] = transform(section(section))
+    return copy(sections = next)
 }
