@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.MaterialTheme
@@ -64,6 +63,7 @@ import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.dhunContentRowSurface
 import dev.dhun.design.components.DhunAssistChip
 import dev.dhun.design.components.DhunFilterChip
+import dev.dhun.design.components.DhunSpinner
 import dev.dhun.design.components.DhunHorizontalRail
 import dev.dhun.design.components.EmptyView
 import dev.dhun.design.components.ErrorView
@@ -484,11 +484,8 @@ private fun HomeFeedContent(
             ) {
                 when {
                     isLoadingMore -> {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(DhunSpacing.iconSizeSm),
-                            strokeWidth = DhunSpacing.iconStroke,
-                            color = DhunColors.accent,
-                        )
+                        // DHUN spinner: thin accent arc in a glass track.
+                        DhunSpinner()
                         Text("Loading more music…", color = DhunColors.textSecondary)
                     }
                     loadMoreError != null -> {

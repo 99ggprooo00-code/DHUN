@@ -113,9 +113,10 @@ fun DhunTextField(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(shape)
-                        // The same quiet glass as a row, so an input belongs to
-                        // the panel around it instead of sitting on top of it.
-                        .background(contentRowFill(VisualPart.INPUTS))
+                        // The same quiet glass as a row (gradient + sheen), so
+                        // an input belongs to the panel around it instead of
+                        // sitting on top of it as a flat Material box.
+                        .dhunGlassBody(contentRowFill(VisualPart.INPUTS), shape)
                         .border(
                             BorderStroke(
                                 DhunSpacing.border,

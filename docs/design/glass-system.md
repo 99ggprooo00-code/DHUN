@@ -23,7 +23,8 @@ dark-first, layered, with soft blur behind sharp content. Material 3 is an
 
 | Cue | Where it lives | Why it matters |
 | --- | --- | --- |
-| Frosted artwork behind the panel | `LyricsArtworkLayer` via `GlassCard(frostArtwork)`, `LyricsMaterial`, `AcrylicSurface`, `TrackMenuSurface` | the surface is visibly *made of* the cover, not just tinted |
+| Frosted artwork behind the panel | `LyricsArtworkLayer` via `GlassCard(frostArtwork = true, artworkUrl = …)`, `LyricsMaterial`, `AcrylicSurface`, `TrackMenuSurface` | the surface is visibly *made of* the cover, not just tinted |
+| Ambient artwork colour under everything | `AmbientBackdrop` (two accent blooms over the theme base) | a page with no cover is still artwork-led, never one flat background |
 | Body gradient (lifted top → deepened bottom) | `GlassMaterialPolicy.bodyStops` | one flat colour is the M3 tell |
 | Specular sheen along the top edge | `GlassMaterialPolicy.sheenStops` | reads as light hitting glass |
 | Gradient hairline edge | `GlassMaterialPolicy.edgeStops` + `DhunColors.glassEdge` | a uniform stroke reads as a Material outline |
@@ -41,6 +42,8 @@ dark-first, layered, with soft blur behind sharp content. Material 3 is an
 | Switch / slider | `DhunSwitch` / `DhunSlider` | `design/components/DhunControls.kt` |
 | Multi-select box (offline selection) | `DhunCheckbox` | `design/components/DhunControls.kt` |
 | Progress bar (download, storage) | `DhunProgressBar` | `design/components/DhunControls.kt` |
+| Loading spinner (buttons, pagination) | `DhunSpinner` (thin accent arc in a faint glass track) | `design/components/DhunSpinner.kt` |
+| Page base under the artwork backdrop | `AmbientBackdrop` (artwork-coloured blooms) | `design/components/NowPlayingBackdrop.kt` |
 | Anchored menu (provider picker, mode picker, overflow) | `DropdownMenu(containerColor = Color.Transparent)` + `TrackMenuSurface` + `MenuActionRow` | `ui/components/TrackOverflowDialog.kt` |
 | Collapsible page toolbar / navigation rail fill | `Modifier.dhunGlassBody(fill)` | `design/components/GlassCard.kt` |
 | Button family | `DhunButton`, `DhunTextButton`, `DhunOutlinedButton`, `DhunIconButton` | `design/components/DhunButton.kt` |
@@ -59,9 +62,10 @@ Two rules follow from that and are enforced mechanically
 
 1. **Never call the raw control from a screen.** `Switch(...)`, `Slider(...)`,
    `Checkbox(...)`, `Button(...)`, `TextButton(...)`, `IconButton(...)`,
-   `LinearProgressIndicator(...)`, `DropdownMenuItem(...)` outside `design/` is a
-   defect; the wrapper exists so the palette, shape and metrics are defined once
-   (`DhunControlPolicy`).
+   `LinearProgressIndicator(...)`, `CircularProgressIndicator(...)`,
+   `DropdownMenuItem(...)` outside `design/` is a defect; the wrapper exists so
+   the palette, shape and metrics are defined once (`DhunControlPolicy`,
+   `DhunSpinnerPolicy`).
 2. **Layout containers stay transparent.** `NavigationBar` / `NavigationRail` /
    `Scaffold` / `DropdownMenu` are only layout or anchoring: they must pass
    `containerColor = Color.Transparent` (and zero tonal/shadow elevation) and let
@@ -103,7 +107,13 @@ buy "more glass".
 - No real blur (Android < 12, no Skiko RenderEffect): draw the dimmed cover or
   the gradient + sheen + edge alone. Never skip the material.
 - Nothing playing / no artwork: `LocalNowPlayingArtwork` is null and the frost
-  cut falls back to gradient + sheen over the scrim. That is intended.
+  cut falls back to gradient + sheen over the scrim. That is intended — and the
+  page still has the `AmbientBackdrop` colour, so "nothing playing" is not the
+  same thing as "plain surface".
+
+`LocalNowPlayingArtwork` is provided once by `DhunAppShell`; `GlassDialog` reads
+it, so every dialog in the app frosts over the playing cover without a call site
+threading a URL. Call sites that know better pass `artworkUrl` explicitly.
 - Light theme: the same recipe, white veil, weaker sheen (`light` branches in
   `GlassMaterialPolicy`).
 
@@ -117,7 +127,8 @@ buy "more glass".
   `containerColor` or when a screen re-invents the glass gradient.
 - `shared/src/jvmTest/.../design/GlassSystemTest.kt` asserts the material
   numbers (gradient ordered, sheen capped, edge fading, dialog floor above the
-  row fill, light/dark asymmetry) and the control palette.
+  row fill, light/dark asymmetry), the control palette, the spinner geometry and
+  the ambient bloom bounds.
 - Screens are reviewed visually on hardware when hardware exists; a lack of
   device access is recorded in `.ai/KNOWN_LIMITATIONS.md`, not used to justify a
   flat build.

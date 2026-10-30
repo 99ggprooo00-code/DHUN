@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -53,6 +52,7 @@ import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunHorizontalRail
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.dhunGlassBody
+import dev.dhun.design.components.DhunSpinner
 import dev.dhun.design.components.DhunTonalButton
 import dev.dhun.design.components.ErrorView
 import dev.dhun.design.components.GlassCard
@@ -281,7 +281,7 @@ private fun ArtistContent(
                 }
                 DhunTonalButton(onClick = onRadio, enabled = !radioLoading && page.topSongs.isNotEmpty()) {
                     if (radioLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(DhunSpacing.iconSizeSm), strokeWidth = DhunSpacing.iconStroke)
+                        DhunSpinner()
                     } else {
                         DhunIconView(
                             icon = DhunIcon.Play,

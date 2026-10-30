@@ -187,12 +187,18 @@ fun GlassCard(
     /** Use on an existing reading surface to avoid stacking two dark/light fills. */
     subtle: Boolean = false,
     /**
-     * Frost over this cover instead of the ambient now-playing one. Implied by
-     * [opaqueBase] (dialogs and sheets are the surfaces that sit over page
-     * artwork); `frostArtwork = true` with no URL falls back to the
-     * now-playing cover.
+     * Raw thumbnail URL of the cover to frost this surface with. The cover is
+     * blurred once per track and cached, then painted *under* the body — so the
+     * panel is visibly made of the artwork the page shows instead of a flat
+     * tint. Dialogs pass the playing track's cover; pages omit it because the
+     * page backdrop is already that blur.
      */
     artworkUrl: String? = null,
+    /**
+     * Paint the frozen artwork under the body. Defaults to [opaqueBase], because
+     * dialogs and sheets are the surfaces that float over page artwork; an
+     * in-page card does not need a second blur of the same cover.
+     */
     frostArtwork: Boolean = opaqueBase,
     content: @Composable BoxScope.() -> Unit,
 ) {
@@ -306,7 +312,8 @@ fun GlassDialog(
             ),
             shape = DhunShapes.large,
             opaqueBase = true,
-            artworkUrl = artworkUrl,
+            artworkUrl = artworkUrl ?: LocalNowPlayingArtwork.current,
+            frostArtwork = true,
         ) {
             Column(modifier = Modifier.padding(DhunSpacing.lg), content = content)
         }

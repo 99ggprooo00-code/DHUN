@@ -1,6 +1,9 @@
 package dev.dhun.design
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Size
+import dev.dhun.design.components.AmbientBackdropPolicy
+import dev.dhun.design.components.DhunSpinnerPolicy
 import dev.dhun.design.components.GlassMaterialPolicy
 import dev.dhun.design.components.DhunControlPolicy
 import kotlin.math.abs
@@ -213,6 +216,57 @@ class GlassSystemTest {
             DhunColors.accent,
             DhunControlPolicy.disableIf(true, DhunColors.accent),
             "an enabled control keeps full opacity",
+        )
+    }
+
+    @Test
+    fun theSpinnerIsAnArcInATrackNotASolidRing() {
+        // Less than a full turn, or it reads as a static circle.
+        assertTrue(
+            DhunSpinnerPolicy.SWEEP_DEGREES in 180f..340f,
+            "the visible arc must be shorter than the circle: ${DhunSpinnerPolicy.SWEEP_DEGREES}",
+        )
+        // The track must be a hint, never a second ring at full strength.
+        assertTrue(
+            DhunSpinnerPolicy.TRACK_ALPHA > 0f && DhunSpinnerPolicy.TRACK_ALPHA < 0.35f,
+            "the glass track is a hint, was ${DhunSpinnerPolicy.TRACK_ALPHA}",
+        )
+        // A full rotation per cycle, and slow enough not to strobe.
+        assertTrue(DhunSpinnerPolicy.ROTATION_MS in 400..2000)
+    }
+
+    @Test
+    fun theAmbientBackdropStaysWithinTheContrastBand() {
+        val dark = AmbientBackdropPolicy.bloomAlpha(light = false)
+        val light = AmbientBackdropPolicy.bloomAlpha(light = true)
+        // Subtle: the blooms must never become a colour wash that the row
+        // contrast gates were not written for.
+        assertTrue(dark > 0f && dark <= 0.20f, "dark bloom alpha $dark")
+        assertTrue(light > 0f && light <= 0.20f, "light bloom alpha $light")
+        assertTrue(light < dark, "white-on-white needs a weaker bloom than the dark theme")
+        assertTrue(AmbientBackdropPolicy.SECONDARY_SCALE in 0f..1f)
+        assertTrue(AmbientBackdropPolicy.BLOOM_RADIUS > 0f)
+
+        val size = Size(1200f, 800f)
+        val blooms = AmbientBackdropPolicy.blooms(
+            size = size,
+            accent = Color(0xFF7A5CC4),
+            secondary = Color(0xFF2E6F6A),
+            bloomAlpha = dark,
+        )
+        assertEquals(2, blooms.size, "an accent bloom and one cool bloom, nothing more")
+        blooms.forEach { bloom ->
+            assertTrue(bloom.radius > 0f)
+            // Radii scale with the viewport, so a desktop window does not get a
+            // phone-sized dot.
+            assertTrue(bloom.radius <= size.width && bloom.radius <= size.height)
+            assertTrue(bloom.center.x in 0f..size.width, "bloom centre off-canvas: ${bloom.center}")
+            assertTrue(bloom.center.y in 0f..size.height, "bloom centre off-canvas: ${bloom.center}")
+            assertTrue(bloom.color.alpha > 0f && bloom.color.alpha <= 0.20f)
+        }
+        assertTrue(
+            blooms.first().color.alpha > blooms.last().color.alpha,
+            "the accent bloom leads; the cool one is a faint companion",
         )
     }
 }

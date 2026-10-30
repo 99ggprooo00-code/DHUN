@@ -1,6 +1,7 @@
 package dev.dhun.design.components
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,7 +13,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
@@ -22,6 +26,7 @@ import coil3.request.crossfade
 import dev.dhun.design.ArtworkUrls
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunAppearance
+import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTokens
 import dev.dhun.design.DhunVisualTuning
@@ -106,6 +111,93 @@ fun NowPlayingBackdrop(
                         }.toTypedArray(),
                     ),
                 ),
+        )
+    }
+}
+
+/**
+ * The ambient page base: DHUN's own artwork-inspired colour, painted even when
+ * nothing is playing.
+ *
+ * Without this, every screen that is not backed by a cover (first run, Library,
+ * Settings, an airplaned device) sat on one flat `background` colour with a
+ * grid of translucent rectangles on top — the exact "ordinary Material 3"
+ * reading the owner keeps reporting. Two soft blooms (the artwork-derived
+ * accent plus a cool secondary) give those pages depth and colour while staying
+ * far inside the luminance range the contrast gates already measure, because
+ * they are painted under the rows and under the artwork veil.
+ */
+@Composable
+fun AmbientBackdrop(modifier: Modifier = Modifier) {
+    val tokens = DhunAppearance.tokens
+    val accent = DhunColors.accent
+    val secondary = DhunColors.accentContainer
+    val bloom = AmbientBackdropPolicy.bloomAlpha(tokens.isLight)
+    Canvas(modifier = modifier.fillMaxSize()) {
+        drawRect(color = tokens.background)
+        AmbientBackdropPolicy.blooms(this.size, accent, secondary, bloom).forEach { bloomLayer ->
+            drawRect(
+                brush = Brush.radialGradient(
+                    colors = listOf(bloomLayer.color, Color.Transparent),
+                    center = bloomLayer.center,
+                    radius = bloomLayer.radius,
+                ),
+            )
+        }
+    }
+}
+
+/** One radial bloom: where it sits, how far it reaches, what it is made of. */
+data class AmbientBloom(
+    val center: Offset,
+    val radius: Float,
+    val color: Color,
+)
+
+object AmbientBackdropPolicy {
+
+    /** Accent bloom alpha in the dark theme. Subtle on purpose. */
+    const val ACCENT_BLOOM_ALPHA_DARK = 0.16f
+
+    /** Light glass needs less of it; white-on-white turns into a smear. */
+    const val ACCENT_BLOOM_ALPHA_LIGHT = 0.11f
+
+    /** The cool secondary bloom is weaker than the accent one. */
+    const val SECONDARY_SCALE = 0.55f
+
+    /** Bloom radius as a fraction of the shorter viewport edge. */
+    const val BLOOM_RADIUS = 0.85f
+
+    /** Where the accent bloom sits, as fractions of width/height. */
+    const val ACCENT_CENTER_X = 0.18f
+    const val ACCENT_CENTER_Y = 0.06f
+
+    /** Where the secondary bloom sits. */
+    const val SECONDARY_CENTER_X = 0.92f
+    const val SECONDARY_CENTER_Y = 0.78f
+
+    fun bloomAlpha(light: Boolean): Float =
+        if (light) ACCENT_BLOOM_ALPHA_LIGHT else ACCENT_BLOOM_ALPHA_DARK
+
+    /** Both blooms, sized from the viewport so they scale with the window. */
+    fun blooms(
+        size: Size,
+        accent: Color,
+        secondary: Color,
+        bloomAlpha: Float,
+    ): List<AmbientBloom> {
+        val radius = BLOOM_RADIUS * minOf(size.width, size.height)
+        return listOf(
+            AmbientBloom(
+                center = Offset(size.width * ACCENT_CENTER_X, size.height * ACCENT_CENTER_Y),
+                radius = radius,
+                color = accent.copy(alpha = bloomAlpha),
+            ),
+            AmbientBloom(
+                center = Offset(size.width * SECONDARY_CENTER_X, size.height * SECONDARY_CENTER_Y),
+                radius = radius,
+                color = secondary.copy(alpha = bloomAlpha * SECONDARY_SCALE),
+            ),
         )
     }
 }

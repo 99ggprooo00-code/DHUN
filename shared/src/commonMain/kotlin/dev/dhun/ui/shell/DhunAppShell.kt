@@ -76,6 +76,7 @@ import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.DhunVisualTuning
 import dev.dhun.design.VisualPart
 import dev.dhun.design.catalog.ComponentCatalogScreen
+import dev.dhun.design.components.AmbientBackdrop
 import dev.dhun.legal.DhunAppInfo
 import dev.dhun.design.components.GlassDock
 import dev.dhun.design.components.dhunGlassBody
@@ -375,7 +376,13 @@ fun DhunAppShell(
         // Only one theme-aware artwork veil lives beneath the screens. Accent
         // extraction above still colors controls, but no second full-screen wash
         // is painted over the image (or over the fallback when art is absent).
-        Box(modifier = Modifier.fillMaxSize().background(DhunColors.background)) {
+        // The page base is never one flat fill: the ambient artwork-coloured
+        // blooms sit under the blurred cover, so a screen that is not backed by
+        // artwork (first run, Library, Settings, offline) still has depth and
+        // colour instead of a plain Material background
+        // (docs/design/glass-system.md §1).
+        Box(modifier = Modifier.fillMaxSize()) {
+            AmbientBackdrop(modifier = Modifier.fillMaxSize())
             NowPlayingBackdrop(
                 artworkUrl = currentTrack?.thumbnailUrl,
                 modifier = Modifier.fillMaxSize(),

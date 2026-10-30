@@ -57,6 +57,7 @@ BANNED = {
     "ElevatedButton": "use DhunButton",
     "IconButton": "use DhunIconButton (glass circle, not a bare Material icon button)",
     "LinearProgressIndicator": "use DhunProgressBar / the shimmer loading states",
+    "CircularProgressIndicator": "use DhunSpinner (thin accent arc in a glass track)",
 }
 
 # Layout containers Material renders *around* content. They may be used, but only
@@ -171,6 +172,8 @@ class GlassDesignSystemTest(unittest.TestCase):
             "DhunSwitch",
             "DhunSlider",
             "DhunCheckbox",
+            "DhunSpinner",
+            "AmbientBackdrop",
             "dhunGlassBody",
             "TrackMenuSurface",
             "ActionErrorBanner",
