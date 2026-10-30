@@ -2262,3 +2262,86 @@ What this round did **not** prove:
   is selected by `(min-width: 480px) and (min-aspect-ratio: 1/1)` and the case has
   not been captured.
 
+
+## 2026-10-30 — session `arena/83a7841b-dhun`: background feature (updated after review)
+
+- **Dynamic colours are derived from the artwork *seed*, not sampled pixels.**
+  `DhunBackgrounds.setArtworkSeed` calls `ArtworkColorExtractor.extractFromSeed`
+  — the same deterministic hash the player's dynamic accent already uses — so the
+  palette is stable per cover, costs no decode, and keeps the "one image
+  pipeline" rule. The consequence is that two different covers can land in the
+  same colour family if their URLs hash near each other. Extracting from the
+  loaded bitmap instead would mean a second image pipeline (and re-extraction on
+  every palette read); that trade-off is deliberate, not an oversight.
+- **A settings write can no longer blank the background, but nothing here
+  measures frames.** The published snapshot keeps the live artwork palette and
+  `restore()` re-derives the playing seed; whether the crossfade between two
+  track palettes reads as "smooth" on a 60 Hz phone is a hardware question.
+- **No device has seen the overlay order.** The mini player's section tint is
+  painted inside `AcrylicSurface` over the acrylic (it was previously applied by
+  the caller, *under* the artwork layer, where it could never be seen). Unit
+  tests assert the call structure, not the pixels.
+
+## 2026-10-30 — session `arena/83a7841b-dhun`: finalization pass (repository audit, no hardware)
+
+**Environment.** The agent sandbox for this pass had no Java/Gradle, no Android
+SDK, no emulator image, no `/dev/kvm`, no display and no Android device: 2 vCPUs,
+3 GB RAM, and outbound network limited to GitHub/PyPI/npm. The MSI and APK cannot
+be *run* here, only downloaded from CI. So this pass is a repository audit plus
+gates, not device validation. The procedure for a human is
+[`docs/verification/35-background-visual-validation.md`](../docs/verification/35-background-visual-validation.md).
+
+- **Bug found and fixed by audit: detail pages ignored the active section.**
+  `AlbumScreen`, `ArtistScreen` and `PlaylistScreen` call `PageArtworkBackdrop`
+  without a section, and its default was `BackgroundSection.HOME`. With Library
+  set to sharp and Home frosted, an album opened from Library stayed frosted —
+  the switch the user set did not control the surface they were looking at, and
+  the cause was invisible in Settings. `NowPlayingBackdrop`,
+  `AmbientBackdrop`, `PageArtworkBackdrop` and `LyricsArtworkLayer` now take a
+  nullable section resolving to `LocalBackgroundSection.current`. Regression
+  guard: `test_page_backdrops_follow_the_page_they_are_composed_on` in
+  `scripts/test_design_system.py` (fails if any backdrop defaults to a literal
+  section or if a detail page pins `BackgroundSection.HOME`).
+- **Audited in code, still unseen on a screen:** exactly one artwork-seed writer
+  (the shell's `LaunchedEffect(artworkSeed)`), so no palette ping-pong between
+  surfaces; the palette animation path never passes through the default palette
+  on a track change (`setArtworkSeed` installs the new palette in one update, and
+  only a genuinely absent track clears it); `MiniPlayer` and `FullPlayer` read
+  their own sections; the pre-API-31 branch skips `Modifier.blur` entirely and
+  keeps the veil. Code review is not observation.
+- **Still owed to a device, unchanged from the entry below:** bloom quality
+  behind real covers, settings legibility over bright artwork, the visible
+  sharp/frosted contrast between neighbouring sections, palette crossfade feel,
+  the API 30 fallback, and layer order. None of these is described as verified
+  anywhere in this repository, and CI cannot upgrade any of them.
+- **Nothing was "fixed" for the five documented limitations** (seed-derived
+  colours, unprofiled 70–100 band, extraction failure → default, unseen layer
+  order, veil-based readability). Each needs an observation to justify a change;
+  §5 of the validation page states what observation would qualify.
+
+## 2026-10-30 — what the background feature still does not prove
+
+- **CI proves it compiles and its unit tests pass on both target platforms** —
+  and that is all it proves.
+  `build-and-test` runs `:shared:jvmTest` (which now includes
+  `BackgroundSettingsTest`), `Build APK` produces the Android artifact and
+  `test-release` / `msi` builds the Windows desktop package. That is compile +
+  logic coverage, not appearance.
+- **No emulator, device or interactive desktop ran.** Specifically unverified:
+  whether the two palette blooms read as artwork behind real covers on a phone,
+  whether a bright cover keeps the settings rows legible, whether a section with
+  blur off looks *deliberately* sharp next to a frosted neighbour, and whether
+  the crossfade between track palettes feels slow rather than laggy on a
+  low-end device. Someone has to look at it.
+- **The pre-API-31 fallback is unchanged and still un-eyeballed.** `Modifier.blur`
+  remains a no-op below API 31; the master switch adds no CPU blur path, so
+  Android 8–11 shows the dimmed cover, now also with per-section colours.
+  Whether that combination is *good* below API 31 is a hardware question this
+  sandbox cannot answer.
+- **Desktop Skiko blur with the palette behind it has not been seen.** The msi
+  job proves the desktop package builds and its JVM tests pass; nobody has
+  watched a Windows window paint the artwork palette and the frost together.
+- **The palette picker offers swatches, not a colour wheel.** That is deliberate
+  (every swatch is inside the measured luminance band) and it is the reason a
+  user cannot pick an unreadable base — but it also means "any colour" is not a
+  promise this build makes.

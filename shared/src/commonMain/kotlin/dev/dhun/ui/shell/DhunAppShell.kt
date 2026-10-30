@@ -9,15 +9,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Scaffold
@@ -26,10 +26,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import dev.dhun.data.SettingsKeys
-import dev.dhun.player.equalizer.EqualizerState
-import dev.dhun.player.equalizer.EqualizerBands
-import kotlinx.coroutines.flow.drop
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,12 +48,10 @@ import dev.dhun.core.ConnectivityMonitor
 import dev.dhun.core.Track
 import dev.dhun.data.DataLayer
 import dev.dhun.data.PlayContext
-import dev.dhun.download.DownloadManager
-import dev.dhun.domain.GetSettingUseCase
-import dev.dhun.domain.UpdateSettingUseCase
+import dev.dhun.data.SettingsKeys
 import dev.dhun.design.ArtworkColorExtractor
-import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunAnimations
+import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunShapes
@@ -65,24 +59,33 @@ import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.DhunVisualTuning
 import dev.dhun.design.VisualPart
+import dev.dhun.design.background.BackgroundSection
+import dev.dhun.design.background.DhunBackgrounds
+import dev.dhun.design.background.LocalBackgroundSection
+import dev.dhun.design.background.backgroundSectionTint
 import dev.dhun.design.catalog.ComponentCatalogScreen
 import dev.dhun.design.components.AmbientBackdrop
-import dev.dhun.legal.DhunAppInfo
 import dev.dhun.design.components.DhunNavigationBar
 import dev.dhun.design.components.DhunNavigationBarItem
 import dev.dhun.design.components.DhunNavigationRail
 import dev.dhun.design.components.DhunNavigationRailItem
+import dev.dhun.design.components.GlassCard
 import dev.dhun.design.components.GlassDock
+import dev.dhun.design.components.LocalNowPlayingArtwork
 import dev.dhun.design.components.LocalTextInputFocusRegistry
 import dev.dhun.design.components.NowPlayingBackdrop
-import dev.dhun.design.components.GlassCard
-import dev.dhun.design.components.LocalNowPlayingArtwork
 import dev.dhun.design.components.TextInputFocusRegistry
 import dev.dhun.design.components.acrylicGlass
-import dev.dhun.design.components.lyricsVeilBrush
 import dev.dhun.design.components.contentRowFill
+import dev.dhun.design.components.lyricsVeilBrush
+import dev.dhun.domain.GetSettingUseCase
+import dev.dhun.domain.UpdateSettingUseCase
+import dev.dhun.download.DownloadManager
+import dev.dhun.legal.DhunAppInfo
 import dev.dhun.player.DhunPlayer
+import dev.dhun.player.equalizer.EqualizerBands
 import dev.dhun.player.equalizer.EqualizerSession
+import dev.dhun.player.equalizer.EqualizerState
 import dev.dhun.presentation.browse.AlbumViewModel
 import dev.dhun.presentation.browse.ArtistViewModel
 import dev.dhun.presentation.browse.PlaylistViewModel
@@ -107,6 +110,7 @@ import dev.dhun.ui.player.FullPlayer
 import dev.dhun.ui.player.MiniPlayer
 import dev.dhun.ui.search.SearchScreen
 import dev.dhun.ui.settings.SettingsScreen
+import kotlinx.coroutines.flow.drop
 
 // A positive layer keeps the immersive player above the rail, split panes and
 // the desktop navigation dock while its enter/exit transition is running.
@@ -193,6 +197,15 @@ fun DhunAppShell(
     val homeMutation by homeViewModel.mutation.collectAsState()
     val searchMutation by searchViewModel.mutation.collectAsState()
     val currentTrack by playerViewModel.currentTrack.collectAsState()
+    // The background palette follows the current artwork, through the *same*
+    // extraction the player tint already uses (cached per seed, one pass per
+    // track). Nothing here decodes an image again or touches blur.
+    val artworkSeed = currentTrack?.thumbnailUrl ?: currentTrack?.id
+    LaunchedEffect(artworkSeed) { DhunBackgrounds.setArtworkSeed(artworkSeed) }
+    // The base wash is theme-relative, so a theme/accent change re-derives it
+    // instead of leaving the previous theme's layers behind.
+    val appearanceRevision = DhunAppearance.appearanceRevision
+    LaunchedEffect(appearanceRevision) { DhunBackgrounds.refreshArtworkPalette() }
     // Phase 10: library owns Playlists / Favorites / History tabs.
     // If the host doesn't supply a ViewModel, create one from DataLayer.
     // Wire play-context via PlayerViewModel so history rows are labeled
@@ -300,9 +313,19 @@ fun DhunAppShell(
     // glass over the app's own artwork instead of a flat plate over a scrim.
     // Null when nothing plays: the documented fallback (gradient + sheen).
     val nowPlayingArtworkForGlass = currentTrack?.thumbnailUrl
+    // Home, Search and Library each have their own saved background
+    // preferences: the page backdrop is painted for the section the user is
+    // actually on, and every panel or dialog floating above it frosts with that
+    // same section's switches (LocalBackgroundSection).
+    val pageSection = when (nav.selectedTab) {
+        AppTab.SEARCH -> BackgroundSection.SEARCH
+        AppTab.LIBRARY -> BackgroundSection.LIBRARY
+        else -> BackgroundSection.HOME
+    }
     CompositionLocalProvider(
         LocalTextInputFocusRegistry provides textInputFocusRegistry,
         LocalNowPlayingArtwork provides nowPlayingArtworkForGlass,
+        LocalBackgroundSection provides pageSection,
     ) {
         BoxWithConstraints(
             modifier = modifier
@@ -373,11 +396,14 @@ fun DhunAppShell(
         // artwork (first run, Library, Settings, offline) still has depth and
         // colour instead of a plain Material background
         // (docs/design/glass-system.md §1).
+        // The page backdrop for the section the user is on (see pageSection
+        // above); it re-resolves when the tab changes.
         Box(modifier = Modifier.fillMaxSize()) {
-            AmbientBackdrop(modifier = Modifier.fillMaxSize())
+            AmbientBackdrop(modifier = Modifier.fillMaxSize(), section = pageSection)
             NowPlayingBackdrop(
                 artworkUrl = currentTrack?.thumbnailUrl,
                 modifier = Modifier.fillMaxSize(),
+                section = pageSection,
             )
         }
         Row(modifier = Modifier.fillMaxSize()) {
@@ -613,31 +639,38 @@ fun DhunAppShell(
                     fadeOut(DhunAnimations.fastTween()),
                 modifier = Modifier.fillMaxSize(),
             ) {
-                FullPlayer(
-                    modifier = Modifier.fillMaxSize(),
-                    viewModel = playerViewModel,
-                    isDesktop = isDesktop,
-                    onCollapse = { nav.playerExpanded = false },
-                    preferredLyricsProvider = preferredLyricsProvider,
-                    onPreferredLyricsProviderChange = { id ->
-                        settingsVm.setPreferredProvider(id) {
-                            playerViewModel.refreshLyrics()
-                        }
-                    },
-                    onOverflowTrack = { overflowTrack = it },
-                    favoriteIds = favoriteIds,
-                    onToggleFavorite = { homeViewModel.toggleFavorite(it) },
-                    onOpenArtist = { track ->
-                        nav.playerExpanded = false
-                        nav.detailStack.clear()
-                        openArtist(track)
-                    },
-                    onOpenAlbum = { track ->
-                        nav.playerExpanded = false
-                        nav.detailStack.clear()
-                        openAlbum(track)
-                    },
-                )
+                // The expanded player is its own background section; providing it
+                // here (not inside FullPlayer) means the player's own dialogs and
+                // sheets frost with the player's switches too.
+                CompositionLocalProvider(
+                    LocalBackgroundSection provides BackgroundSection.FULL_PLAYER,
+                ) {
+                    FullPlayer(
+                        modifier = Modifier.fillMaxSize(),
+                        viewModel = playerViewModel,
+                        isDesktop = isDesktop,
+                        onCollapse = { nav.playerExpanded = false },
+                        preferredLyricsProvider = preferredLyricsProvider,
+                        onPreferredLyricsProviderChange = { id ->
+                            settingsVm.setPreferredProvider(id) {
+                                playerViewModel.refreshLyrics()
+                            }
+                        },
+                        onOverflowTrack = { overflowTrack = it },
+                        favoriteIds = favoriteIds,
+                        onToggleFavorite = { homeViewModel.toggleFavorite(it) },
+                        onOpenArtist = { track ->
+                            nav.playerExpanded = false
+                            nav.detailStack.clear()
+                            openArtist(track)
+                        },
+                        onOpenAlbum = { track ->
+                            nav.playerExpanded = false
+                            nav.detailStack.clear()
+                            openAlbum(track)
+                        },
+                    )
+                }
             }
         }
         // The Scaffold's top bar is behind the immersive player. Re-layer the
@@ -768,7 +801,14 @@ private fun BottomNavigationBar(
         shape = DhunShapes.bottomSheet,
     ) {
         if (showMini) {
-            Box(modifier = Modifier.fillMaxWidth().acrylicGlass()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .acrylicGlass()
+                    // The dock is the miniplayer section: it takes that section's
+                    // palette (artwork or manual) as a soft tint over its acrylic.
+                    .backgroundSectionTint(BackgroundSection.MINI_PLAYER),
+            ) {
                 MiniPlayer(
                     viewModel = playerViewModel,
                     onExpand = { nav.playerExpanded = true },

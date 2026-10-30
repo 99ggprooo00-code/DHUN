@@ -24,7 +24,7 @@ dark-first, layered, with soft blur behind sharp content. Material 3 is an
 | Cue | Where it lives | Why it matters |
 | --- | --- | --- |
 | Frosted artwork behind the panel | `LyricsArtworkLayer` via `GlassCard(frostArtwork = true, artworkUrl = …)`, `LyricsMaterial`, `AcrylicSurface`, `TrackMenuSurface` | the surface is visibly *made of* the cover, not just tinted |
-| Ambient artwork colour under everything | `AmbientBackdrop` (two accent blooms over the theme base) | a page with no cover is still artwork-led, never one flat background |
+| Ambient artwork colour under everything | `AmbientBackdrop(section)` (two blooms from the section palette over its base) | a page with no cover is still artwork-led, never one flat background |
 | Body gradient (lifted top → deepened bottom) | `GlassMaterialPolicy.bodyStops` | one flat colour is the M3 tell |
 | Specular sheen along the top edge | `GlassMaterialPolicy.sheenStops` | reads as light hitting glass |
 | Gradient hairline edge | `GlassMaterialPolicy.edgeStops` + `DhunColors.glassEdge` | a uniform stroke reads as a Material outline |
@@ -43,7 +43,9 @@ dark-first, layered, with soft blur behind sharp content. Material 3 is an
 | Multi-select box (offline selection) | `DhunCheckbox` | `design/components/DhunControls.kt` |
 | Progress bar (download, storage) | `DhunProgressBar` | `design/components/DhunControls.kt` |
 | Loading spinner (buttons, pagination) | `DhunSpinner` (thin accent arc in a faint glass track) | `design/components/DhunSpinner.kt` |
-| Page base under the artwork backdrop | `AmbientBackdrop` (artwork-coloured blooms) | `design/components/NowPlayingBackdrop.kt` |
+| Page base under the artwork backdrop | `AmbientBackdrop(section)` (the section palette) | `design/components/NowPlayingBackdrop.kt` |
+| Surface tint for dock / miniplayer / player chrome | `Modifier.backgroundSectionTint(section)` | `design/background/BackgroundSurface.kt` |
+| Background blur and colour resolution | `DhunBackgrounds`, `BackgroundSection`, `BackgroundPalette`, `BackgroundPalettePolicy` | `design/background/` |
 | Anchored menu (provider picker, mode picker, overflow) | `DropdownMenu(containerColor = Color.Transparent)` + `TrackMenuSurface` + `MenuActionRow` | `ui/components/TrackOverflowDialog.kt` |
 | Collapsible page toolbar / any chrome strip | `Modifier.dhunGlassBody(fill)` | `design/components/GlassCard.kt` |
 | Bottom tab bar (glass band + tabs) | `DhunNavigationBar` + `DhunNavigationBarItem` | `design/components/DhunNavigation.kt` |
@@ -108,6 +110,74 @@ Text must never sit on a blur; blur is always the backdrop.
 - Edge: glass edge token at full alpha on top, `0.34×` at the bottom.
 - Blur: `DhunSpacing.glassBlur` × `LyricsMaterialPolicy.BLUR_SCALE`, computed
   once per artwork and cached (`BlurredArtworkCache`). Never per frame.
+
+## 3a. Backgrounds: blur and colour are separate features
+
+Five sections own a background: **Home, Search, Library, Miniplayer, Full
+player** (`BackgroundSection` in `design/background/BackgroundPalette.kt`).
+Each paints a `BackgroundPalette` of three layers - a base wash plus two related
+blooms - so the five surfaces read as one palette rather than five colour blocks.
+
+**Resolution** (`BackgroundPalettePolicy.resolve`, one place, all five sections):
+
+1. global *Dynamic colors* off -> the section's manual palette, else its default;
+2. global on but the section's own switch off -> the same manual palette;
+3. both on -> the artwork palette, else manual, else default (nothing playing).
+
+Saved preferences are **suspended**, never erased, by a global switch: turning
+*Dynamic colors* off and on again restores exactly the per-section configuration.
+
+**Blur** is two switches plus a per-section switch:
+
+| `DhunBackgrounds.blurPercentFor(section)` | Meaning |
+| --- | --- |
+| master *Background blur* off | `0` - no blur anywhere, including the lyrics card and menus |
+| master on, *Dynamic blur* off (or the section's off) | `BackgroundBlurPolicy.STATIC_PERCENT` (100) - one steady radius, the shipped frost |
+| master on, dynamic on | `adaptivePercent(...)` - a neutral cover keeps that same full frost, pale/busy artwork stays at it, dark and muted artwork gives some back (bounded to 70..100) |
+
+The blur-strength slider scales the result (`applyStrength`) and can only reduce
+it — never to zero: an enabled blur keeps a documented floor
+(`MIN_EFFECTIVE_STRENGTH`, 20%), because the master switch is the *only* off
+switch. A slider that could reach 0 would let "Background blur: on" and "nothing
+is frosted" both be true, which reads as a bug. `BackgroundBlurPolicy` never
+reads a colour switch and `BackgroundPalettePolicy.resolve` never reads a blur
+switch: the two features are independent by construction, and
+`scripts/test_design_system.py` asserts it.
+
+**Every frosted surface asks its own section.** `LyricsArtworkLayer` — the one
+artwork layer behind the page backdrop, the dock, the mini player, the lyrics
+card, dialogs and the player's queue sheet — takes a `BackgroundSection` and
+resolves through `blurPercentFor(section)`. The shell publishes
+`LocalBackgroundSection` (Home / Search / Library) so panels and dialogs floating
+over a page follow that page, and the expanded player publishes `FULL_PLAYER` for
+everything inside it, including its own dialogs. A surface that reads the raw
+slider instead ignores the user's switches, so that is a design gate now.
+
+**A backdrop is never pinned to a section.** `NowPlayingBackdrop`,
+`AmbientBackdrop`, `PageArtworkBackdrop` and `LyricsArtworkLayer` all take a
+*nullable* section that defaults to `LocalBackgroundSection.current`. That is why
+album, artist and playlist pages - which paint their own cover backdrop and are
+reachable from Home, Search and Library alike - frost with the tab they were
+opened from instead of always with Home's switches. Passing a section explicitly
+is still the rule where a surface owns one (the dock is `MINI_PLAYER`, the player
+is `FULL_PLAYER`).
+
+**Manual colours use the same recipe as the artwork.** A pick in Settings runs
+through `BackgroundPalettePolicy.manualFrom`, and the swatch rows render the
+result of that derivation — what the user taps is what the surface will paint,
+the three layers stay a palette rather than three unrelated hues, and every
+offered swatch is already inside the measured contrast band. Swatches are
+derived per theme, so the light theme is not offered near-black "base" choices
+that it could never display.
+
+`DhunBackgrounds.setArtworkSeed(...)` is the **only** artwork input. It reuses
+`ArtworkColorExtractor` (the palette the player tint already computes), caches
+per seed, and is called once per track from the shell. No second image pipeline,
+no per-frame decoding; palette changes animate on `DhunAnimations.slowTween`.
+
+The base wash is clamped to `BASE_LUMINANCE_DRIFT` (0.05) of the theme
+background so text and controls keep the ratios `DhunThemeContrastTest`
+measures; the artwork identity lives in the two blooms, which sit under rows.
 
 ## 4. Legibility beats translucency (unchanged, and it is not a licence to go flat)
 

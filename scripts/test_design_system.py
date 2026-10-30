@@ -182,6 +182,9 @@ class GlassDesignSystemTest(unittest.TestCase):
             "DhunSpinner",
             "DhunDivider",
             "DhunPullToRefresh",
+            "DhunBackgrounds",
+            "BackgroundSection",
+            "BackgroundPalette",
             "DhunNavigationBar",
             "DhunNavigationRail",
             "AmbientBackdrop",
@@ -213,6 +216,135 @@ class GlassDesignSystemTest(unittest.TestCase):
                 "Brush.verticalGradient(listOf(0f to",
                 text,
                 f"{rel} builds its own glass gradient — use GlassMaterialPolicy",
+            )
+
+    def test_blur_and_colour_stay_separate_features(self):
+        """The background feature's two switches must not be wired together.
+
+        Dynamic blur may not consult the colour switch and vice versa: they are
+        independent by requirement, and "one call that does both" is exactly how
+        that independence rots.
+        """
+        policy = (ROOT / "shared/src/commonMain/kotlin/dev/dhun/design/background/BackgroundPalette.kt").read_text()
+        blur = policy[policy.index("object BackgroundBlurPolicy"):]
+        self.assertNotIn(
+            "dynamicColors",
+            blur,
+            "BackgroundBlurPolicy must not read the colour switch",
+        )
+        self.assertNotIn(
+            "blurEnabled",
+            policy[policy.index("fun resolve("):policy.index("fun source(")],
+            "palette resolution must not read any blur switch",
+        )
+        # One extraction pipeline: the backgrounds derive from the existing
+        # extractor, and never decode an image of their own.
+        backgrounds = (ROOT / "shared/src/commonMain/kotlin/dev/dhun/design/background").rglob("*.kt")
+        for path in backgrounds:
+            text = path.read_text()
+            for forbidden in ("AsyncImage", "readPixels", "ImageBitmap", "BitmapFactory"):
+                self.assertNotIn(
+                    forbidden,
+                    text,
+                    f"{path.name} starts its own image pipeline ({forbidden}); reuse ArtworkColorExtractor",
+                )
+
+    def test_every_frosted_surface_asks_its_section_for_the_radius(self):
+        """One blur rule for the whole app.
+
+        Every place that frosts artwork has to resolve its radius through
+        `DhunBackgrounds.blurPercentFor(section)`: the master switch, the
+        section switch and static-vs-dynamic blur all live in that one call.
+        A surface that reads the raw slider (`DhunAppearance.backdropBlurPercent`)
+        directly silently ignores the user's switches — which is exactly the bug
+        the feature exists to fix, so it is a gate now.
+        """
+        sources = [
+            ROOT / "shared/src/commonMain/kotlin/dev/dhun/design/components/NowPlayingBackdrop.kt",
+            ROOT / "shared/src/commonMain/kotlin/dev/dhun/design/components/LyricsMaterial.kt",
+            ROOT / "shared/src/commonMain/kotlin/dev/dhun/design/components/GlassCard.kt",
+            ROOT / "shared/src/commonMain/kotlin/dev/dhun/ui/player/FullPlayer.kt",
+        ]
+        for path in sources:
+            text = path.read_text()
+            for line in text.splitlines():
+                if "Modifier.blur(" not in line and ".blur(" not in line:
+                    continue
+                self.assertNotIn(
+                    "DhunAppearance.backdropBlurPercent",
+                    line,
+                    f"{path.name} builds a blur from the raw slider; use DhunBackgrounds.blurPercentFor(section)",
+                )
+        # The surfaces that paint their own artwork layer must hand it a section
+        # (MiniPlayer reaches it through AcrylicSurface, which passes its own).
+        mini = (ROOT / "shared/src/commonMain/kotlin/dev/dhun/ui/player/MiniPlayer.kt").read_text()
+        self.assertTrue(
+            re.search(r"AcrylicSurface\([\s\S]{0,200}?section\s*=\s*BackgroundSection\.MINI_PLAYER", mini),
+            "MiniPlayer must paint the miniplayer section",
+        )
+        lyrics = (ROOT / "shared/src/commonMain/kotlin/dev/dhun/design/components/LyricsMaterial.kt").read_text()
+        self.assertIn("section: BackgroundSection", lyrics)
+        for caller in (
+            ROOT / "shared/src/commonMain/kotlin/dev/dhun/design/components/GlassCard.kt",
+        ):
+            self.assertTrue(
+                re.search(r"LyricsArtworkLayer\([\s\S]{0,240}?section\s*=", caller.read_text()),
+                f"{caller.name} must tell the artwork layer which section it belongs to",
+            )
+
+    def test_every_background_section_is_persisted_and_wired(self):
+        sections = (ROOT / "shared/src/commonMain/kotlin/dev/dhun/design/background/BackgroundPalette.kt").read_text()
+        for section in ("HOME", "SEARCH", "LIBRARY", "MINI_PLAYER", "FULL_PLAYER"):
+            self.assertIn(f'{section}("', sections, f"BackgroundSection.{section} must exist")
+        # The mini player and the full player must actually paint their own
+        # section, not inherit the page's.
+        for path, section in (
+            ("shared/src/commonMain/kotlin/dev/dhun/ui/player/MiniPlayer.kt", "MINI_PLAYER"),
+            ("shared/src/commonMain/kotlin/dev/dhun/ui/player/FullPlayer.kt", "FULL_PLAYER"),
+            ("shared/src/commonMain/kotlin/dev/dhun/ui/shell/DhunAppShell.kt", "MINI_PLAYER"),
+        ):
+            text = (ROOT / path).read_text()
+            self.assertIn(
+                f"BackgroundSection.{section}",
+                text,
+                f"{path} must wire its own background section",
+            )
+
+    def test_page_backdrops_follow_the_page_they_are_composed_on(self):
+        """A backdrop inherits the section of the surface it is composed on.
+
+        Album, artist and playlist pages paint their own artwork backdrop, and
+        they are reachable from Home, Search *and* Library. Defaulting those
+        backdrops to `HOME` meant an album opened from Library kept Home's
+        switches: set Library to sharp, open a playlist and it was still
+        frosted for a reason nothing in Settings explained. The section is
+        therefore a nullable parameter resolved from `LocalBackgroundSection`,
+        never a hardcoded literal.
+        """
+        text = (
+            ROOT / "shared/src/commonMain/kotlin/dev/dhun/design/components/NowPlayingBackdrop.kt"
+        ).read_text()
+        for name in ("NowPlayingBackdrop", "AmbientBackdrop", "PageArtworkBackdrop"):
+            self.assertTrue(
+                re.search(
+                    rf"fun {name}\([\s\S]{{0,240}}?section: BackgroundSection\? = null",
+                    text,
+                ),
+                f"{name} must take an optional section instead of defaulting to one section",
+            )
+        self.assertGreaterEqual(
+            text.count("LocalBackgroundSection.current"),
+            3,
+            "every backdrop must fall back to the section it is composed on",
+        )
+        for screen in ("AlbumScreen", "ArtistScreen", "PlaylistScreen"):
+            body = (
+                ROOT / f"shared/src/commonMain/kotlin/dev/dhun/ui/browse/{screen}.kt"
+            ).read_text()
+            self.assertNotIn(
+                "section = BackgroundSection.HOME",
+                body,
+                f"{screen} must not pin its backdrop to Home",
             )
 
     def test_the_glass_docs_are_reachable_from_the_agent_instructions(self):

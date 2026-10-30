@@ -50,6 +50,15 @@ Use glass for player chrome, lyrics, navigation band/rail where designed, queue 
 
 **"Sufficiently opaque" is an opacity floor, not a flat surface** (`GlassMaterialPolicy.DIALOG_BODY_ALPHA_DARK/LIGHT`). Dialogs and sheets still carry the full material: frosted artwork behind, body gradient, specular sheen and gradient hairline edge — implemented once as `GlassCard(opaqueBase = true)` / `GlassDialog`. The component map, the numbers and the list of superseded instructions live in [docs/design/glass-system.md](design/glass-system.md); that page is normative for appearance.
 
+### Background preferences
+Blur and colour are two features, not one setting (`docs/design/glass-system.md` §3a).
+*Background blur* is the master off switch; *Dynamic blur* chooses artwork-responsive
+frost versus the steady frost, and is suspended (never cleared) while the master is
+off; *Dynamic colors* is independent of both. Home, Search, Library, the mini player
+and the full player each save their own switches and a three-layer manual palette,
+and those saved choices survive every global override. One resolution policy and one
+blur policy serve all five surfaces — never a per-screen rule.
+
 ### Fallbacks
 - Android versions where real blur is unavailable: gradient/tint/opaque material fallback.
 - Browser: feature-detect backdrop-filter; never make text contrast depend on blur being supported.
