@@ -48,6 +48,10 @@ class SettingsViewModel(
      *   finger), so without this a failed write left the UI showing a value the
      *   database never stored — the screen lied until the next launch. The
      *   rollback republishes what is actually persisted.
+     *
+     * The action is the first argument on purpose, so a call without a rollback
+     * must pass it in parentheses (`enqueueWrite({ … })`): a bare trailing
+     * lambda binds to [onFailure] instead.
      */
     private fun enqueueWrite(action: suspend () -> Unit, onFailure: (suspend () -> Unit)? = null) {
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
@@ -323,7 +327,7 @@ class SettingsViewModel(
     }
 
     fun resetWindowGeometry() {
-        enqueueWrite { update.remove(SettingsKeys.WINDOW_GEOMETRY) }
+        enqueueWrite({ update.remove(SettingsKeys.WINDOW_GEOMETRY) })
     }
 
     fun setCloseToTray(enabled: Boolean) {
@@ -517,10 +521,10 @@ class SettingsViewModel(
     fun setExplicitContent(enabled: Boolean) {
         // Publish the new UI value only after the provider's SQLDelight read
         // can see it; a Home/Search refresh is keyed to this flow.
-        enqueueWrite {
+        enqueueWrite({
             update.boolean(SettingsKeys.EXPLICIT_CONTENT, enabled)
             _explicitContent.value = enabled
-        }
+        })
     }
     fun setPauseOnMute(enabled: Boolean) {
         _pauseOnMute.value = enabled
