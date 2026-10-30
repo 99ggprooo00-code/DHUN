@@ -36,6 +36,7 @@ import dev.dhun.design.DhunVisualTuning
 import dev.dhun.design.VisualPart
 import dev.dhun.design.background.BackgroundSection
 import dev.dhun.design.background.DhunBackgrounds
+import dev.dhun.design.background.LocalBackgroundSection
 import dev.dhun.design.background.backgroundSectionTint
 import dev.dhun.design.supportsRealtimeBlur
 
@@ -159,9 +160,13 @@ fun LyricsMaterial(
     modifier: Modifier = Modifier,
     shape: Shape = DhunShapes.large,
     drawBorder: Boolean = true,
-    section: BackgroundSection = BackgroundSection.HOME,
+    section: BackgroundSection? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
+    // Null means "whatever surface I am composed on": a menu over the page
+    // follows the page, the same menu opened inside the player follows the
+    // player (the shell and the player each provide LocalBackgroundSection).
+    val resolved = section ?: LocalBackgroundSection.current
     Box(
         modifier = modifier
             .clip(shape)
@@ -173,7 +178,7 @@ fun LyricsMaterial(
                 },
             ),
     ) {
-        LyricsArtworkLayer(artworkUrl = artworkUrl, modifier = Modifier.matchParentSize(), section = section)
+        LyricsArtworkLayer(artworkUrl = artworkUrl, modifier = Modifier.matchParentSize(), section = resolved)
         Box(modifier = Modifier.matchParentSize().lyricsVeil())
         Box(modifier = Modifier.fillMaxSize(), content = content)
     }
@@ -203,9 +208,10 @@ fun LyricsArtworkSheet(
     modifier: Modifier = Modifier,
     shape: Shape = DhunShapes.bottomSheet,
     drawBorder: Boolean = true,
-    section: BackgroundSection = BackgroundSection.FULL_PLAYER,
+    section: BackgroundSection? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
+    val resolved = section ?: LocalBackgroundSection.current
     Box(
         modifier = modifier
             .shadow(
@@ -225,7 +231,7 @@ fun LyricsArtworkSheet(
                 },
             ),
     ) {
-        LyricsArtworkLayer(artworkUrl = artworkUrl, modifier = Modifier.matchParentSize(), section = section)
+        LyricsArtworkLayer(artworkUrl = artworkUrl, modifier = Modifier.matchParentSize(), section = resolved)
         Box(modifier = Modifier.matchParentSize().lyricsVeil(part = VisualPart.QUEUE_SHEET))
         Box(modifier = Modifier.fillMaxSize(), content = content)
     }
@@ -241,9 +247,10 @@ fun AcrylicSurface(
     artworkUrl: String?,
     modifier: Modifier = Modifier,
     shape: Shape = DhunShapes.large,
-    section: BackgroundSection = BackgroundSection.MINI_PLAYER,
+    section: BackgroundSection? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
+    val resolved = section ?: LocalBackgroundSection.current
     Box(
         modifier = modifier
             .shadow(
@@ -255,13 +262,13 @@ fun AcrylicSurface(
             .clip(shape)
             .border(BorderStroke(DhunSpacing.border, DhunColors.glassEdge), shape),
     ) {
-        LyricsArtworkLayer(artworkUrl = artworkUrl, modifier = Modifier.matchParentSize(), section = section)
+        LyricsArtworkLayer(artworkUrl = artworkUrl, modifier = Modifier.matchParentSize(), section = resolved)
         Box(modifier = Modifier.matchParentSize().acrylicGlass())
         // The section's palette over the acrylic: this is the one surface that
         // has to *carry* the mini-player colours rather than sit on a page that
         // paints them, so the tint belongs inside the surface — a caller-side
         // modifier would be painted under the artwork layer and never seen.
-        Box(modifier = Modifier.matchParentSize().backgroundSectionTint(section))
+        Box(modifier = Modifier.matchParentSize().backgroundSectionTint(resolved))
         Box(modifier = Modifier.fillMaxSize(), content = content)
     }
 }
@@ -278,10 +285,12 @@ internal fun LyricsArtworkLayer(
     /**
      * Which background section this surface belongs to, so its frost obeys that
      * section's switches (the dock is the miniplayer, a dialog floats over the
-     * page, the player card is the player). One layer type, one blur rule.
+     * page, the player card is the player). `null` means "the surface I am
+     * composed on" ([LocalBackgroundSection]). One layer type, one blur rule.
      */
-    section: BackgroundSection = BackgroundSection.HOME,
+    section: BackgroundSection? = null,
 ) {
+    val blurSection = section ?: LocalBackgroundSection.current
     val resolved = remember(artworkUrl) { NowPlayingBackdropPolicy.resolveUrl(artworkUrl) }
     if (!LyricsMaterialPolicy.shouldPaintArtwork(resolved)) return
     val cacheKey = remember(artworkUrl) { BlurredArtworkCache.keyFor(artworkUrl, null) }
@@ -294,9 +303,9 @@ internal fun LyricsArtworkLayer(
     val canBlur = supportsRealtimeBlur
     val brightnessPercent = DhunAppearance.backdropBrightnessPercent
     // Resolved per section: 0 means this surface is sharp (its master switch or
-    // its own switch is off), 45..100 means frosted at that share of the radius.
+    // its own switch is off), otherwise 1..100 is the share of the radius.
     val blurPercent = DhunBackgrounds.blurPercentFor(
-        section = section,
+        section = blurSection,
         strengthPercent = DhunAppearance.backdropBlurPercent,
     )
     key(cacheKey) {
