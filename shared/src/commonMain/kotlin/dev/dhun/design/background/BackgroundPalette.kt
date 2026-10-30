@@ -399,7 +399,11 @@ object BackgroundBlurPolicy {
      */
     fun applyStrength(percent: Int, strengthPercent: Int): Int {
         if (percent <= 0) return 0
-        return (percent * effectiveStrength(strengthPercent) / 100f).toInt().coerceIn(0, 100)
+        // Never zero while the kind asks for frost (rounding a 1% kind against a
+        // 20% strength would otherwise floor it to nothing), and never more than
+        // the kind itself: strength reduces, it does not amplify.
+        val scaled = (percent * effectiveStrength(strengthPercent) / 100f).toInt()
+        return scaled.coerceIn(1, percent)
     }
 
     /**

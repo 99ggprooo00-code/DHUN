@@ -523,9 +523,13 @@ class BackgroundSettingsTest {
 
         v.setBackgroundDynamicColors(false)
         assertEquals(SectionBackgrounds.default, v.backgrounds.value.section(BackgroundSection.HOME))
-        // The screenshot the user would see: manual/default colours, but the
-        // artwork palette is still known, so switching back needs no re-extract.
-        assertEquals(PaletteSource.DEFAULT, DhunBackgrounds.sourceFor(BackgroundSection.HOME))
+        // The screenshot the user would see: DHUN's own colours, marked as
+        // overridden by the switch that turned the artwork off. The artwork
+        // palette is still known, so switching back needs no re-extraction.
+        assertEquals(
+            PaletteSource.DEFAULT_OVERRIDDEN,
+            DhunBackgrounds.sourceFor(BackgroundSection.HOME),
+        )
         assertEquals(
             BackgroundPalettePolicy.defaultPalette(BackgroundSection.HOME, DhunAppearance.tokens),
             DhunBackgrounds.paletteFor(BackgroundSection.HOME),
