@@ -239,9 +239,13 @@ private fun BackgroundSectionRow(
     // whether that frost is the steady one or the artwork-responsive one.
     val blur = DhunBackgrounds.blurPercentFor(section)
     val blurLabel = when {
-        blur == 0 -> "no blur"
-        state.blurEnabled && state.dynamicBlur && prefs.dynamicBlur -> "artwork blur"
-        else -> "steady blur"
+        blur > 0 && state.dynamicBlur && prefs.dynamicBlur -> "artwork blur"
+        blur > 0 -> "steady blur"
+        // Distinguish "this surface is set sharp" from "the master switch is
+        // holding it": the second one is an override the user should be able to
+        // see and understand without opening the dialog.
+        prefs.blurEnabled && !state.blurEnabled -> "blur paused"
+        else -> "no blur"
     }
     Row(
         modifier = Modifier

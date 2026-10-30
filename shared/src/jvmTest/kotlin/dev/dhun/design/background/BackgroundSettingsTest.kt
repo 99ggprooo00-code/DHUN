@@ -686,6 +686,12 @@ class BackgroundSettingsTest {
 
         val first = loaded(vm(d, this)).backgrounds.value
         assertFalse(first.blurEnabled, "a stored 0 meant no blur and must be imported")
+        // The import also restores the shipped strength, so re-enabling the
+        // master gives the real frost rather than the 20% floor.
+        assertEquals(
+            SettingsKeys.BACKDROP_BLUR_DEFAULT,
+            d.settings.getInt(SettingsKeys.BACKDROP_BLUR, -1),
+        )
 
         // The user turns blur on; a later launch must not import 0 again.
         val v = loaded(vm(d, this))

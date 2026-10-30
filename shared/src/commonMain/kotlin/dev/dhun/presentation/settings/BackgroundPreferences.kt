@@ -118,14 +118,22 @@ object BackgroundPreferences {
      * [read].
      */
     private suspend fun migrate(get: GetSettingUseCase, update: UpdateSettingUseCase): Boolean? {
-        val imported = if (!get.has(SettingsKeys.BACKGROUND_BLUR_ENABLED)) {
-            val legacyPercent = get.int(SettingsKeys.BACKDROP_BLUR, SettingsKeys.BACKDROP_BLUR_DEFAULT)
-            legacyPercent > 0
+        val legacyPercent = if (!get.has(SettingsKeys.BACKGROUND_BLUR_ENABLED)) {
+            get.int(SettingsKeys.BACKDROP_BLUR, SettingsKeys.BACKDROP_BLUR_DEFAULT)
         } else {
             null
         }
+        val imported = legacyPercent?.let { it > 0 }
         bestEffort {
             imported?.let { update.boolean(SettingsKeys.BACKGROUND_BLUR_ENABLED, it) }
+            if (legacyPercent != null && legacyPercent <= 0) {
+                // The old slider was also the off switch, so a stored 0 says
+                // "off" — imported above as the master switch. Reset the slider
+                // itself to the shipped strength: otherwise turning the master
+                // back on would give the faintest allowed frost (20%), and the
+                // user would reasonably conclude the switch does nothing.
+                update.int(SettingsKeys.BACKDROP_BLUR, SettingsKeys.BACKDROP_BLUR_DEFAULT)
+            }
             update.int(SettingsKeys.BACKGROUND_PROFILE_VERSION, SettingsKeys.BACKGROUND_PROFILE_VERSION_CURRENT)
         }
         return imported
