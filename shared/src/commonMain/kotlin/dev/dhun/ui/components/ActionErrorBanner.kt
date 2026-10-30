@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -16,18 +15,21 @@ import androidx.compose.ui.semantics.semantics
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.DhunTextButton
+import dev.dhun.design.components.GlassCard
 
 /**
  * Screen-level failure notice for a mutation that has no dialog of its own —
  * a Like that did not save, a history row that could not be removed, a
  * download that could not be deleted.
  *
- * It is deliberately the same visual family as the shell's offline banner
- * (a tinted full-width strip, no new surface style) and it is a polite live
- * region, so TalkBack announces it instead of leaving a silent no-op.
+ * It is a **glass panel with an error tint** ([GlassCard] with `tint =`
+ * errorContainer), not a flat Material `Surface` strip: the app's one surface
+ * material stays in charge of shape, edge, sheen and depth, and the error is
+ * carried by the tint plus the error-coloured text. It is a polite live region,
+ * so TalkBack announces it instead of leaving a silent no-op.
  *
- * The control that failed stays on screen, which is the retry: tapping it
- * again re-runs the mutation and clears the message when it succeeds.
+ * The control that failed stays on screen, which is the retry: tapping it again
+ * re-runs the mutation and clears the message when it succeeds.
  */
 @Composable
 fun ActionErrorBanner(
@@ -35,7 +37,11 @@ fun ActionErrorBanner(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(color = DhunColors.errorContainer, modifier = modifier.fillMaxWidth()) {
+    GlassCard(
+        modifier = modifier.fillMaxWidth(),
+        tint = DhunColors.errorContainer,
+        elevated = false,
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()

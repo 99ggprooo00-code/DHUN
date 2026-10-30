@@ -27,7 +27,7 @@ Use the existing shared design tokens and components, not ad hoc styling:
 - `app-web/src/css/tokens.css` and generated `app-web/src/js/icons.js` must mirror native values; icons are generated from native source, not manually duplicated.
 - `website/css/tokens.css` is **generated** from `app-web/src/css/tokens.css` by `website/tools/sync-tokens.mjs` (name the `--dhun-*` source in every declaration, carry both schemes in one `light-dark()` pair). Never hand-edit it; `npm run build` regenerates it and `scripts/website_quality.py` re-derives the comparison without Node.
 
-When tokens conflict with an old prose document, the accepted updated design contract and current token source must be reconciled in a deliberate commit. Do not quietly reintroduce Material 3 default styling.
+When tokens conflict with an old prose document, the accepted updated design contract and current token source must be reconciled in a deliberate commit. Do not quietly reintroduce Material 3 default styling — `scripts/test_design_system.py` and `glass-system.md` §2 exist so this is caught mechanically rather than in review.
 
 ## 4. Color, typography, geometry
 
@@ -47,6 +47,8 @@ Artwork changes → load/downscale artwork → blur off the UI thread once → d
 
 ### Surfaces
 Use glass for player chrome, lyrics, navigation band/rail where designed, queue sheets, dialogs and floating actions. Avoid turning every content list/card into a translucent slab. Use opaque base under dialogs and sheets when content behind would compromise reading or text fields.
+
+**"Sufficiently opaque" is an opacity floor, not a flat surface** (`GlassMaterialPolicy.DIALOG_BODY_ALPHA_DARK/LIGHT`). Dialogs and sheets still carry the full material: frosted artwork behind, body gradient, specular sheen and gradient hairline edge — implemented once as `GlassCard(opaqueBase = true)` / `GlassDialog`. The component map, the numbers and the list of superseded instructions live in [docs/design/glass-system.md](design/glass-system.md); that page is normative for appearance.
 
 ### Fallbacks
 - Android versions where real blur is unavailable: gradient/tint/opaque material fallback.

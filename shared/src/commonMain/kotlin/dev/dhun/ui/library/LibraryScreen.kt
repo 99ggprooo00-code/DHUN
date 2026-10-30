@@ -2,6 +2,7 @@ package dev.dhun.ui.library
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -22,10 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -57,10 +55,12 @@ import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.dhunContentRowSurface
 import dev.dhun.design.components.DhunButton
+import dev.dhun.design.components.DhunCheckbox
 import dev.dhun.design.components.DhunFilterChip
 import dev.dhun.design.components.DhunTextField
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.DhunOutlinedButton
+import dev.dhun.design.components.DhunProgressBar
 import dev.dhun.design.components.DhunTextButton
 import dev.dhun.design.components.EmptyView
 import dev.dhun.design.components.GlassCard
@@ -614,10 +614,13 @@ private fun PlaylistRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
         ) {
+            // Placeholder cover: translucent glass with the same hairline edge
+            // as the row it sits in, not an opaque grey tile.
             Box(
                 modifier = Modifier.size(DhunSpacing.artworkThumb)
                     .clip(DhunShapes.medium)
-                    .background(DhunColors.surfaceElevated),
+                    .background(DhunColors.glassStrong)
+                    .border(DhunSpacing.border, DhunColors.glassEdge, DhunShapes.medium),
                 contentAlignment = Alignment.Center,
             ) {
                 DhunIconView(
@@ -1050,7 +1053,8 @@ private fun StorageSummaryCard(
                         .fillMaxWidth()
                         .height(DhunSpacing.progressStroke * 2)
                         .clip(DhunShapes.full)
-                        .background(DhunColors.surfaceElevated),
+                        // Translucent groove: the row's glass reads through it.
+                        .background(DhunColors.glassStrong),
                 ) {
                     Box(
                         modifier = Modifier
@@ -1108,11 +1112,11 @@ private fun StorageManageView(
                     val volumeUsed = (storage.device.totalBytes - storage.device.freeBytes).coerceAtLeast(0L)
                     StorageStatRow("Used by apps & system", formatBytes(volumeUsed))
                     Spacer(modifier = Modifier.height(DhunSpacing.sm))
-                    LinearProgressIndicator(
-                        progress = { storage.deviceUsedFraction ?: 0f },
-                        modifier = Modifier.fillMaxWidth().height(DhunSpacing.progressStroke * 2).clip(DhunShapes.full),
-                        color = DhunColors.accent,
-                        trackColor = DhunColors.surfaceElevated,
+                    // DHUN bar: accent fill over a translucent glass groove,
+                    // instead of Material's opaque-track indicator.
+                    DhunProgressBar(
+                        progress = storage.deviceUsedFraction ?: 0f,
+                        trackHeight = DhunSpacing.progressStroke * 2,
                     )
                 } else {
                     Text(
@@ -1175,13 +1179,11 @@ private fun StorageManageView(
                     .padding(vertical = DhunSpacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Checkbox(
+                // DHUN's glass checkbox, not Material's grey outline — the
+                // offline-selection rows are glass too (glass-system.md §2).
+                DhunCheckbox(
                     checked = selected.size == downloads.size && downloads.isNotEmpty(),
                     onCheckedChange = { onSelectAll() },
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = DhunColors.accent,
-                        uncheckedColor = DhunColors.textTertiary,
-                    ),
                 )
                 Text(
                     if (selected.isEmpty()) "Select all" else "Selected ${selected.size}",
@@ -1254,14 +1256,7 @@ private fun ManageableDownloadRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
     ) {
-        Checkbox(
-            checked = selected,
-            onCheckedChange = { onToggle() },
-            colors = CheckboxDefaults.colors(
-                checkedColor = DhunColors.accent,
-                uncheckedColor = DhunColors.textTertiary,
-            ),
-        )
+        DhunCheckbox(checked = selected, onCheckedChange = { onToggle() })
         ArtworkImage(
             imageUrl = download.thumbnailUrl,
             contentDescription = download.title,
@@ -1424,20 +1419,8 @@ private fun DownloadRow(
         if (download.downloadState == DownloadState.DOWNLOADING) {
             val fraction = progress?.fraction
             Spacer(modifier = Modifier.height(DhunSpacing.xs))
-            if (fraction != null) {
-                LinearProgressIndicator(
-                    progress = { fraction },
-                    modifier = Modifier.fillMaxWidth().height(DhunSpacing.progressStroke).clip(DhunShapes.full),
-                    color = DhunColors.accent,
-                    trackColor = DhunColors.surfaceElevated,
-                )
-            } else {
-                LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth().height(DhunSpacing.progressStroke).clip(DhunShapes.full),
-                    color = DhunColors.accent,
-                    trackColor = DhunColors.surfaceElevated,
-                )
-            }
+            // null = indeterminate, same glass groove as the storage bar.
+            DhunProgressBar(progress = fraction)
         }
     }
 }

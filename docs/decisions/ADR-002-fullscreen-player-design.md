@@ -41,7 +41,7 @@ DHUN already ships:
 A design brief (2026-09-05) proposed elevating Full-Screen Now Playing +
 CC/Lyrics immersion as a signature DHUN experience, referencing Apple Music
 hierarchy, ViMusic immersion, and VIVI Material 3 / dynamic artwork — with an
-explicit **lightweight** glass path (2D blur + translucent M3 + gradients),
+explicit **lightweight** glass path (2D blur + translucent surfaces + gradients),
 **not** a full Liquid Glass renderer.
 
 That brief also used milestone labels (M1/M2/M3) and stack assumptions
@@ -97,8 +97,8 @@ dedicated CC control is tapped):
 NORMAL                          LYRICS-DOMINANT
 ┌─────────────────────┐         ┌─────────────────────────────┐
 │  large centered art │         │ full-bleed blurred artwork  │
-│  title / artist     │   →     │ dark scrim + M3 translucent │
-│  seek + transport     │         │ surface over it             │
+│  title / artist     │   →     │ dark scrim + glass surface   │
+│  seek + transport     │         │ over the blurred artwork    │
 │  tabs               │         │ previous / CURRENT / next   │
 └─────────────────────┘         │ transport remains reachable │
                                 └─────────────────────────────┘
@@ -106,7 +106,9 @@ NORMAL                          LYRICS-DOMINANT
 
 - Artwork **recedes** (scale down / fade) rather than navigating away.
 - Background = **cached** blurred artwork (same pipeline as FullPlayer bg).
-- Lyrics surface = translucent M3 (`GlassCard` / token glass), **not** opaque.
+- Lyrics surface = DHUN glass (`LyricsMaterial` / `GlassCard`), **not** opaque; see
+  `docs/design/glass-system.md` — Material 3 is not the visual target, only the
+  implementation library.
 - Synced: current line large/bright/centered; neighbors dim; auto-scroll;
   tap-to-seek (already implemented — polish motion only).
 - Unsynced: scrollable plain text (already).
@@ -161,8 +163,8 @@ source-neutral (already).
 | P3 | Full-screen Now Playing hierarchy polish | P2 | 🟨 lyrics-dominant weight shift in FullPlayer (2026-09-05). |
 | P4 | Dynamic artwork background cache | P2 | 🟨 `BlurredArtworkCache` key once-per-track (Compose blur still on layer). |
 | P5 | Lyrics domain + providers | done | Phase 11. |
-| P6 | Lyrics-dominant mode | P3+P5 | 🟨 FullPlayer: artwork recedes + M3 translucent lyrics surface when Lyrics tab selected. |
-| P7 | Blur + translucent M3 refinement | P4+P6 | Token-only; <API 31 scrim fallback already in KNOWN_LIMITATIONS. |
+| P6 | Lyrics-dominant mode | P3+P5 | 🟨 FullPlayer: artwork recedes + glass lyrics surface when Lyrics tab selected. |
+| P7 | Blur + translucent-glass refinement | P4+P6 | Token-only; <API 31 scrim fallback already in KNOWN_LIMITATIONS. |
 | P8 | Smooth lyric sync motion | P5 | Spring emphasis, better scroll anchoring. |
 | P9 | Gesture / animation polish | P3–P8 | Horizontal skip swipe optional; keep simple. |
 
@@ -230,6 +232,8 @@ Cross-cutting with Home/shell (not Liquid Glass):
 - Shell ambient wash from now-playing seed colors (cheap); FullPlayer keeps
   real once-per-track blur + lyrics-dominant.
 - Nav bar = M3 `surfaceContainer` tonal surface, not a glass renderer.
+  **Superseded 2026-10-30:** the dock and the desktop rail are glass
+  (`GlassDock`, `Modifier.dhunGlassBody`) — see `docs/design/glass-system.md`.
 
 ## Addendum — 2026-09-15 review fixes (artwork fit, bottom cluster, queue sheet)
 

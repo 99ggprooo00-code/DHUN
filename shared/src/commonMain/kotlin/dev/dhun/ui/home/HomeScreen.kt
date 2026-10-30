@@ -24,7 +24,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -73,6 +72,7 @@ import dev.dhun.design.components.PlaylistCard
 import dev.dhun.design.components.SectionHeader
 import dev.dhun.design.components.SectionShimmer
 import dev.dhun.design.components.TrackCard
+import dev.dhun.design.components.DhunTextButton
 import dev.dhun.domain.HomeMood
 import dev.dhun.domain.GetHomeFeedUseCase
 import dev.dhun.domain.HomeShelfKind
@@ -493,15 +493,15 @@ private fun HomeFeedContent(
                     }
                     loadMoreError != null -> {
                         Text(loadMoreError, color = DhunColors.textSecondary)
-                        TextButton(onClick = onRetryMore, enabled = !isRefreshing) { Text("Retry loading more") }
+                        DhunTextButton(onClick = onRetryMore, enabled = !isRefreshing) { Text("Retry loading more") }
                     }
-                    canLoadMore -> TextButton(onClick = onLoadMore, enabled = !isRefreshing) { Text("Load more music") }
+                    canLoadMore -> DhunTextButton(onClick = onLoadMore, enabled = !isRefreshing) { Text("Load more music") }
                     else -> {
                         Text("You're all caught up", color = DhunColors.textTertiary)
                     }
                 }
                 // Mouse/keyboard/accessibility fallback; no header refresh icon.
-                TextButton(onClick = onRefresh, enabled = !isRefreshing) { Text("Refresh music") }
+                DhunTextButton(onClick = onRefresh, enabled = !isRefreshing) { Text("Refresh music") }
             }
         }
     }

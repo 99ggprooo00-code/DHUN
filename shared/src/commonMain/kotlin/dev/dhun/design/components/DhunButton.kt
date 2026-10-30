@@ -79,7 +79,13 @@ fun DhunTonalButton(
             contentColor = DhunColors.onAccentContainer,
         ),
         content = {
-            if (loading) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+            if (loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = DhunColors.onAccentContainer,
+                )
+            }
             else content()
         },
     )

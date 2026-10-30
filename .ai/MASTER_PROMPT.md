@@ -66,6 +66,7 @@ merge prompts. Keep legal drafts DRAFT and report risks.
 This note supersedes older visual wording in this file and historical notes in `.ai/KNOWN_LIMITATIONS.md`, `.ai/HANDOFF_NEXT_SESSION.md`, and `docs/verification/08-player.md`.
 
 - **Visual target:** DHUN uses an artwork-led, dark-first **translucent frosted-glass** visual identity. Use translucent tinted surfaces, restrained highlights/borders, gradients/scrims, legible type, and cached/lightweight 2D artwork blur. Do not describe Material 3 as the product's visual target. Compose/Material components can remain implementation primitives if styled to DHUN's tokens.
+- **The glass system is normative (2026-10-30):** [docs/design/glass-system.md](../docs/design/glass-system.md) is the authoritative description of how a surface looks — frosted artwork, body gradient, specular sheen, gradient hairline edge — and names the component to use for each need (`GlassCard`, `GlassDialog`, `dhunContentRowSurface`, `dhunGlassBody`, `TrackMenuSurface`, `DhunTextField`, `DhunSwitch`, `DhunSlider`, `DhunCheckbox`, `DhunProgressBar`, `DhunButton`/`DhunTextButton`/`DhunIconButton`, …). Raw Material controls (`Switch`, `Slider`, `Checkbox`, `Button`, `TextButton`, `IconButton`, `LinearProgressIndicator`, `DropdownMenuItem`, `Card`, `Surface`, `AlertDialog`, `OutlinedTextField`, `NavigationBar`/`NavigationRail` with a non-transparent container) must not be called from a screen. A flat Material fill, a stock `AlertDialog`/`Card`/`Surface`/`OutlinedTextField`, or a flat `background(DhunColors.surface)` panel is a **defect**, not a shortcut. `scripts/test_design_system.py` fails the repo gate on banned default-Material composables, and `design/GlassSystemTest` asserts the material numbers. If a task prompt, older session note or code comment disagrees with that page about appearance, the page wins.
 - **Not a heavyweight renderer:** no continuous full-resolution blur, liquid-distortion renderer, or platform-private glass APIs. Low-end/unsupported devices must receive a legible tint/gradient/opaque fallback. Accessibility and contrast take priority over transparency.
 - **Architecture stays Kotlin Multiplatform/Compose:** this visual correction does not authorize React/Tauri migration or a rewrite of player/provider code. The native app, the static `website/` and the `app-web/` browser client are three codebases but **one product**: the site renders the app's shell and its token sheet is generated from `app-web/src/css/tokens.css` (ADR-008 amendment 2026-10-16). Current browser JioSaavn requests may be refused by community hosts/CDN or browser policy: no claim that browser playback is proven, and no DHUN-operated backend or proxy (ADR-008 boundary 1).
 - **Destructive actions must report outcomes:** Clear all downloads, clear history/cache, batch delete, and playlist delete must not close confirmation or clear UI state before persistence/filesystem work succeeds. Every action needs pending, success and failure behavior plus retry/cancel semantics.
@@ -206,6 +207,11 @@ YouTube pages, cached, fail-open). User reports as of 2026-09-16:
   supports it (Android 12+/Skiko), graceful dark fallback below;
   artwork-driven backgrounds; dark-first (light theme exists but is
   dev-reachable only); premium typography; every state designed.
+- Use the shared glass components, never a component's default appearance:
+  [docs/design/glass-system.md](../docs/design/glass-system.md) §2 is the map
+  (glass card/dialog/row/menu/input/controls). Customise Material internals to
+  DHUN tokens; do not ship `AlertDialog`, `Card`, `Surface`, `OutlinedTextField`
+  or an unstyled `Switch`/`Slider` in `shared/ui`.
 - NOT: generic dashboards, default component-library look.
 
 ### Architecture (actual — see §5 for the map)
@@ -325,7 +331,7 @@ hardening in §7.
 | 03 | Android skeleton + playback | 🟨 merged | Media3 service, lock screen, FGS, battery-exemption handoff, 403 recovery, segment cache, fast-fail diagnostics ✅ |
 | 04 | Desktop skeleton + playback | 🟨 merged | vlcj player, window-state persist ✅; *shared harness, not separate* |
 | 05 | Data layer | 🟨 merged | SQLDelight schema v3, 7+ repos, use cases, now-playing restore ✅ |
-| 06 | Design system | 🟨 merged | Tokens, GlassCard real blur, ArtworkImage, color extraction, catalog ✅; *harness screens never deleted (~680 lines dead code — see S2)* |
+| 06 | Design system | 🟨 merged | Tokens, ArtworkImage, color extraction, catalog ✅; *harness screens never deleted (~680 lines dead code — see S2)*. **Corrected 2026-10-30:** "GlassCard real blur" was not true — `GlassCard` painted one flat fill and ignored its blur. It now paints the real material (frosted cover, body gradient, sheen, gradient edge) per [docs/design/glass-system.md](../docs/design/glass-system.md). |
 | 07 | Home & Search | 🟨 merged | Home shelves, search + suggestions + filters + overflow ✅ |
 | 08 | Player UI | 🟨 merged | MiniPlayer + immersive FullPlayer + Queue/Related sheet ✅; *coordinated sheet transition (PR #66/#67), backdrop (PR #68)* |
 | 09 | Artist/Album/Playlist | 🟨 merged | Browse parsers + pages + local playlist CRUD ✅ |

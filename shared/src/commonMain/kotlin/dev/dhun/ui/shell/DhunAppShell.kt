@@ -30,7 +30,6 @@ import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -79,8 +78,11 @@ import dev.dhun.design.VisualPart
 import dev.dhun.design.catalog.ComponentCatalogScreen
 import dev.dhun.legal.DhunAppInfo
 import dev.dhun.design.components.GlassDock
+import dev.dhun.design.components.dhunGlassBody
 import dev.dhun.design.components.LocalTextInputFocusRegistry
 import dev.dhun.design.components.NowPlayingBackdrop
+import dev.dhun.design.components.GlassCard
+import dev.dhun.design.components.LocalNowPlayingArtwork
 import dev.dhun.design.components.TextInputFocusRegistry
 import dev.dhun.design.components.acrylicGlass
 import dev.dhun.design.components.lyricsVeil
@@ -300,7 +302,15 @@ fun DhunAppShell(
     }
 
     val textInputFocusRegistry = remember { TextInputFocusRegistry() }
-    CompositionLocalProvider(LocalTextInputFocusRegistry provides textInputFocusRegistry) {
+    // Every dialog and frost-cut surface (GlassCard/GlassDialog) paints the
+    // song that is playing, blurred once and cached, so the panel is visibly
+    // glass over the app's own artwork instead of a flat plate over a scrim.
+    // Null when nothing plays: the documented fallback (gradient + sheen).
+    val nowPlayingArtworkForGlass = currentTrack?.thumbnailUrl
+    CompositionLocalProvider(
+        LocalTextInputFocusRegistry provides textInputFocusRegistry,
+        LocalNowPlayingArtwork provides nowPlayingArtworkForGlass,
+    ) {
         BoxWithConstraints(
             modifier = modifier
                 .fillMaxSize()
@@ -376,9 +386,11 @@ fun DhunAppShell(
                 AppNavigationRail(nav = nav, layout = layout)
             }
             Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                // Material's Scaffold is only the slot layout here: its own
+                // container is transparent so the glass backdrop shows through.
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
-            containerColor = Color.Transparent,
+                    containerColor = Color.Transparent,
             topBar = {
                 TopLevelAnimatedVisibility(
                     visible = offlineBannerPlacement == OfflineBannerPlacement.ScaffoldTopBar,
@@ -721,7 +733,13 @@ fun DhunAppShell(
 
 @Composable
 private fun OfflineStatusBanner(modifier: Modifier = Modifier) {
-    Surface(color = DhunColors.errorContainer, modifier = modifier.fillMaxWidth()) {
+    // Glass with an error tint, not a flat Material Surface strip: the shell's
+    // chrome is the app's material (see docs/design/glass-system.md §2).
+    GlassCard(
+        modifier = modifier.fillMaxWidth(),
+        tint = DhunColors.errorContainer,
+        elevated = false,
+    ) {
         Text(
             "You're offline. Search and streaming are unavailable; downloaded tracks remain available.",
             fontSize = DhunTypographyTokens.labelSmall.fontSize,
@@ -797,10 +815,15 @@ private fun AppNavigationRail(
     nav: AppNavState,
     layout: DhunShellLayout,
 ) {
+    // Material's rail is only the layout container: its fill is replaced by the
+    // DHUN glass body (gradient + sheen), so the rail and the dock read as the
+    // same material instead of one flat translucent strip (glass-system.md §2).
     NavigationRail(
-        containerColor = readingSurfaceFill(VisualPart.NAVIGATION),
+        containerColor = Color.Transparent,
         contentColor = DhunColors.textPrimary,
-        modifier = Modifier.fillMaxHeight(),
+        modifier = Modifier
+            .fillMaxHeight()
+            .dhunGlassBody(readingSurfaceFill(VisualPart.NAVIGATION)),
     ) {
         AppTab.userTabs.forEach { tab ->
             AppRailNavigationItem(

@@ -22,11 +22,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -68,12 +65,12 @@ import dev.dhun.design.components.DhunButton
 import dev.dhun.design.components.DhunFilterChip
 import dev.dhun.design.components.DhunHorizontalRail
 import dev.dhun.design.components.DhunIconButton
+import dev.dhun.design.components.DhunTextField
 import dev.dhun.design.components.DhunTextButton
 import dev.dhun.design.components.EmptyView
 import dev.dhun.design.components.ErrorView
 import dev.dhun.design.components.GlassCard
 import dev.dhun.design.components.LoadingShimmer
-import dev.dhun.design.components.LocalTextInputFocusRegistry
 import dev.dhun.design.components.PlaylistCard
 import dev.dhun.design.components.SectionHeader
 import dev.dhun.design.components.TrackRow
@@ -199,12 +196,6 @@ private fun SearchBarSection(
     onSearchSubmit: () -> Unit,
     onClear: () -> Unit,
 ) {
-    val focusRegistry = LocalTextInputFocusRegistry.current
-    val focusToken = remember { Any() }
-    DisposableEffect(focusRegistry, focusToken) {
-        onDispose { focusRegistry?.setFocused(focusToken, false) }
-    }
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -212,27 +203,27 @@ private fun SearchBarSection(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
     ) {
-        OutlinedTextField(
+        // DHUN's own input (translucent field, accent caret, hairline edge) in
+        // the pill shape the search bar has always had. It was an M3
+        // OutlinedTextField restyled to look like glass — a Material outline and
+        // floating placeholder inside a glass app, which is the exact drift
+        // docs/design/glass-system.md §2 forbids.
+        DhunTextField(
             value = query,
             onValueChange = onQueryChange,
-            placeholder = {
-                Text(
-                    "Search songs, artists, albums…",
-                    color = DhunColors.textHint,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            },
-            leadingIcon = {
+            placeholder = "Search songs, artists, albums…",
+            shape = DhunShapes.extraLarge,
+            imeAction = ImeAction.Search,
+            onSubmit = onSearchSubmit,
+            leading = {
                 DhunIconView(
                     icon = DhunIcon.Search,
                     contentDescription = "Search",
-                    modifier = Modifier
-                        .padding(start = DhunSpacing.xs)
-                        .size(DhunSpacing.iconSize),
+                    modifier = Modifier.size(DhunSpacing.iconSize),
                     tint = DhunColors.textTertiary,
                 )
             },
-            trailingIcon = {
+            trailing = {
                 if (query.isNotEmpty()) {
                     DhunIconButton(onClick = onClear, contentDescription = "Clear search") {
                         DhunIconView(
@@ -244,29 +235,8 @@ private fun SearchBarSection(
                     }
                 }
             },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { onSearchSubmit() }),
-            shape = DhunShapes.extraLarge,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = readingSurfaceFill(),
-                unfocusedContainerColor = contentRowFill(),
-                disabledContainerColor = contentRowFill(),
-                focusedTextColor = DhunColors.textPrimary,
-                unfocusedTextColor = DhunColors.textPrimary,
-                cursorColor = DhunColors.accent,
-                focusedBorderColor = DhunColors.glassEdge,
-                unfocusedBorderColor = DhunColors.border,
-                focusedLeadingIconColor = DhunColors.accent,
-                unfocusedLeadingIconColor = DhunColors.textTertiary,
-                focusedTrailingIconColor = DhunColors.textSecondary,
-                unfocusedTrailingIconColor = DhunColors.textTertiary,
-                focusedPlaceholderColor = DhunColors.textHint,
-                unfocusedPlaceholderColor = DhunColors.textHint,
-            ),
             modifier = Modifier
                 .weight(1f)
-                .onFocusChanged { focusRegistry?.setFocused(focusToken, it.isFocused) }
                 .onKeyEvent { event ->
                     // Physical Enter (desktop keyboards, and Android hardware
                     // keyboards) — the IME Search action above is the soft-key

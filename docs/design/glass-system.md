@@ -1,0 +1,135 @@
+# DHUN glass system — the visual source of truth
+
+Status: **authoritative for native UI** (`shared/src/commonMain/kotlin/dev/dhun/ui`,
+`app-android`, `app-desktop`). If any other document, older session note, task
+prompt or comment disagrees with this page about how a surface looks, **this
+page wins** and the other text should be corrected (see §7).
+
+DHUN is a **premium translucent frosted-glass** interface: artwork-led,
+dark-first, layered, with soft blur behind sharp content. Material 3 is an
+**implementation detail**, never the look. A screen that renders stock Material
+3 is a defect, exactly like a broken button.
+
+---
+
+## 1. The one rule
+
+> Every surface that visually belongs to DHUN is painted with the glass
+> material in `design/components/`, composited over artwork. A flat opaque fill,
+> a Material `Card`/`Surface`/`AlertDialog`, a default `OutlinedTextField`, or a
+> `background(DhunColors.surface)` panel is drift, not a shortcut.
+
+"Glassy" means **all four** of these are present, not a variable called `glass`:
+
+| Cue | Where it lives | Why it matters |
+| --- | --- | --- |
+| Frosted artwork behind the panel | `LyricsArtworkLayer` via `GlassCard(frostArtwork)`, `LyricsMaterial`, `AcrylicSurface`, `TrackMenuSurface` | the surface is visibly *made of* the cover, not just tinted |
+| Body gradient (lifted top → deepened bottom) | `GlassMaterialPolicy.bodyStops` | one flat colour is the M3 tell |
+| Specular sheen along the top edge | `GlassMaterialPolicy.sheenStops` | reads as light hitting glass |
+| Gradient hairline edge | `GlassMaterialPolicy.edgeStops` + `DhunColors.glassEdge` | a uniform stroke reads as a Material outline |
+
+## 2. Component map — use these, not raw Material
+
+| Need | Use | File |
+| --- | --- | --- |
+| Card, group, notice, generic panel | `GlassCard` | `design/components/GlassCard.kt` |
+| Dialog (confirm, rename, diagnostics, pickers) | `GlassDialog` | `design/components/GlassCard.kt` |
+| List row / settings row body | `Modifier.dhunContentRowSurface()` | `design/components/ContentRowSurface.kt` |
+| Lyrics card, queue sheet, floating player | `LyricsMaterial`, `LyricsArtworkSheet`, `AcrylicSurface` | `design/components/LyricsMaterial.kt` |
+| Overflow menu surface | `TrackMenuSurface` + `MenuActionRow` | `ui/components/TrackOverflowDialog.kt` |
+| One-line text input | `DhunTextField` | `design/components/DhunTextField.kt` |
+| Switch / slider | `DhunSwitch` / `DhunSlider` | `design/components/DhunControls.kt` |
+| Multi-select box (offline selection) | `DhunCheckbox` | `design/components/DhunControls.kt` |
+| Progress bar (download, storage) | `DhunProgressBar` | `design/components/DhunControls.kt` |
+| Anchored menu (provider picker, mode picker, overflow) | `DropdownMenu(containerColor = Color.Transparent)` + `TrackMenuSurface` + `MenuActionRow` | `ui/components/TrackOverflowDialog.kt` |
+| Collapsible page toolbar / navigation rail fill | `Modifier.dhunGlassBody(fill)` | `design/components/GlassCard.kt` |
+| Button family | `DhunButton`, `DhunTextButton`, `DhunOutlinedButton`, `DhunIconButton` | `design/components/DhunButton.kt` |
+| Chips | `DhunFilterChip` / `FrostedChipSurface` | `design/components/Chip.kt` |
+| Bottom dock | `GlassDock` | `design/components/GlassCard.kt` |
+| Error strip at screen level | `ActionErrorBanner` (glass + error tint) | `ui/components/ActionErrorBanner.kt` |
+
+Material components **may** be used inside these wrappers — a `Switch` inside
+`DhunSwitch`, a `Slider` inside `DhunSlider`, a `Checkbox` inside
+`DhunCheckbox`, `DropdownMenu`, `LinearProgressIndicator` — with DHUN tokens
+driving colours, shapes and elevation. What is forbidden is their *default
+appearance* reaching the user.
+
+Two rules follow from that and are enforced mechanically
+(`scripts/test_design_system.py`):
+
+1. **Never call the raw control from a screen.** `Switch(...)`, `Slider(...)`,
+   `Checkbox(...)`, `Button(...)`, `TextButton(...)`, `IconButton(...)`,
+   `LinearProgressIndicator(...)`, `DropdownMenuItem(...)` outside `design/` is a
+   defect; the wrapper exists so the palette, shape and metrics are defined once
+   (`DhunControlPolicy`).
+2. **Layout containers stay transparent.** `NavigationBar` / `NavigationRail` /
+   `Scaffold` / `DropdownMenu` are only layout or anchoring: they must pass
+   `containerColor = Color.Transparent` (and zero tonal/shadow elevation) and let
+   the DHUN glass be what you see — `GlassDock` for the bar,
+   `Modifier.dhunGlassBody(fill)` for the rail and the collapsed page toolbar,
+   `TrackMenuSurface` for a menu. A Material `containerColor` in the shell is a
+   flat plate inside the glass.
+
+## 3. Numbers (do not re-invent per screen)
+
+All glass constants live in `GlassMaterialPolicy` and `LyricsMaterialPolicy`.
+Text must never sit on a blur; blur is always the backdrop.
+
+- Content/reading body opacity: `ContentSurfacePolicy` (0.82–0.89 band).
+- Dialog body opacity floor: `GlassMaterialPolicy.DIALOG_BODY_ALPHA_DARK/LIGHT`
+  (0.91 / 0.93) — "sufficiently opaque" is this number, **not** a flat plate.
+- Sheen: `SHEEN_TOP 0.16` → `SHEEN_EXTENT 0.45` of the panel height; rows use
+  32% of that (`ROW_SHEEN_SCALE`).
+- Edge: glass edge token at full alpha on top, `0.34×` at the bottom.
+- Blur: `DhunSpacing.glassBlur` × `LyricsMaterialPolicy.BLUR_SCALE`, computed
+  once per artwork and cached (`BlurredArtworkCache`). Never per frame.
+
+## 4. Legibility beats translucency (unchanged, and it is not a licence to go flat)
+
+If text, icons, focus or progress become hard to read over artwork, raise the
+**opacity of the body** (or use an opaque tonal rung) — never remove the
+gradient, sheen, edge or frost. `docs/TRD.md` and the design contract's "opaque
+enough base under dialogs" mean: dialogs use `GlassCard(opaqueBase = true)`,
+which is milky glass at the documented floor, **not** a stock `AlertDialog`
+container.
+
+Contrast gates: `shared/src/jvmTest/.../DhunThemeContrastTest.kt` asserts text
+ladder vs. row/reading fills over black and white artwork in both themes. A
+change to a fill must keep those green — and must not lower a fill's opacity to
+buy "more glass".
+
+## 5. Fallbacks
+
+- No real blur (Android < 12, no Skiko RenderEffect): draw the dimmed cover or
+  the gradient + sheen + edge alone. Never skip the material.
+- Nothing playing / no artwork: `LocalNowPlayingArtwork` is null and the frost
+  cut falls back to gradient + sheen over the scrim. That is intended.
+- Light theme: the same recipe, white veil, weaker sheen (`light` branches in
+  `GlassMaterialPolicy`).
+
+## 6. Enforcement (so this cannot silently rot again)
+
+- `scripts/test_design_system.py` (runs in `python3 -m unittest discover -s scripts`)
+  fails the repo gate when a banned Material-default composable appears in
+  `shared/.../ui/`, `app-android` or `app-desktop` outside the design system,
+  unless it is listed with a reason in `scripts/design_system_allowlist.txt`; it
+  also fails when a Material layout container is left with a default
+  `containerColor` or when a screen re-invents the glass gradient.
+- `shared/src/jvmTest/.../design/GlassSystemTest.kt` asserts the material
+  numbers (gradient ordered, sheen capped, edge fading, dialog floor above the
+  row fill, light/dark asymmetry) and the control palette.
+- Screens are reviewed visually on hardware when hardware exists; a lack of
+  device access is recorded in `.ai/KNOWN_LIMITATIONS.md`, not used to justify a
+  flat build.
+
+## 7. Instructions that this page supersedes
+
+Kept on purpose so the next agent does not resurrect them:
+
+| Older text | Correction |
+| --- | --- |
+| `.ai/MASTER_PROMPT.md` roadmap row "GlassCard real blur" | `GlassCard` had **no** blur for a long time; it does now for the frost cut (`opaqueBase`/`frostArtwork`). Treat this file as the description of what ships. |
+| "Content panels above the dock stay neutral" (older shell notes) | Neutral *tint*, never a flat **material**: rows use `dhunContentRowSurface()` with body gradient + sheen. |
+| "Use an opaque base under dialogs" (design contract §5, TRD) | Still true as an opacity floor (`GlassMaterialPolicy.DIALOG_BODY_ALPHA_*`); it does not permit `AlertDialog` or a flat rectangle. |
+| "Material 3 only" (pre-ADR-002 wording, historical) | Superseded: Material 3 is not the visual target (`docs/ui-ux-design.md` §Status). |
+| Visual-tuning sliders / test channel | These change *opacity percentages*; they never change the material recipe. A tuning value of 100% is a contrast fallback, not the design. |
