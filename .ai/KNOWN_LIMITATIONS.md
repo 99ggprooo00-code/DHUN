@@ -2263,9 +2263,29 @@ What this round did **not** prove:
   not been captured.
 
 
-## 2026-10-30 — session `arena/83a7841b-dhun`: background blur / dynamic blur / dynamic colours, and what is still unproven
+## 2026-10-30 — session `arena/83a7841b-dhun`: background feature (updated after review)
 
-- **CI proves it compiles and its unit tests pass on both target platforms.**
+- **Dynamic colours are derived from the artwork *seed*, not sampled pixels.**
+  `DhunBackgrounds.setArtworkSeed` calls `ArtworkColorExtractor.extractFromSeed`
+  — the same deterministic hash the player's dynamic accent already uses — so the
+  palette is stable per cover, costs no decode, and keeps the "one image
+  pipeline" rule. The consequence is that two different covers can land in the
+  same colour family if their URLs hash near each other. Extracting from the
+  loaded bitmap instead would mean a second image pipeline (and re-extraction on
+  every palette read); that trade-off is deliberate, not an oversight.
+- **A settings write can no longer blank the background, but nothing here
+  measures frames.** The published snapshot keeps the live artwork palette and
+  `restore()` re-derives the playing seed; whether the crossfade between two
+  track palettes reads as "smooth" on a 60 Hz phone is a hardware question.
+- **No device has seen the overlay order.** The mini player's section tint is
+  painted inside `AcrylicSurface` over the acrylic (it was previously applied by
+  the caller, *under* the artwork layer, where it could never be seen). Unit
+  tests assert the call structure, not the pixels.
+
+## 2026-10-30 — what the background feature still does not prove
+
+- **CI proves it compiles and its unit tests pass on both target platforms** —
+  and that is all it proves.
   `build-and-test` runs `:shared:jvmTest` (which now includes
   `BackgroundSettingsTest`), `Build APK` produces the Android artifact and
   `test-release` / `msi` builds the Windows desktop package. That is compile +
