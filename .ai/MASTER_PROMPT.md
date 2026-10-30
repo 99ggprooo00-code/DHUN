@@ -101,6 +101,13 @@ architecture and integrations remain planned/design-only work.
   artwork-driven, dark-first, ViMusic-quality. FullPlayer background is
   real blurred artwork; Home/Search/Library sit on the now-playing
   blurred backdrop (PR #68).
+- **Backgrounds are two independent switches** (docs/design/glass-system.md §3a):
+  *Background blur* (off = no artwork behind the app at all, never a sharper or
+  dimmed copy) and *Dynamic colours* (off = the colour the user picked for each
+  surface). They are orthogonal, and four surfaces are customisable —
+  pages, navigation bar, miniplayer, full player — each with one colour, not a
+  palette the user assembles. Never reintroduce `primary`/`secondary`/`tertiary`
+  as the user-facing customisation model.
 - **License:** GPL-3.0. Non-negotiable.
 
 ---

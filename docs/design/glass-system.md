@@ -111,73 +111,89 @@ Text must never sit on a blur; blur is always the backdrop.
 - Blur: `DhunSpacing.glassBlur` × `LyricsMaterialPolicy.BLUR_SCALE`, computed
   once per artwork and cached (`BlurredArtworkCache`). Never per frame.
 
-## 3a. Backgrounds: blur and colour are separate features
+## 3a. Backgrounds: blur and colour are two independent switches
 
-Five sections own a background: **Home, Search, Library, Miniplayer, Full
-player** (`BackgroundSection` in `design/background/BackgroundPalette.kt`).
-Each paints a `BackgroundPalette` of three layers - a base wash plus two related
-blooms - so the five surfaces read as one palette rather than five colour blocks.
+Two questions, answered separately, and four surfaces the user can colour:
 
-**Resolution** (`BackgroundPalettePolicy.resolve`, one place, all five sections):
+| Switch | On | Off |
+| --- | --- | --- |
+| **Background blur** | the playing track's artwork is painted, blurred, behind the interface | **no artwork is painted at all** — not sharp, not dimmed — and every surface is its own colour |
+| **Dynamic colours** | surfaces take their colour from that artwork | surfaces use the colour the user picked for them |
 
-1. global *Dynamic colors* off -> the section's manual palette, else its default;
-2. global on but the section's own switch off -> the same manual palette;
-3. both on -> the artwork palette, else manual, else default (nothing playing).
+They are independent by construction: `BackgroundBlurPolicy` never reads a colour
+switch and `BackgroundPalettePolicy.resolve` never reads a blur switch
+(`scripts/test_design_system.py` asserts both). All four combinations are valid:
 
-Saved preferences are **suspended**, never erased, by a global switch: turning
-*Dynamic colors* off and on again restores exactly the per-section configuration.
+```
+blur off + colours off   solid backgrounds, the user's colours, no artwork
+blur off + colours on    artwork-derived colours, still no artwork
+blur on  + colours off   blurred artwork tinted with the user's colours
+blur on  + colours on    blurred artwork with artwork-derived colours
+```
 
-**Blur** is two switches plus a per-section switch:
+**Four surfaces, not five sections and not three palette layers.** The
+customisation unit is the thing the user recognises
+(`BackgroundComponent`):
 
-| `DhunBackgrounds.blurPercentFor(section)` | Meaning |
+| Component | What it paints |
 | --- | --- |
-| master *Background blur* off | `0` - no blur anywhere, including the lyrics card and menus |
-| master on, *Dynamic blur* off (or the section's off) | `BackgroundBlurPolicy.STATIC_PERCENT` (100) - one steady radius, the shipped frost |
-| master on, dynamic on | `adaptivePercent(...)` - a neutral cover keeps that same full frost, pale/busy artwork stays at it, dark and muted artwork gives some back (bounded to 70..100) |
+| `PAGES` | Home, Search, Library and the pages opened from them (album/artist/playlist) |
+| `NAVIGATION` | the bottom tab band, or the side rail on a wide window |
+| `MINI_PLAYER` | the docked now-playing bar |
+| `FULL_PLAYER` | the immersive player |
 
-The blur-strength slider scales the result (`applyStrength`) and can only reduce
-it — never to zero: an enabled blur keeps a documented floor
-(`MIN_EFFECTIVE_STRENGTH`, 20%), because the master switch is the *only* off
-switch. A slider that could reach 0 would let "Background blur: on" and "nothing
-is frosted" both be true, which reads as a bug. `BackgroundBlurPolicy` never
-reads a colour switch and `BackgroundPalettePolicy.resolve` never reads a blur
-switch: the two features are independent by construction, and
-`scripts/test_design_system.py` asserts it.
+Each one saves a colour (or "DHUN default") and its own blur switch, and each has
+its own "take colour from artwork" switch so one surface can keep a manual colour
+while the rest follow the cover. This replaced the earlier five-section,
+`primary`/`secondary`/`tertiary` model: asking a user to assemble a palette was
+asking them to think like the renderer.
 
-**Every frosted surface asks its own section.** `LyricsArtworkLayer` — the one
-artwork layer behind the page backdrop, the dock, the mini player, the lyrics
-card, dialogs and the player's queue sheet — takes a `BackgroundSection` and
-resolves through `blurPercentFor(section)`. The shell publishes
-`LocalBackgroundSection` (Home / Search / Library) so panels and dialogs floating
-over a page follow that page, and the expanded player publishes `FULL_PLAYER` for
-everything inside it, including its own dialogs. A surface that reads the raw
-slider instead ignores the user's switches, so that is a design gate now.
+**The palette is derived, never assembled.** `BackgroundPalettePolicy.paletteFrom`
+turns one colour into the three layers the background is painted from — a base
+wash plus a main and a companion glow, the last two related by a 38° hue shift —
+and the settings swatches render the result of that same derivation. Artwork
+colour and a manual pick therefore cannot drift into different recipes.
 
-**A backdrop is never pinned to a section.** `NowPlayingBackdrop`,
-`AmbientBackdrop`, `PageArtworkBackdrop` and `LyricsArtworkLayer` all take a
-*nullable* section that defaults to `LocalBackgroundSection.current`. That is why
-album, artist and playlist pages - which paint their own cover backdrop and are
-reachable from Home, Search and Library alike - frost with the tab they were
-opened from instead of always with Home's switches. Passing a section explicitly
-is still the rule where a surface owns one (the dock is `MINI_PLAYER`, the player
-is `FULL_PLAYER`).
+**The base is luminance-clamped, not contrast-clamped by eye.**
+`BASE_LUMINANCE_DRIFT` (0.05) keeps the base inside the band the text ladder was
+measured against in both themes. With no artwork behind it the surface needs more
+of the hue to be visible at all, so `SOLID_BASE_TINT_ALPHA` (0.55) is used instead of
+`BASE_TINT_ALPHA` (0.30) — chroma, not brightness, which is why the contrast band
+still holds in the "blur off, my colours" state. The two glows get a little more
+presence there as well (`AmbientBackdropPolicy.SOLID_BLOOM_SCALE`).
 
-**Manual colours use the same recipe as the artwork.** A pick in Settings runs
-through `BackgroundPalettePolicy.manualFrom`, and the swatch rows render the
-result of that derivation — what the user taps is what the surface will paint,
-the three layers stay a palette rather than three unrelated hues, and every
-offered swatch is already inside the measured contrast band. Swatches are
-derived per theme, so the light theme is not offered near-black "base" choices
-that it could never display.
+**Blur off means no image layer.** `BackgroundBlurPolicy.paintsArtwork(percent)`
+is the single answer every artwork layer asks for: `NowPlayingBackdrop`,
+`LyricsArtworkLayer` (dock, lyrics card, dialogs, queue sheet), `GlassCard`'s
+frost, `PlayerBackdrop`, the player's `ArtworkBackdrop` and its lyrics card all
+return before drawing when it is false. A sharp or dimmed copy of the cover is
+*not* the fallback for "off" — that was the behaviour that made the switch
+indistinguishable from a weaker blur.
 
-`DhunBackgrounds.setArtworkSeed(...)` is the **only** artwork input. It reuses
-`ArtworkColorExtractor` (the palette the player tint already computes), caches
-per seed, and is called once per track from the shell. No second image pipeline,
-no per-frame decoding; palette changes animate on `DhunAnimations.slowTween`.
+**A backdrop is never pinned to a surface.** `NowPlayingBackdrop`,
+`AmbientBackdrop`, `PageArtworkBackdrop` and `LyricsArtworkLayer` take a *nullable*
+component that resolves to `LocalBackgroundComponent.current`, so panels, menus
+and detail pages inherit the surface they are composed on; surfaces that own one
+(the dock is `MINI_PLAYER`, the player is `FULL_PLAYER`, the tab band is
+`NAVIGATION`) pass it explicitly.
 
-The base wash is clamped to `BASE_LUMINANCE_DRIFT` (0.05) of the theme
-background so text and controls keep the ratios `DhunThemeContrastTest`
-measures; the artwork identity lives in the two blooms, which sit under rows.
+**Blur strength cannot impersonate the switch.** The slider scales the radius and
+is floored at `MIN_EFFECTIVE_STRENGTH` (20%) for an enabled blur; the switch is
+the only off control. `Adaptive blur` is a sub-choice of an enabled blur (a bright,
+busy cover keeps the full frost; a dark, calm one is blurred slightly less), never
+a third feature.
+
+**One image pipeline.** `DhunBackgrounds.setArtworkSeed(...)` is the only artwork
+input: it reuses `ArtworkColorExtractor` (the palette the player tint already
+computes), caches per seed, and is called once per track from the shell. No
+decode, no sampling, no per-frame work; palette changes animate on
+`DhunAnimations.slowTween`.
+
+**Fallbacks.** A device without real blur (Android < 12, no Skiko RenderEffect)
+still saves the switches and draws the dimmed cover, and says so in Settings.
+Nothing playing, or an extraction that fell back to the accent, leaves each
+surface on its own colour — never a transparent hole. The pre-API-31 path adds no
+CPU blur.
 
 ## 4. Legibility beats translucency (unchanged, and it is not a licence to go flat)
 

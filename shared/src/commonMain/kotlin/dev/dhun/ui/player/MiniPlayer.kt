@@ -51,7 +51,7 @@ import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
-import dev.dhun.design.background.BackgroundSection
+import dev.dhun.design.background.BackgroundComponent
 import dev.dhun.design.components.AcrylicSurface
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunIconButton
@@ -264,7 +264,7 @@ fun MiniPlayer(
         // palette or the artwork colours reach the floating card too.
         AcrylicSurface(
             artworkUrl = track.thumbnailUrl,
-            section = BackgroundSection.MINI_PLAYER,
+            component = BackgroundComponent.MINI_PLAYER,
             modifier = modifier.fillMaxWidth(),
             shape = DhunShapes.large,
         ) {

@@ -38,6 +38,8 @@ import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.VisualPart
+import dev.dhun.design.background.BackgroundComponent
+import dev.dhun.design.background.backgroundComponentTint
 
 /**
  * DHUN navigation chrome: the bottom tab bar and the desktop rail.
@@ -129,13 +131,21 @@ object DhunNavigationPolicy {
 fun DhunNavigationBar(
     modifier: Modifier = Modifier,
     fill: Color = contentRowFill(VisualPart.NAVIGATION),
+    /**
+     * The surface whose colour tints this band. The navigation bar is its own
+     * customisable surface (Settings → Surface colours), so it carries its
+     * colour over the body rather than borrowing the page's or the dock's.
+     */
+    tintComponent: BackgroundComponent? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
+    val tint = if (tintComponent != null) Modifier.backgroundComponentTint(tintComponent) else Modifier
     Row(
         modifier = modifier
             .fillMaxWidth()
             .height(DhunSpacing.navigationBarContent)
-            .dhunGlassBody(fill),
+            .dhunGlassBody(fill)
+            .then(tint),
         verticalAlignment = Alignment.CenterVertically,
         content = content,
     )
@@ -177,13 +187,17 @@ fun RowScope.DhunNavigationBarItem(
 fun DhunNavigationRail(
     modifier: Modifier = Modifier,
     fill: Color = contentRowFill(VisualPart.NAVIGATION),
+    /** See [DhunNavigationBar.tintComponent]: the rail is the same surface. */
+    tintComponent: BackgroundComponent? = null,
     content: @Composable () -> Unit,
 ) {
+    val tint = if (tintComponent != null) Modifier.backgroundComponentTint(tintComponent) else Modifier
     Column(
         modifier = modifier
             .width(DhunNavigationPolicy.railWidth)
             .fillMaxHeight()
             .dhunGlassBody(fill)
+            .then(tint)
             .padding(vertical = DhunSpacing.sm),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs),

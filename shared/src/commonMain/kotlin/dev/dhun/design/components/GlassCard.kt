@@ -27,8 +27,9 @@ import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.VisualPart
-import dev.dhun.design.background.BackgroundSection
-import dev.dhun.design.background.LocalBackgroundSection
+import dev.dhun.design.background.BackgroundComponent
+import dev.dhun.design.background.DhunBackgrounds
+import dev.dhun.design.background.LocalBackgroundComponent
 
 /**
  * The numbers of the DHUN glass material — the one recipe every translucent
@@ -203,12 +204,11 @@ fun GlassCard(
      */
     frostArtwork: Boolean = opaqueBase,
     /**
-     * Which background section this panel's frost obeys. A dialog floats over
-     * whatever page is behind it, so it defaults to the page section; a card
-     * inside the player passes `FULL_PLAYER` and one in the dock passes
-     * `MINI_PLAYER`.
+     * Which surface this panel's frost obeys. A dialog floats over whatever page
+     * is behind it, so it defaults to that page; a card inside the player passes
+     * `FULL_PLAYER` and one in the dock passes `MINI_PLAYER`.
      */
-    section: BackgroundSection? = null,
+    component: BackgroundComponent? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
     @Suppress("UNUSED_VARIABLE")
@@ -221,8 +221,14 @@ fun GlassCard(
         subtle -> DhunColors.overlayFocus
         else -> readingSurfaceFill()
     }
-    val resolvedSection = section ?: LocalBackgroundSection.current
-    val frostUrl = if (frostArtwork) resolveGlassArtwork(artworkUrl) else null
+    val resolvedComponent = component ?: LocalBackgroundComponent.current
+    // No frost at all while Background blur is off: the panel is its body
+    // gradient, sheen and edge, not a sharp copy of the cover under a wash.
+    val frostUrl = if (frostArtwork && DhunBackgrounds.showsArtwork(resolvedComponent)) {
+        resolveGlassArtwork(artworkUrl)
+    } else {
+        null
+    }
     val bodyStops = GlassMaterialPolicy.bodyStops(body, light).toTypedArray()
     val sheen = sheenStops(light)
     val outer = if (elevated) {
@@ -242,7 +248,7 @@ fun GlassCard(
             LyricsArtworkLayer(
                 artworkUrl = frostUrl,
                 modifier = Modifier.matchParentSize(),
-                section = resolvedSection,
+                component = resolvedComponent,
             )
         }
         // 2. Body: a gradient, never one flat colour.
@@ -316,10 +322,10 @@ fun GlassDialog(
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
     artworkUrl: String? = null,
-    section: BackgroundSection? = null,
+    component: BackgroundComponent? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val resolvedSection = section ?: LocalBackgroundSection.current
+    val resolvedComponent = component ?: LocalBackgroundComponent.current
     Dialog(onDismissRequest = onDismissRequest) {
         GlassCard(
             modifier = modifier.widthIn(
@@ -330,7 +336,7 @@ fun GlassDialog(
             opaqueBase = true,
             artworkUrl = artworkUrl ?: LocalNowPlayingArtwork.current,
             frostArtwork = true,
-            section = resolvedSection,
+            component = resolvedComponent,
         ) {
             Column(modifier = Modifier.padding(DhunSpacing.lg), content = content)
         }
@@ -352,7 +358,7 @@ fun GlassDock(
     artworkUrl: String?,
     modifier: Modifier = Modifier,
     shape: Shape = DhunShapes.bottomSheet,
-    section: BackgroundSection = BackgroundSection.MINI_PLAYER,
+    component: BackgroundComponent = BackgroundComponent.MINI_PLAYER,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val light = DhunAppearance.tokens.isLight
@@ -368,7 +374,7 @@ fun GlassDock(
         LyricsArtworkLayer(
             artworkUrl = artworkUrl,
             modifier = Modifier.matchParentSize(),
-            section = section,
+            component = component,
         )
         Column(modifier = Modifier.fillMaxWidth(), content = content)
     }

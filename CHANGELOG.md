@@ -22,7 +22,64 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Background blur and dynamic colours: two switches, four surfaces (2026-10-30, session `arena/09e5238e-dhun`)
+
+The controls from #216 asked the user to assemble a palette (`primary`,
+`secondary`, `tertiary`) and never made "blur off" mean what it says. This
+replaces that model with the two decisions the owner actually described, and
+makes **individual interface areas** customisable.
+
+- **Two independent switches.** *Background blur* puts the playing track's
+  artwork behind the interface; off removes it **entirely** — no sharp copy, no
+  dimmed copy, no decode. *Dynamic colours* takes surface colours from that
+  artwork and is independent of blur, so all four states work: solid + own
+  colours, solid + artwork colours, blurred + own colours, blurred + artwork
+  colours. *Adaptive blur* is a sub-choice of an enabled blur, not a third
+  feature; the strength slider still cannot impersonate the off switch.
+- **Four surfaces replace five sections and three layers.** `BackgroundComponent`
+  is `PAGES` (Home, Search, Library and the pages opened from them),
+  `NAVIGATION` (tab band / rail), `MINI_PLAYER`, `FULL_PLAYER`. Each saves one
+  colour (or "DHUN default") and its own blur switch, plus an opt-out of artwork
+  colour for that surface alone. The navigation bar is now a real surface with
+  its own tint — it previously only ever showed the dock's frost.
+- **The palette is derived from that one colour**: base wash plus two related
+  glows (`BackgroundPalettePolicy.paletteFrom`), so what a swatch shows is what
+  the surface paints. With no artwork behind it the base uses a stronger tint
+  (`SOLID_BASE_TINT_ALPHA`) so the chosen colour is visible rather than a 30% wash
+  over near-black; the luminance clamp still holds the surface inside the
+  measured contrast band.
+- **"Blur off" is a paint gate, not a radius of zero.** Every artwork layer
+  (`NowPlayingBackdrop`, `LyricsArtworkLayer`, `GlassCard` frost,
+  `PlayerBackdrop`, the player's `ArtworkBackdrop` and lyrics card) returns
+  before drawing, so nothing thumbnail-derived remains on screen.
+- **Settings** are rebuilt around the two switches and the four surfaces: a
+  colour preview per surface, "Showing: …" naming the effective source, a blur
+  switch and an artwork-colour switch per surface, named colour swatches (the
+  six accents plus DHUN default), and restore-defaults per surface and for all
+  of them.
+- **Migration is additive and one-shot.** `background_profile_version` 0 → 1
+  still imports the legacy slider (`backdrop_blur = 0` = blur off, slider reset
+  to the shipped strength); 1 → 2 imports the five per-section palettes into the
+  component model — Home/Search/Library collapse into *Main pages* (first saved
+  section wins), the dock and player map one-to-one, the version-1 `secondary`
+  layer becomes the surface colour, and the navigation bar starts at its default
+  because version 1 had no navigation colour. Version-1 rows are read once and
+  then left alone; "reset everything" clears both shapes.
+- **Tests.** `BackgroundSettingsTest` covers every cell of the two-switch matrix
+  on all four surfaces, per-surface independence, the opt-out of artwork colour,
+  colour with no artwork, adaptivity bounds, the strength floor, luminance-band
+  safety (including solid palettes in both themes), the colour codec,
+  persistence across a restart, both migrations and an unwritable database.
+  `scripts/test_design_system.py` gained `test_blur_off_means_no_artwork_is_painted`
+  and a surface-wiring gate, and now fails if a palette-layer picker returns.
+
 ### Background blur, dynamic blur and dynamic colours are real settings (2026-10-30, session `arena/83a7841b-dhun`)
+
+> **Superseded 2026-10-30** by the entry above. The three global switches and
+> the per-section model described here were correct as far as they went, but
+> they exposed palette *layers* to the user and let "blur off" keep painting the
+> cover. The entry above replaces the five sections with four surfaces, one
+> colour each, and makes blur-off remove the artwork. Kept as history.
 
 The Settings screen had one slider named "background blur" that changed a
 percentage, and nothing else: no way to turn blur off, no way to say whether the

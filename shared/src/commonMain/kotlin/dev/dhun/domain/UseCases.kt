@@ -327,9 +327,9 @@ class GetSettingUseCase(private val settings: SettingsRepository) {
 }
 
 class UpdateSettingUseCase(private val settings: SettingsRepository) {
-    /** Static keys, plus the per-section background keys, which are built from a section id. */
+    /** Static keys, plus the component background keys, which are built from a component id. */
     private fun known(key: String): Boolean =
-        key in SettingsKeys.all || SettingsKeys.isBackgroundSectionKey(key)
+        key in SettingsKeys.all || SettingsKeys.isBackgroundComponentKey(key)
 
     suspend fun remove(key: String) {
         require(known(key)) { "Unknown setting key: $key" }

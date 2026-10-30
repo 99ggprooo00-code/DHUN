@@ -1,12 +1,11 @@
 package dev.dhun.presentation.settings
 
 import dev.dhun.data.SettingsKeys
-import dev.dhun.design.background.BackgroundPalette
-import dev.dhun.design.background.BackgroundPaletteCodec
-import dev.dhun.design.background.BackgroundSection
+import dev.dhun.design.background.BackgroundColorCodec
+import dev.dhun.design.background.BackgroundComponent
 import dev.dhun.design.background.BackgroundState
+import dev.dhun.design.background.ComponentBackgrounds
 import dev.dhun.design.background.DhunBackgrounds
-import dev.dhun.design.background.SectionBackgrounds
 import dev.dhun.domain.GetSettingUseCase
 import dev.dhun.domain.UpdateSettingUseCase
 
@@ -18,24 +17,43 @@ import dev.dhun.domain.UpdateSettingUseCase
  * the state *before the first frame*) cannot drift apart. It lives in the
  * presentation layer because that is the lowest layer allowed to see both the
  * data layer's key strings and the design layer's state.
+ *
+ * Two switches and four per-surface colours, nothing else. The two earlier
+ * shapes of this feature — a bare 0–100 slider, then five sections with a
+ * three-layer palette each — are imported once each and then never read again.
  */
 object BackgroundPreferences {
 
     /**
      * Every persisted key that belongs to the background feature, in the order
-     * Reset removes them (globals first, then sections).
+     * Reset removes them (globals, then current component rows, then the legacy
+     * rows an older install may still carry).
      */
     fun allKeys(): List<String> = buildList {
         add(SettingsKeys.BACKGROUND_BLUR_ENABLED)
         add(SettingsKeys.BACKGROUND_DYNAMIC_BLUR)
         add(SettingsKeys.BACKGROUND_DYNAMIC_COLORS)
         add(SettingsKeys.BACKGROUND_PROFILE_VERSION)
-        for (section in BackgroundSection.entries) {
-            for (field in FIELDS) add(SettingsKeys.backgroundKey(section.id, field))
+        for (component in BackgroundComponent.entries) {
+            for (field in FIELDS) add(SettingsKeys.backgroundComponentKey(component.id, field))
+        }
+        // Legacy version-1 rows: cleared too, so "reset everything" cannot leave
+        // a future import reading a stale per-section palette.
+        for (section in LEGACY_SECTIONS) {
+            for (field in LEGACY_FIELDS) add(SettingsKeys.backgroundKey(section, field))
         }
     }
 
     private val FIELDS = listOf(
+        SettingsKeys.BACKGROUND_FIELD_BLUR,
+        SettingsKeys.BACKGROUND_FIELD_FOLLOW_ARTWORK,
+        SettingsKeys.BACKGROUND_FIELD_COLOR,
+    )
+
+    /** Version-1 section ids that owned a palette. */
+    private val LEGACY_SECTIONS = listOf("home", "search", "library", "mini", "player")
+
+    private val LEGACY_FIELDS = listOf(
         SettingsKeys.BACKGROUND_FIELD_BLUR,
         SettingsKeys.BACKGROUND_FIELD_DYNAMIC_BLUR,
         SettingsKeys.BACKGROUND_FIELD_DYNAMIC_COLORS,
@@ -51,92 +69,146 @@ object BackgroundPreferences {
      * purpose. Publishing as each key arrives meant a read that failed halfway
      * left the app on a mixture of stored values and defaults that the user
      * never chose — a state that then silently reverted on the next launch.
-     *
-     * **Backward compatibility.** A database written before this feature has no
-     * `background_*` rows at all, and its only blur vocabulary was
-     * `backdrop_blur = 0..100`. Version 0 therefore imports that one fact — a
-     * stored 0 means the user had turned blur off — and then writes the marker
-     * so the import runs exactly once. Users who never touched the slider get
-     * the new defaults, which are the old behaviour.
      */
     suspend fun read(get: GetSettingUseCase, update: UpdateSettingUseCase): BackgroundState {
         val version = get.int(SettingsKeys.BACKGROUND_PROFILE_VERSION, 0)
         // A migration is a *write*, and a write is not allowed to decide whether
         // the stored preferences can be read: on a full disk the old build failed
         // the entire load here, so every setting came back as its default and the
-        // screen reported that nothing could be read. The imported value is
-        // therefore computed first and persisted on a best-effort basis — if the
-        // marker write fails the import simply runs again next launch, which is
-        // safe because it is derived from the same legacy row.
+        // screen reported that nothing could be read. Every imported value is
+        // therefore derived from rows that are left in place, and persisted on a
+        // best-effort basis — if the marker write fails the import simply runs
+        // again next launch.
         val importedBlur = if (version < SettingsKeys.BACKGROUND_PROFILE_VERSION_CURRENT) {
-            migrate(get, update)
+            migrate(get, update, version)
         } else {
             null
         }
 
         val blurEnabled = importedBlur
             ?: get.boolean(SettingsKeys.BACKGROUND_BLUR_ENABLED, SettingsKeys.BACKGROUND_BLUR_ENABLED_DEFAULT)
-        val dynamicBlur = get.boolean(SettingsKeys.BACKGROUND_DYNAMIC_BLUR, SettingsKeys.BACKGROUND_DYNAMIC_BLUR_DEFAULT)
+        val adaptiveBlur = get.boolean(SettingsKeys.BACKGROUND_DYNAMIC_BLUR, SettingsKeys.BACKGROUND_DYNAMIC_BLUR_DEFAULT)
         val dynamicColors = get.boolean(SettingsKeys.BACKGROUND_DYNAMIC_COLORS, SettingsKeys.BACKGROUND_DYNAMIC_COLORS_DEFAULT)
 
-        val sections = BackgroundSection.entries.associateWith { section ->
-            SectionBackgrounds(
+        val components = BackgroundComponent.entries.associateWith { component ->
+            ComponentBackgrounds(
                 blurEnabled = get.boolean(
-                    SettingsKeys.backgroundKey(section.id, SettingsKeys.BACKGROUND_FIELD_BLUR),
+                    SettingsKeys.backgroundComponentKey(component.id, SettingsKeys.BACKGROUND_FIELD_BLUR),
                     true,
                 ),
-                dynamicBlur = get.boolean(
-                    SettingsKeys.backgroundKey(section.id, SettingsKeys.BACKGROUND_FIELD_DYNAMIC_BLUR),
+                followArtwork = get.boolean(
+                    SettingsKeys.backgroundComponentKey(component.id, SettingsKeys.BACKGROUND_FIELD_FOLLOW_ARTWORK),
                     true,
                 ),
-                dynamicColors = get.boolean(
-                    SettingsKeys.backgroundKey(section.id, SettingsKeys.BACKGROUND_FIELD_DYNAMIC_COLORS),
-                    true,
-                ),
-                manual = BackgroundPaletteCodec.decodePalette(
-                    primary = get.string(SettingsKeys.backgroundKey(section.id, SettingsKeys.BACKGROUND_FIELD_PRIMARY), ""),
-                    secondary = get.string(SettingsKeys.backgroundKey(section.id, SettingsKeys.BACKGROUND_FIELD_SECONDARY), ""),
-                    tertiary = get.string(SettingsKeys.backgroundKey(section.id, SettingsKeys.BACKGROUND_FIELD_TERTIARY), ""),
+                color = BackgroundColorCodec.decode(
+                    get.string(
+                        SettingsKeys.backgroundComponentKey(component.id, SettingsKeys.BACKGROUND_FIELD_COLOR),
+                        "",
+                    ),
                 ),
             )
         }
 
         return BackgroundState(
             blurEnabled = blurEnabled,
-            dynamicBlur = dynamicBlur,
+            adaptiveBlur = adaptiveBlur,
             dynamicColors = dynamicColors,
-            sections = sections,
+            components = components,
         )
     }
 
     /**
-     * One-time import of the pre-switch blur setting. Idempotent by the marker,
-     * so a user who deliberately turns blur off later keeps that choice.
+     * Import the older shapes of this feature, once.
      *
-     * Returns the imported master-blur value (or `null` when there was nothing to
-     * import), and never lets a failed write hide the stored preferences — see
-     * [read].
+     * Version 0 is the slider era: `backdrop_blur = 0` was the only way to say
+     * "no blur", so it becomes Background blur off — and the slider itself is
+     * reset to the shipped strength, otherwise turning blur back on would hand
+     * the user the 20% floor instead of the frost they had before.
+     *
+     * Version 1 is the five-section, three-layer era. Its rows are read into the
+     * component model: Home/Search/Library collapse into *Main pages* (the
+     * surfaces share one page background; the first section that has a saved
+     * setting wins, Home first), the dock and the player map one to one, and the
+     * navigation bar gets nothing because version 1 had no navigation colour.
+     * The version-1 `secondary` layer is imported as the surface colour: it is
+     * the hue the user actually chose, whereas `primary` was already the derived
+     * wash and re-deriving it would mute it twice.
+     *
+     * Returns the imported global blur value, or `null` when nothing was
+     * imported — see [read].
      */
-    private suspend fun migrate(get: GetSettingUseCase, update: UpdateSettingUseCase): Boolean? {
-        val legacyPercent = if (!get.has(SettingsKeys.BACKGROUND_BLUR_ENABLED)) {
+    private suspend fun migrate(
+        get: GetSettingUseCase,
+        update: UpdateSettingUseCase,
+        version: Int,
+    ): Boolean? {
+        val legacyPercent = if (version < 1 && !get.has(SettingsKeys.BACKGROUND_BLUR_ENABLED)) {
             get.int(SettingsKeys.BACKDROP_BLUR, SettingsKeys.BACKDROP_BLUR_DEFAULT)
         } else {
             null
         }
-        val imported = legacyPercent?.let { it > 0 }
+        val importedBlur = legacyPercent?.let { it > 0 }
+        val legacySections = if (version < 2) legacySections(get) else emptyMap()
+
         bestEffort {
-            imported?.let { update.boolean(SettingsKeys.BACKGROUND_BLUR_ENABLED, it) }
+            importedBlur?.let { update.boolean(SettingsKeys.BACKGROUND_BLUR_ENABLED, it) }
             if (legacyPercent != null && legacyPercent <= 0) {
                 // The old slider was also the off switch, so a stored 0 says
-                // "off" — imported above as the master switch. Reset the slider
-                // itself to the shipped strength: otherwise turning the master
-                // back on would give the faintest allowed frost (20%), and the
-                // user would reasonably conclude the switch does nothing.
+                // "off" — imported above. Reset the slider itself to the shipped
+                // strength so the switch is not left pointing at the 20% floor.
                 update.int(SettingsKeys.BACKDROP_BLUR, SettingsKeys.BACKDROP_BLUR_DEFAULT)
+            }
+            for ((component, prefs) in legacySections) {
+                update.boolean(
+                    SettingsKeys.backgroundComponentKey(component.id, SettingsKeys.BACKGROUND_FIELD_BLUR),
+                    prefs.blurEnabled,
+                )
+                update.boolean(
+                    SettingsKeys.backgroundComponentKey(component.id, SettingsKeys.BACKGROUND_FIELD_FOLLOW_ARTWORK),
+                    prefs.followArtwork,
+                )
+                prefs.color?.let { color ->
+                    update.string(
+                        SettingsKeys.backgroundComponentKey(component.id, SettingsKeys.BACKGROUND_FIELD_COLOR),
+                        BackgroundColorCodec.encode(color),
+                    )
+                }
             }
             update.int(SettingsKeys.BACKGROUND_PROFILE_VERSION, SettingsKeys.BACKGROUND_PROFILE_VERSION_CURRENT)
         }
-        return imported
+        return importedBlur
+    }
+
+    /**
+     * Read the version-1 section rows into component preferences.
+     *
+     * A section counts as "saved" when any of its rows exists. Sections that were
+     * never touched are skipped, so a fresh install is not given a colour it did
+     * not choose.
+     */
+    private suspend fun legacySections(
+        get: GetSettingUseCase,
+    ): Map<BackgroundComponent, ComponentBackgrounds> {
+        suspend fun saved(section: String): Boolean =
+            LEGACY_FIELDS.any { field -> get.has(SettingsKeys.backgroundKey(section, field)) }
+
+        suspend fun prefs(section: String) = ComponentBackgrounds(
+            blurEnabled = get.boolean(SettingsKeys.backgroundKey(section, SettingsKeys.BACKGROUND_FIELD_BLUR), true),
+            followArtwork = get.boolean(
+                SettingsKeys.backgroundKey(section, SettingsKeys.BACKGROUND_FIELD_DYNAMIC_COLORS),
+                true,
+            ),
+            color = BackgroundColorCodec.decode(
+                get.string(SettingsKeys.backgroundKey(section, SettingsKeys.BACKGROUND_FIELD_SECONDARY), ""),
+            ),
+        )
+
+        val pages = listOf("home", "search", "library").firstOrNull(::saved)
+        return buildMap {
+            pages?.let { put(BackgroundComponent.PAGES, prefs(it)) }
+            if (saved("mini")) put(BackgroundComponent.MINI_PLAYER, prefs("mini"))
+            if (saved("player")) put(BackgroundComponent.FULL_PLAYER, prefs("player"))
+        }
     }
 
     /**
@@ -152,7 +224,7 @@ object BackgroundPreferences {
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
         } catch (_: Exception) {
-            // The next launch retries: the import is derived from the same row.
+            // The next launch retries: every import is derived from the same rows.
         }
     }
 
@@ -180,32 +252,39 @@ object BackgroundPreferences {
     suspend fun writeGlobalBlur(update: UpdateSettingUseCase, enabled: Boolean) =
         update.boolean(SettingsKeys.BACKGROUND_BLUR_ENABLED, enabled)
 
-    suspend fun writeGlobalDynamicBlur(update: UpdateSettingUseCase, enabled: Boolean) =
+    suspend fun writeGlobalAdaptiveBlur(update: UpdateSettingUseCase, enabled: Boolean) =
         update.boolean(SettingsKeys.BACKGROUND_DYNAMIC_BLUR, enabled)
 
     suspend fun writeGlobalDynamicColors(update: UpdateSettingUseCase, enabled: Boolean) =
         update.boolean(SettingsKeys.BACKGROUND_DYNAMIC_COLORS, enabled)
 
-    suspend fun writeSectionBlur(update: UpdateSettingUseCase, section: BackgroundSection, enabled: Boolean) =
-        update.boolean(SettingsKeys.backgroundKey(section.id, SettingsKeys.BACKGROUND_FIELD_BLUR), enabled)
-
-    suspend fun writeSectionDynamicBlur(update: UpdateSettingUseCase, section: BackgroundSection, enabled: Boolean) =
-        update.boolean(SettingsKeys.backgroundKey(section.id, SettingsKeys.BACKGROUND_FIELD_DYNAMIC_BLUR), enabled)
-
-    suspend fun writeSectionDynamicColors(update: UpdateSettingUseCase, section: BackgroundSection, enabled: Boolean) =
-        update.boolean(SettingsKeys.backgroundKey(section.id, SettingsKeys.BACKGROUND_FIELD_DYNAMIC_COLORS), enabled)
-
-    /** Writes the three layers, or clears them when the user restores defaults. */
-    suspend fun writeSectionPalette(
+    suspend fun writeComponentBlur(
         update: UpdateSettingUseCase,
-        section: BackgroundSection,
-        palette: BackgroundPalette?,
-    ) {
-        val encoded = BackgroundPaletteCodec.encodePalette(palette)
-        update.string(SettingsKeys.backgroundKey(section.id, SettingsKeys.BACKGROUND_FIELD_PRIMARY), encoded[0])
-        update.string(SettingsKeys.backgroundKey(section.id, SettingsKeys.BACKGROUND_FIELD_SECONDARY), encoded[1])
-        update.string(SettingsKeys.backgroundKey(section.id, SettingsKeys.BACKGROUND_FIELD_TERTIARY), encoded[2])
-    }
+        component: BackgroundComponent,
+        enabled: Boolean,
+    ) = update.boolean(
+        SettingsKeys.backgroundComponentKey(component.id, SettingsKeys.BACKGROUND_FIELD_BLUR),
+        enabled,
+    )
+
+    suspend fun writeComponentFollowArtwork(
+        update: UpdateSettingUseCase,
+        component: BackgroundComponent,
+        enabled: Boolean,
+    ) = update.boolean(
+        SettingsKeys.backgroundComponentKey(component.id, SettingsKeys.BACKGROUND_FIELD_FOLLOW_ARTWORK),
+        enabled,
+    )
+
+    /** Writes the surface colour, or clears it when the user restores the default. */
+    suspend fun writeComponentColor(
+        update: UpdateSettingUseCase,
+        component: BackgroundComponent,
+        color: androidx.compose.ui.graphics.Color?,
+    ) = update.string(
+        SettingsKeys.backgroundComponentKey(component.id, SettingsKeys.BACKGROUND_FIELD_COLOR),
+        BackgroundColorCodec.encode(color),
+    )
 
     /** Removes every background row so the next launch starts from the defaults. */
     suspend fun clearAll(update: UpdateSettingUseCase) {
@@ -218,7 +297,7 @@ object BackgroundPreferences {
      * exactly what the app paints.
      *
      * The snapshot is the *settings* half of the state; [DhunBackgrounds.restore]
-     * keeps the runtime artwork palette (re-deriving it from the playing track)
+     * keeps the runtime artwork colour (re-deriving it from the playing track)
      * so saving a switch never blanks the background for a frame.
      */
     fun apply(state: BackgroundState) {

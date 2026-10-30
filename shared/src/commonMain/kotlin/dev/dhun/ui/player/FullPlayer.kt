@@ -114,7 +114,8 @@ import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.DhunVisualTuning
 import dev.dhun.design.FullPlayerLayoutMode
 import dev.dhun.design.VisualPart
-import dev.dhun.design.background.BackgroundSection
+import dev.dhun.design.background.BackgroundBlurPolicy
+import dev.dhun.design.background.BackgroundComponent
 import dev.dhun.design.background.DhunBackgrounds
 import dev.dhun.design.components.AmbientBackdrop
 import dev.dhun.design.components.ArtworkImage
@@ -385,7 +386,7 @@ fun FullPlayer(
         // a void (docs/design/glass-system.md §1).
         AmbientBackdrop(
             modifier = Modifier.fillMaxSize(),
-            section = BackgroundSection.FULL_PLAYER,
+            component = BackgroundComponent.FULL_PLAYER,
         )
 
         // ---- artwork backdrop (runs under the status bar) -------------------
@@ -1466,6 +1467,10 @@ private fun ArtworkBackdrop(
     lyricsDominant: Boolean,
     cacheKey: String,
 ) {
+    // With the player's blur off, nothing artwork-derived is painted here — not
+    // the cover, not the scrims that exist only to sit under it. The player's
+    // own colour (AmbientBackdrop, just above) is the background instead.
+    if (!DhunBackgrounds.showsArtwork(BackgroundComponent.FULL_PLAYER)) return
     val brightnessShift = (55 - DhunAppearance.backdropBrightnessPercent) / 100f * 0.12f
     val dimColor by animateColorAsState(
         targetValue = NowPlayingBackdropPolicy.veilTint(DhunAppearance.tokens).copy(alpha =
@@ -1705,12 +1710,13 @@ private fun PlayerBackdrop(
     if (!shouldRenderPlayerBackdrop(artworkUrl)) return
 
     val canBlur = supportsRealtimeBlur
-    // The player is its own background section: it has its own blur switch and
-    // its own colour palette, independent of the page behind it.
+    // The player is its own surface: it has its own blur switch and its own
+    // colour, independent of the page behind it.
     val blurPercent = DhunBackgrounds.blurPercentFor(
-        section = BackgroundSection.FULL_PLAYER,
+        component = BackgroundComponent.FULL_PLAYER,
         strengthPercent = DhunAppearance.backdropBlurPercent,
     )
+    if (!BackgroundBlurPolicy.paintsArtwork(blurPercent)) return
 
     var prepared by remember {
         mutableStateOf(cacheKey.isNotBlank() && BlurredArtworkCache.isPrepared(cacheKey))
@@ -1766,12 +1772,13 @@ private fun LyricsCard(
     accent: Color,
     modifier: Modifier = Modifier,
 ) {
-    // The card's frost follows the player's own section switches, so the master
-    // switch and the player's static/dynamic choice both reach it.
+    // The card's frost follows the player's own switches, so the global switch
+    // and the player's adaptive choice both reach it.
     val blurPercent = DhunBackgrounds.blurPercentFor(
-        section = BackgroundSection.FULL_PLAYER,
+        component = BackgroundComponent.FULL_PLAYER,
         strengthPercent = DhunAppearance.backdropBlurPercent,
     )
+    val paintsArtwork = BackgroundBlurPolicy.paintsArtwork(blurPercent)
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -1783,7 +1790,7 @@ private fun LyricsCard(
         // Blurred artwork inside the card — keyed like the backdrop so the
         // blur is prepared once per track, never per frame.
         key(cacheKey) {
-            if (shouldRenderPlayerBackdrop(artworkUrl)) {
+            if (paintsArtwork && shouldRenderPlayerBackdrop(artworkUrl)) {
                 ArtworkImage(
                     imageUrl = artworkUrl,
                     contentDescription = null,

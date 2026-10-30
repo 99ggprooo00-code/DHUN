@@ -7,7 +7,6 @@ import dev.dhun.data.DatabaseFactory
 import dev.dhun.data.EpochClock
 import dev.dhun.data.SettingsKeys
 import dev.dhun.data.SettingsRepository
-import dev.dhun.design.ArtworkColors
 import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunTokens
 import dev.dhun.design.luminance
@@ -15,6 +14,7 @@ import dev.dhun.domain.GetSettingUseCase
 import dev.dhun.domain.UpdateSettingUseCase
 import dev.dhun.presentation.settings.BackgroundPreferences
 import dev.dhun.presentation.settings.SettingsViewModel
+import kotlin.math.abs
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -30,18 +30,28 @@ import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.runBlocking
 
 /**
- * The background feature: precedence, the two blur switches, manual palettes,
- * persistence/restore and the colour-safety rules.
+ * The background feature, in the terms the user meets it:
  *
- * The policy is pure, so most of this needs no composition; the persistence
- * half runs against the real settings repository on an in-memory database, the
- * same pattern `SettingsViewModelTest` uses, so a regression in the key names or
- * the migration is caught rather than mocked away.
+ * - **Background blur** is one decision (is the artwork behind the app?),
+ * - **Dynamic colours** is a second, independent one (does the colour come from
+ *   the artwork?),
+ * - each of the four surfaces keeps its own colour and its own blur switch.
+ *
+ * The policy is pure, so most of this needs no composition; the persistence half
+ * runs against the real settings repository on an in-memory database, the same
+ * pattern `SettingsViewModelTest` uses, so a regression in the key names or the
+ * migrations is caught rather than mocked away.
  */
 class BackgroundSettingsTest {
 
     private val dark = DhunTokens.dark
     private val light = DhunTokens.light
+
+    /** A representative artwork colour: saturated, mid-luminance. */
+    private val artColor = Color(0xFFB060A0)
+
+    /** A representative user pick that is nothing like the artwork. */
+    private val pickColor = Color(0xFF4FC3A1)
 
     @BeforeTest
     fun setUp() {
@@ -54,62 +64,102 @@ class BackgroundSettingsTest {
         DhunAppearance.applyPersistedAppearance("dark", "brand")
     }
 
-    /* ------------------------------------------------ palette precedence */
+    /* ------------------------------------------------ colour precedence */
 
     private fun resolve(
-        section: BackgroundSection = BackgroundSection.HOME,
-        global: Boolean,
-        sectionOn: Boolean,
-        manual: BackgroundPalette? = null,
-        artwork: BackgroundPalette? = null,
+        component: BackgroundComponent = BackgroundComponent.PAGES,
+        dynamicColors: Boolean,
+        followArtwork: Boolean,
+        manual: Color? = null,
+        artwork: Color? = null,
+        solid: Boolean = false,
         tokens: DhunTokens = dark,
-    ) = BackgroundPalettePolicy.resolve(section, tokens, global, sectionOn, manual, artwork)
+    ) = BackgroundPalettePolicy.resolve(
+        component = component,
+        tokens = tokens,
+        dynamicColors = dynamicColors,
+        followArtwork = followArtwork,
+        manualColor = manual,
+        artworkColor = artwork,
+        solid = solid,
+    )
 
     @Test
-    fun theTwoSwitchesTogetherDecideWhichPaletteAPaints() {
-        val manual = BackgroundPalette(Color(0xFF202020), Color(0xFF3366CC), Color(0xFF33CC99))
-        val artwork = BackgroundPalette(Color(0xFF151515), Color(0xFFAA4488), Color(0xFF44AAAA))
-
-        // 1. Global off → manual, whatever the section says.
-        for (sectionOn in listOf(true, false)) {
-            assertEquals(manual, resolve(global = false, sectionOn = sectionOn, manual = manual, artwork = artwork))
+    fun dynamicColoursOffAlwaysUsesThePickedColour() {
+        val expected = BackgroundPalettePolicy.paletteFrom(pickColor, dark, solid = false)
+        for (follow in listOf(true, false)) {
+            assertEquals(
+                expected,
+                resolve(dynamicColors = false, followArtwork = follow, manual = pickColor, artwork = artColor),
+                "with Dynamic colours off no artwork colour may reach the screen",
+            )
         }
-        // 2. Global on, section off → manual. This is the "my own colours in
-        //    Search" case, and it must not depend on artwork being absent.
-        assertEquals(manual, resolve(global = true, sectionOn = false, manual = manual, artwork = artwork))
-        // 3. Both on → artwork.
-        assertEquals(artwork, resolve(global = true, sectionOn = true, manual = manual, artwork = artwork))
     }
 
     @Test
-    fun aSectionWithNoManualPaletteFallsBackToItsDefault() {
-        val fallback = BackgroundPalettePolicy.defaultPalette(BackgroundSection.LIBRARY, dark)
-        assertEquals(fallback, resolve(global = false, sectionOn = true, manual = null, artwork = null))
-        assertEquals(fallback, resolve(global = true, sectionOn = false, manual = null, artwork = null))
-        // Both on but nothing is playing: still a deliberate background, never
-        // a transparent hole.
-        assertEquals(fallback, resolve(global = true, sectionOn = true, manual = null, artwork = null))
+    fun aSurfaceCanOptOutOfArtworkColoursOnItsOwn() {
+        val expected = BackgroundPalettePolicy.paletteFrom(pickColor, dark, solid = false)
+        assertEquals(
+            expected,
+            resolve(dynamicColors = true, followArtwork = false, manual = pickColor, artwork = artColor),
+            "a surface set to its own colour keeps it even with Dynamic colours on",
+        )
+        // …and the neighbouring surface still follows the artwork.
+        assertEquals(
+            BackgroundPalettePolicy.paletteFrom(artColor, dark, solid = false),
+            resolve(dynamicColors = true, followArtwork = true, manual = pickColor, artwork = artColor),
+        )
     }
 
     @Test
-    fun everySectionResolvesWithTheSameRules() {
-        val manual = BackgroundPalette(Color(0xFF1A1A1A), Color(0xFF557799), Color(0xFF775599))
-        val artwork = BackgroundPalette(Color(0xFF161616), Color(0xFF994477), Color(0xFF447799))
-        for (section in BackgroundSection.entries) {
+    fun bothOnUsesTheArtworkColour() {
+        assertEquals(
+            BackgroundPalettePolicy.paletteFrom(artColor, dark, solid = false),
+            resolve(dynamicColors = true, followArtwork = true, manual = pickColor, artwork = artColor),
+        )
+    }
+
+    @Test
+    fun aSurfaceWithNoColourFallsBackToItsDefault() {
+        for (component in BackgroundComponent.entries) {
+            val fallback = BackgroundPalettePolicy.defaultPalette(component, dark)
+            for (dynamic in listOf(true, false)) {
+                for (follow in listOf(true, false)) {
+                    assertEquals(
+                        fallback,
+                        resolve(
+                            component = component,
+                            dynamicColors = dynamic,
+                            followArtwork = follow,
+                            manual = null,
+                            artwork = null,
+                        ),
+                        "$component must never resolve to a transparent hole",
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun everySurfaceResolvesWithTheSameRules() {
+        val artworkPalette = BackgroundPalettePolicy.paletteFrom(artColor, dark, solid = false)
+        val pickPalette = BackgroundPalettePolicy.paletteFrom(pickColor, dark, solid = false)
+        for (component in BackgroundComponent.entries) {
             assertEquals(
-                manual,
-                resolve(section = section, global = false, sectionOn = true, manual = manual, artwork = artwork),
-                "$section must respect the global switch",
+                pickPalette,
+                resolve(component, dynamicColors = false, followArtwork = true, manual = pickColor, artwork = artColor),
+                "$component must respect Dynamic colours",
             )
             assertEquals(
-                manual,
-                resolve(section = section, global = true, sectionOn = false, manual = manual, artwork = artwork),
-                "$section must respect its own switch",
+                pickPalette,
+                resolve(component, dynamicColors = true, followArtwork = false, manual = pickColor, artwork = artColor),
+                "$component must respect its own artwork-colour switch",
             )
             assertEquals(
-                artwork,
-                resolve(section = section, global = true, sectionOn = true, manual = manual, artwork = artwork),
-                "$section must follow the artwork when both switches allow it",
+                artworkPalette,
+                resolve(component, dynamicColors = true, followArtwork = true, manual = pickColor, artwork = artColor),
+                "$component must follow the artwork when both allow it",
             )
         }
     }
@@ -118,48 +168,49 @@ class BackgroundSettingsTest {
     fun theSettingsCaptionMatchesTheResolution() {
         assertEquals(
             PaletteSource.ARTWORK,
-            BackgroundPalettePolicy.source(globalDynamicColors = true, sectionDynamicColors = true, hasManual = false, hasArtwork = true),
+            BackgroundPalettePolicy.source(dynamicColors = true, followArtwork = true, hasManual = true, hasArtwork = true),
         )
         assertEquals(
             PaletteSource.MANUAL,
-            BackgroundPalettePolicy.source(globalDynamicColors = true, sectionDynamicColors = false, hasManual = true, hasArtwork = true),
+            BackgroundPalettePolicy.source(dynamicColors = true, followArtwork = false, hasManual = true, hasArtwork = true),
         )
         assertEquals(
             PaletteSource.DEFAULT,
-            BackgroundPalettePolicy.source(globalDynamicColors = true, sectionDynamicColors = false, hasManual = false, hasArtwork = true),
+            BackgroundPalettePolicy.source(dynamicColors = true, followArtwork = false, hasManual = false, hasArtwork = true),
         )
-        // Global off is *overridden* even when the section itself is on: that
-        // is what the settings caption has to say out loud.
-        for (sectionOn in listOf(true, false)) {
-            val source = BackgroundPalettePolicy.source(
-                globalDynamicColors = false,
-                sectionDynamicColors = sectionOn,
-                hasManual = true,
-                hasArtwork = true,
-            )
-            assertEquals(PaletteSource.MANUAL_OVERRIDDEN, source)
-            assertTrue(source.isOverridden)
-        }
+        assertEquals(
+            PaletteSource.MANUAL_OVERRIDDEN,
+            BackgroundPalettePolicy.source(dynamicColors = false, followArtwork = true, hasManual = true, hasArtwork = true),
+        )
+        assertEquals(
+            PaletteSource.DEFAULT_OVERRIDDEN,
+            BackgroundPalettePolicy.source(dynamicColors = false, followArtwork = true, hasManual = false, hasArtwork = true),
+        )
+        // Something is playing but this surface opted out: not an override of the
+        // global switch, so the caption must not blame it.
+        assertEquals(
+            PaletteSource.MANUAL,
+            BackgroundPalettePolicy.source(dynamicColors = true, followArtwork = false, hasManual = true, hasArtwork = true),
+        )
     }
 
-    /* ---------------------------------------------------- blur precedence */
+    /* ------------------------------------------------------- colour safety */
 
     @Test
-    fun theMasterSwitchBeatsEverySectionPreference() {
-        for (sectionBlur in listOf(true, false)) {
-            for (dynamic in listOf(true, false)) {
-                for (sectionDynamic in listOf(true, false)) {
-                    assertEquals(
-                        0,
-                        BackgroundBlurPolicy.percentFor(
-                            globalBlurEnabled = false,
-                            sectionBlurEnabled = sectionBlur,
-                            dynamicBlur = dynamic,
-                            sectionDynamicBlur = sectionDynamic,
-                            artworkLuminance = 0.9f,
-                            artworkSaturation = 0.9f,
-                        ),
-                        "master off must mean no blur anywhere",
+    fun everySurfaceColourStaysInsideTheContrastBand() {
+        val accents = listOf(
+            Color(0xFFBB86FC), Color(0xFF7FB3FF), Color(0xFF79E0B4), Color(0xFFFFC46B),
+            Color(0xFFF08FB0), Color(0xFF8AD8E8), Color(0xFFFFFFFF), Color(0xFF000000),
+        )
+        for (tokens in listOf(dark, light)) {
+            val themeBase = tokens.background.luminance()
+            for (color in accents) {
+                for (solid in listOf(true, false)) {
+                    val palette = BackgroundPalettePolicy.paletteFrom(color, tokens, solid)
+                    val drift = abs(palette.base.luminance() - themeBase)
+                    assertTrue(
+                        drift <= BackgroundPalettePolicy.BASE_LUMINANCE_DRIFT + 1e-3f,
+                        "base drift $drift for $color (solid=$solid) exceeds the measured band",
                     )
                 }
             }
@@ -167,330 +218,334 @@ class BackgroundSettingsTest {
     }
 
     @Test
-    fun aSectionCanStaySharpWhileTheRestOfTheAppIsBlurred() {
+    fun aSolidSurfaceIsMoreColouredThanAWashOverArtwork() {
+        // The whole point of "blur off = my colours": with nothing behind it a
+        // 30% wash is invisible, so the solid base has to carry more of the hue.
+        val solid = BackgroundPalettePolicy.paletteFrom(pickColor, dark, solid = true)
+        val washed = BackgroundPalettePolicy.paletteFrom(pickColor, dark, solid = false)
+        assertNotEquals(solid.base, washed.base)
+        val solidTint = BackgroundPalettePolicy.SOLID_BASE_TINT_ALPHA
+        val washTint = BackgroundPalettePolicy.BASE_TINT_ALPHA
+        assertTrue(solidTint > washTint)
+        // Both stay in the band: the extra is chroma, not brightness.
+        val base = dark.background.luminance()
+        assertTrue(abs(solid.base.luminance() - base) <= BackgroundPalettePolicy.BASE_LUMINANCE_DRIFT + 1e-3f)
+    }
+
+    @Test
+    fun clampingIsIdempotentSoRepeatedReadsCannotDrift() {
+        val palette = BackgroundPalettePolicy.paletteFrom(Color(0xFFFFFFFF), dark, solid = true)
+        val once = BackgroundPalettePolicy.sanitize(palette, dark)
+        val twice = BackgroundPalettePolicy.sanitize(once, dark)
+        assertEquals(once, twice)
+        assertEquals(once, BackgroundPalettePolicy.sanitize(twice, dark))
+    }
+
+    @Test
+    fun glowsKeepAVisibleFloor() {
+        val palette = BackgroundPalettePolicy.paletteFrom(Color(0x00FF00FF), dark, solid = true)
+        assertTrue(palette.mainGlow.alpha >= BackgroundPalettePolicy.MIN_GLOW_ALPHA)
+        assertTrue(palette.companionGlow.alpha >= BackgroundPalettePolicy.MIN_GLOW_ALPHA)
+    }
+
+    @Test
+    fun theLightThemeGetsItsOwnPalettes() {
+        val darkBase = BackgroundPalettePolicy.paletteFrom(pickColor, dark, solid = true).base
+        val lightBase = BackgroundPalettePolicy.paletteFrom(pickColor, light, solid = true).base
+        assertTrue(
+            lightBase.luminance() > darkBase.luminance(),
+            "the same pick must follow the theme it is painted on",
+        )
+    }
+
+    /* ------------------------------------------------------------- blur */
+
+    @Test
+    fun theBlurSwitchDecidesWhetherArtworkIsPaintedAtAll() {
+        // Blur off → no radius, on every surface, whatever the surface says.
+        for (component in BackgroundComponent.entries) {
+            assertEquals(
+                0,
+                BackgroundBlurPolicy.percentFor(
+                    blurEnabled = false,
+                    componentBlurEnabled = true,
+                    adaptive = true,
+                ),
+            )
+            assertFalse(
+                BackgroundBlurPolicy.paintsArtwork(
+                    BackgroundBlurPolicy.percentFor(false, true, true),
+                ),
+                "$component must not paint artwork with Background blur off",
+            )
+        }
+        // Blur on + adaptive off → the shipped, steady frost.
+        assertEquals(
+            BackgroundBlurPolicy.STATIC_PERCENT,
+            BackgroundBlurPolicy.percentFor(blurEnabled = true, componentBlurEnabled = true, adaptive = false),
+        )
+        assertTrue(
+            BackgroundBlurPolicy.paintsArtwork(
+                BackgroundBlurPolicy.percentFor(true, true, adaptive = false),
+            ),
+        )
+    }
+
+    @Test
+    fun aSurfaceCanTurnBlurOffOnItsOwn() {
         assertEquals(
             0,
-            BackgroundBlurPolicy.percentFor(
-                globalBlurEnabled = true,
-                sectionBlurEnabled = false,
-                dynamicBlur = true,
-                sectionDynamicBlur = true,
-            ),
+            BackgroundBlurPolicy.percentFor(blurEnabled = true, componentBlurEnabled = false, adaptive = true),
         )
-        assertTrue(
-            BackgroundBlurPolicy.percentFor(
-                globalBlurEnabled = true,
-                sectionBlurEnabled = true,
-                dynamicBlur = true,
-                sectionDynamicBlur = true,
-            ) > 0,
-        )
-    }
-
-    @Test
-    fun staticBlurIsOneSteadyRadiusAndDynamicBlurFollowsTheArtwork() {
-        val static = BackgroundBlurPolicy.percentFor(
-            globalBlurEnabled = true,
-            sectionBlurEnabled = true,
-            dynamicBlur = false,
-            sectionDynamicBlur = true,
-            artworkLuminance = 0.95f,
-            artworkSaturation = 1f,
-        )
-        assertEquals(BackgroundBlurPolicy.STATIC_PERCENT, static)
-        // A section opting out of dynamic blur gets the same steady radius even
-        // when the global switch is dynamic.
+        // …and that is not a colour decision.
         assertEquals(
-            BackgroundBlurPolicy.STATIC_PERCENT,
-            BackgroundBlurPolicy.percentFor(
-                globalBlurEnabled = true,
-                sectionBlurEnabled = true,
-                dynamicBlur = true,
-                sectionDynamicBlur = false,
-            ),
+            BackgroundPalettePolicy.paletteFrom(artColor, dark, solid = true),
+            resolve(dynamicColors = true, followArtwork = true, artwork = artColor, solid = true),
         )
-
-        val bright = BackgroundBlurPolicy.adaptivePercent(0.95f, 0.95f)
-        val dark = BackgroundBlurPolicy.adaptivePercent(0.05f, 0.05f)
-        val neutral = BackgroundBlurPolicy.adaptivePercent(0.5f, 0.5f)
-        // A neutral cover is the shipped frost exactly, in *both* modes: choosing
-        // the steady radius must never be a quiet downgrade of the app's look.
-        assertEquals(static, neutral)
-        // A pale, busy cover keeps the full radius…
-        assertEquals(BackgroundBlurPolicy.DYNAMIC_MAX_PERCENT, bright)
-        // …and a dark, muted one gives some back so the art survives the frost.
-        assertTrue(dark < static, "a dark, moody cover keeps its detail: $dark vs $static")
-        assertTrue(dark >= BackgroundBlurPolicy.DYNAMIC_MIN_PERCENT)
-        assertNotEquals(bright, dark)
     }
 
     @Test
-    fun dynamicBlurStaysInsideItsBand() {
-        for (luminance in listOf(0f, 0.25f, 0.5f, 0.75f, 1f)) {
-            for (saturation in listOf(0f, 0.5f, 1f)) {
-                val percent = BackgroundBlurPolicy.adaptivePercent(luminance, saturation)
-                assertTrue(
-                    percent in BackgroundBlurPolicy.DYNAMIC_MIN_PERCENT..BackgroundBlurPolicy.DYNAMIC_MAX_PERCENT,
-                    "adaptive percent $percent out of band for lum=$luminance sat=$saturation",
-                )
-            }
-        }
-        // No artwork statistics yet: the neutral case is the static radius.
+    fun adaptiveBlurStaysInTheDocumentedBand() {
+        assertEquals(BackgroundBlurPolicy.ADAPTIVE_BASE_PERCENT, BackgroundBlurPolicy.adaptivePercent(null, null))
         assertEquals(
-            BackgroundBlurPolicy.STATIC_PERCENT,
-            BackgroundBlurPolicy.adaptivePercent(null, null),
+            BackgroundBlurPolicy.ADAPTIVE_BASE_PERCENT,
+            BackgroundBlurPolicy.adaptivePercent(0.5f, 0.5f),
+            "neutral artwork keeps the shipped frost",
         )
-        // Extreme statistics clamp, they never escape the band.
-        assertEquals(BackgroundBlurPolicy.DYNAMIC_MAX_PERCENT, BackgroundBlurPolicy.adaptivePercent(1f, 1f))
-        assertEquals(BackgroundBlurPolicy.DYNAMIC_MIN_PERCENT, BackgroundBlurPolicy.adaptivePercent(0f, 0f))
+        assertEquals(BackgroundBlurPolicy.ADAPTIVE_MAX_PERCENT, BackgroundBlurPolicy.adaptivePercent(1f, 1f))
+        val darkCalm = BackgroundBlurPolicy.adaptivePercent(0f, 0f)
+        assertEquals(BackgroundBlurPolicy.ADAPTIVE_MIN_PERCENT, darkCalm)
+        assertTrue(darkCalm < BackgroundBlurPolicy.ADAPTIVE_MAX_PERCENT)
     }
 
     @Test
-    fun theStrengthSliderCanOnlyReduceNeverSwitchBlurOnOrOff() {
-        assertEquals(0, BackgroundBlurPolicy.applyStrength(percent = 0, strengthPercent = 100))
-        assertEquals(50, BackgroundBlurPolicy.applyStrength(percent = 100, strengthPercent = 50))
-        // The slider cannot reproduce "off": an enabled blur keeps the
-        // documented floor, because the master switch is the off switch.
-        assertEquals(
-            BackgroundBlurPolicy.applyStrength(percent = 80, strengthPercent = 0),
-            (80 * BackgroundBlurPolicy.MIN_EFFECTIVE_STRENGTH / 100f).toInt(),
-        )
-        assertTrue(BackgroundBlurPolicy.applyStrength(percent = 80, strengthPercent = 0) > 0)
-        assertEquals(80, BackgroundBlurPolicy.applyStrength(percent = 80, strengthPercent = 100))
-    }
-
-    /* --------------------------------------------------- palette safety */
-
-    @Test
-    fun theArtworkBaseStaysInsideTheThemeContrastBand() {
-        // A violent artwork colour must not repaint the page base.
-        for (hue in listOf(Color(0xFFFF0000), Color(0xFF00FF00), Color(0xFF0000FF), Color(0xFFFF00FF))) {
-            for (tokens in listOf(dark, light)) {
-                val palette = BackgroundPalettePolicy.artworkPalette(
-                    ArtworkColors.fromPrimary(hue),
-                    tokens,
-                )!!
-                val drift = kotlin.math.abs(palette.primary.luminance() - tokens.background.luminance())
-                assertTrue(
-                    drift <= BackgroundPalettePolicy.BASE_LUMINANCE_DRIFT + 0.001f,
-                    "base drifted $drift past the contrast band for $hue",
-                )
-            }
-        }
-    }
-
-    @Test
-    fun aManualPaletteIsClampedBeforeItIsPainted() {
-        val white = BackgroundPalette(Color.White, Color.White, Color.White)
-        val safe = BackgroundPalettePolicy.sanitize(white, dark)
-        val drift = kotlin.math.abs(safe.primary.luminance() - dark.background.luminance())
-        assertTrue(drift <= BackgroundPalettePolicy.BASE_LUMINANCE_DRIFT + 0.001f)
-        // The glows may stay bright, but never fully transparent.
-        assertTrue(safe.secondary.alpha >= BackgroundPalettePolicy.MIN_LAYER_ALPHA)
-        assertTrue(safe.tertiary.alpha >= BackgroundPalettePolicy.MIN_LAYER_ALPHA)
-    }
-
-    @Test
-    fun theArtworkPaletteKeepsTheThreeLayersRelated() {
-        val art = ArtworkColors.fromPrimary(Color(0xFF8A4FBF))
-        val palette = BackgroundPalettePolicy.artworkPalette(art, dark)!!
-        assertNotEquals(palette.secondary, palette.tertiary, "the companion layer must be a different layer")
-        assertTrue(palette.secondary.luminance() > palette.primary.luminance(), "the glow reads over the base")
-        assertNull(BackgroundPalettePolicy.artworkPalette(null, dark))
-    }
-
-    /* ---------------------------------------------------- live holder */
-
-    @Test
-    fun theHolderResolvesPerSectionAndSurvivesGlobalOverrides() {
-        val manual = BackgroundPalette(Color(0xFF1C1C1C), Color(0xFF446688), Color(0xFF664488))
-        DhunBackgrounds.setSectionManualPalette(BackgroundSection.SEARCH, manual)
-        DhunBackgrounds.setSectionDynamicColors(BackgroundSection.SEARCH, false)
-
-        // Global on, Search off → Search uses its own colours, Home follows art.
-        DhunBackgrounds.setArtworkSeed("https://example.test/cover.jpg")
-        assertEquals(PaletteSource.ARTWORK, DhunBackgrounds.sourceFor(BackgroundSection.HOME))
-        // The manual palette is sanitised on the way in, so that is what the
-        // section paints. The blooms are compared exactly; the base is compared
-        // by luminance because sanitising twice must not drift it.
-        val painted = DhunBackgrounds.paletteFor(BackgroundSection.SEARCH)
-        val expected = BackgroundPalettePolicy.sanitize(manual, DhunAppearance.tokens)
-        assertEquals(expected.secondary, painted.secondary)
-        assertEquals(expected.tertiary, painted.tertiary)
-        assertTrue(
-            kotlin.math.abs(painted.primary.luminance() - expected.primary.luminance()) <= 0.001f,
-            "sanitising an already-safe palette must be idempotent",
-        )
-
-        // Global off → Search keeps its colours and Home now uses its default,
-        // and **the saved section preference is still there**.
-        DhunBackgrounds.setDynamicColors(false)
-        assertEquals(manual.secondary, DhunBackgrounds.paletteFor(BackgroundSection.SEARCH).secondary)
-        assertFalse(DhunBackgrounds.usesArtworkColors(BackgroundSection.HOME))
-        DhunBackgrounds.setDynamicColors(true)
-        assertEquals(PaletteSource.MANUAL, DhunBackgrounds.sourceFor(BackgroundSection.SEARCH))
-        assertEquals(PaletteSource.ARTWORK, DhunBackgrounds.sourceFor(BackgroundSection.HOME))
-    }
-
-    @Test
-    fun turningTheMasterBlurOffSuspendsDynamicBlurWithoutForgettingIt() {
-        DhunBackgrounds.setDynamicBlur(true)
-        DhunBackgrounds.setBlurEnabled(false)
-        for (section in BackgroundSection.entries) {
-            assertEquals(0, DhunBackgrounds.blurPercentFor(section))
-        }
-        // The saved preference is untouched…
-        assertTrue(DhunBackgrounds.current.dynamicBlur)
-        // …and comes straight back with the master switch.
-        DhunBackgrounds.setBlurEnabled(true)
-        assertTrue(DhunBackgrounds.blurPercentFor(BackgroundSection.HOME, strengthPercent = 100) > 0)
-        DhunBackgrounds.setDynamicBlur(false)
-        assertEquals(
-            BackgroundBlurPolicy.STATIC_PERCENT,
-            DhunBackgrounds.blurPercentFor(BackgroundSection.HOME, strengthPercent = 100),
-        )
-    }
-
-    @Test
-    fun aMissingArtworkFallsBackToManualOrDefault() {
-        val manual = BackgroundPalette(Color(0xFF1A1A1A), Color(0xFF5588AA), Color(0xFFAA5588))
-        DhunBackgrounds.setSectionManualPalette(BackgroundSection.LIBRARY, manual)
-        DhunBackgrounds.setArtworkSeed("https://example.test/a.jpg")
-        DhunBackgrounds.setArtworkSeed(null)
-        assertNull(DhunBackgrounds.current.artwork)
-        assertEquals(manual.secondary, DhunBackgrounds.paletteFor(BackgroundSection.LIBRARY).secondary)
-        assertEquals(
-            BackgroundPalettePolicy.defaultPalette(BackgroundSection.HOME, DhunAppearance.tokens).secondary,
-            DhunBackgrounds.paletteFor(BackgroundSection.HOME).secondary,
-        )
-        // Blur is unaffected by a missing palette: it is a separate feature.
-        assertTrue(DhunBackgrounds.blurPercentFor(BackgroundSection.HOME, strengthPercent = 100) > 0)
-    }
-
-    @Test
-    fun theStrengthFloorKeepsAnEnabledBlurVisible() {
-        // The master switch is the off switch: an enabled blur can be faint, but
-        // not zero, or the switch reads as broken.
-        for (percent in listOf(1, 40, 70, 100)) {
-            for (strength in 0..100) {
-                val effective = BackgroundBlurPolicy.applyStrength(percent, strength)
-                assertTrue(effective > 0, "percent=$percent strength=$strength produced no blur")
-                assertTrue(effective <= percent, "strength must only ever reduce the kind's radius")
-            }
-        }
-        // A disabled blur can never be resurrected by the slider.
+    fun strengthScalesButNeverSwitchesBlurOffOrOn() {
+        val enabled = BackgroundBlurPolicy.STATIC_PERCENT
         assertEquals(0, BackgroundBlurPolicy.applyStrength(0, 100))
-        assertEquals(
-            BackgroundBlurPolicy.MIN_EFFECTIVE_STRENGTH,
-            BackgroundBlurPolicy.effectiveStrength(-20),
+        // The slider cannot impersonate the off switch…
+        assertTrue(BackgroundBlurPolicy.applyStrength(enabled, 0) >= 1)
+        assertTrue(BackgroundBlurPolicy.applyStrength(enabled, 1) >= BackgroundBlurPolicy.MIN_EFFECTIVE_STRENGTH)
+        // …and cannot exceed the radius it is scaling.
+        assertEquals(enabled, BackgroundBlurPolicy.applyStrength(enabled, 100))
+        assertTrue(BackgroundBlurPolicy.applyStrength(70, 100) <= 70)
+    }
+
+    /* ------------------------------------------------------- live holder */
+
+    @Test
+    fun blurOffRemovesTheArtworkWithoutTouchingTheColours() {
+        DhunBackgrounds.restore(
+            BackgroundState(
+                dynamicColors = true,
+                artworkPrimary = artColor,
+                artworkLuminance = 0.6f,
+                artworkSaturation = 0.7f,
+            ),
         )
-        assertEquals(100, BackgroundBlurPolicy.effectiveStrength(250))
-    }
+        val withBlur = DhunBackgrounds.paletteFor(BackgroundComponent.PAGES)
 
-    @Test
-    fun aManualPickIsDerivedTheSameWayArtworkIs() {
-        // Selecting a swatch must produce the palette the artwork would have
-        // produced for that hue — one recipe, no "hand-picked colours" variant.
-        val picks = listOf(Color(0xFFBB86FC), Color(0xFF4FC3A1), Color(0xFFE0A458))
-        for (pick in picks) {
-            val manual = BackgroundPalettePolicy.manualFrom(pick, dark)
-            val asArtwork = BackgroundPalettePolicy.artworkPalette(ArtworkColors.fromPrimary(pick), dark)!!
-            assertEquals(asArtwork, manual)
-            // And it is already safe: nothing to clamp on the way in.
-            assertEquals(manual, BackgroundPalettePolicy.sanitize(manual, dark))
-        }
-    }
-
-    @Test
-    fun restoringASettingsSnapshotKeepsTheArtworkThatIsAlreadyPlaying() {
-        // The settings half of the state is persisted; the artwork half is
-        // runtime. Saving a switch must not blank the palette for a frame.
-        DhunBackgrounds.setArtworkSeed("https://example.test/live.jpg")
-        val artworkPalette = DhunBackgrounds.paletteFor(BackgroundSection.HOME)
-
-        DhunBackgrounds.restore(BackgroundState(blurEnabled = false))
-        assertEquals(artworkPalette, DhunBackgrounds.paletteFor(BackgroundSection.HOME))
-        assertFalse(DhunBackgrounds.current.blurEnabled)
-
-        // A snapshot that carries its own artwork palette wins outright.
-        val other = BackgroundPalette(Color(0xFF101010), Color(0xFF336699), Color(0xFF663399))
-        DhunBackgrounds.restore(BackgroundState(artwork = other))
-        assertEquals(other, DhunBackgrounds.current.artwork)
-    }
-
-    @Test
-    fun clearingTheArtworkAlsoForgetsTheSeed() {
-        DhunBackgrounds.setArtworkSeed("https://example.test/gone.jpg")
-        DhunBackgrounds.setArtworkSeed(null)
-        assertNull(DhunBackgrounds.current.artwork)
-        // A theme change re-derives from the *current* seed; a cleared seed must
-        // not resurrect the previous track's palette.
-        DhunBackgrounds.refreshArtworkPalette()
-        assertNull(DhunBackgrounds.current.artwork)
-    }
-
-    @Test
-    fun resettingASectionRestoresEveryOneOfItsPreferences() {
-        DhunBackgrounds.setSectionBlurEnabled(BackgroundSection.FULL_PLAYER, false)
-        DhunBackgrounds.setSectionDynamicBlur(BackgroundSection.FULL_PLAYER, false)
-        DhunBackgrounds.setSectionDynamicColors(BackgroundSection.FULL_PLAYER, false)
-        DhunBackgrounds.setSectionManualPalette(
-            BackgroundSection.FULL_PLAYER,
-            BackgroundPalette(Color(0xFF111111), Color(0xFF445566), Color(0xFF665544)),
-        )
-        DhunBackgrounds.resetSection(BackgroundSection.FULL_PLAYER)
-        assertEquals(SectionBackgrounds.default, DhunBackgrounds.current.section(BackgroundSection.FULL_PLAYER))
-        // A different section is untouched.
-        DhunBackgrounds.setSectionBlurEnabled(BackgroundSection.HOME, false)
-        DhunBackgrounds.resetSection(BackgroundSection.FULL_PLAYER)
-        assertFalse(DhunBackgrounds.current.section(BackgroundSection.HOME).blurEnabled)
-    }
-
-    @Test
-    fun switchingTracksReusesTheCachedExtraction() {
-        DhunBackgrounds.setArtworkSeed("https://example.test/one.jpg")
-        val first = DhunBackgrounds.current
-        val firstPalette = DhunBackgrounds.paletteFor(BackgroundSection.HOME)
-        DhunBackgrounds.setArtworkSeed("https://example.test/one.jpg")
-        // Same seed → same revision: no second extraction, no repaint.
-        assertEquals(first.revision, DhunBackgrounds.current.revision)
-        DhunBackgrounds.setArtworkSeed("https://example.test/two.jpg")
-        assertTrue(DhunBackgrounds.current.revision > first.revision)
-        // A track change *does* change the resolved palette — that is the change
-        // the backdrop animates rather than snaps.
-        assertNotEquals(firstPalette.secondary, DhunBackgrounds.paletteFor(BackgroundSection.HOME).secondary)
-    }
-
-    @Test
-    fun anUnreadableArtworkBehavesLikeNoArtwork() {
-        // The extractor's fallback is the brand accent, not artwork colour: a
-        // blank or unreadable seed must not paint the accent as if it were the
-        // song's palette.
-        for (seed in listOf(null, "", "   ")) {
-            DhunBackgrounds.setArtworkSeed(seed)
-            assertNull(DhunBackgrounds.current.artwork, "seed=$seed must not produce a palette")
-            assertEquals(
-                BackgroundPalettePolicy.defaultPalette(BackgroundSection.HOME, DhunAppearance.tokens),
-                DhunBackgrounds.paletteFor(BackgroundSection.HOME),
+        DhunBackgrounds.setBlurEnabled(false)
+        for (component in BackgroundComponent.entries) {
+            assertFalse(
+                DhunBackgrounds.showsArtwork(component),
+                "$component must paint no artwork while Background blur is off",
             )
-            assertEquals(PaletteSource.DEFAULT, DhunBackgrounds.sourceFor(BackgroundSection.HOME))
+            // Colour still resolves — this is the "Dynamic colours on, blur off"
+            // cell of the matrix, and it must not collapse to the default.
+            assertEquals(
+                BackgroundPalettePolicy.paletteFrom(artColor, DhunAppearance.tokens, solid = true),
+                DhunBackgrounds.paletteFor(component),
+            )
+            assertTrue(DhunBackgrounds.usesArtworkColors(component))
+            assertEquals(PaletteSource.ARTWORK, DhunBackgrounds.sourceFor(component))
         }
+        assertNotEquals(
+            withBlur.base,
+            DhunBackgrounds.paletteFor(BackgroundComponent.PAGES).base,
+            "with no artwork behind it the colour has to carry the surface",
+        )
+    }
+
+    @Test
+    fun theFourCombinationsResolveAsTheMatrixSays() {
+        // Artwork playing first (restore replaces the whole snapshot), then a
+        // solid pick on every surface.
+        DhunBackgrounds.restore(BackgroundState(artworkPrimary = artColor))
+        for (component in BackgroundComponent.entries) {
+            DhunBackgrounds.setComponentColor(component, pickColor)
+        }
+
+        for (blur in listOf(false, true)) {
+            for (dynamic in listOf(false, true)) {
+                DhunBackgrounds.setBlurEnabled(blur)
+                DhunBackgrounds.setDynamicColors(dynamic)
+                for (component in BackgroundComponent.entries) {
+                    assertEquals(
+                        blur,
+                        DhunBackgrounds.showsArtwork(component),
+                        "$component: artwork must be painted exactly when blur is on",
+                    )
+                    val expected = if (dynamic) artColor else pickColor
+                    assertEquals(
+                        BackgroundPalettePolicy.paletteFrom(expected, DhunAppearance.tokens, solid = !blur),
+                        DhunBackgrounds.paletteFor(component),
+                        "$component: colour source for blur=$blur, dynamic=$dynamic",
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun everySurfaceKeepsItsOwnColour() {
+        val pageColor = Color(0xFF7FB3FF)
+        val navColor = Color(0xFF79E0B4)
+        val miniColor = Color(0xFFFFC46B)
+        val playerColor = Color(0xFFF08FB0)
+        DhunBackgrounds.setComponentColor(BackgroundComponent.PAGES, pageColor)
+        DhunBackgrounds.setComponentColor(BackgroundComponent.NAVIGATION, navColor)
+        DhunBackgrounds.setComponentColor(BackgroundComponent.MINI_PLAYER, miniColor)
+        DhunBackgrounds.setComponentColor(BackgroundComponent.FULL_PLAYER, playerColor)
+        DhunBackgrounds.setDynamicColors(false)
+        DhunBackgrounds.setBlurEnabled(false)
+
+        val tokens = DhunAppearance.tokens
+        assertEquals(BackgroundPalettePolicy.paletteFrom(pageColor, tokens, solid = true), DhunBackgrounds.paletteFor(BackgroundComponent.PAGES))
+        assertEquals(BackgroundPalettePolicy.paletteFrom(navColor, tokens, solid = true), DhunBackgrounds.paletteFor(BackgroundComponent.NAVIGATION))
+        assertEquals(BackgroundPalettePolicy.paletteFrom(miniColor, tokens, solid = true), DhunBackgrounds.paletteFor(BackgroundComponent.MINI_PLAYER))
+        assertEquals(BackgroundPalettePolicy.paletteFrom(playerColor, tokens, solid = true), DhunBackgrounds.paletteFor(BackgroundComponent.FULL_PLAYER))
+
+        // Changing one must not touch the others.
+        DhunBackgrounds.setComponentColor(BackgroundComponent.NAVIGATION, null)
+        assertEquals(
+            BackgroundPalettePolicy.defaultPalette(BackgroundComponent.NAVIGATION, tokens),
+            DhunBackgrounds.paletteFor(BackgroundComponent.NAVIGATION),
+        )
+        assertEquals(
+            BackgroundPalettePolicy.paletteFrom(pageColor, tokens, solid = true),
+            DhunBackgrounds.paletteFor(BackgroundComponent.PAGES),
+            "resetting the navigation bar must not repaint the pages",
+        )
+    }
+
+    @Test
+    fun oneSurfaceCanKeepArtworkColoursWhileAnotherDoesNot() {
+        DhunBackgrounds.setDynamicColors(true)
+        DhunBackgrounds.restore(BackgroundState(artworkPrimary = artColor))
+        DhunBackgrounds.setComponentColor(BackgroundComponent.NAVIGATION, pickColor)
+        DhunBackgrounds.setComponentFollowArtwork(BackgroundComponent.NAVIGATION, false)
+
+        val tokens = DhunAppearance.tokens
+        assertEquals(PaletteSource.MANUAL, DhunBackgrounds.sourceFor(BackgroundComponent.NAVIGATION))
+        assertEquals(
+            BackgroundPalettePolicy.paletteFrom(pickColor, tokens, solid = false),
+            DhunBackgrounds.paletteFor(BackgroundComponent.NAVIGATION),
+        )
+        assertEquals(PaletteSource.ARTWORK, DhunBackgrounds.sourceFor(BackgroundComponent.PAGES))
+        assertEquals(
+            BackgroundPalettePolicy.paletteFrom(artColor, tokens, solid = false),
+            DhunBackgrounds.paletteFor(BackgroundComponent.PAGES),
+        )
+    }
+
+    @Test
+    fun theSwitchOffSuspendsPerSurfaceChoicesInsteadOfClearingThem() {
+        DhunBackgrounds.setComponentBlurEnabled(BackgroundComponent.MINI_PLAYER, false)
+        DhunBackgrounds.setBlurEnabled(false)
+        assertFalse(DhunBackgrounds.showsArtwork(BackgroundComponent.MINI_PLAYER))
+
+        DhunBackgrounds.setBlurEnabled(true)
+        assertFalse(
+            DhunBackgrounds.showsArtwork(BackgroundComponent.MINI_PLAYER),
+            "the dock's own switch must survive the global toggle",
+        )
+        assertTrue(DhunBackgrounds.showsArtwork(BackgroundComponent.PAGES))
+    }
+
+    @Test
+    fun artworkChangesAndMissingArtworkAreHandled() {
+        fun snapshot(artwork: Color?) = BackgroundState(
+            dynamicColors = true,
+            components = mapOf(BackgroundComponent.PAGES to ComponentBackgrounds(color = pickColor)),
+            artworkPrimary = artwork,
+        )
+
+        DhunBackgrounds.restore(snapshot(artColor))
+        val first = DhunBackgrounds.paletteFor(BackgroundComponent.PAGES)
+
+        // A different track: a different colour, and the surface follows it.
+        DhunBackgrounds.restore(snapshot(Color(0xFF3366CC)))
+        val second = DhunBackgrounds.paletteFor(BackgroundComponent.PAGES)
+        assertNotEquals(first.base, second.base)
+        assertEquals(PaletteSource.ARTWORK, DhunBackgrounds.sourceFor(BackgroundComponent.PAGES))
+
+        // No artwork (nothing playing, or an extraction that fell back to the
+        // accent): the surface keeps the user's colour rather than a hole.
+        DhunBackgrounds.restore(snapshot(null))
+        assertEquals(PaletteSource.MANUAL, DhunBackgrounds.sourceFor(BackgroundComponent.PAGES))
+        assertEquals(
+            BackgroundPalettePolicy.paletteFrom(pickColor, DhunAppearance.tokens, solid = false),
+            DhunBackgrounds.paletteFor(BackgroundComponent.PAGES),
+        )
+        // …and with no colour either, the default.
+        DhunBackgrounds.setComponentColor(BackgroundComponent.PAGES, null)
+        assertEquals(
+            BackgroundPalettePolicy.defaultPalette(BackgroundComponent.PAGES, DhunAppearance.tokens),
+            DhunBackgrounds.paletteFor(BackgroundComponent.PAGES),
+        )
+    }
+
+    @Test
+    fun theSameSeedIsNeverReExtracted() {
+        DhunBackgrounds.setArtworkSeed("https://example.test/one.jpg")
+        val revision = DhunBackgrounds.current.revision
+        DhunBackgrounds.setArtworkSeed("https://example.test/one.jpg")
+        assertEquals(revision, DhunBackgrounds.current.revision, "a recomposition must not re-run extraction")
+        DhunBackgrounds.setArtworkSeed(null)
+        assertNull(DhunBackgrounds.current.artworkPrimary)
+        assertNotEquals(revision, DhunBackgrounds.current.revision)
+    }
+
+    /* ---------------------------------------------------------- resets */
+
+    @Test
+    fun resettingOneSurfaceLeavesTheOthersAlone() {
+        val manual = Color(0xFF334455)
+        DhunBackgrounds.setComponentBlurEnabled(BackgroundComponent.PAGES, false)
+        DhunBackgrounds.setComponentColor(BackgroundComponent.PAGES, manual)
+        DhunBackgrounds.setComponentBlurEnabled(BackgroundComponent.FULL_PLAYER, false)
+        DhunBackgrounds.setComponentColor(BackgroundComponent.FULL_PLAYER, manual)
+
+        DhunBackgrounds.resetComponent(BackgroundComponent.PAGES)
+        assertEquals(ComponentBackgrounds.default, DhunBackgrounds.current.component(BackgroundComponent.PAGES))
+        assertEquals(manual, DhunBackgrounds.current.component(BackgroundComponent.FULL_PLAYER).color)
+        assertFalse(DhunBackgrounds.current.component(BackgroundComponent.FULL_PLAYER).blurEnabled)
+    }
+
+    @Test
+    fun resettingEverySurfaceKeepsTheGlobalSwitches() {
+        DhunBackgrounds.setBlurEnabled(false)
+        DhunBackgrounds.setDynamicColors(false)
+        DhunBackgrounds.setComponentColor(BackgroundComponent.MINI_PLAYER, pickColor)
+        DhunBackgrounds.resetComponents()
+        assertFalse(DhunBackgrounds.current.blurEnabled)
+        assertFalse(DhunBackgrounds.current.dynamicColors)
+        assertEquals(ComponentBackgrounds.default, DhunBackgrounds.current.component(BackgroundComponent.MINI_PLAYER))
     }
 
     /* --------------------------------------------------------- encoding */
 
     @Test
-    fun palettesRoundTripThroughTheSettingsEncoding() {
-        val palette = BackgroundPalette(Color(0xFF16213A), Color(0xFFBB86FC), Color(0xFF4FC3A1))
-        val encoded = BackgroundPaletteCodec.encodePalette(palette)
-        assertEquals(3, encoded.size)
-        val decoded = BackgroundPaletteCodec.decodePalette(encoded[0], encoded[1], encoded[2])
-        assertEquals(palette, decoded)
-        // Nothing saved is three empty strings, and that is *not* black.
-        assertEquals(listOf("", "", ""), BackgroundPaletteCodec.encodePalette(null))
-        assertNull(BackgroundPaletteCodec.decodePalette("", "", ""))
-        // A half-written or hand-edited row is unset, never a crash.
-        assertNull(BackgroundPaletteCodec.decodePalette(encoded[0], encoded[1], "nonsense"))
+    fun aColourRoundTripsThroughTheSettingsEncoding() {
+        assertEquals("", BackgroundColorCodec.encode(null))
+        assertNull(BackgroundColorCodec.decode(""))
+        assertEquals(pickColor, BackgroundColorCodec.decode(BackgroundColorCodec.encode(pickColor)))
+        assertEquals(Color(0xFF000000), BackgroundColorCodec.decode("#FF000000"), "a black pick is not 'unset'")
+        // A hand-edited row is unset, never a crash.
+        assertNull(BackgroundColorCodec.decode("not-a-colour"))
+        assertNull(BackgroundColorCodec.decode("#12345"))
+        // Six hex digits is a hand-edited row, not a colour: unset.
+        assertNull(BackgroundColorCodec.decode("4fc3a1"))
     }
 
     /* ------------------------------------------------------ persistence */
@@ -510,120 +565,101 @@ class BackgroundSettingsTest {
         return vm
     }
 
+    private suspend fun reloaded(d: DataLayer, scope: CoroutineScope): SettingsViewModel {
+        val fresh = vm(d, scope)
+        return loaded(fresh)
+    }
+
     /** Waits for every pending preference write the ViewModel launched. */
     private suspend fun settled(scope: CoroutineScope) {
         scope.coroutineContext[Job]!!.children.toList().joinAll()
     }
 
-    private suspend fun reloaded(d: DataLayer, scope: CoroutineScope): SettingsViewModel {
-        settled(scope)
-        return loaded(vm(d, scope))
-    }
-
     @Test
-    fun aSwitchTapDoesNotBlankTheArtworkOnTheLiveHolder(): Unit = runBlocking {
-        // The settings snapshot is the persisted half; the artwork is runtime.
-        // Writing a switch used to republish a settings-only snapshot, which
-        // dropped the palette (and with it the page colour) for a frame.
+    fun aFreshInstallGetsTheDocumentedDefaults(): Unit = runBlocking {
         val d = data()
-        val v = loaded(vm(d, this))
-        DhunBackgrounds.setArtworkSeed("https://example.test/playing.jpg")
-        val painted = DhunBackgrounds.paletteFor(BackgroundSection.HOME)
-        assertEquals(PaletteSource.ARTWORK, DhunBackgrounds.sourceFor(BackgroundSection.HOME))
-
-        v.setBackgroundDynamicColors(false)
-        assertEquals(SectionBackgrounds.default, v.backgrounds.value.section(BackgroundSection.HOME))
-        // The screenshot the user would see: DHUN's own colours, marked as
-        // overridden by the switch that turned the artwork off. The artwork
-        // palette is still known, so switching back needs no re-extraction.
-        assertEquals(
-            PaletteSource.DEFAULT_OVERRIDDEN,
-            DhunBackgrounds.sourceFor(BackgroundSection.HOME),
-        )
-        assertEquals(
-            BackgroundPalettePolicy.defaultPalette(BackgroundSection.HOME, DhunAppearance.tokens),
-            DhunBackgrounds.paletteFor(BackgroundSection.HOME),
-        )
-        v.setBackgroundDynamicColors(true)
-
-        // …and turning it back on restores the *same* cover palette without a
-        // re-extraction (the seed was never lost).
-        assertEquals(painted, DhunBackgrounds.paletteFor(BackgroundSection.HOME))
-        assertEquals(PaletteSource.ARTWORK, DhunBackgrounds.sourceFor(BackgroundSection.HOME))
-    }
-
-    @Test
-    fun aHandEditedPaletteRowIsUnsetRatherThanRendered(): Unit = runBlocking {
-        val d = data()
-        loaded(vm(d, this))
-        // A row written by an older build, by hand, or half-finished: one layer
-        // missing must read as "no manual palette", not as a black hole.
-        d.settings.putString(
-            SettingsKeys.backgroundKey(BackgroundSection.HOME.id, SettingsKeys.BACKGROUND_FIELD_PRIMARY),
-            "not-a-colour",
-        )
-        val restarted = reloaded(d, this)
-        assertNull(restarted.backgrounds.value.section(BackgroundSection.HOME).manual)
-        assertEquals(
-            BackgroundPalettePolicy.defaultPalette(BackgroundSection.HOME, DhunAppearance.tokens),
-            DhunBackgrounds.paletteFor(BackgroundSection.HOME),
-        )
-        // The settings flow reads the same thing the renderer does.
-        assertEquals(PaletteSource.DEFAULT, DhunBackgrounds.sourceFor(BackgroundSection.HOME))
-        assertEquals(SectionBackgrounds.default, restarted.backgrounds.value.section(BackgroundSection.HOME))
-    }
-
-    @Test
-    fun anAnimatedResetLeavesEveryOtherSectionAlone(): Unit = runBlocking {
-        val d = data()
-        val v = loaded(vm(d, this))
-        val manual = BackgroundPalette(Color(0xFF111111), Color(0xFF334455), Color(0xFF554433))
-        v.setSectionBlurEnabled(BackgroundSection.HOME, false)
-        v.setSectionManualPalette(BackgroundSection.HOME, manual)
-        v.setSectionBlurEnabled(BackgroundSection.SEARCH, false)
-        v.setSectionManualPalette(BackgroundSection.SEARCH, manual)
-
-        v.resetSectionBackgrounds(BackgroundSection.HOME)
-        settled(this)
-        val state = reloaded(d, this).backgrounds.value
-        assertEquals(SectionBackgrounds.default, state.section(BackgroundSection.HOME))
-        assertFalse(state.section(BackgroundSection.SEARCH).blurEnabled, "Search keeps its own switch")
-        assertEquals(manual, state.section(BackgroundSection.SEARCH).manual)
+        val state = loaded(vm(d, this)).backgrounds.value
+        assertTrue(state.blurEnabled)
+        assertTrue(state.adaptiveBlur)
+        assertTrue(state.dynamicColors)
+        for (component in BackgroundComponent.entries) {
+            assertEquals(ComponentBackgrounds.default, state.component(component))
+        }
     }
 
     @Test
     fun everyBackgroundPreferenceSurvivesARestart(): Unit = runBlocking {
         val d = data()
         val v = loaded(vm(d, this))
-        val manual = BackgroundPalette(Color(0xFF1A1E2A), Color(0xFF5577AA), Color(0xFFAA7755))
 
         v.setBackgroundBlurEnabled(false)
-        v.setBackgroundDynamicBlur(false)
+        v.setBackgroundAdaptiveBlur(false)
         v.setBackgroundDynamicColors(false)
-        v.setSectionBlurEnabled(BackgroundSection.MINI_PLAYER, false)
-        v.setSectionDynamicColors(BackgroundSection.LIBRARY, false)
-        v.setSectionManualPalette(BackgroundSection.LIBRARY, manual)
+        v.setComponentBlurEnabled(BackgroundComponent.MINI_PLAYER, false)
+        v.setComponentFollowArtwork(BackgroundComponent.FULL_PLAYER, false)
+        v.setComponentColor(BackgroundComponent.NAVIGATION, pickColor)
+        v.setComponentColor(BackgroundComponent.PAGES, Color(0xFF7FB3FF))
+        settled(this)
 
         val restarted = reloaded(d, this)
         val state = restarted.backgrounds.value
         assertFalse(state.blurEnabled)
-        assertFalse(state.dynamicBlur)
+        assertFalse(state.adaptiveBlur)
         assertFalse(state.dynamicColors)
-        assertFalse(state.section(BackgroundSection.MINI_PLAYER).blurEnabled)
-        assertFalse(state.section(BackgroundSection.LIBRARY).dynamicColors)
-        assertEquals(manual, state.section(BackgroundSection.LIBRARY).manual)
-        // And the live holder was restored too, not just the settings copy.
-        assertEquals(PaletteSource.MANUAL_OVERRIDDEN, DhunBackgrounds.sourceFor(BackgroundSection.LIBRARY))
-        assertEquals(0, DhunBackgrounds.blurPercentFor(BackgroundSection.HOME, strengthPercent = 100))
+        assertFalse(state.component(BackgroundComponent.MINI_PLAYER).blurEnabled)
+        assertFalse(state.component(BackgroundComponent.FULL_PLAYER).followArtwork)
+        assertEquals(pickColor, state.component(BackgroundComponent.NAVIGATION).color)
+        assertEquals(Color(0xFF7FB3FF), state.component(BackgroundComponent.PAGES).color)
+        // The live holder was restored too, not just the settings copy.
+        assertEquals(
+            BackgroundPalettePolicy.paletteFrom(
+                pickColor,
+                DhunAppearance.tokens,
+                solid = true,
+            ),
+            DhunBackgrounds.paletteFor(BackgroundComponent.NAVIGATION),
+        )
+        assertEquals(0, DhunBackgrounds.blurPercentFor(BackgroundComponent.PAGES, strengthPercent = 100))
+    }
+
+    @Test
+    fun anOptimisticSwitchIsTheValueThatWasPersisted(): Unit = runBlocking {
+        val d = data()
+        val v = loaded(vm(d, this))
+        v.setBackgroundDynamicColors(false)
+        assertFalse(v.backgrounds.value.dynamicColors)
+        settled(this)
+        reloaded(d, this)
+        assertEquals("false", d.settings.getString(SettingsKeys.BACKGROUND_DYNAMIC_COLORS))
+        assertFalse(v.backgrounds.value.dynamicColors)
+    }
+
+    @Test
+    fun restoringBeforeTheFirstFrameNeverTakesTheLaunchDown(): Unit = runBlocking {
+        val d = data()
+        UpdateSettingUseCase(d.settings).boolean(SettingsKeys.BACKGROUND_DYNAMIC_COLORS, false)
+        BackgroundPreferences.restoreBeforeFirstFrame(
+            GetSettingUseCase(d.settings),
+            UpdateSettingUseCase(d.settings),
+        )
+        assertFalse(DhunBackgrounds.current.dynamicColors)
+
+        DhunBackgrounds.clear()
+        val broken = object : SettingsRepository by d.settings {
+            override suspend fun getString(key: String): String? = error("database not ready")
+        }
+        BackgroundPreferences.restoreBeforeFirstFrame(
+            GetSettingUseCase(broken),
+            UpdateSettingUseCase(broken),
+        )
+        assertTrue(DhunBackgrounds.current.blurEnabled)
+        assertTrue(DhunBackgrounds.current.dynamicColors)
     }
 
     @Test
     fun anUnwritableDatabaseStillLoadsTheStoredBackgrounds(): Unit = runBlocking {
         val d = data()
         UpdateSettingUseCase(d.settings).boolean(SettingsKeys.BACKGROUND_BLUR_ENABLED, false)
-        // A full disk: the version-0 marker cannot be written. That must not make
-        // the load fail — the previous implementation turned "cannot save" into
-        // "cannot read anything", which reverted every setting in the app.
         val readOnly = object : SettingsRepository by d.settings {
             override suspend fun putString(key: String, value: String): Unit = error("disk full")
             override suspend fun putBoolean(key: String, value: Boolean): Unit = error("disk full")
@@ -641,53 +677,75 @@ class BackgroundSettingsTest {
     }
 
     @Test
-    fun restoringBeforeTheFirstFrameNeverTakesTheLaunchDown(): Unit = runBlocking {
+    fun resettingEverySettingAlsoClearsTheBackgroundRows(): Unit = runBlocking {
         val d = data()
-        // The happy path stores the user's values on the live holder.
-        UpdateSettingUseCase(d.settings).boolean(SettingsKeys.BACKGROUND_DYNAMIC_COLORS, false)
-        BackgroundPreferences.restoreBeforeFirstFrame(
-            GetSettingUseCase(d.settings),
-            UpdateSettingUseCase(d.settings),
-        )
-        assertFalse(DhunBackgrounds.current.dynamicColors)
-
-        // A database that is not ready yet falls back to the documented defaults
-        // instead of throwing inside the Activity/window creation.
-        DhunBackgrounds.clear()
-        val broken = object : SettingsRepository by d.settings {
-            override suspend fun getString(key: String): String? = error("database not ready")
+        val v = loaded(vm(d, this))
+        v.setBackgroundBlurEnabled(false)
+        v.setComponentColor(BackgroundComponent.PAGES, pickColor)
+        v.reset()
+        // Writes are asynchronous: observe the database only once they have all
+        // landed, otherwise this asserts on a race instead of on the reset.
+        settled(this)
+        for (key in BackgroundPreferences.allKeys()) {
+            assertNull(d.settings.getString(key), "$key should have been removed")
         }
-        BackgroundPreferences.restoreBeforeFirstFrame(
-            GetSettingUseCase(broken),
-            UpdateSettingUseCase(broken),
-        )
-        assertTrue(DhunBackgrounds.current.blurEnabled)
-        assertTrue(DhunBackgrounds.current.dynamicColors)
+        val restarted = reloaded(d, this).backgrounds.value
+        assertTrue(restarted.blurEnabled)
+        assertEquals(ComponentBackgrounds.default, restarted.component(BackgroundComponent.PAGES))
     }
 
     @Test
-    fun aFreshInstallGetsTheDocumentedDefaults(): Unit = runBlocking {
+    fun resettingOneSurfacePersistsWithoutTouchingTheGlobalSwitches(): Unit = runBlocking {
         val d = data()
-        val state = loaded(vm(d, this)).backgrounds.value
-        assertTrue(state.blurEnabled)
-        assertTrue(state.dynamicBlur)
-        assertTrue(state.dynamicColors)
-        for (section in BackgroundSection.entries) {
-            assertEquals(SectionBackgrounds.default, state.section(section))
+        val v = loaded(vm(d, this))
+        v.setBackgroundDynamicColors(false)
+        v.setComponentBlurEnabled(BackgroundComponent.PAGES, false)
+        v.setComponentColor(BackgroundComponent.PAGES, pickColor)
+
+        v.resetComponentBackgrounds(BackgroundComponent.PAGES)
+        assertEquals(ComponentBackgrounds.default, v.backgrounds.value.component(BackgroundComponent.PAGES))
+        assertFalse(v.backgrounds.value.dynamicColors, "a surface reset must not re-enable a global switch")
+        settled(this)
+
+        val restarted = reloaded(d, this).backgrounds.value
+        assertEquals(ComponentBackgrounds.default, restarted.component(BackgroundComponent.PAGES))
+        assertFalse(restarted.dynamicColors)
+    }
+
+    @Test
+    fun restoreAllClearsEverySurfaceColour(): Unit = runBlocking {
+        val d = data()
+        val v = loaded(vm(d, this))
+        for (component in BackgroundComponent.entries) {
+            v.setComponentFollowArtwork(component, false)
+            v.setComponentColor(component, pickColor)
+        }
+        v.resetAllComponentBackgrounds()
+        settled(this)
+        v.backgrounds.value.resolvedComponents().forEach { (component, prefs) ->
+            assertEquals(ComponentBackgrounds.default, prefs, "$component must be back to its defaults")
+        }
+        val restarted = reloaded(d, this).backgrounds.value
+        restarted.resolvedComponents().forEach { (component, prefs) ->
+            assertEquals(ComponentBackgrounds.default, prefs, "$component must stay reset after a restart")
         }
     }
 
+    /* -------------------------------------------------------- migration */
+
+    /**
+     * Version 0: the slider era. `backdrop_blur = 0` was the only way to say "no
+     * blur", so it becomes Background blur off — and the slider is reset, so
+     * turning blur back on gives the real frost rather than the 20% floor.
+     */
     @Test
     fun anOlderInstallWithBlurOffKeepsItOffOnce(): Unit = runBlocking {
         val d = data()
         val update = UpdateSettingUseCase(d.settings)
-        // A database from before the feature: only the legacy slider exists.
         update.int(SettingsKeys.BACKDROP_BLUR, 0)
 
         val first = loaded(vm(d, this)).backgrounds.value
         assertFalse(first.blurEnabled, "a stored 0 meant no blur and must be imported")
-        // The import also restores the shipped strength, so re-enabling the
-        // master gives the real frost rather than the 20% floor.
         assertEquals(
             SettingsKeys.BACKDROP_BLUR_DEFAULT,
             d.settings.getInt(SettingsKeys.BACKDROP_BLUR, -1),
@@ -696,7 +754,11 @@ class BackgroundSettingsTest {
         // The user turns blur on; a later launch must not import 0 again.
         val v = loaded(vm(d, this))
         v.setBackgroundBlurEnabled(true)
-        assertEquals(SettingsKeys.BACKGROUND_PROFILE_VERSION_CURRENT, d.settings.getInt(SettingsKeys.BACKGROUND_PROFILE_VERSION, 0))
+        settled(this)
+        assertEquals(
+            SettingsKeys.BACKGROUND_PROFILE_VERSION_CURRENT,
+            d.settings.getInt(SettingsKeys.BACKGROUND_PROFILE_VERSION, 0),
+        )
         val restarted = reloaded(d, this).backgrounds.value
         assertTrue(restarted.blurEnabled)
     }
@@ -705,90 +767,104 @@ class BackgroundSettingsTest {
     fun theLegacySliderIsLeftAloneForUsersWhoNeverTouchedIt(): Unit = runBlocking {
         val d = data()
         val state = loaded(vm(d, this)).backgrounds.value
-        assertTrue(state.blurEnabled)
-        // Defaults are the pre-feature behaviour: blurred, dynamic, artwork colours.
+        // Defaults are the pre-feature behaviour: artwork blurred, artwork colours.
         assertEquals(SettingsKeys.BACKGROUND_BLUR_ENABLED_DEFAULT, state.blurEnabled)
+        assertEquals(SettingsKeys.BACKGROUND_DYNAMIC_BLUR_DEFAULT, state.adaptiveBlur)
+        assertEquals(SettingsKeys.BACKGROUND_DYNAMIC_COLORS_DEFAULT, state.dynamicColors)
+    }
+
+    /**
+     * Version 1: five sections × three palette layers. The rows must land in the
+     * component model without losing the two decisions the user made (blur on
+     * this surface, artwork colours on this surface) or the hue they picked.
+     */
+    @Test
+    fun versionOneSectionPalettesMigrateIntoTheSurfaceModel(): Unit = runBlocking {
+        val d = data()
+        val s = d.settings
+        fun legacy(section: String, field: String, value: String) =
+            s.putString(SettingsKeys.backgroundKey(section, field), value)
+
+        // Home: artwork colours off, blur on, and a violet bloom the user chose.
+        legacy("home", SettingsKeys.BACKGROUND_FIELD_BLUR, "true")
+        legacy("home", SettingsKeys.BACKGROUND_FIELD_DYNAMIC_COLORS, "false")
+        legacy("home", SettingsKeys.BACKGROUND_FIELD_PRIMARY, "#FF141118")
+        legacy("home", SettingsKeys.BACKGROUND_FIELD_SECONDARY, "#FFBB86FC")
+        legacy("home", SettingsKeys.BACKGROUND_FIELD_TERTIARY, "#FF9C7BE8")
+        // The dock: blur off.
+        legacy("mini", SettingsKeys.BACKGROUND_FIELD_BLUR, "false")
+        legacy("mini", SettingsKeys.BACKGROUND_FIELD_SECONDARY, "#FF4FC3A1")
+        // Search/Library were never touched, so they must not overwrite Home.
+        s.putInt(SettingsKeys.BACKGROUND_PROFILE_VERSION, 1)
+
+        val state = BackgroundPreferences.read(GetSettingUseCase(s), UpdateSettingUseCase(s))
+        val pages = state.component(BackgroundComponent.PAGES)
+        assertEquals(Color(0xFFBB86FC), pages.color, "the chosen hue (secondary) becomes the surface colour")
+        assertFalse(pages.followArtwork)
+        assertTrue(pages.blurEnabled)
+        val mini = state.component(BackgroundComponent.MINI_PLAYER)
+        assertFalse(mini.blurEnabled)
+        assertEquals(Color(0xFF4FC3A1), mini.color)
+        // The navigation bar had no version-1 equivalent: it starts at its default.
+        assertEquals(ComponentBackgrounds.default, state.component(BackgroundComponent.NAVIGATION))
+        // The import wrote the new shape and the marker, so it runs once.
+        assertEquals(
+            SettingsKeys.BACKGROUND_PROFILE_VERSION_CURRENT,
+            s.getInt(SettingsKeys.BACKGROUND_PROFILE_VERSION, 0),
+        )
+        assertEquals(
+            "#FF4FC3A1",
+            s.getString(
+                SettingsKeys.backgroundComponentKey(
+                    BackgroundComponent.MINI_PLAYER.id,
+                    SettingsKeys.BACKGROUND_FIELD_COLOR,
+                ),
+            ),
+        )
     }
 
     @Test
-    fun sectionResetWritesDefaultsWithoutTouchingTheGlobalSwitches(): Unit = runBlocking {
+    fun theVersionOneImportDoesNotOverwriteALaterChoice(): Unit = runBlocking {
         val d = data()
+        d.settings.putString(
+            SettingsKeys.backgroundKey("home", SettingsKeys.BACKGROUND_FIELD_SECONDARY),
+            "#FFBB86FC",
+        )
+        d.settings.putInt(SettingsKeys.BACKGROUND_PROFILE_VERSION, 1)
         val v = loaded(vm(d, this))
-        v.setBackgroundDynamicColors(false)
-        v.setSectionBlurEnabled(BackgroundSection.HOME, false)
-        v.setSectionManualPalette(BackgroundSection.HOME, BackgroundPalette(Color(0xFF101010), Color(0xFF334455), Color(0xFF554433)))
+        assertEquals(Color(0xFFBB86FC), v.backgrounds.value.component(BackgroundComponent.PAGES).color)
 
-        v.resetSectionBackgrounds(BackgroundSection.HOME)
-        assertEquals(SectionBackgrounds.default, v.backgrounds.value.section(BackgroundSection.HOME))
-        assertFalse(v.backgrounds.value.dynamicColors, "a section reset must not re-enable a global switch")
-
-        val restarted = reloaded(d, this).backgrounds.value
-        assertEquals(SectionBackgrounds.default, restarted.section(BackgroundSection.HOME))
-        assertFalse(restarted.dynamicColors)
-    }
-
-    @Test
-    fun restoreAllSectionsClearsEveryManualPalette(): Unit = runBlocking {
-        val d = data()
-        val v = loaded(vm(d, this))
-        for (section in BackgroundSection.entries) {
-            v.setSectionDynamicColors(section, false)
-            v.setSectionManualPalette(section, BackgroundPalette(Color(0xFF111111), Color(0xFF334455), Color(0xFF554433)))
-        }
-        v.resetAllSectionBackgrounds()
-        v.backgrounds.value.resolvedSections().forEach { (section, prefs) ->
-            assertEquals(SectionBackgrounds.default, prefs, "$section must be back to its defaults")
-        }
-        val restarted = reloaded(d, this).backgrounds.value
-        restarted.resolvedSections().forEach { (section, prefs) ->
-            assertEquals(SectionBackgrounds.default, prefs, "$section must stay reset after a restart")
-        }
-    }
-
-    @Test
-    fun resettingEverySettingAlsoClearsTheBackgroundRows(): Unit = runBlocking {
-        val d = data()
-        val v = loaded(vm(d, this))
-        v.setBackgroundBlurEnabled(false)
-        v.setSectionManualPalette(BackgroundSection.HOME, BackgroundPalette(Color(0xFF111111), Color(0xFF334455), Color(0xFF554433)))
-        v.reset()
-        // Writes are asynchronous: observe the database only once they have all
-        // landed, otherwise this asserts on a race instead of on the reset.
+        v.setComponentColor(BackgroundComponent.PAGES, pickColor)
         settled(this)
-        // Every background row is gone, including the per-section ones that are
-        // not in SettingsKeys.all.
-        for (key in BackgroundPreferences.allKeys()) {
-            assertNull(d.settings.getString(key), "$key should have been removed")
-        }
         val restarted = reloaded(d, this).backgrounds.value
-        assertTrue(restarted.blurEnabled)
-        assertEquals(SectionBackgrounds.default, restarted.section(BackgroundSection.HOME))
+        assertEquals(pickColor, restarted.component(BackgroundComponent.PAGES).color, "the import must run once")
     }
 
     @Test
-    fun anOptimisticSwitchIsTheValueThatWasPersisted(): Unit = runBlocking {
-        // The switch is published the instant it is tapped (the app behind the
-        // settings page follows it), and the persisted row has to end up
-        // matching it — a mismatch is exactly the "screen lies" bug the
-        // rollback contract exists to prevent.
+    fun theVersionOneImportIsSkippedOnAFreshInstall(): Unit = runBlocking {
         val d = data()
-        val v = loaded(vm(d, this))
-        v.setBackgroundDynamicColors(false)
-        assertFalse(v.backgrounds.value.dynamicColors)
-        reloaded(d, this)
-        assertEquals("false", d.settings.getString(SettingsKeys.BACKGROUND_DYNAMIC_COLORS))
-        assertFalse(v.backgrounds.value.dynamicColors)
+        val state = BackgroundPreferences.read(GetSettingUseCase(d.settings), UpdateSettingUseCase(d.settings))
+        for (component in BackgroundComponent.entries) {
+            assertEquals(
+                ComponentBackgrounds.default,
+                state.component(component),
+                "$component must not gain a colour nobody chose",
+            )
+        }
     }
 
     @Test
-    fun theLightThemeGetsItsOwnPaletteDefaults() {
-        val darkDefault = BackgroundPalettePolicy.defaultPalette(BackgroundSection.HOME, dark)
-        val lightDefault = BackgroundPalettePolicy.defaultPalette(BackgroundSection.HOME, light)
-        assertNotEquals(darkDefault.primary, lightDefault.primary)
-        // The artwork base follows the theme it will be painted on.
-        val art = ArtworkColors.fromPrimary(Color(0xFFB060A0))
-        val darkArt = BackgroundPalettePolicy.artworkPalette(art, dark)!!
-        val lightArt = BackgroundPalettePolicy.artworkPalette(art, light)!!
-        assertTrue(lightArt.primary.luminance() > darkArt.primary.luminance())
+    fun aComponentColourRowThatIsNotAColourIsUnsetNotACrash(): Unit = runBlocking {
+        val d = data()
+        d.settings.putString(
+            SettingsKeys.backgroundComponentKey(BackgroundComponent.PAGES.id, SettingsKeys.BACKGROUND_FIELD_COLOR),
+            "not-a-colour",
+        )
+        val state = BackgroundPreferences.read(GetSettingUseCase(d.settings), UpdateSettingUseCase(d.settings))
+        assertNull(state.component(BackgroundComponent.PAGES).color)
+        assertEquals(
+            BackgroundPalettePolicy.defaultPalette(BackgroundComponent.PAGES, DhunAppearance.tokens),
+            DhunBackgrounds.paletteFor(BackgroundComponent.PAGES),
+        )
     }
 }

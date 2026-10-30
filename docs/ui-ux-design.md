@@ -51,13 +51,26 @@ Use glass for player chrome, lyrics, navigation band/rail where designed, queue 
 **"Sufficiently opaque" is an opacity floor, not a flat surface** (`GlassMaterialPolicy.DIALOG_BODY_ALPHA_DARK/LIGHT`). Dialogs and sheets still carry the full material: frosted artwork behind, body gradient, specular sheen and gradient hairline edge — implemented once as `GlassCard(opaqueBase = true)` / `GlassDialog`. The component map, the numbers and the list of superseded instructions live in [docs/design/glass-system.md](design/glass-system.md); that page is normative for appearance.
 
 ### Background preferences
-Blur and colour are two features, not one setting (`docs/design/glass-system.md` §3a).
-*Background blur* is the master off switch; *Dynamic blur* chooses artwork-responsive
-frost versus the steady frost, and is suspended (never cleared) while the master is
-off; *Dynamic colors* is independent of both. Home, Search, Library, the mini player
-and the full player each save their own switches and a three-layer manual palette,
-and those saved choices survive every global override. One resolution policy and one
-blur policy serve all five surfaces — never a per-screen rule.
+Blur and colour are two independent decisions, not one setting
+(`docs/design/glass-system.md` §3a):
+
+- *Background blur* — is the playing track's artwork behind the interface? Turning it
+  off removes the artwork **entirely**; it does not swap it for a sharper or dimmed
+  copy, and it never turns colour customisation off.
+- *Dynamic colours* — do the surfaces take their colour from that artwork? This works
+  with the artwork removed, so "artwork colours, no thumbnail" is a real state.
+- *Adaptive blur* is a sub-choice of an enabled blur, not a third feature: bright,
+  busy covers keep the full frost; dark, calm covers are blurred slightly less.
+
+Four surfaces carry their own colour and blur switch: **Main pages** (Home, Search,
+Library and the pages opened from them), **Navigation bar** (tab band or side rail),
+**Miniplayer** and **Full player**. A surface's colour is used on its own when the
+artwork is removed and as the tint over the blurred artwork when it is present, and
+each surface can also opt out of artwork colour while the others follow the cover.
+Settings shows the four surfaces, the colour in effect and why ("From the current
+artwork", "Your colour", "DHUN default"), and never asks the user to assemble
+palette layers. One resolution policy and one blur policy serve all four surfaces —
+never a per-screen rule.
 
 ### Fallbacks
 - Android versions where real blur is unavailable: gradient/tint/opaque material fallback.

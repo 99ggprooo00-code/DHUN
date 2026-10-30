@@ -1,7 +1,6 @@
 package dev.dhun.design.background
 
 import androidx.compose.ui.graphics.Color
-import dev.dhun.design.ArtworkColors
 import dev.dhun.design.DhunTokens
 import dev.dhun.design.luminance
 import kotlin.math.abs
@@ -9,229 +8,314 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * The five surfaces whose background DHUN paints itself.
+ * The interface areas a user can give their own colour.
  *
- * Every one of them is a *section* rather than a screen id: Home, Search and
- * Library share the page backdrop, but the user asked to be able to colour
- * them differently, so each is its own saved preference set. The miniplayer
- * and the full player are surfaces in their own right.
+ * This is the *customisation unit*, not a screen: Home, Search and Library are
+ * the same surface physically (one page backdrop, one set of panels) and share
+ * [PAGES]. The dock and the player are surfaces in their own right, and the tab
+ * bar/rail is a separate piece of chrome that sits over whichever page is open.
+ *
+ * Deliberately small. The previous model exposed five "sections" and three
+ * palette layers per section, which asked the user to reason about the
+ * implementation (`primary`, `secondary`, `tertiary`) instead of about the app
+ * they were looking at.
  */
-enum class BackgroundSection(
+enum class BackgroundComponent(
     /** Stable persistence key. Never rename: it is in the settings table. */
     val id: String,
     val label: String,
     /** One line, plain language, no implementation detail. */
     val description: String,
 ) {
-    HOME("home", "Home", "The Home tab behind the shelves"),
-    SEARCH("search", "Search", "The Search tab behind results"),
-    LIBRARY("library", "Library", "The Library tab behind playlists and downloads"),
+    PAGES("page", "Main pages", "Home, Search, Library and the pages you open from them"),
+    NAVIGATION("nav", "Navigation bar", "The tab bar, or the side rail on a wide window"),
     MINI_PLAYER("mini", "Miniplayer", "The now-playing bar above the tabs"),
     FULL_PLAYER("player", "Full player", "The immersive player behind the artwork"),
     ;
 
     companion object {
-        val default: BackgroundSection = HOME
+        val default: BackgroundComponent = PAGES
 
-        fun fromId(id: String?): BackgroundSection? = entries.firstOrNull { it.id == id }
+        fun fromId(id: String?): BackgroundComponent? = entries.firstOrNull { it.id == id }
     }
 }
 
 /**
- * The three layers a section background is made of, in painting order:
+ * One component's saved preferences.
  *
- * - **primary** is the base wash the section sits on;
- * - **secondary** is the main bloom (top-left), the layer that carries the
- *   section's colour identity;
- * - **tertiary** is the companion bloom (bottom-right) that stops the
- *   background reading as one flat tint.
- *
- * They are a palette rather than three independent colours: [BackgroundPalettePolicy]
- * derives all three from one source, so a manual pick or an artwork tint keeps
- * the three related to each other instead of producing unrelated blocks.
+ * Everything here survives a global switch: turning *Dynamic colours* off
+ * suspends [followArtwork] rather than clearing it, and turning *Background
+ * blur* off suspends [blurEnabled] rather than clearing it, so re-enabling
+ * either global restores exactly this configuration.
  */
-data class BackgroundPalette(
-    val primary: Color,
-    val secondary: Color,
-    val tertiary: Color,
+data class ComponentBackgrounds(
+    /** This surface frosts the artwork at all (only meaningful while the global is on). */
+    val blurEnabled: Boolean = true,
+    /** This surface may use artwork-derived colours (while *Dynamic colours* is on). */
+    val followArtwork: Boolean = true,
+    /**
+     * The colour the user picked for this surface, or `null` for the DHUN
+     * default. One colour, not three layers: the three-layer palette the
+     * background is painted from is *derived* from it, so the user picks a
+     * colour and sees a related set of layers rather than being asked to
+     * assemble a palette.
+     */
+    val color: Color? = null,
 ) {
-    /** All three, for the settings preview and for equality-based tests. */
-    val layers: List<Color> get() = listOf(primary, secondary, tertiary)
+    companion object {
+        val default = ComponentBackgrounds()
+    }
+}
+
+/**
+ * A complete, immutable snapshot of every background preference plus the
+ * artwork colour currently in play.
+ *
+ * A snapshot type (rather than a dozen mutable fields) is what makes the
+ * precedence testable without a composition, lets the host restore the whole
+ * state in one assignment before the first frame, and gives the settings screen
+ * one object to preview.
+ */
+data class BackgroundState(
+    /** Background blur: the current track's artwork as a blurred background. */
+    val blurEnabled: Boolean = true,
+    /**
+     * Whether the frost adapts to the artwork. A sub-choice of [blurEnabled],
+     * not a third feature: it only changes *how much* an enabled blur frosts.
+     */
+    val adaptiveBlur: Boolean = true,
+    /** Dynamic colours: artwork-derived colours, independent of both blur choices. */
+    val dynamicColors: Boolean = true,
+    val components: Map<BackgroundComponent, ComponentBackgrounds> = emptyMap(),
+    /** The seed colour extracted from the current artwork, if any. */
+    val artworkPrimary: Color? = null,
+    val artworkLuminance: Float? = null,
+    val artworkSaturation: Float? = null,
+    /** Bumped on every change so derived values are re-read. */
+    val revision: Int = 0,
+) {
+    fun component(component: BackgroundComponent): ComponentBackgrounds =
+        components[component] ?: ComponentBackgrounds.default
+
+    /** Every component, with the defaults filled in. */
+    fun resolvedComponents(): Map<BackgroundComponent, ComponentBackgrounds> =
+        BackgroundComponent.entries.associateWith { component(it) }
+
+    /**
+     * Carry the *runtime* artwork half over from another snapshot.
+     *
+     * The settings layer owns preferences; the artwork colour belongs to the
+     * live holder (it is not a preference). Publishing a settings-only snapshot
+     * must not drop the playing track's colour, which is what this restores.
+     */
+    fun withArtworkFrom(live: BackgroundState): BackgroundState = copy(
+        artworkPrimary = live.artworkPrimary,
+        artworkLuminance = live.artworkLuminance,
+        artworkSaturation = live.artworkSaturation,
+    )
 
     companion object {
-        /** The neutral palette every section starts from. */
+        val default = BackgroundState()
+    }
+}
+
+/**
+ * The three layers a component background is painted from, in painting order:
+ *
+ * - **base** is the wash the surface sits on;
+ * - **main glow** is the strongest bloom (top-left), the layer that carries the
+ *   surface's colour identity;
+ * - **companion glow** is the related hue (bottom-right) that stops the
+ *   background reading as one flat tint.
+ *
+ * These are never chosen by the user directly: they are derived from one source
+ * colour (the artwork's, or the user's pick) so that a surface always looks
+ * like one deliberate colour scheme.
+ */
+data class BackgroundPalette(
+    val base: Color,
+    val mainGlow: Color,
+    val companionGlow: Color,
+) {
+    val layers: List<Color> get() = listOf(base, mainGlow, companionGlow)
+
+    companion object {
+        /** The neutral palette every component starts from. */
         fun neutral(tokens: DhunTokens): BackgroundPalette = BackgroundPalette(
-            primary = tokens.background,
-            secondary = tokens.accent,
-            tertiary = tokens.accentContainer,
+            base = tokens.background,
+            mainGlow = tokens.accent,
+            companionGlow = tokens.accentContainer,
         )
     }
 }
 
 /**
- * Which palette a section actually paints, and why.
+ * Which palette a component paints, and why.
  *
- * Resolution is a three-step precedence and nothing else — the same order for
- * all five sections, so a section can never behave differently from its
- * neighbour for an unrelated reason:
+ * Resolution is a two-step precedence and nothing else, identical for all four
+ * components, so no surface can behave differently from its neighbour for an
+ * unrelated reason:
  *
- * 1. **Global Dynamic Colors off** → the section's manual palette, else its
- *    default. Artwork never reaches the screen.
- * 2. **Global on, section off** → the same manual palette. This is what makes
- *    "I want artwork on Home but my own colours in Search" work.
- * 3. **Both on** → the artwork-derived palette, if there is artwork; otherwise
- *    fall back to the manual palette, then to the default.
+ * 1. **Dynamic colours off**, or this surface opted out of artwork colours →
+ *    the user's colour for this surface, else the DHUN default. Artwork colour
+ *    never reaches the screen.
+ * 2. **Both on** → the artwork palette; no artwork (nothing playing, a failed
+ *    extraction, a blank seed) falls back to the user's colour, then to the
+ *    default, so a device with no cover still paints a deliberate background
+ *    instead of a hole.
  *
- * The third fallback matters: a device with nothing playing, a failed image
- * request or a blank seed must still paint a deliberate background rather than
- * a transparent hole.
+ * Blur is **not** an input here, and this function is not an input to any blur
+ * decision: the two features are independent by construction. The only thing
+ * they share is [solid]: whether the surface has artwork under it. A solid
+ * surface needs the picked colour to *be* the background rather than a wash
+ * over a cover, which is a rendering difference, not a precedence one.
  */
 object BackgroundPalettePolicy {
 
     /**
-     * How far an artwork palette may move a section's base away from the theme
+     * How far a palette may move a surface's base away from the theme
      * background, as a fraction of the 0..1 luminance range.
      *
      * The contrast gates (`DhunThemeContrastTest`) measure the text ladder
-     * against rows painted *over* the background. Keep the base inside this
-     * band and the measured ratios stay inside the band they were written for;
-     * the artwork identity belongs to the two blooms, which sit far below the
-     * rows and are already alpha-limited.
+     * against rows painted *over* the background. Keeping the base inside this
+     * band keeps those ratios valid while the hue still reads: a dark theme
+     * gains a deep coloured surface, not a bright one.
      */
     const val BASE_LUMINANCE_DRIFT = 0.05f
 
-    /** Share of the artwork colour left in the base wash. */
+    /** Share of the source colour in the base when artwork is blurred behind it. */
     const val BASE_TINT_ALPHA = 0.30f
 
-    /** The main bloom is the artwork hue, pulled toward neutral. */
-    const val SECONDARY_DESATURATION = 0.35f
+    /**
+     * Share of the source colour in the base when there is **no** artwork
+     * behind it (blur off).
+     *
+     * Higher on purpose: with nothing behind it, a 30% wash over near-black is
+     * indistinguishable from "no colour set", which is the complaint that
+     * started this. The luminance clamp below still holds the surface inside
+     * the measured band, so this buys chroma, not brightness.
+     */
+    const val SOLID_BASE_TINT_ALPHA = 0.55f
 
-    /** The companion bloom is a related hue, weaker still. */
-    const val TERTIARY_DESATURATION = 0.55f
+    /** The main glow is the source hue, pulled toward neutral. */
+    const val MAIN_GLOW_DESATURATION = 0.35f
+
+    /** The companion glow is a related hue, weaker still. */
+    const val COMPANION_GLOW_DESATURATION = 0.55f
 
     /** Companion hue offset in degrees — a related colour, not a second random one. */
-    const val TERTIARY_HUE_SHIFT = 38f
+    const val COMPANION_HUE_SHIFT = 38f
+
+    /** A glow layer must never be fully transparent — that reads as "unset". */
+    const val MIN_GLOW_ALPHA = 0.05f
+
+    /** Tolerance for "already inside the band", so clamping is idempotent. */
+    const val CLAMP_EPSILON = 1e-4f
 
     /**
-     * The palette a section uses when nothing else applies.
+     * The palette a component uses when nothing else applies.
      *
-     * Sections share the theme's own colours, except the full player, which
-     * leans on the accent a little harder because it is the one screen that is
-     * *made* of artwork.
+     * Every component starts from the theme, except that the player leans on
+     * the accent (it is the one surface made of artwork) and the dock's
+     * companion layer is a raised surface so it reads as chrome.
      */
-    fun defaultPalette(section: BackgroundSection, tokens: DhunTokens): BackgroundPalette =
-        when (section) {
-            // The player is the one surface that is genuinely made of artwork,
-            // so its default leans on the accent and a surface rung.
-            BackgroundSection.FULL_PLAYER -> BackgroundPalette(
-                primary = tokens.background,
-                secondary = tokens.accent,
-                tertiary = tokens.surfaceVariant,
+    fun defaultPalette(component: BackgroundComponent, tokens: DhunTokens): BackgroundPalette =
+        when (component) {
+            BackgroundComponent.FULL_PLAYER -> BackgroundPalette(
+                base = tokens.background,
+                mainGlow = tokens.accent,
+                companionGlow = tokens.surfaceVariant,
             )
-            // The dock sits on top of the page: its companion layer is the
-            // raised surface, not another accent, so it reads as chrome.
-            BackgroundSection.MINI_PLAYER -> BackgroundPalette(
-                primary = tokens.background,
-                secondary = tokens.accent,
-                tertiary = tokens.surfaceElevated,
+            BackgroundComponent.MINI_PLAYER -> BackgroundPalette(
+                base = tokens.background,
+                mainGlow = tokens.accent,
+                companionGlow = tokens.surfaceElevated,
             )
-            else -> BackgroundPalette.neutral(tokens)
+            BackgroundComponent.NAVIGATION -> BackgroundPalette(
+                base = tokens.background,
+                mainGlow = tokens.accent,
+                companionGlow = tokens.surfaceElevated,
+            )
+            BackgroundComponent.PAGES -> BackgroundPalette.neutral(tokens)
         }
 
     /**
-     * The artwork palette, or `null` when there is no artwork to derive one
-     * from.
+     * The palette one source colour produces. Used for the artwork palette and
+     * for a user's pick, so the two cannot drift into different recipes: pick
+     * the colour a cover happens to have and the surface looks the way the
+     * cover made it look.
      *
-     * One palette serves all five sections: they are coloured by the same cover,
-     * so a per-section derivation would only let two surfaces drift apart for a
-     * reason the user never asked for. [ArtworkColors] is the *existing*
-     * extraction result — this function never decodes or samples an image, it
-     * only reshapes a palette the app has already computed. That is the "one
-     * image pipeline" rule.
+     * [solid] is `true` when no artwork is painted behind the surface (blur
+     * off), which is exactly when the colour has to carry the surface on its
+     * own.
      */
-    fun artworkPalette(
-        art: ArtworkColors?,
-        tokens: DhunTokens,
-    ): BackgroundPalette? = art?.let { derive(it.primary, tokens) }
+    fun paletteFrom(source: Color, tokens: DhunTokens, solid: Boolean): BackgroundPalette =
+        BackgroundPalette(
+            // The base keeps the theme's own luminance and borrows the hue, so
+            // rows over it keep their measured contrast.
+            base = keepLuminance(
+                source = source,
+                base = tokens.background,
+                tint = if (solid) SOLID_BASE_TINT_ALPHA else BASE_TINT_ALPHA,
+            ),
+            mainGlow = source.desaturated(MAIN_GLOW_DESATURATION).withMinimumAlpha(MIN_GLOW_ALPHA),
+            companionGlow = source.shifted(COMPANION_HUE_SHIFT)
+                .desaturated(COMPANION_GLOW_DESATURATION)
+                .withMinimumAlpha(MIN_GLOW_ALPHA),
+        )
 
     /**
-     * The three layers one source hue produces. Shared by the artwork palette
-     * and a manual pick so the two cannot drift into different recipes, and so
-     * a picked swatch lands in exactly the palette the cover would have made.
-     */
-    private fun derive(hue: Color, tokens: DhunTokens): BackgroundPalette = BackgroundPalette(
-        // The base keeps the theme's own luminance and only borrows a little of
-        // the source colour, so rows over it keep their measured contrast.
-        primary = keepLuminance(hue, tokens.background, BASE_TINT_ALPHA),
-        secondary = hue.desaturated(SECONDARY_DESATURATION),
-        tertiary = hue.shifted(TERTIARY_HUE_SHIFT).desaturated(TERTIARY_DESATURATION),
-    )
-
-    /**
-     * The palette a manual pick of [primary] produces.
-     *
-     * Deliberately the same derivation as [artworkPalette]: pick the same hue in
-     * each of the three layers in Settings and you get exactly the palette the
-     * artwork would have produced for that hue. It is also what keeps the
-     * settings swatches related to each other instead of three unrelated
-     * colours, and why every offered swatch is already inside the contrast band.
-     */
-    fun manualFrom(primary: Color, tokens: DhunTokens): BackgroundPalette = derive(primary, tokens)
-
-    /**
-     * Resolve what a section paints. Pure function of saved preferences plus
-     * the current artwork palette — the single place precedence lives, so the
-     * settings preview and the rendered background cannot disagree.
+     * Resolve what a component paints. Pure function of saved preferences plus
+     * the current artwork colour — the single place precedence lives, so the
+     * settings preview and the rendered surface cannot disagree.
      */
     fun resolve(
-        section: BackgroundSection,
+        component: BackgroundComponent,
         tokens: DhunTokens,
-        globalDynamicColors: Boolean,
-        sectionDynamicColors: Boolean,
-        manual: BackgroundPalette?,
-        artwork: BackgroundPalette?,
+        dynamicColors: Boolean,
+        followArtwork: Boolean,
+        manualColor: Color?,
+        artworkColor: Color?,
+        solid: Boolean,
     ): BackgroundPalette {
-        // Sanitised here rather than at the write site: a palette restored from
-        // an older build, or set directly in a test, must be just as legible.
-        val safeManual = manual?.let { sanitize(it, tokens) }
-        val fallback = safeManual ?: defaultPalette(section, tokens)
-        if (!globalDynamicColors || !sectionDynamicColors) return fallback
-        return artwork ?: fallback
+        val fallback = manualColor?.let { paletteFrom(it, tokens, solid) }
+            ?: defaultPalette(component, tokens)
+        if (!dynamicColors || !followArtwork) return fallback
+        return artworkColor?.let { paletteFrom(it, tokens, solid) } ?: fallback
     }
 
     /**
-     * Why a section is showing what it shows — rendered in Settings so the
-     * global override is visible instead of mysterious.
+     * Why a component is showing what it shows — rendered in Settings so a
+     * global switch never looks like a broken per-surface setting.
      */
     fun source(
-        globalDynamicColors: Boolean,
-        sectionDynamicColors: Boolean,
+        dynamicColors: Boolean,
+        followArtwork: Boolean,
         hasManual: Boolean,
         hasArtwork: Boolean,
     ): PaletteSource = when {
-        !globalDynamicColors ->
+        !dynamicColors ->
             if (hasManual) PaletteSource.MANUAL_OVERRIDDEN else PaletteSource.DEFAULT_OVERRIDDEN
-        !sectionDynamicColors ->
-            if (hasManual) PaletteSource.MANUAL else PaletteSource.DEFAULT
+        !followArtwork -> if (hasManual) PaletteSource.MANUAL else PaletteSource.DEFAULT
         hasArtwork -> PaletteSource.ARTWORK
         else -> if (hasManual) PaletteSource.MANUAL else PaletteSource.DEFAULT
     }
 
     /**
-     * Force user-picked / artwork colours into the legibility band.
+     * Force a stored/derived palette back into the legibility band.
      *
-     * Applied to every manual pick and every manual palette read back from
-     * storage (a value written by an older build, or by hand, is still safe).
-     * The blooms are only floored for visibility — they sit under the rows, so
-     * they can be as saturated as the artwork, but a fully transparent layer
-     * would be an invisible setting the user could not understand.
+     * Applied on read as well as on write: a value written by an older build,
+     * or by hand, must be just as safe as one picked here. The glows are only
+     * floored for visibility — they sit under the rows, so they can be as
+     * saturated as the artwork, but a fully transparent layer would be an
+     * invisible setting the user could not understand.
      */
     fun sanitize(palette: BackgroundPalette, tokens: DhunTokens): BackgroundPalette {
         val base = tokens.background
         return BackgroundPalette(
-            primary = clampBase(palette.primary, base),
-            secondary = palette.secondary.withMinimumAlpha(MIN_LAYER_ALPHA),
-            tertiary = palette.tertiary.withMinimumAlpha(MIN_LAYER_ALPHA),
+            base = clampBase(palette.base, base),
+            mainGlow = palette.mainGlow.withMinimumAlpha(MIN_GLOW_ALPHA),
+            companionGlow = palette.companionGlow.withMinimumAlpha(MIN_GLOW_ALPHA),
         )
     }
 
@@ -263,37 +347,31 @@ object BackgroundPalettePolicy {
 
     /**
      * A colour that carries [source]'s hue and [base]'s luminance. Used for the
-     * artwork base wash: recognisably the song's colour, provably in the
-     * contrast band the text ladder was measured against.
+     * base wash: recognisably the chosen colour, provably inside the contrast
+     * band the text ladder was measured against.
      */
     fun keepLuminance(source: Color, base: Color, tint: Float): Color {
         val t = tint.coerceIn(0f, 1f)
         val mixed = base.blend(source, t)
         return clampBase(mixed, base)
     }
-
-    /** A manual layer must never be fully transparent — that reads as "unset". */
-    const val MIN_LAYER_ALPHA = 0.05f
-
-    /** Tolerance for "already inside the band", so clamping is idempotent. */
-    const val CLAMP_EPSILON = 1e-4f
 }
 
-/** Where a section's current palette came from. Drives the Settings caption. */
+/** Where a component's current palette came from. Drives the Settings caption. */
 enum class PaletteSource {
-    /** Artwork-derived (both the global and the section toggle are on). */
+    /** Artwork-derived (dynamic colours on, and this surface follows the artwork). */
     ARTWORK,
 
-    /** The user's own palette for this section. */
+    /** The user's colour for this surface. */
     MANUAL,
 
-    /** The section default; the user has not picked colours. */
+    /** The DHUN default; the user has not picked a colour. */
     DEFAULT,
 
-    /** The user's palette, but the global Dynamic Colors switch is off. */
+    /** The user's colour, but the global Dynamic colours switch is off. */
     MANUAL_OVERRIDDEN,
 
-    /** The section default, and the global switch is off. */
+    /** The DHUN default, and the global switch is off. */
     DEFAULT_OVERRIDDEN,
     ;
 
@@ -302,28 +380,29 @@ enum class PaletteSource {
     val label: String
         get() = when (this) {
             ARTWORK -> "From the current artwork"
-            MANUAL -> "Your colours"
+            MANUAL -> "Your colour"
             DEFAULT -> "DHUN default"
-            MANUAL_OVERRIDDEN -> "Your colours · Dynamic Colors is off"
-            DEFAULT_OVERRIDDEN -> "DHUN default · Dynamic Colors is off"
+            MANUAL_OVERRIDDEN -> "Your colour · Dynamic colours is off"
+            DEFAULT_OVERRIDDEN -> "DHUN default · Dynamic colours is off"
         }
 }
 
 /**
- * Blur is two switches, not one.
+ * Blur: on or off, plus *how much*.
  *
- * `Background blur` is the master: off means *no* blur anywhere, and it is the
- * switch a user reaches for when the device is struggling. `Dynamic blur` is
- * the *kind* of blur: on, the radius responds to the artwork; off, every
- * surface uses the same steady radius. Neither touches colour.
+ * The switch is the feature ("use the track's artwork as a blurred
+ * background"); [MIN_EFFECTIVE_STRENGTH] only stops the strength slider from
+ * impersonating that switch. Nothing here reads a colour setting, and the
+ * colour policy never reads this: a user can have blur with no artwork colour,
+ * artwork colour with no blur, both, or neither.
  */
 object BackgroundBlurPolicy {
 
     /**
-     * The radius used when blur is on but not dynamic: the shipped frost, i.e.
+     * The radius used when the frost does not adapt: the shipped frost, i.e.
      * the full radius of the user's strength setting.
      *
-     * "Dynamic blur off" means *the normal blur* — not a different, weaker one.
+     * "Adaptive off" means *the normal blur* — not a different, weaker one.
      * Anything less here would make choosing the steady frost a quiet downgrade
      * of the app's own look.
      */
@@ -332,57 +411,55 @@ object BackgroundBlurPolicy {
     /**
      * Adaptive range, in percent of the strength radius.
      *
-     * The adaptive radius starts at [DYNAMIC_BASE_PERCENT] (the shipped frost,
+     * The adaptive radius starts at [ADAPTIVE_BASE_PERCENT] (the shipped frost,
      * so a neutral cover looks exactly like it did) and only ever moves *down*
      * for artwork that does not need that much: a dark, muted cover at the full
      * radius is just a grey smear, and letting it stay recognisable is the whole
-     * point of following the artwork. It never reaches zero — "dynamic blur"
-     * must not mean "sometimes none".
+     * point of following the artwork. It never reaches zero — "adaptive" must
+     * not mean "sometimes none".
      */
-    const val DYNAMIC_MIN_PERCENT = 70
-    const val DYNAMIC_MAX_PERCENT = 100
-    const val DYNAMIC_BASE_PERCENT = 100
+    const val ADAPTIVE_MIN_PERCENT = 70
+    const val ADAPTIVE_MAX_PERCENT = 100
+    const val ADAPTIVE_BASE_PERCENT = 100
 
     /** How far artwork luminance can pull the radius, in percent. */
-    const val DYNAMIC_LUMINANCE_SPREAD = 18
+    const val ADAPTIVE_LUMINANCE_SPREAD = 18
 
     /** Saturated artwork keeps more frost; muted artwork gives some back. */
-    const val DYNAMIC_SATURATION_SPREAD = 12
+    const val ADAPTIVE_SATURATION_SPREAD = 12
 
-    /** Neutral artwork statistics: the radius is [DYNAMIC_BASE_PERCENT]. */
+    /** Neutral artwork statistics: the radius is [ADAPTIVE_BASE_PERCENT]. */
     const val NEUTRAL_LUMINANCE = 0.5f
     const val NEUTRAL_SATURATION = 0.5f
 
     /**
      * The weakest frost an *enabled* blur is allowed to reach.
      *
-     * The master switch is the only control that turns blur off. Before this
-     * feature the intensity slider was also the off switch, and the version-0
-     * migration still maps a stored `backdrop_blur = 0` to "master off" — so a
-     * slider that could reach zero would let the master switch say "on" while
-     * nothing blurred, which reads as a broken switch rather than a light
-     * frost. An enabled blur therefore keeps at least this share of its radius.
+     * The switch is the only control that removes blur. Before this feature the
+     * intensity slider was also the off switch, and the version-0 migration
+     * still maps a stored `backdrop_blur = 0` to blur off — so a slider that
+     * could reach zero would let the switch say "on" while nothing blurred,
+     * which reads as a broken switch rather than a light frost.
      */
     const val MIN_EFFECTIVE_STRENGTH = 20
 
     /**
-     * The blur percentage a section should render, or 0 for "no blur".
+     * The blur percentage a component should render, or 0 for "no artwork
+     * behind this surface at all".
      *
-     * The master switch wins over everything, then the section's own switch,
-     * then the *kind* of blur. Turning the master off suspends dynamic blur
-     * without forgetting it — the saved preference is untouched, and the
-     * radius comes straight back when the master returns.
+     * The global switch wins, then the surface's own switch, then the kind of
+     * blur. Turning the global off suspends both per-surface choices without
+     * forgetting them.
      */
     fun percentFor(
-        globalBlurEnabled: Boolean,
-        sectionBlurEnabled: Boolean,
-        dynamicBlur: Boolean,
-        sectionDynamicBlur: Boolean,
+        blurEnabled: Boolean,
+        componentBlurEnabled: Boolean,
+        adaptive: Boolean,
         artworkLuminance: Float? = null,
         artworkSaturation: Float? = null,
     ): Int {
-        if (!globalBlurEnabled || !sectionBlurEnabled) return 0
-        if (!dynamicBlur || !sectionDynamicBlur) return STATIC_PERCENT
+        if (!blurEnabled || !componentBlurEnabled) return 0
+        if (!adaptive) return STATIC_PERCENT
         return adaptivePercent(artworkLuminance, artworkSaturation)
     }
 
@@ -395,34 +472,38 @@ object BackgroundBlurPolicy {
     fun adaptivePercent(luminance: Float?, saturation: Float?): Int {
         val lum = (luminance ?: NEUTRAL_LUMINANCE).coerceIn(0f, 1f)
         val sat = (saturation ?: NEUTRAL_SATURATION).coerceIn(0f, 1f)
-        val fromLuminance = (lum - NEUTRAL_LUMINANCE) * 2f * DYNAMIC_LUMINANCE_SPREAD
-        val fromSaturation = (sat - NEUTRAL_SATURATION) * 2f * DYNAMIC_SATURATION_SPREAD
-        val percent = DYNAMIC_BASE_PERCENT + fromLuminance + fromSaturation
-        return percent.toInt().coerceIn(DYNAMIC_MIN_PERCENT, DYNAMIC_MAX_PERCENT)
+        val fromLuminance = (lum - NEUTRAL_LUMINANCE) * 2f * ADAPTIVE_LUMINANCE_SPREAD
+        val fromSaturation = (sat - NEUTRAL_SATURATION) * 2f * ADAPTIVE_SATURATION_SPREAD
+        val percent = ADAPTIVE_BASE_PERCENT + fromLuminance + fromSaturation
+        return percent.toInt().coerceIn(ADAPTIVE_MIN_PERCENT, ADAPTIVE_MAX_PERCENT)
     }
 
-    /** Whether a section renders any blur at all, for labels and tests. */
-    fun isBlurred(percent: Int): Boolean = percent > 0
+    /**
+     * Whether the artwork is painted behind a surface at this radius.
+     *
+     * This is the one answer every image layer in the app asks for, and the
+     * reason "blur off" can mean *no thumbnail anywhere* instead of "a sharp,
+     * dimmed thumbnail": with no radius there is no artwork layer at all, only
+     * the component's colour.
+     */
+    fun paintsArtwork(percent: Int): Boolean = percent > 0
 
     /**
      * The user's blur *strength* (the existing slider) applied to the resolved
      * kind. Strength is a preference about intensity; on/off belongs to the
-     * master switch, so strength can only reduce a blur — never resurrect a
-     * disabled one, and never silently reproduce "off" either (see
+     * switch, so strength can only reduce a blur — never resurrect a disabled
+     * one, and never silently reproduce "off" either (see
      * [MIN_EFFECTIVE_STRENGTH]).
      */
     fun applyStrength(percent: Int, strengthPercent: Int): Int {
         if (percent <= 0) return 0
-        // Never zero while the kind asks for frost (rounding a 1% kind against a
-        // 20% strength would otherwise floor it to nothing), and never more than
-        // the kind itself: strength reduces, it does not amplify.
         val scaled = (percent * effectiveStrength(strengthPercent) / 100f).toInt()
         return scaled.coerceIn(1, percent)
     }
 
     /**
      * The strength actually used for an enabled blur: the slider, clamped into
-     * the documented band. The one place both the per-section surfaces and the
+     * the documented band. The one place both the surface layers and the
      * single-surface ones (lyrics card, menus) agree on it.
      */
     fun effectiveStrength(strengthPercent: Int): Int =
@@ -431,7 +512,7 @@ object BackgroundBlurPolicy {
 
 /* ---------------------------------------------------------------- colours */
 
-private fun Color.blend(other: Color, t: Float): Color {
+internal fun Color.blend(other: Color, t: Float): Color {
     val k = t.coerceIn(0f, 1f)
     return Color(
         red = red + (other.red - red) * k,

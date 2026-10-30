@@ -59,10 +59,10 @@ import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.DhunVisualTuning
 import dev.dhun.design.VisualPart
-import dev.dhun.design.background.BackgroundSection
+import dev.dhun.design.background.BackgroundComponent
 import dev.dhun.design.background.DhunBackgrounds
-import dev.dhun.design.background.LocalBackgroundSection
-import dev.dhun.design.background.backgroundSectionTint
+import dev.dhun.design.background.LocalBackgroundComponent
+import dev.dhun.design.background.backgroundComponentTint
 import dev.dhun.design.catalog.ComponentCatalogScreen
 import dev.dhun.design.components.AmbientBackdrop
 import dev.dhun.design.components.DhunNavigationBar
@@ -313,19 +313,14 @@ fun DhunAppShell(
     // glass over the app's own artwork instead of a flat plate over a scrim.
     // Null when nothing plays: the documented fallback (gradient + sheen).
     val nowPlayingArtworkForGlass = currentTrack?.thumbnailUrl
-    // Home, Search and Library each have their own saved background
-    // preferences: the page backdrop is painted for the section the user is
-    // actually on, and every panel or dialog floating above it frosts with that
-    // same section's switches (LocalBackgroundSection).
-    val pageSection = when (nav.selectedTab) {
-        AppTab.SEARCH -> BackgroundSection.SEARCH
-        AppTab.LIBRARY -> BackgroundSection.LIBRARY
-        else -> BackgroundSection.HOME
-    }
+    // Home, Search and Library are one surface visually: one page backdrop, one
+    // set of panels on top of it, one colour and one blur switch ("Main pages"
+    // in Settings). The dock and the player are surfaces of their own.
+    val pageComponent = BackgroundComponent.PAGES
     CompositionLocalProvider(
         LocalTextInputFocusRegistry provides textInputFocusRegistry,
         LocalNowPlayingArtwork provides nowPlayingArtworkForGlass,
-        LocalBackgroundSection provides pageSection,
+        LocalBackgroundComponent provides pageComponent,
     ) {
         BoxWithConstraints(
             modifier = modifier
@@ -396,14 +391,15 @@ fun DhunAppShell(
         // artwork (first run, Library, Settings, offline) still has depth and
         // colour instead of a plain Material background
         // (docs/design/glass-system.md §1).
-        // The page backdrop for the section the user is on (see pageSection
-        // above); it re-resolves when the tab changes.
+        // The page backdrop: the "Main pages" colour, plus the playing cover
+        // when Background blur is on. With blur off the second layer paints
+        // nothing and this colour is the page.
         Box(modifier = Modifier.fillMaxSize()) {
-            AmbientBackdrop(modifier = Modifier.fillMaxSize(), section = pageSection)
+            AmbientBackdrop(modifier = Modifier.fillMaxSize(), component = pageComponent)
             NowPlayingBackdrop(
                 artworkUrl = currentTrack?.thumbnailUrl,
                 modifier = Modifier.fillMaxSize(),
-                section = pageSection,
+                component = pageComponent,
             )
         }
         Row(modifier = Modifier.fillMaxSize()) {
@@ -643,7 +639,7 @@ fun DhunAppShell(
                 // here (not inside FullPlayer) means the player's own dialogs and
                 // sheets frost with the player's switches too.
                 CompositionLocalProvider(
-                    LocalBackgroundSection provides BackgroundSection.FULL_PLAYER,
+                    LocalBackgroundComponent provides BackgroundComponent.FULL_PLAYER,
                 ) {
                     FullPlayer(
                         modifier = Modifier.fillMaxSize(),
@@ -807,7 +803,7 @@ private fun BottomNavigationBar(
                     .acrylicGlass()
                     // The dock is the miniplayer section: it takes that section's
                     // palette (artwork or manual) as a soft tint over its acrylic.
-                    .backgroundSectionTint(BackgroundSection.MINI_PLAYER),
+                    .backgroundComponentTint(BackgroundComponent.MINI_PLAYER),
             ) {
                 MiniPlayer(
                     viewModel = playerViewModel,
@@ -827,8 +823,12 @@ private fun BottomNavigationBar(
         // item metrics were the last stock-Material look in the shell.
         // `lyricsVeil` still sets the tone so the tabs match the lyrics panel.
         DhunNavigationBar(
+            // The navigation bar is its own surface: it takes its own colour
+            // over the dock's frost, so a green dock with a violet tab bar is a
+            // thing the user can ask for.
             modifier = Modifier.background(lyricsVeilBrush(part = VisualPart.NAVIGATION)),
             fill = contentRowFill(VisualPart.NAVIGATION),
+            tintComponent = BackgroundComponent.NAVIGATION,
         ) {
             AppTab.userTabs.forEach { tab ->
                 DhunNavigationBarItem(
@@ -858,7 +858,7 @@ private fun AppNavigationRail(
     // Not Material's NavigationRail: DHUN owns the container, the pill and the
     // labels. Its width is DhunNavigationPolicy.railWidth, the same number
     // DhunShellPolicy.railAllowance reserves for the pane split.
-    DhunNavigationRail {
+    DhunNavigationRail(tintComponent = BackgroundComponent.NAVIGATION) {
         AppTab.userTabs.forEach { tab ->
             DhunNavigationRailItem(
                 icon = tab.icon,

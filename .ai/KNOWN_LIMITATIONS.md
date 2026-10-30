@@ -2263,6 +2263,46 @@ What this round did **not** prove:
   not been captured.
 
 
+## 2026-10-30 — session `arena/09e5238e-dhun`: backgrounds rebuilt as two switches + four surfaces
+
+- **No hardware in this pass either.** No JDK/Gradle, no Android SDK, no emulator
+  image, no `/dev/kvm`, no display. Everything below is a repository-level
+  change verified by unit tests, the Python design gates and CI compilation — not
+  by looking at a screen. The manual procedure is
+  [`docs/verification/35-background-visual-validation.md`](../docs/verification/35-background-visual-validation.md).
+- **What was wrong, in the owner's terms.** The #216 controls exposed
+  `primary`/`secondary`/`tertiary` (a palette the user had to assemble) instead of
+  the surfaces they see, and "Background blur off" kept painting a sharp, dimmed
+  cover, so it was indistinguishable from "less blur". Both are now structural:
+  the customisation unit is `BackgroundComponent` (pages, navigation bar,
+  miniplayer, full player) and every artwork layer returns before drawing when
+  its surface has no blur.
+- **Migration collapses per-tab colours.** Version 1 stored a palette per section
+  (Home, Search, Library separately). Version 2 has one *Main pages* colour, so
+  an install that had deliberately different Home/Search/Library colours keeps
+  one of them (Home first, then Search, then Library). The per-tab difference
+  cannot be represented any more and is not silently re-invented.
+- **The navigation bar has a colour but has never been looked at.** It is tinted
+  through `DhunNavigationBar`/`DhunNavigationRail` (`tintComponent`), over the
+  dock's frost on phones. Whether that reads as chrome or as a colour clash next
+  to the dock is a screen question.
+- **The colour picker offers named swatches, not a colour wheel.** The six accent
+  hues plus "DHUN default", all inside the measured contrast band. A free picker
+  would need per-colour contrast solving; that is deliberate scope, not a
+  limitation of the model.
+- **Artwork colour still comes from the seed hash** (`ArtworkColorExtractor`), so
+  two covers can land in the same colour family, and the glow need not match the
+  cover's dominant colour. VIVI Music samples a 100×100 bitmap with
+  `androidx.palette`; doing that here would mean a second decode on the hot path
+  or a new bitmap pipeline, which the brief forbids. Recorded, not changed.
+- **Solid surfaces are a rendering choice, not a measured one.** With no artwork
+  behind it the base uses `SOLID_BASE_TINT_ALPHA` (0.55) instead of 0.30 and the glows
+  are 1.45× stronger. The luminance clamp keeps the text ladder valid in both
+  themes (unit-tested), but whether the result *looks* like a deliberate coloured
+  surface rather than mud on a real phone is unverified.
+- **Crossfades, layer order, contrast over real covers and the pre-API-31 dimmed
+  fallback remain un-eyeballed**, exactly as recorded in the earlier entries.
+
 ## 2026-10-30 — session `arena/83a7841b-dhun`: background feature (updated after review)
 
 - **Dynamic colours are derived from the artwork *seed*, not sampled pixels.**

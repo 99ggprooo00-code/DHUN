@@ -31,14 +31,18 @@ import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTokens
 import dev.dhun.design.DhunVisualTuning
 import dev.dhun.design.VisualPart
-import dev.dhun.design.background.BackgroundSection
+import dev.dhun.design.background.BackgroundBlurPolicy
+import dev.dhun.design.background.BackgroundComponent
 import dev.dhun.design.background.DhunBackgrounds
-import dev.dhun.design.background.LocalBackgroundSection
+import dev.dhun.design.background.LocalBackgroundComponent
 import dev.dhun.design.supportsRealtimeBlur
 
 /**
  * The atmospheric backdrop behind Home, Search and Library: the artwork of the
  * **currently playing** song, edge to edge, under everything else.
+ *
+ * Only painted while Background blur is on for this surface: "blur off" means
+ * no thumbnail behind the app, not a sharp or dimmed one.
  *
  * On API 31+ / desktop the cover is heavily blurred (user-controlled). On
  * Android below API 31 `Modifier.blur` is a no-op, so the thumbnail is
@@ -50,26 +54,36 @@ import dev.dhun.design.supportsRealtimeBlur
 fun NowPlayingBackdrop(
     artworkUrl: String?,
     modifier: Modifier = Modifier,
-    section: BackgroundSection? = null,
+    component: BackgroundComponent? = null,
 ) {
     if (!NowPlayingBackdropPolicy.shouldRenderBackdrop(artworkUrl)) return
-    val resolvedSection = section ?: LocalBackgroundSection.current
+    val resolvedComponent = component ?: LocalBackgroundComponent.current
     val url = remember(artworkUrl) { NowPlayingBackdropPolicy.resolveUrl(artworkUrl) } ?: return
 
-    // Blur is resolved per section and per the two switches: master off means
-    // 0 (no blur, artwork still shown sharp, translucent styling intact);
-    // master on + dynamic off means one steady radius. Colour is untouched by
-    // any of this — it lives in AmbientBackdrop.
+    // Blur is resolved per surface and per the switch: with Background blur off
+    // the artwork is not painted *at all* (not sharp, not dimmed) and the
+    // surface is the component's own colour. That early return is the whole
+    // difference between "blur off" and "blur replaced by a dark picture".
     val blurPercent = DhunBackgrounds.blurPercentFor(
-        section = resolvedSection,
+        component = resolvedComponent,
         strengthPercent = DhunAppearance.backdropBlurPercent,
     )
+    if (!BackgroundBlurPolicy.paintsArtwork(blurPercent)) return
     val brightnessPercent = DhunAppearance.backdropBrightnessPercent
     val canBlur = supportsRealtimeBlur
     val tokens = DhunAppearance.tokens
     val veilStops = NowPlayingBackdropPolicy.veilStops(tokens.isLight, brightnessPercent)
         .map { (offset, alpha) -> offset to DhunVisualTuning.veilAlpha(VisualPart.PAGE_BACKDROP, alpha) }
-    val veilTint = NowPlayingBackdropPolicy.veilTint(tokens)
+    // The veil carries the surface's colour: with Dynamic colours on that is the
+    // artwork's, otherwise the user's pick for this surface, so a frosted page
+    // is tinted either way (and never just a theme grey). Animated on the same
+    // curve as the palette, so a track change crossfades the tint instead of
+    // snapping it a beat before the blooms catch up.
+    val veilTint by animateColorAsState(
+        targetValue = DhunBackgrounds.paletteFor(resolvedComponent).base,
+        animationSpec = DhunAnimations.slowTween(),
+        label = "pageVeilTint",
+    )
 
     val context = LocalPlatformContext.current
     var phase by remember(artworkUrl) { mutableStateOf(NowPlayingBackdropPhase.Idle) }
@@ -142,22 +156,26 @@ fun NowPlayingBackdrop(
 @Composable
 fun AmbientBackdrop(
     modifier: Modifier = Modifier,
-    section: BackgroundSection? = null,
+    component: BackgroundComponent? = null,
 ) {
-    val resolvedSection = section ?: LocalBackgroundSection.current
+    val resolvedComponent = component ?: LocalBackgroundComponent.current
     val tokens = DhunAppearance.tokens
     // The resolved palette is the whole colour feature in one call: artwork
-    // when both dynamic switches are on, otherwise this section's manual
-    // palette or its default (see BackgroundPalettePolicy.resolve).
-    val palette = DhunBackgrounds.paletteFor(resolvedSection)
+    // colours when Dynamic colours is on and this surface follows it, otherwise
+    // the user's colour for this surface, otherwise the DHUN default.
+    val palette = DhunBackgrounds.paletteFor(resolvedComponent)
+    // With no artwork behind it, this *is* the background rather than a wash
+    // under one: the glows get a little more presence so the surface reads as a
+    // deliberate colour instead of a flat dark page.
+    val solid = !DhunBackgrounds.showsArtwork(resolvedComponent)
     // Track changes crossfade instead of snapping: the palette is derived from
     // the artwork, so it changes exactly when the song does.
-    val primary by animateColorAsState(palette.primary, DhunAnimations.slowTween(), label = "bgPrimary")
-    val secondary by animateColorAsState(palette.secondary, DhunAnimations.slowTween(), label = "bgSecondary")
-    val tertiary by animateColorAsState(palette.tertiary, DhunAnimations.slowTween(), label = "bgTertiary")
-    val bloom = AmbientBackdropPolicy.bloomAlpha(tokens.isLight)
+    val base by animateColorAsState(palette.base, DhunAnimations.slowTween(), label = "bgBase")
+    val secondary by animateColorAsState(palette.mainGlow, DhunAnimations.slowTween(), label = "bgMainGlow")
+    val tertiary by animateColorAsState(palette.companionGlow, DhunAnimations.slowTween(), label = "bgCompanionGlow")
+    val bloom = AmbientBackdropPolicy.bloomAlpha(tokens.isLight, solid)
     Canvas(modifier = modifier.fillMaxSize()) {
-        drawRect(color = primary)
+        drawRect(color = base)
         AmbientBackdropPolicy.layers(this.size, secondary, tertiary, bloom).forEach { layer ->
             drawRect(
                 brush = Brush.radialGradient(
@@ -188,6 +206,9 @@ object AmbientBackdropPolicy {
     /** The companion bloom is weaker than the main one. */
     const val SECONDARY_SCALE = 0.55f
 
+    /** A solid surface's glows are stronger than a wash over artwork. */
+    const val SOLID_BLOOM_SCALE = 1.45f
+
     /** Bloom radius as a fraction of the shorter viewport edge. */
     const val BLOOM_RADIUS = 0.85f
 
@@ -199,8 +220,15 @@ object AmbientBackdropPolicy {
     const val SECONDARY_CENTER_X = 0.92f
     const val SECONDARY_CENTER_Y = 0.78f
 
-    fun bloomAlpha(light: Boolean): Float =
-        if (light) ACCENT_BLOOM_ALPHA_LIGHT else ACCENT_BLOOM_ALPHA_DARK
+    /**
+     * The main glow's alpha. A solid surface (no artwork behind it) gets a
+     * little more of it: the glow is then part of the background rather than a
+     * tint over a photograph, and the colour the user picked has to be visible.
+     */
+    fun bloomAlpha(light: Boolean, solid: Boolean = false): Float {
+        val base = if (light) ACCENT_BLOOM_ALPHA_LIGHT else ACCENT_BLOOM_ALPHA_DARK
+        return if (solid) base * SOLID_BLOOM_SCALE else base
+    }
 
     /**
      * The two blooms for a palette's secondary and tertiary layers, sized from
@@ -240,21 +268,21 @@ object AmbientBackdropPolicy {
 /**
  * A detail page's own artwork backdrop (album, artist, playlist).
  *
- * The section is the one the page is composed *on*, not a hardcoded Home:
- * opening an album from Library must frost with Library's switches, otherwise
- * switching Library to sharp while Home stays frosted would leave the album
- * page frosted for a reason the user cannot see in Settings.
+ * The component is the one the page is composed *on*: a detail page lives on
+ * the main pages, so it takes that surface's colour and blur switch rather than
+ * pinning itself to a section (which is how an album opened from Library used to
+ * keep Home's settings).
  */
 @Composable
 fun PageArtworkBackdrop(
     artworkUrl: String?,
     modifier: Modifier = Modifier,
-    section: BackgroundSection? = null,
+    component: BackgroundComponent? = null,
 ) {
     NowPlayingBackdrop(
         artworkUrl = artworkUrl,
         modifier = modifier,
-        section = section ?: LocalBackgroundSection.current,
+        component = component ?: LocalBackgroundComponent.current,
     )
 }
 
@@ -286,6 +314,7 @@ object NowPlayingBackdropPolicy {
      */
     fun veilTint(tokens: DhunTokens) =
         if (tokens.isLight) tokens.surfaceContainerHighest else tokens.surfaceElevated
+
 
     /**
      * One translucent veil; brightness changes opacity, never the tint.

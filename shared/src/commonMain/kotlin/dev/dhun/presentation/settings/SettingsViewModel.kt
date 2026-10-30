@@ -1,13 +1,13 @@
 package dev.dhun.presentation.settings
 
+import androidx.compose.ui.graphics.Color
 import dev.dhun.data.SettingsKeys
 import dev.dhun.design.DhunVisualTuning
 import dev.dhun.design.VisualPart
-import dev.dhun.design.background.BackgroundPalette
-import dev.dhun.design.background.BackgroundSection
+import dev.dhun.design.background.BackgroundComponent
 import dev.dhun.design.background.BackgroundState
+import dev.dhun.design.background.ComponentBackgrounds
 import dev.dhun.design.background.DhunBackgrounds
-import dev.dhun.design.background.SectionBackgrounds
 import dev.dhun.domain.GetSettingUseCase
 import dev.dhun.domain.UpdateSettingUseCase
 import dev.dhun.player.AudioCacheBudget
@@ -410,15 +410,14 @@ class SettingsViewModel(
      * immediately, before the row is written.
      *
      * The snapshot this ViewModel owns is the *settings* half of the background
-     * state; the artwork palette is runtime and belongs to
+     * state; the artwork colour is runtime and belongs to
      * [dev.dhun.design.background.DhunBackgrounds], which extracted it from the
      * playing track. Publishing a settings-only snapshot must therefore keep
      * whatever artwork the holder already has instead of dropping to "nothing
      * playing" every time a switch is tapped.
      */
     private fun publishBackgrounds(state: BackgroundState) {
-        val artwork = DhunBackgrounds.current
-        _backgrounds.value = state.withArtwork(artwork)
+        _backgrounds.value = state.withArtworkFrom(DhunBackgrounds.current)
         BackgroundPreferences.apply(state)
     }
 
@@ -437,9 +436,9 @@ class SettingsViewModel(
     }
 
     /**
-     * The master blur switch. Switching it off suspends every section's blur
-     * without touching a single saved per-section preference, so switching it
-     * back on restores exactly the configuration the user had.
+     * The Background blur switch. Off removes the artwork behind every surface
+     * and leaves the colours alone; the per-surface choices are suspended, not
+     * cleared, so switching it back on restores exactly what the user had.
      */
     fun setBackgroundBlurEnabled(enabled: Boolean) {
         val previous = _backgrounds.value
@@ -449,12 +448,12 @@ class SettingsViewModel(
         }
     }
 
-    /** Dynamic (artwork-responsive) vs static blur. Never touches colour. */
-    fun setBackgroundDynamicBlur(enabled: Boolean) {
+    /** Adaptive vs steady frost. Never touches colour. */
+    fun setBackgroundAdaptiveBlur(enabled: Boolean) {
         val previous = _backgrounds.value
-        if (previous.dynamicBlur == enabled) return
-        writeBackgrounds(previous, previous.copy(dynamicBlur = enabled)) {
-            BackgroundPreferences.writeGlobalDynamicBlur(update, enabled)
+        if (previous.adaptiveBlur == enabled) return
+        writeBackgrounds(previous, previous.copy(adaptiveBlur = enabled)) {
+            BackgroundPreferences.writeGlobalAdaptiveBlur(update, enabled)
         }
     }
 
@@ -467,62 +466,60 @@ class SettingsViewModel(
         }
     }
 
-    fun setSectionBlurEnabled(section: BackgroundSection, enabled: Boolean) {
+    fun setComponentBlurEnabled(component: BackgroundComponent, enabled: Boolean) {
         val previous = _backgrounds.value
-        val next = previous.withSection(section) { it.copy(blurEnabled = enabled) }
-        if (next == previous) return
-        writeBackgrounds(previous, next) { BackgroundPreferences.writeSectionBlur(update, section, enabled) }
-    }
-
-    fun setSectionDynamicBlur(section: BackgroundSection, enabled: Boolean) {
-        val previous = _backgrounds.value
-        val next = previous.withSection(section) { it.copy(dynamicBlur = enabled) }
-        if (next == previous) return
-        writeBackgrounds(previous, next) { BackgroundPreferences.writeSectionDynamicBlur(update, section, enabled) }
-    }
-
-    fun setSectionDynamicColors(section: BackgroundSection, enabled: Boolean) {
-        val previous = _backgrounds.value
-        val next = previous.withSection(section) { it.copy(dynamicColors = enabled) }
-        if (next == previous) return
-        writeBackgrounds(previous, next) { BackgroundPreferences.writeSectionDynamicColors(update, section, enabled) }
-    }
-
-    fun setSectionManualPalette(section: BackgroundSection, palette: BackgroundPalette?) {
-        val previous = _backgrounds.value
-        val next = previous.withSection(section) { it.copy(manual = palette) }
-        if (next == previous) return
-        writeBackgrounds(previous, next) { BackgroundPreferences.writeSectionPalette(update, section, palette) }
-    }
-
-    /**
-     * Restores one section to its defaults: blur, both dynamic switches and the
-     * manual palette. Global switches are deliberately untouched — they are not
-     * this section's setting.
-     */
-    fun resetSectionBackgrounds(section: BackgroundSection) {
-        val previous = _backgrounds.value
-        val next = previous.withSection(section) { SectionBackgrounds.default }
+        val next = previous.withComponent(component) { it.copy(blurEnabled = enabled) }
         if (next == previous) return
         writeBackgrounds(previous, next) {
-            BackgroundPreferences.writeSectionBlur(update, section, true)
-            BackgroundPreferences.writeSectionDynamicBlur(update, section, true)
-            BackgroundPreferences.writeSectionDynamicColors(update, section, true)
-            BackgroundPreferences.writeSectionPalette(update, section, null)
+            BackgroundPreferences.writeComponentBlur(update, component, enabled)
         }
     }
 
-    /** Restores every section, leaving the three global switches alone. */
-    fun resetAllSectionBackgrounds() {
+    fun setComponentFollowArtwork(component: BackgroundComponent, enabled: Boolean) {
         val previous = _backgrounds.value
-        val next = previous.copy(sections = emptyMap())
+        val next = previous.withComponent(component) { it.copy(followArtwork = enabled) }
         if (next == previous) return
         writeBackgrounds(previous, next) {
-            for (section in BackgroundSection.entries) {
-                BackgroundPreferences.writeSectionBlur(update, section, true)
-                BackgroundPreferences.writeSectionDynamicBlur(update, section, true)
-                BackgroundPreferences.writeSectionDynamicColors(update, section, true)
-                BackgroundPreferences.writeSectionPalette(update, section, null)
+            BackgroundPreferences.writeComponentFollowArtwork(update, component, enabled)
+        }
+    }
+
+    /** The colour for one surface. `null` = restore the DHUN default. */
+    fun setComponentColor(component: BackgroundComponent, color: Color?) {
+        val previous = _backgrounds.value
+        val next = previous.withComponent(component) { it.copy(color = color) }
+        if (next == previous) return
+        writeBackgrounds(previous, next) {
+            BackgroundPreferences.writeComponentColor(update, component, color)
+        }
+    }
+
+    /**
+     * Restores one surface: its own blur switch, its artwork-colour choice and
+     * its picked colour. The two global switches are deliberately untouched —
+     * they are not this surface's setting.
+     */
+    fun resetComponentBackgrounds(component: BackgroundComponent) {
+        val previous = _backgrounds.value
+        val next = previous.withComponent(component) { ComponentBackgrounds.default }
+        if (next == previous) return
+        writeBackgrounds(previous, next) {
+            BackgroundPreferences.writeComponentBlur(update, component, true)
+            BackgroundPreferences.writeComponentFollowArtwork(update, component, true)
+            BackgroundPreferences.writeComponentColor(update, component, null)
+        }
+    }
+
+    /** Restores every surface, leaving the global switches alone. */
+    fun resetAllComponentBackgrounds() {
+        val previous = _backgrounds.value
+        val next = previous.copy(components = emptyMap())
+        if (next == previous) return
+        writeBackgrounds(previous, next) {
+            for (component in BackgroundComponent.entries) {
+                BackgroundPreferences.writeComponentBlur(update, component, true)
+                BackgroundPreferences.writeComponentFollowArtwork(update, component, true)
+                BackgroundPreferences.writeComponentColor(update, component, null)
             }
         }
     }
@@ -792,18 +789,12 @@ class SettingsViewModel(
  * settings snapshot. Keeps the settings copy honest for the section previews
  * without making the artwork a persisted preference.
  */
-private fun BackgroundState.withArtwork(live: BackgroundState): BackgroundState = copy(
-    artwork = live.artwork,
-    artworkLuminance = live.artworkLuminance,
-    artworkSaturation = live.artworkSaturation,
-)
-
-/** Same section, one field changed, with the defaults materialised for the rest. */
-private fun BackgroundState.withSection(
-    section: BackgroundSection,
-    transform: (SectionBackgrounds) -> SectionBackgrounds,
+/** Same component, one field changed, with the defaults materialised for the rest. */
+private fun BackgroundState.withComponent(
+    component: BackgroundComponent,
+    transform: (ComponentBackgrounds) -> ComponentBackgrounds,
 ): BackgroundState {
-    val next = resolvedSections().toMutableMap()
-    next[section] = transform(section(section))
-    return copy(sections = next)
+    val next = resolvedComponents().toMutableMap()
+    next[component] = transform(component(component))
+    return copy(components = next)
 }

@@ -64,49 +64,77 @@ object SettingsKeys {
     const val BACKDROP_BRIGHTNESS_DEFAULT = 55
 
     /**
-     * Background blur, as three switches (see `dev.dhun.design.background`):
-     * the master [BACKGROUND_BLUR_ENABLED], the *kind* of blur
-     * [BACKGROUND_DYNAMIC_BLUR], and the independent colour switch
-     * [BACKGROUND_DYNAMIC_COLORS]. They default to the behaviour the app had
-     * before the switches existed: blurred, artwork-responsive, artwork-coloured.
+     * Background blur — is the current track's artwork painted, blurred, behind
+     * the interface? Off means it is not painted at all. See
+     * `dev.dhun.design.background`.
      */
     const val BACKGROUND_BLUR_ENABLED = "background_blur_enabled"
     const val BACKGROUND_BLUR_ENABLED_DEFAULT = true
+
+    /**
+     * Whether an enabled frost adapts to the artwork. A sub-choice of
+     * [BACKGROUND_BLUR_ENABLED], kept under its original key so an existing
+     * install does not lose the choice.
+     */
     const val BACKGROUND_DYNAMIC_BLUR = "background_dynamic_blur"
     const val BACKGROUND_DYNAMIC_BLUR_DEFAULT = true
+
+    /** Dynamic colours — artwork-derived surface colours, independent of blur. */
     const val BACKGROUND_DYNAMIC_COLORS = "background_dynamic_colors"
     const val BACKGROUND_DYNAMIC_COLORS_DEFAULT = true
 
     /**
-     * One-off migration marker for the background settings. Version 0 (absent)
-     * means the build predates the switches, so the legacy `BACKDROP_BLUR = 0`
-     * row means "no blur" and is imported once. Bumping this constant is how a
-     * future default change is applied without overwriting a user's choice.
+     * One-off migration marker for the background settings.
+     *
+     * - Version 0 (absent) predates the switches: the legacy `BACKDROP_BLUR = 0`
+     *   row meant "no blur" and is imported once.
+     * - Version 1 had five per-section palettes (primary/secondary/tertiary).
+     * - Version 2 is the component model: one colour per surface.
+     *
+     * Each step is imported once and is derived from rows that are never
+     * deleted, so a failed write simply re-runs the same import.
      */
     const val BACKGROUND_PROFILE_VERSION = "background_profile_version"
-    const val BACKGROUND_PROFILE_VERSION_CURRENT = 1
+    const val BACKGROUND_PROFILE_VERSION_CURRENT = 2
 
-    /** Per-section background keys: `background_<section>_<field>`. */
-    fun backgroundKey(sectionId: String, field: String): String = "background_${sectionId}_$field"
+    /** Per-component background keys: `background_component_<id>_<field>`. */
+    fun backgroundComponentKey(componentId: String, field: String): String =
+        "background_component_${componentId}_$field"
 
     const val BACKGROUND_FIELD_BLUR = "blur"
+    const val BACKGROUND_FIELD_FOLLOW_ARTWORK = "follow_artwork"
+    const val BACKGROUND_FIELD_COLOR = "color"
+
+    /**
+     * Version-1 per-section keys: `background_<section>_<field>`. Still readable
+     * (the version-1 → 2 import reads them) and still clearable, but never
+     * written again.
+     */
+    fun backgroundKey(sectionId: String, field: String): String = "background_${sectionId}_$field"
+
+    /** Version-1 field names, kept for that import only. */
     const val BACKGROUND_FIELD_DYNAMIC_BLUR = "dynamic_blur"
     const val BACKGROUND_FIELD_DYNAMIC_COLORS = "dynamic_colors"
     const val BACKGROUND_FIELD_PRIMARY = "primary"
     const val BACKGROUND_FIELD_SECONDARY = "secondary"
     const val BACKGROUND_FIELD_TERTIARY = "tertiary"
 
-    private val BACKGROUND_SECTION_KEY = Regex(
+    private val LEGACY_BACKGROUND_SECTION_KEY = Regex(
         "^background_(home|search|library|mini|player)_(blur|dynamic_blur|dynamic_colors|primary|secondary|tertiary)$",
     )
 
+    private val BACKGROUND_COMPONENT_KEY = Regex(
+        "^background_component_(page|nav|mini|player)_(blur|follow_artwork|color)$",
+    )
+
     /**
-     * Per-section background keys are built from a section id, so they cannot
+     * Component and legacy section keys are built from an id, so they cannot
      * live in [all]. [UpdateSettingUseCase] still has to refuse typos, so it
      * asks this instead: the shape is validated, and an id that is not one of
-     * the five sections is rejected exactly like an unknown key.
+     * the known ids is rejected exactly like an unknown key.
      */
-    fun isBackgroundSectionKey(key: String): Boolean = BACKGROUND_SECTION_KEY.matches(key)
+    fun isBackgroundComponentKey(key: String): Boolean =
+        BACKGROUND_COMPONENT_KEY.matches(key) || LEGACY_BACKGROUND_SECTION_KEY.matches(key)
 
     // Internal test-build visual tuning. The public build ignores persisted values.
     const val TUNE_PAGE_BACKDROP = "tune_page_backdrop"
