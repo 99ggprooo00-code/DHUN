@@ -56,7 +56,7 @@ class SettingsPersistenceTest {
         fun close() = scope.cancel()
     }
 
-    private suspend fun eventually(timeoutMs: Long = 10_000, check: () -> Boolean) {
+    private suspend fun eventually(timeoutMs: Long = 10_000, check: suspend () -> Boolean) {
         withTimeout(timeoutMs) { while (!check()) delay(10) }
     }
 
