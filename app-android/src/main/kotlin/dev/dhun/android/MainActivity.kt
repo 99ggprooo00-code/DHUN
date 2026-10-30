@@ -174,11 +174,9 @@ class MainActivity : ComponentActivity() {
                 // frame for the same reason as the theme: the launch frame must
                 // already be the user's background, not a default one that
                 // fades into the stored one.
-                BackgroundPreferences.apply(
-                    BackgroundPreferences.read(
-                        GetSettingUseCase(settings),
-                        UpdateSettingUseCase(settings),
-                    ),
+                BackgroundPreferences.restoreBeforeFirstFrame(
+                    GetSettingUseCase(settings),
+                    UpdateSettingUseCase(settings),
                 )
             }
         }

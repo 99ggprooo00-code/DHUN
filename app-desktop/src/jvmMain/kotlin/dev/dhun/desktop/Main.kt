@@ -344,11 +344,9 @@ fun main(args: Array<String>) {
                     // Backgrounds before the first frame: the window must open
                     // with the user's blur + palette, not a default that
                     // repaints a moment later.
-                    BackgroundPreferences.apply(
-                        BackgroundPreferences.read(
-                            GetSettingUseCase(settings),
-                            UpdateSettingUseCase(settings),
-                        ),
+                    BackgroundPreferences.restoreBeforeFirstFrame(
+                        GetSettingUseCase(settings),
+                        UpdateSettingUseCase(settings),
                     )
                 }
             }

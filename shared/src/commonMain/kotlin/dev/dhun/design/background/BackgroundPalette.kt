@@ -235,7 +235,11 @@ object BackgroundPalettePolicy {
         val target = background.luminance()
         val lum = color.luminance()
         val drift = lum - target
-        if (abs(drift) <= BASE_LUMINANCE_DRIFT) return color
+        // The epsilon matters: clamping lands the colour exactly on the band
+        // edge, and without it a second pass (sanitise runs on the way in *and*
+        // on the way out of storage) would nudge an already-safe palette again,
+        // drifting a little further every read.
+        if (abs(drift) <= BASE_LUMINANCE_DRIFT + CLAMP_EPSILON) return color
         val excess = abs(drift) - BASE_LUMINANCE_DRIFT
         val towardBlack = drift > 0f
         val span = if (towardBlack) lum else 1f - lum
@@ -256,6 +260,9 @@ object BackgroundPalettePolicy {
 
     /** A manual layer must never be fully transparent — that reads as "unset". */
     const val MIN_LAYER_ALPHA = 0.05f
+
+    /** Tolerance for "already inside the band", so clamping is idempotent. */
+    const val CLAMP_EPSILON = 1e-4f
 }
 
 /** Where a section's current palette came from. Drives the Settings caption. */

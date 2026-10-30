@@ -295,10 +295,15 @@ class BackgroundSettingsTest {
         DhunBackgrounds.setArtworkSeed("https://example.test/cover.jpg")
         assertEquals(PaletteSource.ARTWORK, DhunBackgrounds.sourceFor(BackgroundSection.HOME))
         // The manual palette is sanitised on the way in, so that is what the
-        // section paints — byte for byte, not "close enough".
-        assertEquals(
-            BackgroundPalettePolicy.sanitize(manual, DhunAppearance.tokens),
-            DhunBackgrounds.paletteFor(BackgroundSection.SEARCH),
+        // section paints. The blooms are compared exactly; the base is compared
+        // by luminance because sanitising twice must not drift it.
+        val painted = DhunBackgrounds.paletteFor(BackgroundSection.SEARCH)
+        val expected = BackgroundPalettePolicy.sanitize(manual, DhunAppearance.tokens)
+        assertEquals(expected.secondary, painted.secondary)
+        assertEquals(expected.tertiary, painted.tertiary)
+        assertTrue(
+            kotlin.math.abs(painted.primary.luminance() - expected.primary.luminance()) <= 0.001f,
+            "sanitising an already-safe palette must be idempotent",
         )
 
         // Global off → Search keeps its colours and Home now uses its default,
@@ -407,8 +412,13 @@ class BackgroundSettingsTest {
         return vm
     }
 
-    private suspend fun reloaded(d: DataLayer, scope: CoroutineScope): SettingsViewModel {
+    /** Waits for every pending preference write the ViewModel launched. */
+    private suspend fun settled(scope: CoroutineScope) {
         scope.coroutineContext[Job]!!.children.toList().joinAll()
+    }
+
+    private suspend fun reloaded(d: DataLayer, scope: CoroutineScope): SettingsViewModel {
+        settled(scope)
         return loaded(vm(d, scope))
     }
 
@@ -519,6 +529,9 @@ class BackgroundSettingsTest {
         v.setBackgroundBlurEnabled(false)
         v.setSectionManualPalette(BackgroundSection.HOME, BackgroundPalette(Color(0xFF111111), Color(0xFF334455), Color(0xFF554433)))
         v.reset()
+        // Writes are asynchronous: observe the database only once they have all
+        // landed, otherwise this asserts on a race instead of on the reset.
+        settled(this)
         // Every background row is gone, including the per-section ones that are
         // not in SettingsKeys.all.
         for (key in BackgroundPreferences.allKeys()) {

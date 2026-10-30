@@ -61,11 +61,21 @@ object BackgroundPreferences {
      */
     suspend fun read(get: GetSettingUseCase, update: UpdateSettingUseCase): BackgroundState {
         val version = get.int(SettingsKeys.BACKGROUND_PROFILE_VERSION, 0)
-        if (version < SettingsKeys.BACKGROUND_PROFILE_VERSION_CURRENT) {
+        // A migration is a *write*, and a write is not allowed to decide whether
+        // the stored preferences can be read: on a full disk the old build failed
+        // the entire load here, so every setting came back as its default and the
+        // screen reported that nothing could be read. The imported value is
+        // therefore computed first and persisted on a best-effort basis — if the
+        // marker write fails the import simply runs again next launch, which is
+        // safe because it is derived from the same legacy row.
+        val importedBlur = if (version < SettingsKeys.BACKGROUND_PROFILE_VERSION_CURRENT) {
             migrate(get, update)
+        } else {
+            null
         }
 
-        val blurEnabled = get.boolean(SettingsKeys.BACKGROUND_BLUR_ENABLED, SettingsKeys.BACKGROUND_BLUR_ENABLED_DEFAULT)
+        val blurEnabled = importedBlur
+            ?: get.boolean(SettingsKeys.BACKGROUND_BLUR_ENABLED, SettingsKeys.BACKGROUND_BLUR_ENABLED_DEFAULT)
         val dynamicBlur = get.boolean(SettingsKeys.BACKGROUND_DYNAMIC_BLUR, SettingsKeys.BACKGROUND_DYNAMIC_BLUR_DEFAULT)
         val dynamicColors = get.boolean(SettingsKeys.BACKGROUND_DYNAMIC_COLORS, SettingsKeys.BACKGROUND_DYNAMIC_COLORS_DEFAULT)
 
@@ -102,13 +112,59 @@ object BackgroundPreferences {
     /**
      * One-time import of the pre-switch blur setting. Idempotent by the marker,
      * so a user who deliberately turns blur off later keeps that choice.
+     *
+     * Returns the imported master-blur value (or `null` when there was nothing to
+     * import), and never lets a failed write hide the stored preferences — see
+     * [read].
      */
-    private suspend fun migrate(get: GetSettingUseCase, update: UpdateSettingUseCase) {
-        if (!get.has(SettingsKeys.BACKGROUND_BLUR_ENABLED)) {
+    private suspend fun migrate(get: GetSettingUseCase, update: UpdateSettingUseCase): Boolean? {
+        val imported = if (!get.has(SettingsKeys.BACKGROUND_BLUR_ENABLED)) {
             val legacyPercent = get.int(SettingsKeys.BACKDROP_BLUR, SettingsKeys.BACKDROP_BLUR_DEFAULT)
-            update.boolean(SettingsKeys.BACKGROUND_BLUR_ENABLED, legacyPercent > 0)
+            legacyPercent > 0
+        } else {
+            null
         }
-        update.int(SettingsKeys.BACKGROUND_PROFILE_VERSION, SettingsKeys.BACKGROUND_PROFILE_VERSION_CURRENT)
+        bestEffort {
+            imported?.let { update.boolean(SettingsKeys.BACKGROUND_BLUR_ENABLED, it) }
+            update.int(SettingsKeys.BACKGROUND_PROFILE_VERSION, SettingsKeys.BACKGROUND_PROFILE_VERSION_CURRENT)
+        }
+        return imported
+    }
+
+    /**
+     * Runs a migration write, ignoring a storage failure.
+     *
+     * Deliberately narrow: it swallows a failed *write*, never a cancellation,
+     * and never a failed read. A migration that cannot be saved is not a reason
+     * to show the user defaults for settings that are sitting in the database.
+     */
+    private suspend fun bestEffort(block: suspend () -> Unit) {
+        try {
+            block()
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // The next launch retries: the import is derived from the same row.
+        }
+    }
+
+    /**
+     * Applies the stored state to the live holder from a platform entry point,
+     * before the first frame.
+     *
+     * Never throws. These call sites run while the Activity/window is still
+     * being created, so a database that is briefly unavailable must not take the
+     * launch down; the documented defaults stay in place, which is exactly what
+     * a fresh install shows.
+     */
+    suspend fun restoreBeforeFirstFrame(get: GetSettingUseCase, update: UpdateSettingUseCase) {
+        try {
+            apply(read(get, update))
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            DhunBackgrounds.clear()
+        }
     }
 
     /* ------------------------------------------------------------- writes */
