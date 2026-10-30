@@ -32,6 +32,10 @@ is worth more than a paragraph of description.
 
 ### Android
 
+> Beginner version with the exact artifact, the download links, the
+> version-code caveat and the ADB commands step by step:
+> [`36-pr217-device-install.md`](36-pr217-device-install.md).
+
 1. Open the pull request (or the branch) on GitHub and go to **Checks**.
 2. Open the **`apk`** job for the commit you want to test, scroll to
    **Artifacts**, and download **`apk`** (a zip containing `dhun-test.apk`). The
