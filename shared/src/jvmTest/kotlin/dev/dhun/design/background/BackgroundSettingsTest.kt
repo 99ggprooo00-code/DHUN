@@ -372,11 +372,31 @@ class BackgroundSettingsTest {
     fun switchingTracksReusesTheCachedExtraction() {
         DhunBackgrounds.setArtworkSeed("https://example.test/one.jpg")
         val first = DhunBackgrounds.current
+        val firstPalette = DhunBackgrounds.paletteFor(BackgroundSection.HOME)
         DhunBackgrounds.setArtworkSeed("https://example.test/one.jpg")
         // Same seed → same revision: no second extraction, no repaint.
         assertEquals(first.revision, DhunBackgrounds.current.revision)
         DhunBackgrounds.setArtworkSeed("https://example.test/two.jpg")
         assertTrue(DhunBackgrounds.current.revision > first.revision)
+        // A track change *does* change the resolved palette — that is the change
+        // the backdrop animates rather than snaps.
+        assertNotEquals(firstPalette.secondary, DhunBackgrounds.paletteFor(BackgroundSection.HOME).secondary)
+    }
+
+    @Test
+    fun anUnreadableArtworkBehavesLikeNoArtwork() {
+        // The extractor's fallback is the brand accent, not artwork colour: a
+        // blank or unreadable seed must not paint the accent as if it were the
+        // song's palette.
+        for (seed in listOf(null, "", "   ")) {
+            DhunBackgrounds.setArtworkSeed(seed)
+            assertNull(DhunBackgrounds.current.artwork, "seed=$seed must not produce a palette")
+            assertEquals(
+                BackgroundPalettePolicy.defaultPalette(BackgroundSection.HOME, DhunAppearance.tokens),
+                DhunBackgrounds.paletteFor(BackgroundSection.HOME),
+            )
+            assertEquals(PaletteSource.DEFAULT, DhunBackgrounds.sourceFor(BackgroundSection.HOME))
+        }
     }
 
     /* --------------------------------------------------------- encoding */

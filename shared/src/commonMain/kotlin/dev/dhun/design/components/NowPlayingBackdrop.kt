@@ -239,8 +239,9 @@ object AmbientBackdropPolicy {
 fun PageArtworkBackdrop(
     artworkUrl: String?,
     modifier: Modifier = Modifier,
+    section: BackgroundSection = BackgroundSection.HOME,
 ) {
-    NowPlayingBackdrop(artworkUrl = artworkUrl, modifier = modifier)
+    NowPlayingBackdrop(artworkUrl = artworkUrl, modifier = modifier, section = section)
 }
 
 enum class NowPlayingBackdropPhase { Idle, Loading, Loaded, Failed }
