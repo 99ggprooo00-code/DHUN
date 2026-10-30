@@ -152,11 +152,45 @@ class SettingsViewModel(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
+                // Loading is one logical snapshot. If a later key fails, do not
+                // leave earlier keys applied alongside defaults for the rest.
+                resetLoadedValuesToDefaults()
                 maintenance.report(SETTINGS_LOAD_FAILED)
             } finally {
                 _loaded.value = true
             }
         }
+    }
+
+    /**
+     * A partial settings read must never publish a mixed snapshot. Restore every
+     * UI-facing setting to its documented default before exposing [loaded].
+     */
+    private fun resetLoadedValuesToDefaults() {
+        _themeId.value = SettingsKeys.THEME_DEFAULT
+        _accentId.value = SettingsKeys.ACCENT_DEFAULT
+        _cacheSizeMb.value = SettingsKeys.CACHE_SIZE_MB_DEFAULT
+        _resumeOnLaunch.value = SettingsKeys.RESUME_ON_LAUNCH_DEFAULT
+        _closeToTray.value = SettingsKeys.CLOSE_TO_TRAY_DEFAULT
+        _backdropBlurPercent.value = SettingsKeys.BACKDROP_BLUR_DEFAULT
+        _backdropBrightnessPercent.value = SettingsKeys.BACKDROP_BRIGHTNESS_DEFAULT
+        _visualTuning.value = emptyMap()
+        DhunVisualTuning.reset()
+        _accentMode.value = SettingsKeys.ACCENT_MODE_DEFAULT
+        _audioQuality.value = SettingsKeys.AUDIO_QUALITY_DEFAULT
+        _seekStepSeconds.value = SettingsKeys.SEEK_STEP_SECONDS_DEFAULT
+        _autoplayRadio.value = SettingsKeys.AUTOPLAY_RADIO_ENABLED_DEFAULT
+        _lyricsEnabled.value = SettingsKeys.LYRICS_ENABLED_DEFAULT
+        _lyricsPreferSynced.value = SettingsKeys.LYRICS_PREFER_SYNCED_DEFAULT
+        _lyricsAutoScroll.value = SettingsKeys.LYRICS_AUTO_SCROLL_DEFAULT
+        _lyricsTextSize.value = SettingsKeys.LYRICS_TEXT_SIZE_DEFAULT
+        _providerOrder.value = SettingsKeys.LYRICS_PROVIDER_ORDER_DEFAULT
+        _preferredProvider.value = SettingsKeys.LYRICS_PREFERRED_PROVIDER_DEFAULT
+        _countryCode.value = SettingsKeys.COUNTRY_CODE_DEFAULT
+        _explicitContent.value = SettingsKeys.EXPLICIT_CONTENT_DEFAULT
+        _pauseOnMute.value = SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME_DEFAULT
+        _persistShuffleRepeat.value = SettingsKeys.PERSIST_SHUFFLE_REPEAT_DEFAULT
+        _recordListeningHistory.value = SettingsKeys.RECORD_LISTENING_HISTORY_DEFAULT
     }
 
     private suspend fun loadPersistedValues() {
