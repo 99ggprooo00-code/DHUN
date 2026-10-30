@@ -886,9 +886,11 @@ Updated every phase. Nothing hidden.
 - The track ⋮ menu is still **centered**; anchoring it near its source ⋮ remains
   a separate UX decision (round-1 report; gate step 12 records it as "not a
   failure of this step").
-- `SearchScreen`'s in-page search field is still an M3 `OutlinedTextField`
-  (styled via `OutlinedTextFieldDefaults`). It is a page-level search bar, not a
-  dialog field, and was deliberately left alone.
+- ~~`SearchScreen`'s in-page search field is still an M3 `OutlinedTextField`~~
+  **Closed 2026-10-30:** the page-level search bar and the lyrics TTML field are
+  `DhunTextField` now — the last two `OutlinedTextField`s in the app are gone and
+  the design gate (`scripts/test_design_system.py`) fails if one comes back
+  (`docs/design/glass-system.md` §2).
 - `DhunTextField` is a `BasicTextField` wrapper: it carries the app's visual
   language and IME Done handling, but no M3 text-field semantics/autofill
   extras. Revisit if a real form ever needs them.

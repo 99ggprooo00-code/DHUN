@@ -3,6 +3,7 @@ package dev.dhun.design.components
 import androidx.compose.foundation.background
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import dev.dhun.design.DhunAppearance
@@ -43,11 +44,35 @@ internal fun readingSurfaceFill(part: VisualPart = VisualPart.READING): Color {
 /**
  * Quiet surface for music rows and groups, readable over blurred artwork in
  * both themes. Apply before clickable so the ripple stays within the shape.
+ *
+ * Rows are glass too, just the quiet cut of it: the readable fill painted as a
+ * short top-lifted → bottom-deepened gradient with a light sheen along the top
+ * edge ([GlassMaterialPolicy] plus [ROW_SHEEN_SCALE]). A single flat
+ * `background(fill)` made every row, card and settings group one shade — the
+ * "glassy in name only" look the design contract forbids. The lift and sheen
+ * are deliberately smaller than the panel cut so a list stays scannable.
  */
 fun Modifier.dhunContentSurface(
     shape: Shape = DhunShapes.large,
     reading: Boolean = false,
-): Modifier = this.clip(shape).background(if (reading) readingSurfaceFill() else contentRowFill(), shape)
+): Modifier {
+    val light = DhunAppearance.tokens.isLight
+    val fill = if (reading) readingSurfaceFill() else contentRowFill()
+    val bodyStops = GlassMaterialPolicy.bodyStops(fill, light).toTypedArray()
+    val sheen = rowSheenStops(light)
+    return this
+        .clip(shape)
+        .background(Brush.verticalGradient(*bodyStops), shape)
+        .background(Brush.verticalGradient(*sheen), shape)
+}
+
+/** A row carries a fraction of the panel's specular highlight. */
+private const val ROW_SHEEN_SCALE = 0.32f
+
+private fun rowSheenStops(light: Boolean): Array<Pair<Float, Color>> =
+    GlassMaterialPolicy.sheenStops(light)
+        .map { (offset, alpha) -> offset to Color.White.copy(alpha = alpha * ROW_SHEEN_SCALE) }
+        .toTypedArray()
 
 /** One row shape across Home, Search, Library and browse lists. */
 fun Modifier.dhunContentRowSurface(): Modifier = dhunContentSurface(shape = DhunShapes.medium)

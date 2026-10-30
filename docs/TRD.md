@@ -68,7 +68,7 @@ Use the same navigation contract, components and source-derived design tokens/ic
 
 ## 6. Design-system technical requirements
 
-The intended visual identity is **translucent frosted glass** with artwork-led color, not a Material 3 visual theme. Compose Material components may be used as implementation primitives, but their default appearance must not override the agreed visual contract. Source of truth: `shared/design/DhunAppearance.kt`, `DhunTypography.kt`, `DhunShapes.kt`, `DhunSpacing.kt`, `DhunAnimations.kt`, `DhunIcons.kt`, and the glass component policies.
+The intended visual identity is **translucent frosted glass** with artwork-led color, not a Material 3 visual theme. Compose Material components may be used as implementation primitives, but their default appearance must not override the agreed visual contract. Source of truth: [`docs/design/glass-system.md`](design/glass-system.md) (the normative appearance contract) and `shared/src/commonMain/kotlin/dev/dhun/design/` — `DhunAppearance.kt`, `DhunTypography.kt`, `DhunShapes.kt`, `DhunSpacing.kt`, `DhunAnimations.kt`, `DhunIcons.kt`, and the glass component policies.
 
 - Blur artwork once per artwork/track generation, cache the result, and avoid per-frame full-resolution blur.
 - Layer blur + controlled tint + gradient scrim + translucent surfaces; ensure text and controls remain readable on bright and dark art.

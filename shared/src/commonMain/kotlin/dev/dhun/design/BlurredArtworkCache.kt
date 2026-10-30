@@ -9,7 +9,7 @@ package dev.dhun.design
  * future bitmap-pipeline work (downscale → offscreen blur → tint) can skip
  * redundant work and so tests can assert the once-per-track rule.
  *
- * Material 3 only — no Liquid Glass, no continuous full-res reblur.
+ * One cached blur per track — no platform glass API, no continuous full-res reblur.
  */
 object BlurredArtworkCache {
     @Volatile

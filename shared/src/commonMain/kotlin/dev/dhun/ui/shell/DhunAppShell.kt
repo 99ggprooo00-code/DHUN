@@ -11,26 +11,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
-import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -70,21 +60,27 @@ import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
-import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.DhunVisualTuning
 import dev.dhun.design.VisualPart
 import dev.dhun.design.catalog.ComponentCatalogScreen
+import dev.dhun.design.components.AmbientBackdrop
 import dev.dhun.legal.DhunAppInfo
+import dev.dhun.design.components.DhunNavigationBar
+import dev.dhun.design.components.DhunNavigationBarItem
+import dev.dhun.design.components.DhunNavigationRail
+import dev.dhun.design.components.DhunNavigationRailItem
 import dev.dhun.design.components.GlassDock
 import dev.dhun.design.components.LocalTextInputFocusRegistry
 import dev.dhun.design.components.NowPlayingBackdrop
+import dev.dhun.design.components.GlassCard
+import dev.dhun.design.components.LocalNowPlayingArtwork
 import dev.dhun.design.components.TextInputFocusRegistry
 import dev.dhun.design.components.acrylicGlass
-import dev.dhun.design.components.lyricsVeil
-import dev.dhun.design.components.readingSurfaceFill
+import dev.dhun.design.components.lyricsVeilBrush
+import dev.dhun.design.components.contentRowFill
 import dev.dhun.player.DhunPlayer
 import dev.dhun.player.equalizer.EqualizerSession
 import dev.dhun.presentation.browse.AlbumViewModel
@@ -111,7 +107,6 @@ import dev.dhun.ui.player.FullPlayer
 import dev.dhun.ui.player.MiniPlayer
 import dev.dhun.ui.search.SearchScreen
 import dev.dhun.ui.settings.SettingsScreen
-import kotlinx.coroutines.launch
 
 // A positive layer keeps the immersive player above the rail, split panes and
 // the desktop navigation dock while its enter/exit transition is running.
@@ -300,7 +295,15 @@ fun DhunAppShell(
     }
 
     val textInputFocusRegistry = remember { TextInputFocusRegistry() }
-    CompositionLocalProvider(LocalTextInputFocusRegistry provides textInputFocusRegistry) {
+    // Every dialog and frost-cut surface (GlassCard/GlassDialog) paints the
+    // song that is playing, blurred once and cached, so the panel is visibly
+    // glass over the app's own artwork instead of a flat plate over a scrim.
+    // Null when nothing plays: the documented fallback (gradient + sheen).
+    val nowPlayingArtworkForGlass = currentTrack?.thumbnailUrl
+    CompositionLocalProvider(
+        LocalTextInputFocusRegistry provides textInputFocusRegistry,
+        LocalNowPlayingArtwork provides nowPlayingArtworkForGlass,
+    ) {
         BoxWithConstraints(
             modifier = modifier
                 .fillMaxSize()
@@ -365,7 +368,13 @@ fun DhunAppShell(
         // Only one theme-aware artwork veil lives beneath the screens. Accent
         // extraction above still colors controls, but no second full-screen wash
         // is painted over the image (or over the fallback when art is absent).
-        Box(modifier = Modifier.fillMaxSize().background(DhunColors.background)) {
+        // The page base is never one flat fill: the ambient artwork-coloured
+        // blooms sit under the blurred cover, so a screen that is not backed by
+        // artwork (first run, Library, Settings, offline) still has depth and
+        // colour instead of a plain Material background
+        // (docs/design/glass-system.md §1).
+        Box(modifier = Modifier.fillMaxSize()) {
+            AmbientBackdrop(modifier = Modifier.fillMaxSize())
             NowPlayingBackdrop(
                 artworkUrl = currentTrack?.thumbnailUrl,
                 modifier = Modifier.fillMaxSize(),
@@ -376,9 +385,11 @@ fun DhunAppShell(
                 AppNavigationRail(nav = nav, layout = layout)
             }
             Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                // Material's Scaffold is only the slot layout here: its own
+                // container is transparent so the glass backdrop shows through.
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
-            containerColor = Color.Transparent,
+                    containerColor = Color.Transparent,
             topBar = {
                 TopLevelAnimatedVisibility(
                     visible = offlineBannerPlacement == OfflineBannerPlacement.ScaffoldTopBar,
@@ -721,7 +732,13 @@ fun DhunAppShell(
 
 @Composable
 private fun OfflineStatusBanner(modifier: Modifier = Modifier) {
-    Surface(color = DhunColors.errorContainer, modifier = modifier.fillMaxWidth()) {
+    // Glass with an error tint, not a flat Material Surface strip: the shell's
+    // chrome is the app's material (see docs/design/glass-system.md §2).
+    GlassCard(
+        modifier = modifier.fillMaxWidth(),
+        tint = DhunColors.errorContainer,
+        elevated = false,
+    ) {
         Text(
             "You're offline. Search and streaming are unavailable; downloaded tracks remain available.",
             fontSize = DhunTypographyTokens.labelSmall.fontSize,
@@ -765,28 +782,29 @@ private fun BottomNavigationBar(
                     .background(DhunColors.glassEdge),
             )
         }
-        Box(modifier = Modifier.fillMaxWidth().lyricsVeil(part = VisualPart.NAVIGATION)) {
-            NavigationBar(
-                containerColor = Color.Transparent,
-                contentColor = DhunColors.textPrimary,
-                tonalElevation = DhunSpacing.zero,
-                modifier = Modifier.fillMaxWidth().height(DhunSpacing.navigationBarContent),
-            ) {
-                AppTab.userTabs.forEach { tab ->
-                    AppBottomNavigationItem(
+        // The band is the DHUN glass body (gradient + sheen over the dock's
+        // frosted artwork), not Material's NavigationBar: its selection pill and
+        // item metrics were the last stock-Material look in the shell.
+        // `lyricsVeil` still sets the tone so the tabs match the lyrics panel.
+        DhunNavigationBar(
+            modifier = Modifier.background(lyricsVeilBrush(part = VisualPart.NAVIGATION)),
+            fill = contentRowFill(VisualPart.NAVIGATION),
+        ) {
+            AppTab.userTabs.forEach { tab ->
+                DhunNavigationBarItem(
+                    icon = tab.icon,
+                    label = tab.title,
+                    selected = DhunShellPolicy.isTabSelected(
+                        layout = layout,
+                        selectedTab = nav.selectedTab,
                         tab = tab,
-                        selected = DhunShellPolicy.isTabSelected(
-                            layout = layout,
-                            selectedTab = nav.selectedTab,
-                            tab = tab,
-                            detailDepth = nav.detailStack.size,
-                        ),
-                        // A bottom bar only exists in the single-pane layout, so
-                        // `false` here is the phone rule by construction: switching
-                        // tabs drops the stack that was covering the tab.
-                        onClick = { nav.selectTab(tab, keepDetailOnTabChange = false) },
-                    )
-                }
+                        detailDepth = nav.detailStack.size,
+                    ),
+                    // A bottom bar only exists in the single-pane layout, so
+                    // `false` here is the phone rule by construction: switching
+                    // tabs drops the stack that was covering the tab.
+                    onClick = { nav.selectTab(tab, keepDetailOnTabChange = false) },
+                )
             }
         }
     }
@@ -797,14 +815,14 @@ private fun AppNavigationRail(
     nav: AppNavState,
     layout: DhunShellLayout,
 ) {
-    NavigationRail(
-        containerColor = readingSurfaceFill(VisualPart.NAVIGATION),
-        contentColor = DhunColors.textPrimary,
-        modifier = Modifier.fillMaxHeight(),
-    ) {
+    // Not Material's NavigationRail: DHUN owns the container, the pill and the
+    // labels. Its width is DhunNavigationPolicy.railWidth, the same number
+    // DhunShellPolicy.railAllowance reserves for the pane split.
+    DhunNavigationRail {
         AppTab.userTabs.forEach { tab ->
-            AppRailNavigationItem(
-                tab = tab,
+            DhunNavigationRailItem(
+                icon = tab.icon,
+                label = tab.title,
                 selected = DhunShellPolicy.isTabSelected(
                     layout = layout,
                     selectedTab = nav.selectedTab,
@@ -1130,59 +1148,6 @@ private fun SettingsThemeCatalogue(
             viewModel.setAccentId(accent.id)
             DhunAppearance.setAppearance(nextAccent = accent)
         },
-    )
-}
-
-@Composable
-private fun AppNavigationIcon(tab: AppTab, selected: Boolean) {
-    DhunIconView(
-        icon = tab.icon,
-        contentDescription = "${tab.title} tab",
-        modifier = Modifier.size(DhunSpacing.iconSize),
-        tint = if (selected) DhunColors.accent else DhunColors.textTertiary,
-    )
-}
-
-@Composable
-private fun ColumnScope.AppRailNavigationItem(
-    tab: AppTab,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    NavigationRailItem(
-        selected = selected,
-        onClick = onClick,
-        icon = { AppNavigationIcon(tab, selected) },
-        label = { Text(text = tab.title, style = MaterialTheme.typography.labelSmall) },
-        alwaysShowLabel = true,
-        colors = NavigationRailItemDefaults.colors(
-            selectedIconColor = DhunColors.accent,
-            selectedTextColor = DhunColors.accent,
-            unselectedIconColor = DhunColors.textTertiary,
-            unselectedTextColor = DhunColors.textTertiary,
-            indicatorColor = DhunColors.accentContainer,
-        ),
-    )
-}
-
-@Composable
-private fun RowScope.AppBottomNavigationItem(
-    tab: AppTab,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    NavigationBarItem(
-        selected = selected,
-        onClick = onClick,
-        icon = { AppNavigationIcon(tab, selected) },
-        label = { Text(text = tab.title, style = MaterialTheme.typography.labelSmall) },
-        colors = NavigationBarItemDefaults.colors(
-            selectedIconColor = DhunColors.onAccentContainer,
-            selectedTextColor = DhunColors.accent,
-            unselectedIconColor = DhunColors.textTertiary,
-            unselectedTextColor = DhunColors.textTertiary,
-            indicatorColor = DhunColors.accentContainer,
-        ),
     )
 }
 

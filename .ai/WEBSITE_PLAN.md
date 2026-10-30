@@ -1124,7 +1124,9 @@ matching GitHub. The site must not hide that status to improve conversion.
 ### B.6.4 Visual direction
 
 - dark, artwork-led, but not a clone of Volta;
-- DHUN's existing Material 3 / artwork / translucent-surface vocabulary;
+- DHUN's own vocabulary: translucent frosted glass over artwork, layered
+  surfaces, soft gradients and scrims. Material 3 is an implementation detail,
+  never the look (`docs/design/glass-system.md`);
 - system font stack for v1 unless a font licence and self-hosting plan are
   reviewed first;
 - no remote font, analytics, advertising, autoplay audio/video or tracking

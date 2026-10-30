@@ -49,6 +49,15 @@ import dev.dhun.design.components.DhunButton
 import dev.dhun.design.components.DhunFilterChip
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.DhunOutlinedButton
+import dev.dhun.design.components.DhunSlider
+import dev.dhun.design.components.DhunCheckbox
+import dev.dhun.design.components.DhunDivider
+import dev.dhun.design.components.DhunNavigationBar
+import dev.dhun.design.components.DhunNavigationBarItem
+import dev.dhun.design.components.DhunProgressBar
+import dev.dhun.design.components.DhunSpinner
+import dev.dhun.design.components.DhunSwitch
+import dev.dhun.design.components.DhunTextField
 import dev.dhun.design.components.DhunTextButton
 import dev.dhun.design.components.DhunTonalButton
 import dev.dhun.design.components.EmptyView
@@ -154,7 +163,7 @@ fun ComponentCatalogScreen(
                 item { SectionHeader(title = "Tokens — Colors") }
                 item { ColorTokenRow() }
 
-                item { SectionHeader(title = "GlassCard — real blur over artwork") }
+                item { SectionHeader(title = "Glass material — gradient + sheen + edge (frost over artwork)") }
                 item { GlassCardDemo() }
 
                 item { SectionHeader(title = "ArtworkImage — states") }
@@ -165,6 +174,9 @@ fun ComponentCatalogScreen(
 
                 item { SectionHeader(title = "Buttons — all states") }
                 item { ButtonStates() }
+
+                item { SectionHeader(title = "Controls — DHUN switch / slider / input / checkbox / progress / spinner") }
+                item { ControlStates() }
 
                 item { SectionHeader(title = "Chips — filter / assist / input") }
                 item { ChipStates() }
@@ -216,7 +228,8 @@ private fun GlassCardDemo() {
             Column(verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm)) {
                 Text("GlassCard", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
                 Text(
-                    "Real blur (RenderEffect on Android 12+ / Desktop Skiko). Falls back to scrim+border below the floor.",
+                    "Body gradient (lifted top → deep bottom) + specular sheen + gradient hairline edge, " +
+                        "frosted over artwork in the dialog cut. No platform blur: gradient + sheen + edge remain.",
                     style = MaterialTheme.typography.bodySmall,
                     color = DhunColors.textSecondary,
                 )
@@ -228,6 +241,112 @@ private fun GlassCardDemo() {
         }
         GlassCard(modifier = Modifier.fillMaxWidth(), contentPadding = androidx.compose.foundation.layout.PaddingValues(DhunSpacing.lg)) {
             Text("Second GlassCard — layered depth over artwork", color = DhunColors.textSecondary)
+        }
+    }
+}
+
+@Composable
+private fun ControlStates() {
+    var enabled by remember { mutableStateOf(true) }
+    var slider by remember { mutableStateOf(42f) }
+    var typed by remember { mutableStateOf("") }
+    var checked by remember { mutableStateOf(true) }
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = DhunSpacing.lg),
+        verticalArrangement = Arrangement.spacedBy(DhunSpacing.md),
+    ) {
+        GlassCard(modifier = Modifier.fillMaxWidth(), contentPadding = androidx.compose.foundation.layout.PaddingValues(DhunSpacing.lg)) {
+            Column(verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "DhunSwitch (glass off-track, accent on-track)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DhunColors.textSecondary,
+                        modifier = Modifier.weight(1f),
+                    )
+                    DhunSwitch(checked = enabled, onCheckedChange = { enabled = it })
+                }
+                Text(
+                    "DhunSlider (accent groove over translucent glass)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DhunColors.textSecondary,
+                )
+                DhunSlider(
+                    value = slider,
+                    onValueChange = { slider = it },
+                    valueRange = 0f..100f,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                DhunTextField(
+                    value = typed,
+                    onValueChange = { typed = it },
+                    placeholder = "DhunTextField — no Material outline",
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
+                ) {
+                    // The glass box, not Material's outlined square: same role
+                    // semantics, 48dp target, accent fill with an on-accent tick.
+                    DhunCheckbox(checked = checked, onCheckedChange = { checked = it })
+                    Text(
+                        "DhunCheckbox (offline-row selection)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DhunColors.textSecondary,
+                    )
+                }
+                Text(
+                    "DhunProgressBar (accent fill over a translucent groove)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DhunColors.textSecondary,
+                )
+                DhunProgressBar(progress = slider / 100f, modifier = Modifier.fillMaxWidth())
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
+                ) {
+                    // Every indeterminate state in the app is this arc: button
+                    // loading, Home pagination, the refresh disc.
+                    DhunSpinner()
+                    Text(
+                        "DhunSpinner (accent arc in a faint glass track)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DhunColors.textSecondary,
+                    )
+                }
+                DhunDivider()
+                Text(
+                    "DhunDivider (the hairline fades at both ends)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DhunColors.textTertiary,
+                )
+            }
+        }
+
+        // Navigation chrome: the same components the shell uses, rendered on a
+        // sample glass band so the selected pill, the label ladder and the
+        // unselected state can all be seen at once without a wide window.
+        GlassCard(modifier = Modifier.fillMaxWidth(), contentPadding = androidx.compose.foundation.layout.PaddingValues(DhunSpacing.zero)) {
+            DhunNavigationBar {
+                DhunNavigationBarItem(
+                    icon = DhunIcon.Home,
+                    label = "Home",
+                    selected = true,
+                    onClick = {},
+                )
+                DhunNavigationBarItem(
+                    icon = DhunIcon.Search,
+                    label = "Search",
+                    selected = false,
+                    onClick = {},
+                )
+                DhunNavigationBarItem(
+                    icon = DhunIcon.History,
+                    label = "Library",
+                    selected = false,
+                    onClick = {},
+                )
+            }
         }
     }
 }

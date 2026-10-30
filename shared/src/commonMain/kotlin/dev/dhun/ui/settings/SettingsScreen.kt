@@ -20,17 +20,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.window.Dialog
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import dev.dhun.design.components.GlassCard
 import dev.dhun.design.components.dhunContentSurface
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -59,6 +55,9 @@ import dev.dhun.design.components.DhunAppearanceControls
 import dev.dhun.design.components.DhunFilterChip
 import dev.dhun.design.components.DhunButton
 import dev.dhun.design.components.DhunIconButton
+import dev.dhun.design.components.DhunSlider
+import dev.dhun.design.components.DhunSwitch
+import dev.dhun.design.components.DhunTextField
 import dev.dhun.design.components.DhunTextButton
 import dev.dhun.design.components.DhunTonalButton
 import dev.dhun.design.components.SectionHeader
@@ -520,12 +519,14 @@ private fun CountryRegionPicker(viewModel: SettingsViewModel) {
                 verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
             ) {
                 Text("Choose a country or region", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
-                OutlinedTextField(
+                // DHUN's own input, not Material's 56dp outlined box: this
+                // dialog is glass, and an OutlinedTextField dropped into it was
+                // one of the places this screen still read as stock Material 3.
+                DhunTextField(
                     value = query,
                     onValueChange = { query = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Search by name or code") },
-                    singleLine = true,
+                    placeholder = "Search by name or code",
                 )
                 if (matches.isEmpty()) {
                     Text(
@@ -589,7 +590,7 @@ private fun BackdropControls(viewModel: SettingsViewModel) {
                 color = DhunColors.textSecondary,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Slider(
+                DhunSlider(
                     value = blur.toFloat(),
                     onValueChange = { value ->
                         val percent = value.toInt().coerceIn(0, 100)
@@ -618,7 +619,7 @@ private fun BackdropControls(viewModel: SettingsViewModel) {
                 color = DhunColors.textSecondary,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Slider(
+                DhunSlider(
                     value = brightness.toFloat(),
                     onValueChange = { value ->
                         val percent = value.toInt().coerceIn(0, 100)
@@ -659,7 +660,7 @@ private fun VisualTuningControls(viewModel: SettingsViewModel) {
                 Text(part.label, style = MaterialTheme.typography.bodyLarge, color = DhunColors.textPrimary)
                 Text(part.detail, style = MaterialTheme.typography.bodySmall, color = DhunColors.textSecondary)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Slider(
+                    DhunSlider(
                         value = percent.toFloat(),
                         onValueChange = { value ->
                             val next = value.toInt().coerceIn(0, 100)
@@ -676,7 +677,9 @@ private fun VisualTuningControls(viewModel: SettingsViewModel) {
                 }
             }
         }
-        TextButton(onClick = viewModel::resetVisualTuning, enabled = loaded) { Text("Reset adjustable sliders to 15%") }
+        DhunTextButton(onClick = viewModel::resetVisualTuning, enabled = loaded) {
+            Text("Reset adjustable sliders to 15%")
+        }
     }
 }
 
@@ -739,7 +742,7 @@ private fun SettingsSwitchRow(
             )
         }
         Spacer(modifier = Modifier.width(DhunSpacing.md))
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        DhunSwitch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
@@ -794,7 +797,7 @@ private fun EqualizerSection(session: EqualizerSession) {
                 color = DhunColors.textPrimary,
                 modifier = Modifier.weight(1f),
             )
-            Switch(
+            DhunSwitch(
                 checked = model.enabled,
                 onCheckedChange = session::setEnabled,
             )
@@ -866,7 +869,7 @@ private fun EqualizerSliderRow(
             color = DhunColors.textPrimary,
             modifier = Modifier.width(DhunSpacing.touchTarget),
         )
-        Slider(
+        DhunSlider(
             value = value,
             onValueChange = onChange,
             valueRange = min..max,

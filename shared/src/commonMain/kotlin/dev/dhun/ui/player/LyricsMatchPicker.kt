@@ -6,14 +6,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -24,10 +21,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import dev.dhun.core.Track
-import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.GlassCard
 import dev.dhun.design.components.DhunTextField
+import dev.dhun.design.components.DhunTextButton
+import dev.dhun.design.components.DhunDivider
 import dev.dhun.lyrics.TtmlParser
 import dev.dhun.presentation.player.LyricsMatchController
 
@@ -39,7 +37,12 @@ internal fun LyricsMatchPicker(track: Track, controller: LyricsMatchController, 
     var showLocalImport by remember(track.id) { mutableStateOf(false) }
     var ttml by remember(track.id) { mutableStateOf("") }
     Dialog(onDismissRequest = onDismiss) {
-        GlassCard(modifier = Modifier.fillMaxWidth(), opaqueBase = true) {
+        // Same dialog width cap as every other DHUN dialog, so the picker does
+        // not stretch across a desktop window while the rest stay compact.
+        GlassCard(
+            modifier = Modifier.fillMaxWidth().widthIn(max = DhunSpacing.dialogMaxWidth),
+            opaqueBase = true,
+        ) {
             Column(
                 modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp)
                     .verticalScroll(rememberScrollState()).padding(DhunSpacing.lg),
@@ -52,28 +55,29 @@ internal fun LyricsMatchPicker(track: Track, controller: LyricsMatchController, 
                 DhunTextField(value = query, onValueChange = { query = it.take(240) },
                     placeholder = "Title, artist or manual search")
                 Row {
-                    TextButton(onClick = { controller.search(track.id, query) }, enabled = query.isNotBlank() && !state.loading) {
+                    DhunTextButton(onClick = { controller.search(track.id, query) }, enabled = query.isNotBlank() && !state.loading) {
                         Text("Search / Retry")
                     }
-                    TextButton(onClick = { controller.choose(track.id, null) }, enabled = !state.loading) { Text("Use automatic") }
+                    DhunTextButton(onClick = { controller.choose(track.id, null) }, enabled = !state.loading) { Text("Use automatic") }
                 }
-                TextButton(onClick = { showLocalImport = !showLocalImport }) { Text("Paste local TTML lyrics") }
+                DhunTextButton(onClick = { showLocalImport = !showLocalImport }) { Text("Paste local TTML lyrics") }
                 if (showLocalImport) {
                     Text("Local only: paste TTML you have permission to use. Preview does not save or contact a provider. Unsupported XML/timing is rejected; use Choose this match after reviewing the preview.",
                         style = MaterialTheme.typography.bodySmall)
-                    OutlinedTextField(value = ttml, onValueChange = { ttml = it.take(TtmlParser.MAX_INPUT_CHARS + 1) },
-                        label = { Text("TTML document (maximum 256,000 characters)") },
-                        minLines = 3, maxLines = 5, modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = DhunColors.surfaceElevated,
-                            unfocusedContainerColor = DhunColors.surfaceElevated,
-                            focusedTextColor = DhunColors.textPrimary,
-                            unfocusedTextColor = DhunColors.textPrimary,
-                            focusedBorderColor = DhunColors.accent,
-                            unfocusedBorderColor = DhunColors.borderStrong,
-                        ))
+                    // The document field is the app's own input too: multi-line
+                    // and Height-bounded, with a label above it instead of
+                    // Material's floating label.
+                    DhunTextField(
+                        value = ttml,
+                        onValueChange = { ttml = it.take(TtmlParser.MAX_INPUT_CHARS + 1) },
+                        label = "TTML document (maximum 256,000 characters)",
+                        singleLine = false,
+                        minLines = 3,
+                        maxLines = 5,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     if (ttml.length > TtmlParser.MAX_INPUT_CHARS) Text("Document is too large. Paste a smaller document.")
-                    TextButton(onClick = { controller.previewTtml(track.id, ttml) },
+                    DhunTextButton(onClick = { controller.previewTtml(track.id, ttml) },
                         enabled = !state.loading && ttml.isNotBlank() && ttml.length <= TtmlParser.MAX_INPUT_CHARS) { Text("Preview local TTML") }
                 }
                 if (state.loading) Text("Searching / parsing / saving…", style = MaterialTheme.typography.bodySmall)
@@ -85,7 +89,7 @@ internal fun LyricsMatchPicker(track: Track, controller: LyricsMatchController, 
                         style = MaterialTheme.typography.bodySmall,
                     )
                     state.matches.forEach { match ->
-                        HorizontalDivider()
+                        DhunDivider()
                         Text("${match.title} — ${match.artist}", style = MaterialTheme.typography.titleMedium)
                         val timing = if (match.synced) "Synced" else "Unsynced"
                         val wordTimed = (match.lyrics as? dev.dhun.core.Lyrics.Synced)?.lines?.any { it.words.isNotEmpty() } == true
@@ -97,12 +101,12 @@ internal fun LyricsMatchPicker(track: Track, controller: LyricsMatchController, 
                         ) else Text(if (match.provider == "local_ttml") "Local import for this song; title/artist are not verified against the document."
                             else "Requested track metadata; this source did not provide match details.", style = MaterialTheme.typography.bodySmall)
                         Text(match.preview, style = MaterialTheme.typography.bodyMedium)
-                        TextButton(onClick = { controller.choose(track.id, match) }, enabled = !state.loading) {
+                        DhunTextButton(onClick = { controller.choose(track.id, match) }, enabled = !state.loading) {
                             Text(if (state.selected?.let { it.provider == match.provider && it.id == match.id } == true) "Selected" else "Choose this match")
                         }
                     }
                 }
-                TextButton(onClick = onDismiss) { Text("Close") }
+                DhunTextButton(onClick = onDismiss) { Text("Close") }
             }
         }
     }

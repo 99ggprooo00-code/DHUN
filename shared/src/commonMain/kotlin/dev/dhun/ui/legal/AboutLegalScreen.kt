@@ -1,6 +1,5 @@
 package dev.dhun.ui.legal
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,6 +43,7 @@ import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunSpacing
+import dev.dhun.design.components.DhunDivider
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.GlassCard
 import dev.dhun.design.components.dhunContentSurface
@@ -163,13 +163,9 @@ private fun LegalListRow(document: LegalDocument, onClick: () -> Unit) {
 
 @Composable
 private fun LegalDivider() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = DhunSpacing.screenPadding)
-            .height(DhunSpacing.divider)
-            .background(DhunColors.border),
-    )
+    // The same tapered hairline as everywhere else: a full-width flat rule was
+    // the last thing on this page that read as a Material outline.
+    DhunDivider(modifier = Modifier.padding(horizontal = DhunSpacing.screenPadding))
 }
 
 /* ---------------------------------------------------------------- the reader */
@@ -387,13 +383,7 @@ private fun LegalBlock(block: MarkdownBlock, onOpenUrl: (String) -> Unit) {
 
         is MarkdownBlock.Table -> LegalTable(table = block, onOpenUrl = onOpenUrl)
 
-        MarkdownBlock.Rule -> Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = DhunSpacing.sm)
-                .height(DhunSpacing.divider)
-                .background(DhunColors.border),
-        )
+        MarkdownBlock.Rule -> DhunDivider(modifier = Modifier.padding(vertical = DhunSpacing.sm))
     }
 }
 

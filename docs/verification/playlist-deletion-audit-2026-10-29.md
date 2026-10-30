@@ -25,3 +25,14 @@ The original 6 MiB repeated-character quota fixture failed its own assumption on
 - [x] Follow-up: explicit retry button; cover a database error *after* deleting membership (rollback), ambiguous post-commit acknowledgement, and persisted playback queue on restart. Existing coverage checks pending, duplicate requests, failure/retry, cancellation and unrelated library data.
 - [ ] Physical Android dialog/loading/retry test and desktop interactive UI test: no Android SDK/emulator, JDK, or interactive desktop session is available in this sandbox. CI compiles Android and desktop and executes JVM/Android unit tests, not an emulator UI suite.
 - [x] Merge safety for **this continuation PR only**: a `shared/**` main push normally runs `publish_test`, which deletes the existing 12-asset private rolling draft and tag. A reviewed one-shot preservation marker added relative to the first parent now selects `build_only=true`, and `publish_test` explicitly requires `build_only=false`. PR and arena pushes also build only. Tests cover ordinary, merged, subsequent and conflicting intents. The current draft remains at main `0ebc309`. **Do not merge #210 separately:** it lacks this marker and would replace the draft. Verify release_plan output, skipped publish jobs and unchanged draft after merging #211; do not assume the guard works merely because the PR checks pass.
+
+## Update (2026-10-30) — Library list management
+
+The statements above that `LibraryViewModel.deletePlaylist` is unused describe
+the code as audited on 2026-10-29. As of
+[verification 33](33-library-playlist-management.md) the Library playlist list
+has its own rename and delete entry points, and that ViewModel function is now
+the tracked, non-suspending `deletePlaylist(id, onSuccess)` (mutation key
+`playlist-delete:<id>`) — the untracked `suspend fun` was replaced rather than
+left beside it. The detail-page path, the SQL transaction and everything this
+audit found about deletion semantics are unchanged.
