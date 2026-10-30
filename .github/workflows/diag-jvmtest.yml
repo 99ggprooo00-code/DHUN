@@ -1,0 +1,45 @@
+name: diag-jvmtest
+
+# TEMPORARY (session arena/09e5238e-dhun, audit pass): CI logs are outside this
+# sandbox's network allowlist, so a red :shared:jvmTest can only be read through
+# check-run annotations. Deleted once the branch is green.
+on:
+  push:
+    branches: ["arena/09e5238e-dhun"]
+
+jobs:
+  failures:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Run shared JVM tests and surface every failure
+        run: |
+          set +e
+          ./gradlew :shared:jvmTest --no-daemon --continue
+          echo "gradle exit: $?"
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+
+          files = glob.glob("shared/build/test-results/jvmTest/*.xml")
+          print(f"result files: {len(files)}")
+          for path in files:
+              try:
+                  root = ET.parse(path).getroot()
+              except Exception as exc:  # noqa: BLE001
+                  print(f"::error file={path}::unreadable: {exc}")
+                  continue
+              for case in root.iter("testcase"):
+                  for kind in ("failure", "error"):
+                      for bad in case.iter(kind):
+                          msg = (bad.get("message") or "").strip()[:600]
+                          body = " | ".join((bad.text or "").strip().splitlines())[:1200]
+                          name = f"{case.get('classname')}.{case.get('name')}"
+                          print(f"::error file={path}::{name}: {msg} :: {body}")
+          PY
