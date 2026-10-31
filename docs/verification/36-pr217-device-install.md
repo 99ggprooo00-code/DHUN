@@ -30,10 +30,13 @@ The agent could not fetch any artifact bytes: this sandbox may only reach
 `github.com`, `api.github.com`, `codeload.github.com`, npm and PyPI, and artifact
 downloads redirect to Azure Blob storage, which is blocked here. So the identity
 above comes from the workflow and `app-android/build.gradle.kts`, not from
-opening an APK. Confirm the bytes yourself: the zip carries a `.sha256` next to
-each APK, and `sha256sum dhun-test.apk` must print the same value.
+opening an APK. The `test-release` → `apk` zip carries a `.sha256` next to each
+APK (`sha256sum dhun-test.apk` must print the same value). The simpler `debug-apk`
+zip contains only the three APKs, so keep its Actions run page as the build
+identity and record the exact file you installed.
 
-**Which file to install:** `dhun-test.apk` (the universal one). It works on every
+**Which file to install:** the universal one — `dhun-test.apk` in the `apk`
+artifact, or `app-android-universal-debug.apk` in `debug-apk`. It works on every
 phone that can run DHUN. The per-ABI files are only smaller.
 
 ## 1. Will it install over the DHUN you already have?
@@ -55,19 +58,20 @@ and use §3.
 
 ## 2. No cable — the simplest path
 
-1. On the phone, open <https://github.com/99ggprooo00-code/DHUN/actions/runs/41044210169>
+1. On the phone, open <https://github.com/99ggprooo00-code/DHUN/pull/217/checks>
    in Chrome and sign in to GitHub if asked (the artifact needs a signed-in
    session; an Actions artifact is not public like a release asset).
-2. Scroll to the bottom of the page to the **Artifacts** box.
-3. Tap **apk** to download. You get `apk.zip`.
-4. Open the phone's **Files** app → **Downloads**, long-press `apk.zip` →
+2. Find the latest **Build APK** check for the PR's top commit and tap it.
+3. Scroll to the bottom of the page to the **Artifacts** box.
+4. Tap **debug-apk** to download. You get `debug-apk.zip`.
+5. Open the phone's **Files** app → **Downloads**, long-press `debug-apk.zip` →
    **Extract**.
-5. Open the extracted folder and tap **dhun-test.apk**.
-6. Android asks to allow installs from that app (Chrome or Files):
+6. Open the extracted folder and tap **app-android-universal-debug.apk**.
+7. Android asks to allow installs from that app (Chrome or Files):
    tap **Settings** in the prompt, turn on **Allow from this source**, go back.
-7. Tap **Install**. If it offers **Update** instead, that is the good case: your
+8. Tap **Install**. If it offers **Update** instead, that is the good case: your
    settings are kept.
-8. Tap **Open**.
+9. Tap **Open**.
 
 ## 3. With a computer and a cable (keeps your settings, enables Check G)
 
@@ -102,12 +106,12 @@ from an older build without losing data.
 
 **Install**
 
-4. Download the `apk` artifact from the run page above on the computer and unzip
-   it, so that `dhun-test.apk` sits in a folder you know.
+4. Download the `debug-apk` artifact from the Build APK run above on the computer
+   and unzip it, so that `app-android-universal-debug.apk` is in a folder you know.
 5. In that folder:
 
    ```
-   adb install -r -d dhun-test.apk
+   adb install -r -d app-android-universal-debug.apk
    ```
 
    `-r` reinstalls and keeps data; `-d` allows the version-code downgrade
@@ -121,7 +125,7 @@ from an older build without losing data.
 | `App not installed` with no detail | usually the version-code downgrade | §3, or uninstall the old DHUN first (and say so in §7 — Check G becomes untested) |
 | `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | the old build was signed with a different key (for example a locally built debug APK from Android Studio) | uninstall the old DHUN, then install |
 | `INSTALL_FAILED_INSUFFICIENT_STORAGE` | no space | free ~150 MB |
-| "For your security, your phone is not allowed to install unknown apps from this source" | the toggle in §2 step 6 | turn it on for the app you are installing from |
+| "For your security, your phone is not allowed to install unknown apps from this source" | the toggle in §2 step 7 | turn it on for the app you are installing from |
 | `adb: no devices found` | cable/driver/authorisation | re-plug, unlock the phone, `adb kill-server`, accept the prompt |
 
 ## 5. What to check once it opens

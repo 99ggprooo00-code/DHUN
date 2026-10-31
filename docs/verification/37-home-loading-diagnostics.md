@@ -68,8 +68,9 @@ older diagnostic-probe build).
 1. Open the pull request in the phone browser.
 2. Tap **Checks**, then the latest **Build APK** run.
 3. Under **Artifacts**, download **debug-apk**.
-4. Open the downloaded ZIP, then tap `dhun-test.apk`. If Android asks, allow
-   installation from the browser or file manager for this one installation.
+4. Open the downloaded ZIP, then tap **`app-android-universal-debug.apk`** (the
+   universal APK in `debug-apk`). If Android asks, allow installation from the
+   browser or file manager for this one installation.
 5. Install **over** the existing app. Do not uninstall first; uninstalling erases
    settings and downloaded music. If Android says the versions conflict, stop
    and report the message rather than deleting anything.
