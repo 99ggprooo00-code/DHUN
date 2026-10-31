@@ -4,15 +4,33 @@ Date: 2026-10-31. Branch: `arena/8a70a040-dhun`.
 
 ## Status and evidence boundary
 
-The stage diffs are implemented and the available Python/source suite passes.
-This is **not visual or device acceptance**. This workspace has no JDK, Android
-SDK, emulator, ADB/phone, or interactive desktop display. Kotlin compilation and
-JVM/Android/desktop tests require GitHub CI; screenshots, navigation interaction,
-artwork review, large text/TalkBack, blur fallback, and audible playback remain
-**NOT RUN** unless separately evidenced.
+The stage diffs are implemented and the local Python/source suite passes
+**519/519** at `bc0913c`. Hosted Compose/Skia screenshots now exist and have
+been inspected; this is **not physical-device, accessibility-service, audible-
+playback, or performance acceptance**. This workspace has no JDK, Android SDK,
+emulator, ADB/phone, or interactive desktop display. Kotlin compilation and
+JVM/Android/desktop tests require GitHub CI.
 
 Persistent-update phone recovery is a linked but independent acceptance gate.
 Nothing in this visual-stage record proves its cause or fresh/update behavior.
+
+## Reviewed evidence and corrections (exact heads)
+
+| Head / run | Result and boundary |
+| --- | --- |
+| `55c6ff3` / CI `41221873380` | **1,018 executed tests**: 794 shared JVM, 169 Android Robolectric, 4 playback probes, 51 desktop JVM. All except one desktop playlist-dialog assertion passed. |
+| `53d2388` / Visual `41222626645` | **FAIL, 60 images / 5 tests / 1 failure**. The real repository was requested once and emitted `Visual QA / 4 tracks`; Library held the same row while the popup stayed empty. This disproved repository/dispatcher starvation as the cause. |
+| `dc0e506` | Reads the collected playlist value in the parent composition and passes a fresh snapshot into the separate `Dialog` composition. The flow remains remembered so that parent recomposition does not restart collection. |
+| `dc0e506` / Visual `41223387654` | **PASS, 62 verified PNGs / 5 tests / 0 failures / 0 errors**; manifest `d5a9a46d5fa22f34861594b7910b420ed1b93bb3`. All 62 frames were inspected. Direct and in-app dialogs visibly contain `Visual QA / 4 tracks` in dark and light modes. |
+| `dc0e506` / test-release `41223387670` | Install-over and userdata/cache preservation **PASS**. The launch check **FAILED** because it watched only the launcher PID, while safe metadata showed a responding child `DHUN` process with a normal main-window handle. No PNG was captured, so this is not an installed-startup PASS. Manifest `19434c619dd4dc6124bbf08b69c37f6baf718c60`. |
+| `bc0913c` | Corrects the Windows harness to find the normal window-owning `DHUN.exe` process, exclude pre-launch and startup-error windows, and clean up child and launcher. A startup PASS still requires a new real window capture and successful upgrade/uninstall result. |
+
+The reviewed `dc0e506` matrix covers compact and wide Home, Search, Library,
+Artist, Album, Playlist, player, queue, lyrics, Related, Settings, navigation,
+menus/dialogs, loading/empty/error/offline, brightness, no-blur, and controlled
+black/white artwork in dark and light modes. It does not establish TalkBack or
+another native screen reader, large-text/IME behavior, reduced motion, audible
+playback, physical rendering, frame cost, or memory behavior.
 
 ## Separately reviewable stages
 
@@ -71,14 +89,19 @@ correct/incorrect examples; and documents the real non-blur fallback.
 These are source/policy guardrails, not proof of taste, contrast on a physical
 screen, frame cost, or accessibility-service behavior.
 
-## Remaining acceptance
+## Acceptance boundary and remaining hardware work
 
-1. Successful CI on the corrected cumulative Stage 7/8 head and the exact Stage
-   9 head, including Kotlin policy tests and Android/desktop compilation.
-2. Real screenshots and interaction on Android and desktop where supported:
-   dark, OLED, and light; bright/dark artwork; Home/Search/Library; player,
-   queue/lyrics/Related; Settings/dialogs; navigation and non-blur fallback.
-3. Large text, keyboard/focus, screen-reader labels/live regions, pending/error
-   states, and reduced-motion review in actual environments.
-4. The independent persistent-update recovery matrix and actual phone
-   acceptance before any recovery merge claim.
+1. The final PR report must name the exact head and its own CI, Android package,
+   desktop package, and visual-evidence results. A historical green run is not
+   evidence for a later head.
+2. The independent persistent-update recovery matrix still requires actual
+   phone acceptance: fresh install, one install-over, and several successive
+   install-over runs without clearing playlists, favourites, settings,
+   downloads, queue, or history.
+3. Real Android and interactive desktop review remains required for large text,
+   keyboard/IME/focus, native screen readers, reduced motion, dismissal,
+   playback during navigation, and audible playback. Hosted Skia interaction is
+   not a substitute for those environments.
+4. Frame timing, recomposition cost, memory, and battery behavior require a
+   supported runtime measurement; source policy tests and screenshot bounds do
+   not establish performance acceptance.

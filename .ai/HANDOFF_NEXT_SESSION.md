@@ -5,16 +5,20 @@
 > committed DHUN glass stages. Start with
 > [verification §40](../docs/verification/40-persistent-update-recovery.md),
 > [§41](../docs/verification/41-native-restoration-and-glass-plan.md), and
-> [§42](../docs/verification/42-playlist-deletion-restoration.md). The visual
+> [§42](../docs/verification/42-playlist-deletion-restoration.md), and
+> [§43](../docs/verification/43-dhun-glass-restoration.md). The visual
 > source of truth is [docs/design/glass-system.md](../docs/design/glass-system.md).
 > Its current backdrop model is only Background blur + Background brightness;
 > zero blur keeps sharp, dimmed artwork. Do not restore old palette editors or
 > unimplemented components from dated snapshots below.
 >
 > **Evidence boundary:** local source/Python policy checks do not compile Kotlin
-> or show a screen. No emulator, physical phone, interactive desktop, screenshot,
-> or audible-playback acceptance is available in this workspace. Inspect CI for
-> the exact commit being reviewed; keep phone recovery and visual acceptance open.
+> or show a screen. Hosted Compose/Skia screenshots and interaction exist and are
+> indexed in verification §43; the `dc0e506` run passed five tests and all 62
+> frames were reviewed. They are not emulator, physical-phone, interactive-desktop, native
+> screen-reader, audible-playback, or performance acceptance. No such hardware
+> acceptance is available in this workspace. Inspect CI for the exact commit
+> being reviewed and keep phone recovery open.
 
 Read [PRD §1](../docs/PRD.md#1-product-definition-and-source-of-truth), ROADMAP's
 current task, [matrix 05](../docs/research/05-source-capability-matrix.md),

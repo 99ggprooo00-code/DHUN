@@ -4,10 +4,13 @@
   triggers, fresh/update behavior, and independent Home/Search/Related/artwork/
   downloads/playback/queue/Library checks still require their recorded evidence.
   Clearing data or reinstalling is not a fix. Green CI alone does not close this.
-- Glass stages 5–8 are source/policy work. No emulator, physical phone,
-  interactive desktop, screenshot, large-text/TalkBack pass, artwork review, or
-  audible playback was available. Exact-head CI must be read for the commit under
-  review; earlier green runs are not evidence for a later head.
+- Hosted Compose/Skia evidence at `dc0e506` passed with **62 verified PNGs / 5
+  tests / 0 failures**, and all frames were inspected, including dark/light
+  populated playlist dialogs and controlled black/white artwork. This is not an
+  emulator, physical phone, interactive desktop, large-text/TalkBack, native
+  screen-reader, reduced-motion, audible-playback, or performance pass. Exact-
+  head CI must still be read for the commit under review; earlier green runs are
+  not evidence for a later head. See [verification 43](../docs/verification/43-dhun-glass-restoration.md).
 - The current background model is Background blur + Background brightness.
   Zero blur keeps sharp, dimmed artwork; unsupported platforms hide only blur.
   Historical entries below about dynamic surface colours, four surface editors,
