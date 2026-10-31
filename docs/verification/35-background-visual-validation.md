@@ -74,10 +74,11 @@ In order:
   "From the current artwork · artwork behind it", "Your colour · solid colour" or
   "DHUN default · blur paused".
 - Tapping a row opens that surface's dialog, in this order: preview strip,
-  "Showing: …", **Colour for …** with the swatches (**DHUN default** plus Violet,
-  Azure, Jade, Amber, Rose, Cyan), then **Overrides for this surface** — a
+  "Showing: …", **Quick colours** (**Default** plus Violet, Azure, Jade, Amber,
+  Rose, Cyan) and **More colours**, then **Overrides for this surface** — a
   **Background blur here** switch and a **Take colour from artwork** switch — then
-  **Restore defaults**.
+  **Restore defaults**. **More colours** opens **Custom colour** with a large
+  preview, Hue / Saturation / Lightness gradient sliders, Cancel and **Use colour**.
 - **Backdrop detail** (below) holds **Adaptive blur** (disabled while Background
   blur is off: "Paused while Background blur is off. Your choice is remembered.")
   and **Blur strength**.
@@ -170,6 +171,21 @@ Passes if: the player's blurred artwork is visibly tinted with the chosen colour
 Fails if: the player looks neutral/grey, the pages change with the player, or the
 controls' text contrast visibly drops.
 
+### Check 3c — Custom colour sliders and their draft
+
+1. Open **Main pages → More colours**. Drag **Hue**, then **Saturation**, then
+   **Lightness**. The large preview and each gradient track should update.
+2. Tap **Cancel**. The surface must keep its previous colour. Open More colours
+   again, choose a visibly different colour and tap **Use colour**.
+3. Repeat for one other surface, restart the app, and check both custom colours
+   survived. Repeat the editor in the light theme and with TalkBack enabled.
+
+Passes if: the sliders are easy to drag, their labels/values are readable, the
+preview matches the chosen colour, Cancel discards and Use colour applies the
+draft, and only the intended surface changes.
+Fails if: a track is invisible or misleading, dragging stutters, Cancel saves,
+Use colour does nothing, or the colour is lost on restart.
+
 ### Check 4 — Palette transitions
 
 1. Queue two tracks whose covers are very different in hue (for example warm
@@ -258,6 +274,7 @@ the database rather than deleted.
 | 2. Four combinations | | | |
 | 3. One colour per surface | | | |
 | 3b. Full player colour visible with blur on | | | |
+| 3c. Custom colour sliders and draft | | | |
 | 4. Palette transitions | | | |
 | 5. Settings readability + preview | | | |
 | 6. Pre-Android-12 fallback | | | |
@@ -275,7 +292,7 @@ under which it would deserve code.
 | The adaptive band (70–100 %) was reasoned, not profiled | Bright/busy covers keep full frost, dark/calm ones slightly less | The difference is invisible, or songs look sharp vs. smeared |
 | A failed extraction falls back to the surface's colour | A track with unusable artwork shows your colour / the default | The default flashes on tracks that clearly have artwork |
 | Solid surfaces use a stronger tint (0.55 vs 0.30) with the same luminance clamp | Picked colours read as deep coloured surfaces, not bright ones | Colours look like mud, or text contrast visibly degrades |
-| The colour picker is named swatches, not a wheel | You cannot choose an arbitrary hex | The six hues feel too limiting in normal use |
+| Custom colours use three sliders rather than a hex field | Hue, Saturation and Lightness cover the full range without colour-notation knowledge | A slider is hard to drag, its track does not match the result, or Cancel/Use colour saves the wrong value |
 | Layer order is reasoned from the composition, never seen | See Check 7 | Any layer is visibly in the wrong place |
 | Version-1 installs lose per-tab colours | Home/Search/Library keep one colour after upgrading; the old rows stay in the database | You relied on Home and Search having *different* colours |
 | Version-1 palettes had three layers; version 2 keeps one | The imported colour is the one you picked (the old `secondary`); the derived wash and companion glow are re-derived | A surface looks flatter than it did before upgrading |

@@ -35,19 +35,28 @@ import androidx.compose.ui.unit.dp
 import dev.dhun.design.DhunAccent
 import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
+import dev.dhun.design.hueSliderColors
+import dev.dhun.design.lightnessSliderColors
+import dev.dhun.design.saturationSliderColors
+import dev.dhun.design.toHsl
 import dev.dhun.design.background.BackgroundComponent
 import dev.dhun.design.background.BackgroundPalette
 import dev.dhun.design.background.BackgroundPalettePolicy
 import dev.dhun.design.background.BackgroundState
 import dev.dhun.design.background.DhunBackgrounds
 import dev.dhun.design.components.DhunButton
+import dev.dhun.design.components.DhunColourSlider
+import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.DhunSwitch
 import dev.dhun.design.components.DhunTextButton
 import dev.dhun.design.components.GlassDialog
 import dev.dhun.design.supportsRealtimeBlur
 import dev.dhun.presentation.settings.SettingsViewModel
+import kotlin.math.roundToInt
 
 /**
  * Background preferences, in the order the two decisions actually are:
@@ -285,8 +294,24 @@ private fun BackgroundComponentDialog(
     // effect: while Dynamic colours is on, the surface is showing artwork
     // colours, and pretending a swatch is selected would be a lie.
     val picked = prefs.color
+    val defaultColour = BackgroundPalettePolicy
+        .defaultPalette(component, tokens)
+        .mainGlow
+        .copy(alpha = 1f)
+    var customColour by remember { mutableStateOf(false) }
 
     GlassDialog(onDismissRequest = onDismiss) {
+        if (customColour) {
+            CustomColourEditor(
+                initialColor = picked ?: defaultColour,
+                onBack = { customColour = false },
+                onUseColour = { color ->
+                    viewModel.setComponentColor(component, color)
+                    customColour = false
+                },
+            )
+            return@GlassDialog
+        }
         Column(
             modifier = Modifier.fillMaxWidth().widthIn(max = DhunSpacing.dialogMaxWidth),
             verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
@@ -304,25 +329,34 @@ private fun BackgroundComponentDialog(
                 color = if (source.isOverridden) DhunColors.warning else DhunColors.textSecondary,
             )
 
-            // The colour comes first: it is what this dialog is for, and what
-            // the two global switches above act on. Everything below it is an
-            // override for this one surface.
-            Text(
-                text = "Colour for ${component.label.lowercase()}",
-                style = MaterialTheme.typography.titleSmall,
-                color = DhunColors.textPrimary,
-            )
-            Text(
-                text = "Used on its own when blur is off, and as the tint over the blurred artwork when it is on.",
-                style = MaterialTheme.typography.bodySmall,
-                color = DhunColors.textSecondary,
-            )
+            // The quick path is one tap. The full colour range is one level
+            // deeper, so three sliders never crowd the ordinary choice.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Quick colours",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = DhunColors.textPrimary,
+                    )
+                    Text(
+                        text = "Tap one to apply it.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DhunColors.textSecondary,
+                    )
+                }
+                DhunTextButton(onClick = { customColour = true }) {
+                    Text("More colours")
+                }
+            }
             // Fixed rows rather than a wrapping flow: seven picks fit two rows
             // on a phone, and a stable grid is easier to scan than a reflowing
             // one (and needs no experimental layout API).
-            val picks = remember(tokens.isLight) {
+            val picks = remember(component, tokens.isLight, defaultColour) {
                 buildList {
-                    add(SwatchPick("DHUN default", null, BackgroundPalettePolicy.defaultPalette(component, tokens).mainGlow))
+                    add(SwatchPick("Default", null, defaultColour))
                     for (accent in DhunAccent.entries) {
                         add(
                             SwatchPick(
@@ -399,6 +433,124 @@ private fun BackgroundComponentDialog(
     }
 }
 
+/**
+ * The full colour range, one step away from the quick picks.
+ *
+ * The draft stays local until **Use colour**. A drag therefore repaints only
+ * this preview; it does not enqueue a database write for every pointer frame.
+ * Applying still calls the same per-component setter as every quick swatch.
+ */
+@Composable
+private fun CustomColourEditor(
+    initialColor: Color,
+    onBack: () -> Unit,
+    onUseColour: (Color) -> Unit,
+) {
+    var draft by remember(initialColor) { mutableStateOf(initialColor.toHsl()) }
+    val preview = draft.toColor()
+    val hueColors = remember { hueSliderColors() }
+
+    Column(
+        modifier = Modifier.fillMaxWidth().widthIn(max = DhunSpacing.dialogMaxWidth),
+        verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            DhunIconButton(
+                onClick = onBack,
+                modifier = Modifier.size(DhunSpacing.touchTarget),
+                contentDescription = "Back to quick colours",
+            ) {
+                DhunIconView(
+                    icon = DhunIcon.ArrowBack,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSize),
+                    tint = DhunColors.textPrimary,
+                )
+            }
+            Spacer(modifier = Modifier.width(DhunSpacing.sm))
+            Text(
+                text = "Custom colour",
+                style = MaterialTheme.typography.titleLarge,
+                color = DhunColors.textPrimary,
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .clip(DhunShapes.medium)
+                .background(preview)
+                .border(DhunSpacing.border, DhunColors.glassEdge, DhunShapes.medium)
+                .semantics { contentDescription = "Selected colour preview" },
+        )
+        Text(
+            text = "Move the sliders, then choose Use colour.",
+            style = MaterialTheme.typography.bodySmall,
+            color = DhunColors.textSecondary,
+        )
+        HslSlider(
+            label = "Hue",
+            value = draft.hue,
+            valueRange = 0f..360f,
+            valueDescription = "${draft.hue.roundToInt()} degrees",
+            colors = hueColors,
+            onValueChange = { draft = draft.copy(hue = it) },
+        )
+        HslSlider(
+            label = "Saturation",
+            value = draft.saturation,
+            valueRange = 0f..1f,
+            valueDescription = "${(draft.saturation * 100).roundToInt()} percent",
+            colors = saturationSliderColors(draft),
+            onValueChange = { draft = draft.copy(saturation = it) },
+        )
+        HslSlider(
+            label = "Lightness",
+            value = draft.lightness,
+            valueRange = 0f..1f,
+            valueDescription = "${(draft.lightness * 100).roundToInt()} percent",
+            colors = lightnessSliderColors(draft),
+            onValueChange = { draft = draft.copy(lightness = it) },
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            DhunTextButton(onClick = onBack) { Text("Cancel") }
+            Spacer(modifier = Modifier.width(DhunSpacing.sm))
+            DhunButton(onClick = { onUseColour(preview) }) { Text("Use colour") }
+        }
+    }
+}
+
+/** An accessible slider with the colour ramp painted into its rounded track. */
+@Composable
+private fun HslSlider(
+    label: String,
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    valueDescription: String,
+    colors: List<Color>,
+    onValueChange: (Float) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = DhunColors.textPrimary,
+        )
+        DhunColourSlider(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.fillMaxWidth(),
+            valueRange = valueRange,
+            trackColors = colors,
+            contentDescription = label,
+            stateDescription = valueDescription,
+        )
+    }
+}
+
 /** One offered colour: its label, the value stored (`null` = default), its swatch. */
 private data class SwatchPick(
     val label: String,
@@ -412,10 +564,9 @@ private const val SWATCHES_PER_ROW = 4
 /**
  * One colour pick.
  *
- * A fixed, named set rather than a free colour wheel on purpose: every swatch
- * is a colour the app already measures its text ladder against, and the picked
- * colour is run through the same luminance clamp as the artwork palette, so
- * "choose my own colour" can never produce an unreadable surface.
+ * The quick path uses a small, named set. More colours accepts the full HSL
+ * range; both paths store one colour and use the same existing luminance clamp
+ * as the artwork palette, so custom colours cannot bypass readable surfaces.
  */
 @Composable
 private fun ColorSwatch(

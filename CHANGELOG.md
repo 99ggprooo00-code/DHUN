@@ -22,6 +22,24 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Simpler surface colours with custom HSL sliders (2026-10-31, session `arena/09e5238e-dhun`)
+
+- **Quick colours** keeps the named swatches as a one-tap choice. **More colours**
+  opens a focused custom-colour view with a large preview and Hue, Saturation and
+  Lightness gradient sliders, rather than asking for a hex value or palette layers.
+- The custom editor is a draft: Cancel/back discards it and **Use colour** applies
+  it through the same per-surface setter as a quick swatch. No new preference,
+  palette, background pipeline or global colour control was added.
+- `DhunColourSlider` keeps the accessible Slider primitive inside the design
+  system and paints the meaningful ramp into DHUN's rounded, hairline-edged track.
+  `HslColorTest` covers primary/secondary hues, round trips, achromatic colours,
+  clamping/wrapping, gradient endpoints and opaque codec-compatible output.
+
+The 510 Python repository checks pass, including the default-Material design gate.
+Kotlin/Android CI is required for compilation and JVM tests. Slider touch behavior,
+preview appearance and saved colours on a real device remain **unverified**; Check
+3c in `docs/verification/35-background-visual-validation.md` records the procedure.
+
 ### Audit of the background controls: the surface colour now reaches every surface (2026-10-30, session `arena/09e5238e-dhun`)
 
 Four defects found reading the shipped feature against the brief, each with a
@@ -89,9 +107,9 @@ makes **individual interface areas** customisable.
   before drawing, so nothing thumbnail-derived remains on screen.
 - **Settings** are rebuilt around the two switches and the four surfaces: a
   colour preview per surface, "Showing: …" naming the effective source, a blur
-  switch and an artwork-colour switch per surface, named colour swatches (the
-  six accents plus DHUN default), and restore-defaults per surface and for all
-  of them.
+  switch and an artwork-colour switch per surface, quick named colour swatches
+  plus the custom HSL editor described above, and restore-defaults per surface
+  and for all of them.
 - **Migration is additive and one-shot.** `background_profile_version` 0 → 1
   still imports the legacy slider (`backdrop_blur = 0` = blur off, slider reset
   to the shipped strength); 1 → 2 imports the five per-section palettes into the

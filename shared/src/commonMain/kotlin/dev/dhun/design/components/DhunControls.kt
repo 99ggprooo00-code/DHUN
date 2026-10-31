@@ -16,8 +16,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.dhun.design.DhunColors
@@ -154,6 +158,60 @@ fun DhunSlider(
         onValueChangeFinished = onValueChangeFinished,
         colors = colors,
     )
+}
+
+/**
+ * A DHUN slider whose track is a meaningful colour ramp.
+ *
+ * Used by the custom surface-colour editor for Hue, Saturation and Lightness.
+ * The ramp is painted inside the same rounded, hairline-edged track for every
+ * value; the accessible Slider primitive supplies touch, keyboard and TalkBack
+ * behaviour on top. This is a styled track, not a second colour pipeline.
+ */
+@Composable
+fun DhunColourSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    trackColors: List<Color>,
+    contentDescription: String,
+    stateDescription: String,
+    modifier: Modifier = Modifier,
+    valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
+    enabled: Boolean = true,
+) {
+    Box(
+        modifier = modifier.height(DhunSpacing.touchTarget),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(DhunSpacing.lg)
+                .clip(DhunShapes.full)
+                .background(Brush.horizontalGradient(trackColors))
+                .border(DhunSpacing.border, DhunColors.glassEdge, DhunShapes.full),
+        )
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.fillMaxWidth().semantics {
+                this.contentDescription = contentDescription
+                this.stateDescription = stateDescription
+            },
+            enabled = enabled,
+            valueRange = valueRange,
+            colors = SliderDefaults.colors(
+                thumbColor = DhunControlPolicy.disableIf(enabled, DhunColors.textPrimary),
+                activeTrackColor = Color.Transparent,
+                inactiveTrackColor = Color.Transparent,
+                activeTickColor = Color.Transparent,
+                inactiveTickColor = Color.Transparent,
+                disabledThumbColor = DhunControlPolicy.disabled(DhunColors.textPrimary),
+                disabledActiveTrackColor = Color.Transparent,
+                disabledInactiveTrackColor = Color.Transparent,
+            ),
+        )
+    }
 }
 
 /**

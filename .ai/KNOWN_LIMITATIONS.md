@@ -2345,10 +2345,11 @@ upgrade path on a real install. The procedure is
   through `DhunNavigationBar`/`DhunNavigationRail` (`tintComponent`), over the
   dock's frost on phones. Whether that reads as chrome or as a colour clash next
   to the dock is a screen question.
-- **The colour picker offers named swatches, not a colour wheel.** The six accent
-  hues plus "DHUN default", all inside the measured contrast band. A free picker
-  would need per-colour contrast solving; that is deliberate scope, not a
-  limitation of the model.
+- **Custom colours now use Hue / Saturation / Lightness sliders** (updated
+  2026-10-31). Quick named swatches remain the one-tap path; More colours accepts
+  the full HSL range and applies only on **Use colour**. The existing palette
+  luminance clamp still protects the surface, but slider usability, preview
+  accuracy and the resulting colours on a real screen are unverified.
 - **Artwork colour still comes from the seed hash** (`ArtworkColorExtractor`), so
   two covers can land in the same colour family, and the glow need not match the
   cover's dominant colour. VIVI Music samples a 100×100 bitmap with
@@ -2440,7 +2441,7 @@ gates, not device validation. The procedure for a human is
 - **Desktop Skiko blur with the palette behind it has not been seen.** The msi
   job proves the desktop package builds and its JVM tests pass; nobody has
   watched a Windows window paint the artwork palette and the frost together.
-- **The palette picker offers swatches, not a colour wheel.** That is deliberate
-  (every swatch is inside the measured luminance band) and it is the reason a
-  user cannot pick an unreadable base — but it also means "any colour" is not a
-  promise this build makes.
+- **The custom colour sliders have not been used on a device** (updated
+  2026-10-31). The earlier fixed-swatch-only limit is superseded: arbitrary HSL
+  colours are now accepted, still through the existing luminance clamp. Conversion
+  and gradient endpoints are JVM-tested; touch behaviour and visual results are not.

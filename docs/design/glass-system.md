@@ -39,7 +39,7 @@ dark-first, layered, with soft blur behind sharp content. Material 3 is an
 | Lyrics card, queue sheet, floating player | `LyricsMaterial`, `LyricsArtworkSheet`, `AcrylicSurface` | `design/components/LyricsMaterial.kt` |
 | Overflow menu surface | `TrackMenuSurface` + `MenuActionRow` | `ui/components/TrackOverflowDialog.kt` |
 | One-line text input | `DhunTextField` | `design/components/DhunTextField.kt` |
-| Switch / slider | `DhunSwitch` / `DhunSlider` | `design/components/DhunControls.kt` |
+| Switch / ordinary slider / colour-ramp slider | `DhunSwitch` / `DhunSlider` / `DhunColourSlider` | `design/components/DhunControls.kt` |
 | Multi-select box (offline selection) | `DhunCheckbox` | `design/components/DhunControls.kt` |
 | Progress bar (download, storage) | `DhunProgressBar` | `design/components/DhunControls.kt` |
 | Loading spinner (buttons, pagination) | `DhunSpinner` (thin accent arc in a faint glass track) | `design/components/DhunSpinner.kt` |
@@ -58,7 +58,7 @@ dark-first, layered, with soft blur behind sharp content. Material 3 is an
 | Error strip at screen level | `ActionErrorBanner` (glass + error tint) | `ui/components/ActionErrorBanner.kt` |
 
 Material components **may** be used inside these wrappers — a `Switch` inside
-`DhunSwitch`, a `Slider` inside `DhunSlider`, a `Checkbox` inside
+`DhunSwitch`, a `Slider` inside `DhunSlider` or `DhunColourSlider`, a `Checkbox` inside
 `DhunCheckbox`, `DropdownMenu`, `LinearProgressIndicator` — with DHUN tokens
 driving colours, shapes and elevation. What is forbidden is their *default
 appearance* reaching the user.
@@ -142,8 +142,13 @@ customisation unit is the thing the user recognises
 | `MINI_PLAYER` | the docked now-playing bar |
 | `FULL_PLAYER` | the immersive player |
 
-Each one saves **one colour** (or "DHUN default"). That colour is the feature;
-the two switches inside a surface — *Background blur here* and *Take colour from
+Each one saves **one colour** (or "DHUN default"). **Quick colours** applies a
+named swatch with one tap. **More colours** opens a custom-colour view with Hue,
+Saturation and Lightness gradient sliders and a large preview; nothing is saved
+until **Use colour**, and Cancel/back discards the draft. Both paths call the
+same component-colour setter and the same palette/contrast policy. The sliders
+are a way to choose that one colour, not another theme or background pipeline.
+That colour is the feature; the two switches inside a surface — *Background blur here* and *Take colour from
 artwork* — are **overrides for that surface only**, they sit after the colour in
 the dialog, they are disabled while their global is off, and their captions name
 the global that suspends them. They exist for "keep the dock solid while the pages

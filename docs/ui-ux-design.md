@@ -76,8 +76,11 @@ and *Take colour from artwork*. They affect that surface alone, are disabled whi
 their global is off, and say so; they are for "keep the dock solid while the pages
 show the cover", not a second copy of the global switches. Settings shows the four
 surfaces, the colour in effect and why ("From the current artwork", "Your colour",
-"DHUN default"), and never asks the user to assemble palette layers. One resolution
-policy and one blur policy serve all four surfaces — never a per-screen rule.
+"DHUN default"), and never asks the user to assemble palette layers. **Quick
+colours** covers the common one-tap choice; **More colours** offers Hue,
+Saturation and Lightness sliders with a preview and an explicit **Use colour**
+action. Custom and quick picks share one saved colour and one resolution policy;
+one blur policy serves all four surfaces — never a per-screen rule.
 
 ### Fallbacks
 - Android versions where real blur is unavailable: gradient/tint/opaque material fallback.
