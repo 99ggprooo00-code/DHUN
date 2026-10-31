@@ -50,6 +50,7 @@ import dev.dhun.core.HomeItem
 import dev.dhun.core.HomeSection
 import dev.dhun.core.Playlist
 import dev.dhun.core.Track
+import dev.dhun.design.ArtworkUrls
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
@@ -177,14 +178,42 @@ fun HomeScreen(
                     HomeShimmerSkeleton(modifier = Modifier.fillMaxSize())
                 }
                 is HomeUiState.Error -> {
-                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                        ErrorView(
-                            message = state.message,
-                            title = "Could not load Home",
-                            onRetry = { viewModel.load() },
-                            details = state.detail,
-                            modifier = Modifier.fillMaxSize(),
-                        )
+                    if (shouldShowLocalHomeOnError(selectedMood, recentlyPlayed, recommendedSongs)) {
+                        key(selectedMood) {
+                            HomeFeedContent(
+                                feed = HomeFeed(greeting = ""),
+                                recentlyPlayed = recentlyPlayed,
+                                recommendedSongs = recommendedSongs,
+                                isLoadingRecommended = isLoadingRecommended,
+                                isRefreshing = isRefreshing,
+                                isLoadingMore = false,
+                                loadMoreError = null,
+                                onLoadMore = {},
+                                onRetryMore = {},
+                                onRefresh = { viewModel.load() },
+                                onTrackClick = onTrackClick,
+                                onAlbumClick = onAlbumClick,
+                                onPlaylistClick = onPlaylistClick,
+                                onArtistClick = onArtistClick,
+                                onTrackOverflow = onTrackOverflow,
+                                downloadManager = downloadManager,
+                                onOpenLiked = onOpenLiked,
+                                onOpenOffline = onOpenOffline,
+                                sleepTimerLabel = sleepTimerLabel,
+                                onCycleSleepTimer = onCycleSleepTimer,
+                                feedError = state,
+                            )
+                        }
+                    } else {
+                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                            ErrorView(
+                                message = state.message,
+                                title = "Could not load Home",
+                                onRetry = { viewModel.load() },
+                                details = state.detail,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
                     }
                 }
                 is HomeUiState.Empty -> {
@@ -251,6 +280,7 @@ private fun HomeFeedContent(
     onOpenOffline: () -> Unit,
     sleepTimerLabel: String?,
     onCycleSleepTimer: () -> Unit,
+    feedError: HomeUiState.Error? = null,
 ) {
     val classified = remember(feed.sections) {
         feed.sections.map { it to GetHomeFeedUseCase.classifySection(it.title) }
@@ -286,6 +316,18 @@ private fun HomeFeedContent(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = DhunSpacing.contentBottomInset),
     ) {
+        if (feedError != null) {
+            item(key = "home_feed_error") {
+                ErrorView(
+                    message = feedError.message,
+                    title = "Could not refresh Home",
+                    onRetry = onRefresh,
+                    details = feedError.detail,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+
         // ---- Quick-action chips (rail, same pattern as the mood row:
         // symmetric edge padding via contentPadding holds while scrolling —
         // horizontalScroll + padding drops the trailing inset at scroll end,
@@ -477,7 +519,7 @@ private fun HomeFeedContent(
 
         // Visible retry/end states: a failed continuation must not look like
         // an exhausted feed, or retry automatically on every recomposition.
-        item(key = "pagination_status") {
+        if (feedError == null) item(key = "pagination_status") {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(DhunSpacing.screenPadding),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -617,6 +659,7 @@ private fun QuickPickItem(
     ) {
         ArtworkImage(
             imageUrl = track.thumbnailUrl,
+            fallbackImageUrl = ArtworkUrls.videoThumbnail(track.id),
             contentDescription = track.title,
             modifier = Modifier.size(DhunSpacing.touchTarget),
             shape = DhunShapes.medium,
@@ -672,6 +715,13 @@ private fun HomeShimmerSkeleton(modifier: Modifier = Modifier) {
         SectionShimmer()
     }
 }
+
+/** Real local shelves remain useful during a For You request failure; other moods have no local feed. */
+internal fun shouldShowLocalHomeOnError(
+    mood: HomeMood,
+    recentlyPlayed: List<Track>,
+    recommendedSongs: List<Track>,
+): Boolean = mood == HomeMood.FOR_YOU && (recentlyPlayed.isNotEmpty() || recommendedSongs.isNotEmpty())
 
 /** Hide only music actually promoted into the hero, not every later shelf with the same label. */
 internal fun quickPickShelfAlreadyShown(section: HomeSection, quickPicks: List<Track>): Boolean {

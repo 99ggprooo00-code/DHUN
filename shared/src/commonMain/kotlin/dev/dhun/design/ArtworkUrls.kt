@@ -27,6 +27,7 @@ object ArtworkUrls {
 
     private val sizedParam = Regex("w\\d+-h\\d+")
     private val avatarParam = Regex("=s\\d+(-c)?")
+    private val youtubeVideoId = Regex("[A-Za-z0-9_-]{11}")
 
     /**
      * Normalizes [url] for image loading: `//` → `https://`, and proxy-host
@@ -51,6 +52,12 @@ object ArtworkUrls {
 
     /** Full-resolution tier for the Now Playing artwork + backdrop. */
     fun nowPlaying(url: String?): String? = list(url, NOW_PLAYING_SIZE_PX)
+
+    /** Real YouTube cover for a sparse persisted track whose URL was lost. */
+    fun videoThumbnail(videoId: String?): String? {
+        val id = videoId?.trim()?.takeIf { youtubeVideoId.matches(it) } ?: return null
+        return "https://i.ytimg.com/vi/$id/hqdefault.jpg"
+    }
 
     private fun isProxyHost(url: String): Boolean =
         url.contains("googleusercontent.com") || url.contains("ggpht.com")

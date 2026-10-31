@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import dev.dhun.core.PlaylistDetail
 import dev.dhun.core.Track
+import dev.dhun.design.ArtworkUrls
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
@@ -263,6 +264,7 @@ private fun RemoteTrackRow(index: Int, track: Track, onClick: () -> Unit, onOver
     ) {
         ArtworkImage(
             imageUrl = track.thumbnailUrl,
+            fallbackImageUrl = ArtworkUrls.videoThumbnail(track.id),
             contentDescription = track.title,
             modifier = Modifier.size(DhunSpacing.touchTarget),
             shape = DhunShapes.medium,
@@ -360,6 +362,7 @@ private fun LocalPlaylistContent(
                 ) {
                     ArtworkImage(
                         imageUrl = track.thumbnailUrl,
+                        fallbackImageUrl = ArtworkUrls.videoThumbnail(track.id),
                         contentDescription = track.title,
                         modifier = Modifier.size(DhunSpacing.compactTarget),
                     )

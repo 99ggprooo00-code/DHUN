@@ -46,6 +46,19 @@ class RepositoriesTest {
     }
 
     @Test
+    fun sparseTrackUpdateDoesNotEraseKnownArtwork(): Unit = runBlocking {
+        val repo = SqlDelightTrackRepository(newDb(), FakeClock(), Dispatchers.Unconfined)
+        val full = track("artwork")
+        repo.save(full)
+        repo.save(full.copy(title = "Sparse replay", thumbnailUrl = null))
+        assertEquals(full.thumbnailUrl, repo.get(full.id)?.thumbnailUrl)
+        assertEquals("Sparse replay", repo.get(full.id)?.title)
+
+        repo.save(full.copy(thumbnailUrl = "https://i/new.jpg"))
+        assertEquals("https://i/new.jpg", repo.get(full.id)?.thumbnailUrl)
+    }
+
+    @Test
     fun trackObserveEmitsOnChange(): Unit = runBlocking {
         val repo = SqlDelightTrackRepository(newDb(), FakeClock(), Dispatchers.Unconfined)
         assertNull(repo.observe("z").first())

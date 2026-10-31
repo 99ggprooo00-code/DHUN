@@ -86,9 +86,9 @@ internal fun BackgroundSettingsSection(viewModel: SettingsViewModel) {
         BackgroundSwitchRow(
             title = "Background blur",
             subtitle = if (backgrounds.blurEnabled) {
-                "The playing track's artwork is used as a blurred background, tinted with each surface's colour."
+                "Blurred artwork behind app surfaces"
             } else {
-                "Off: no artwork behind the app at all. Every surface uses its own solid colour."
+                "Solid colours; no artwork background"
             },
             checked = backgrounds.blurEnabled,
             onCheckedChange = viewModel::setBackgroundBlurEnabled,
@@ -98,7 +98,7 @@ internal fun BackgroundSettingsSection(viewModel: SettingsViewModel) {
         // instead of frosted — the documented fallback.
         if (!supportsRealtimeBlur) {
             Text(
-                text = "This device cannot blur artwork. Your choices are saved, and the cover is dimmed instead of frosted.",
+                text = "Blur is unavailable here; artwork is dimmed instead.",
                 style = MaterialTheme.typography.bodySmall,
                 color = DhunColors.textTertiary,
             )
@@ -106,9 +106,9 @@ internal fun BackgroundSettingsSection(viewModel: SettingsViewModel) {
         BackgroundSwitchRow(
             title = "Dynamic colours",
             subtitle = if (backgrounds.dynamicColors) {
-                "Surface colours come from the playing track's artwork. Works with or without background blur."
+                "Colours follow the current artwork"
             } else {
-                "Off: every surface uses the colour you pick below, and artwork colour is ignored."
+                "Use your chosen surface colours"
             },
             checked = backgrounds.dynamicColors,
             onCheckedChange = viewModel::setBackgroundDynamicColors,
@@ -121,9 +121,7 @@ internal fun BackgroundSettingsSection(viewModel: SettingsViewModel) {
             color = DhunColors.textPrimary,
         )
         Text(
-            text = "A colour for each part of the interface. With background blur on it tints the blurred artwork; " +
-                "with blur off it is the surface itself. The two switches above are global; each surface below can " +
-                "also opt out of artwork colour or drop its own blur.",
+            text = "Choose a colour for each area. More options are inside.",
             style = MaterialTheme.typography.bodySmall,
             color = DhunColors.textSecondary,
         )
@@ -162,8 +160,7 @@ internal fun BackgroundSettingsSection(viewModel: SettingsViewModel) {
                     color = DhunColors.textPrimary,
                 )
                 Text(
-                    text = "Main pages, Navigation bar, Miniplayer and Full player go back to their default " +
-                        "colours and blur. The two switches above keep their current settings.",
+                    text = "Restore all four surfaces? Global switches stay unchanged.",
                     style = MaterialTheme.typography.bodySmall,
                     color = DhunColors.textSecondary,
                 )
@@ -398,9 +395,9 @@ private fun BackgroundComponentDialog(
             BackgroundSwitchRow(
                 title = "Background blur here",
                 subtitle = if (state.blurEnabled) {
-                    "Only this surface. Turn Background blur off above to remove artwork everywhere."
+                    "Use artwork behind this surface"
                 } else {
-                    "Background blur is off above, so no surface shows artwork. This choice is remembered."
+                    "Global blur is off; this choice is saved"
                 },
                 checked = prefs.blurEnabled,
                 enabled = state.blurEnabled,
@@ -409,9 +406,9 @@ private fun BackgroundComponentDialog(
             BackgroundSwitchRow(
                 title = "Take colour from artwork",
                 subtitle = when {
-                    !state.dynamicColors -> "Dynamic colours is off above, so every surface uses its own colour."
-                    !prefs.followArtwork -> "Only this surface: the others still follow the cover."
-                    else -> "This surface follows the playing cover."
+                    !state.dynamicColors -> "Dynamic colours is off; this choice is saved"
+                    !prefs.followArtwork -> "Use this surface’s chosen colour"
+                    else -> "Use the current artwork’s colours"
                 },
                 checked = prefs.followArtwork,
                 enabled = state.dynamicColors,

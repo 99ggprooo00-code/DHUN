@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -44,6 +45,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import dev.dhun.core.PlaybackState
 import dev.dhun.design.ArtworkColorExtractor
 import dev.dhun.design.ArtworkColors
+import dev.dhun.design.ArtworkUrls
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
@@ -77,10 +79,7 @@ fun MiniPlayer(
 ) {
     val state by viewModel.state.collectAsState()
     val currentTrack by viewModel.currentTrack.collectAsState()
-    val positionMs by viewModel.positionMs.collectAsState()
-    val durationMs by viewModel.durationMs.collectAsState()
     val track = currentTrack ?: return
-    val progress = playbackProgress(positionMs, durationMs)
     val accentMode = DhunAppearance.accentMode
     val selectedAccent = DhunAppearance.selectedAccentColor
     val colors = remember(track.thumbnailUrl, track.id, accentMode, selectedAccent) {
@@ -102,28 +101,11 @@ fun MiniPlayer(
 
     val miniContent: @Composable () -> Unit = {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // A new track starts at its own position, never a sweep backwards
-            // from the previous track. Playback ticks are gently interpolated.
-            key(track.id, durationMs) {
-                val displayedProgress by animateFloatAsState(
-                    targetValue = progress,
-                    animationSpec = DhunAnimations.fastTween(),
-                    label = "miniProgress",
-                )
-                Box(
-                    modifier = Modifier.fillMaxWidth().height(DhunSpacing.progressHeight)
-                        .background(DhunColors.border.copy(alpha = 0.35f)),
-                    contentAlignment = Alignment.CenterStart,
-                ) {
-                    if (displayedProgress > 0f) {
-                        Box(
-                            modifier = Modifier.fillMaxWidth(displayedProgress)
-                                .height(DhunSpacing.progressHeight)
-                                .background(Brush.horizontalGradient(listOf(accent.copy(alpha = 0.7f), accent))),
-                        )
-                    }
-                }
-            }
+            MiniPlayerProgress(
+                viewModel = viewModel,
+                trackId = track.id,
+                accent = accent,
+            )
 
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                 // Keep the title usable on narrow phones; Previous remains in
@@ -170,6 +152,7 @@ fun MiniPlayer(
                 ) {
                     ArtworkImage(
                         imageUrl = track.thumbnailUrl,
+                        fallbackImageUrl = ArtworkUrls.videoThumbnail(track.id),
                         contentDescription = null,
                         modifier = Modifier.size(DhunSpacing.touchTarget)
                             .shadow(DhunSpacing.xs, DhunShapes.medium, clip = false),
@@ -274,6 +257,39 @@ fun MiniPlayer(
 
     if (showErrorDialog && errorState != null) {
         PlaybackErrorDialog(errorState, onDismiss = { showErrorDialog = false }, onRetry = viewModel::retry)
+    }
+}
+
+/** Only this two-pixel strip observes 500 ms playback ticks, not the whole dock. */
+@Composable
+private fun MiniPlayerProgress(
+    viewModel: PlayerViewModel,
+    trackId: String,
+    accent: Color,
+) {
+    val positionMs by viewModel.positionMs.collectAsState()
+    val durationMs by viewModel.durationMs.collectAsState()
+    // A new track starts at its own position, never a sweep backwards from the
+    // previous track. Playback ticks are gently interpolated inside this strip.
+    key(trackId, durationMs) {
+        val displayedProgress by animateFloatAsState(
+            targetValue = playbackProgress(positionMs, durationMs),
+            animationSpec = DhunAnimations.fastTween(),
+            label = "miniProgress",
+        )
+        Box(
+            modifier = Modifier.fillMaxWidth().height(DhunSpacing.progressHeight)
+                .background(DhunColors.border.copy(alpha = 0.35f)),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            if (displayedProgress > 0f) {
+                Box(
+                    modifier = Modifier.fillMaxWidth(displayedProgress)
+                        .height(DhunSpacing.progressHeight)
+                        .background(Brush.horizontalGradient(listOf(accent.copy(alpha = 0.7f), accent))),
+                )
+            }
+        }
     }
 }
 

@@ -241,12 +241,14 @@ object BackgroundPalettePolicy {
             BackgroundComponent.MINI_PLAYER -> BackgroundPalette(
                 base = tokens.background,
                 mainGlow = tokens.accent,
-                companionGlow = tokens.surfaceElevated,
+                // Chrome already has a pale glass body in light mode. A pure
+                // white companion tint stacked on it washed the whole band out.
+                companionGlow = if (tokens.isLight) tokens.surfaceContainerHighest else tokens.surfaceElevated,
             )
             BackgroundComponent.NAVIGATION -> BackgroundPalette(
                 base = tokens.background,
                 mainGlow = tokens.accent,
-                companionGlow = tokens.surfaceElevated,
+                companionGlow = if (tokens.isLight) tokens.surfaceContainerHighest else tokens.surfaceElevated,
             )
             BackgroundComponent.PAGES -> BackgroundPalette.neutral(tokens)
         }

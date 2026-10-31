@@ -46,6 +46,7 @@ import dev.dhun.core.HistoryEntry
 import dev.dhun.core.Track
 import dev.dhun.data.LocalPlaylist
 import dev.dhun.data.PlayContext
+import dev.dhun.design.ArtworkUrls
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
@@ -71,6 +72,7 @@ import dev.dhun.presentation.library.DownloadsListUi
 import dev.dhun.presentation.library.LibraryTab
 import dev.dhun.presentation.library.LibraryViewModel
 import dev.dhun.presentation.library.currentUtcOffsetMs
+import dev.dhun.presentation.library.preferredArtworkUrl
 import dev.dhun.presentation.library.toTrack
 import dev.dhun.ui.components.ActionErrorBanner
 import dev.dhun.ui.components.DragHandleGrip
@@ -557,6 +559,7 @@ private fun LikedSongsDetailView(
             ) {
                 ArtworkImage(
                     imageUrl = track.thumbnailUrl,
+                    fallbackImageUrl = ArtworkUrls.videoThumbnail(track.id),
                     contentDescription = track.title,
                     modifier = Modifier.size(DhunSpacing.touchTarget),
                 )
@@ -1258,7 +1261,8 @@ private fun ManageableDownloadRow(
     ) {
         DhunCheckbox(checked = selected, onCheckedChange = { onToggle() })
         ArtworkImage(
-            imageUrl = download.thumbnailUrl,
+            imageUrl = download.preferredArtworkUrl,
+            fallbackImageUrl = download.thumbnailUrl,
             contentDescription = download.title,
             modifier = Modifier.size(DhunSpacing.touchTarget),
         )
@@ -1307,7 +1311,8 @@ private fun DownloadRow(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md)) {
             ArtworkImage(
-                imageUrl = download.thumbnailUrl,
+                imageUrl = download.preferredArtworkUrl,
+                fallbackImageUrl = download.thumbnailUrl,
                 contentDescription = download.title,
                 modifier = Modifier.size(DhunSpacing.touchTarget),
             )
@@ -1627,7 +1632,12 @@ private fun HistoryRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
     ) {
-        ArtworkImage(imageUrl = entry.track.thumbnailUrl, contentDescription = entry.track.title, modifier = Modifier.size(DhunSpacing.touchTarget))
+        ArtworkImage(
+            imageUrl = entry.track.thumbnailUrl,
+            fallbackImageUrl = ArtworkUrls.videoThumbnail(entry.track.id),
+            contentDescription = entry.track.title,
+            modifier = Modifier.size(DhunSpacing.touchTarget),
+        )
         Column(modifier = Modifier.weight(1f)) {
             Text(entry.track.title, style = MaterialTheme.typography.bodyMedium, color = DhunColors.textPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(

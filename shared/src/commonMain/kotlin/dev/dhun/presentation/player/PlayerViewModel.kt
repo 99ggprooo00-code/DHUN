@@ -172,6 +172,12 @@ class PlayerViewModel(
     private val _sleepTimerRemainingMs = MutableStateFlow<Long?>(null)
     val sleepTimerRemainingMs: StateFlow<Long?> = _sleepTimerRemainingMs.asStateFlow()
 
+    /** The shell observes this minute-level label, not one-second timer ticks. */
+    val sleepTimerLabel: StateFlow<String?> = sleepTimerRemainingMs
+        .map { remaining -> remaining?.let(::sleepTimerChipLabel) }
+        .distinctUntilChanged()
+        .stateIn(scope, SharingStarted.Eagerly, null)
+
     /** Preset minutes the Home chip cycles through. 0 = cancel. */
     fun cycleSleepTimer() {
         val current = _sleepTimerRemainingMs.value
@@ -782,4 +788,9 @@ class PlayerViewModel(
          */
         const val RADIO_REFILL_THRESHOLD_SONGS = 3
     }
+}
+
+internal fun sleepTimerChipLabel(remainingMs: Long): String {
+    val minutes = ((remainingMs.coerceAtLeast(0L) + 59_999L) / 60_000L).coerceAtLeast(1)
+    return "Sleep · ${minutes}m"
 }

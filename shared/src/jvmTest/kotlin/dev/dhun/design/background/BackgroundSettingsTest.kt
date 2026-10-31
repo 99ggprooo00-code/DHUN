@@ -65,6 +65,20 @@ class BackgroundSettingsTest {
         DhunAppearance.applyPersistedAppearance("dark", "brand")
     }
 
+    @Test
+    fun lightChromeDefaultsDoNotStackPureWhiteCompanionLayers() {
+        for (component in listOf(BackgroundComponent.MINI_PLAYER, BackgroundComponent.NAVIGATION)) {
+            val palette = BackgroundPalettePolicy.defaultPalette(component, light)
+            assertEquals(light.surfaceContainerHighest, palette.companionGlow, component.label)
+            assertNotEquals(Color(0xFFFFFFFF), palette.companionGlow, component.label)
+            assertEquals(
+                dark.surfaceElevated,
+                BackgroundPalettePolicy.defaultPalette(component, dark).companionGlow,
+                "dark chrome stays unchanged",
+            )
+        }
+    }
+
     /* ------------------------------------------------ colour precedence */
 
     private fun resolve(

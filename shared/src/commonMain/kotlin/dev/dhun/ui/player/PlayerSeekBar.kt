@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -56,8 +57,33 @@ import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
+import dev.dhun.presentation.player.PlayerViewModel
 import kotlinx.coroutines.delay
 import kotlin.math.abs
+
+/**
+ * Playback ticks belong to the timeline only. Observing them in FullPlayer's
+ * root recomposed the hero, backdrop and every control twice per second.
+ */
+@Composable
+internal fun ObservedPlayerTimeline(
+    viewModel: PlayerViewModel,
+    accent: Color,
+    onSeek: (Long) -> Unit,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val positionMs by viewModel.positionMs.collectAsState()
+    val durationMs by viewModel.durationMs.collectAsState()
+    PlayerTimeline(
+        positionMs = positionMs,
+        durationMs = durationMs,
+        accent = accent,
+        onSeek = onSeek,
+        enabled = enabled,
+        modifier = modifier,
+    )
+}
 
 /** The caller keys this whole timeline to the current track/queue occurrence. */
 @Composable

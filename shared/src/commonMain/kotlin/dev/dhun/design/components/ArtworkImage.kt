@@ -63,32 +63,55 @@ fun ArtworkImage(
      * glyph placeholder either way.
      */
     placeholderBase: Boolean = true,
+    /**
+     * Original image to try when a derived [imageUrl] fails. Full Player uses
+     * this for its enlarged artwork: a working mini-player URL remains a
+     * fallback instead of turning the hero into a placeholder.
+     */
+    fallbackImageUrl: String? = null,
 ) {
     val resolvedShape: Shape = if (cornerRadius != null) RoundedCornerShape(cornerRadius) else shape
+    val candidates = remember(imageUrl, fallbackImageUrl) {
+        listOfNotNull(imageUrl, fallbackImageUrl)
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+    }
 
-    if (imageUrl.isNullOrBlank()) {
+    if (candidates.isEmpty()) {
         ArtworkPlaceholder(modifier = modifier, shape = resolvedShape)
         return
     }
 
+    var candidateIndex by remember(candidates) { mutableStateOf(0) }
+    val currentImageUrl = candidates[candidateIndex]
     val context = LocalPlatformContext.current
-    val request = ImageRequest.Builder(context)
-        .data(imageUrl)
-        .crossfade(true)
-        .build()
+    val request = remember(context, currentImageUrl) {
+        ImageRequest.Builder(context)
+            .data(currentImageUrl)
+            .crossfade(true)
+            .build()
+    }
 
     // Load phase drives the placeholder: pulse only while the fetch is in
     // flight; a failed load settles to a static gradient instead of pulsing
-    // forever (which read as a "skeleton that never resolves").
-    var phase by remember(imageUrl) { mutableStateOf(LoadPhase.Loading) }
-    val pulse by rememberInfiniteTransition(label = "artwork-pulse")
-        .animateFloat(
-            initialValue = 0.6f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
-            label = "alpha",
-        )
-    val placeholderAlpha = if (phase == LoadPhase.Loading) pulse else 1f
+    // forever (which read as a "skeleton that never resolves"). A derived
+    // URL gets one original-URL attempt before the failure is final.
+    var phase by remember(candidates) { mutableStateOf(LoadPhase.Loading) }
+    val placeholderAlpha = if (phase == LoadPhase.Loading) {
+        // Compose the infinite transition only while it is visible. Keeping
+        // one alive in every loaded/failed row made long lists animate forever.
+        val pulse by rememberInfiniteTransition(label = "artwork-pulse")
+            .animateFloat(
+                initialValue = 0.6f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
+                label = "alpha",
+            )
+        pulse
+    } else {
+        1f
+    }
 
     Box(
         modifier = modifier.clip(resolvedShape),
@@ -121,7 +144,14 @@ fun ArtworkImage(
                 // Coil handles crossfade; we keep the placeholder underneath.
                 onLoading = { phase = LoadPhase.Loading },
                 onSuccess = { phase = LoadPhase.Loaded },
-                onError = { phase = LoadPhase.Failed },
+                onError = {
+                    if (candidateIndex < candidates.lastIndex) {
+                        candidateIndex++
+                        phase = LoadPhase.Loading
+                    } else {
+                        phase = LoadPhase.Failed
+                    }
+                },
             )
         }
     }

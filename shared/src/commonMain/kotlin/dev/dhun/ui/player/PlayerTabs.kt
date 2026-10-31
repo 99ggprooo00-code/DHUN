@@ -55,6 +55,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import dev.dhun.core.Track
 import dev.dhun.data.PlayContext
 import dev.dhun.design.DhunAnimations
+import dev.dhun.design.ArtworkUrls
 import dev.dhun.design.DhunColors
 import dev.dhun.design.components.resolveGlassArtwork
 import dev.dhun.design.DhunIcon
@@ -203,6 +204,7 @@ internal fun QueueTabContent(
                 Box(modifier = Modifier.size(DhunSpacing.touchTarget).clip(DhunShapes.medium)) {
                     ArtworkImage(
                         imageUrl = track.thumbnailUrl,
+                        fallbackImageUrl = ArtworkUrls.videoThumbnail(track.id),
                         contentDescription = null, // The adjacent title already labels the row.
                         modifier = Modifier.fillMaxSize(),
                         shape = DhunShapes.medium,
@@ -754,6 +756,7 @@ private fun RelatedRow(track: Track, accent: Color, onClick: () -> Unit, onAddTo
     ) {
         ArtworkImage(
             imageUrl = track.thumbnailUrl,
+            fallbackImageUrl = ArtworkUrls.videoThumbnail(track.id),
             contentDescription = null,
             modifier = Modifier.size(DhunSpacing.touchTarget),
             shape = DhunShapes.medium,

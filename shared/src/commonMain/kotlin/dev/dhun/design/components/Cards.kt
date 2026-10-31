@@ -16,6 +16,7 @@ import dev.dhun.core.Album
 import dev.dhun.core.Artist
 import dev.dhun.core.Playlist
 import dev.dhun.core.Track
+import dev.dhun.design.ArtworkUrls
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
@@ -34,6 +35,7 @@ fun TrackCard(
     ) {
         ArtworkImage(
             imageUrl = track.thumbnailUrl,
+            fallbackImageUrl = ArtworkUrls.videoThumbnail(track.id),
             contentDescription = track.title,
             modifier = Modifier.fillMaxWidth().aspectRatio(1f),
             shape = DhunShapes.artwork,

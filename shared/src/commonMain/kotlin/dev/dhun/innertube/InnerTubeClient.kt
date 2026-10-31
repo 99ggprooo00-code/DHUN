@@ -99,6 +99,9 @@ class InnerTubeClient(
     @Volatile
     private var cachedMusicVisitorData: String? = null
 
+    @Volatile
+    private var cachedHomeInitialData: JsonObject? = null
+
     /** Player-JS URL to the `signatureTimestamp` extracted from it. */
     @Volatile
     private var cachedSts: Pair<String, String>? = null
@@ -132,6 +135,7 @@ class InnerTubeClient(
                 ),
             )
         cachedMusicVisitorData = parseVisitorDataFromHomepage(html)
+        cachedHomeInitialData = parseHomeInitialData(html)
         cachedClientVersion = version
         return version
     }
@@ -183,7 +187,31 @@ class InnerTubeClient(
                 put("context", context())
                 put("browseId", "FEmusic_home")
             }
-            parseHomeFeedPage(postJson("browse", body))
+            val response = try {
+                postJson("browse", body)
+            } catch (rejected: DhunException) {
+                val detail = (rejected.error as? DhunError.Parse)?.detail
+                if (detail?.startsWith("HTTP 400 from /browse") != true) throw rejected
+
+                // The music homepage carries the same real ytInitialData Home
+                // envelope. Some sessions reject the anonymous browse POST
+                // while still serving that page; refresh it on every fallback
+                // so Retry is a real request, never a cached success. If the
+                // fallback is absent or malformed, preserve the original 400.
+                val fallback = try {
+                    clientVersion(forceRefresh = true)
+                    cachedHomeInitialData?.let(::parseHomeFeedPage)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    null
+                }
+                if (fallback != null && (fallback.sections.isNotEmpty() || fallback.continuationToken != null)) {
+                    return@resultify fallback
+                }
+                throw rejected
+            }
+            parseHomeFeedPage(response)
         }
 
     /**
@@ -540,7 +568,9 @@ class InnerTubeClient(
                 when {
                     code == 429 -> lastError = onRateLimited(response.headers["Retry-After"])
                     code in 500..599 -> lastError = DhunError.Network("HTTP $code from /$endpoint")
-                    code != 200 -> throw DhunException(DhunError.Parse("HTTP $code from /$endpoint"))
+                    code != 200 -> throw DhunException(
+                        DhunError.Parse(innerTubeHttpErrorDetail(code, endpoint, response.bodyAsText())),
+                    )
                     else -> {
                         val text = response.bodyAsText()
                         try {
@@ -810,6 +840,25 @@ internal fun parseSignatureTimestampFromPlayerJs(playerJs: String): String? {
     if (playerJs.isEmpty()) return null
     return Regex("signatureTimestamp\\s*:\\s*(\\d+)")
         .find(playerJs)?.groupValues?.get(1)
+}
+
+/**
+ * Standard InnerTube error fields only. Never include the raw response,
+ * debugInfo, request context or visitor/session values in phone diagnostics.
+ */
+internal fun innerTubeHttpErrorDetail(code: Int, endpoint: String, responseBody: String): String {
+    val base = "HTTP $code from /$endpoint"
+    val error = runCatching {
+        (Json.parseToJsonElement(responseBody) as? JsonObject)?.obj("error")
+    }.getOrNull() ?: return base
+    val firstCause = error.arr("errors")?.firstOrNull() as? JsonObject
+    val summary = listOfNotNull(
+        base,
+        error.str("status")?.takeIf { it.isNotBlank() }?.let { "status=$it" },
+        firstCause?.str("reason")?.takeIf { it.isNotBlank() }?.let { "reason=$it" },
+        error.str("message")?.takeIf { it.isNotBlank() },
+    )
+    return diagnosticText(summary.joinToString("; "))
 }
 
 internal fun bodyWithClientVersion(body: JsonObject, version: String): JsonObject {

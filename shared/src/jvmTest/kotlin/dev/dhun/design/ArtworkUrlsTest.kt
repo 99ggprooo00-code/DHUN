@@ -63,4 +63,15 @@ class ArtworkUrlsTest {
         assertNull(ArtworkUrls.list(null))
         assertNull(ArtworkUrls.nowPlaying(null))
     }
+
+    @Test
+    fun sparseTracksRecoverOnlyRealYoutubeVideoCovers() {
+        assertEquals(
+            "https://i.ytimg.com/vi/utwMHfDZ6SA/hqdefault.jpg",
+            ArtworkUrls.videoThumbnail(" utwMHfDZ6SA "),
+        )
+        assertNull(ArtworkUrls.videoThumbnail("not-a-video"))
+        assertNull(ArtworkUrls.videoThumbnail(""))
+        assertNull(ArtworkUrls.videoThumbnail(null))
+    }
 }

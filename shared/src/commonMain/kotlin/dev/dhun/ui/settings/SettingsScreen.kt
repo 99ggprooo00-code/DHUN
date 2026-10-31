@@ -186,7 +186,7 @@ fun SettingsScreen(
                     DhunAppearance.setAccentMode(it)
                 }
                 Text(
-                    text = "Dynamic tints accent-colored controls throughout the app from the current track; static keeps the selected color.",
+                    text = "Dynamic follows artwork; Static uses your selected accent.",
                     style = MaterialTheme.typography.bodySmall,
                     color = DhunColors.textSecondary,
                     modifier = Modifier.padding(horizontal = DhunSpacing.screenPadding),
@@ -207,13 +207,13 @@ fun SettingsScreen(
                     viewModel.audioQuality.collectAsState().value, viewModel::setAudioQuality)
                 OptionRow("Keyboard seek step", listOf(5 to "5s", 10 to "10s", 15 to "15s", 30 to "30s"),
                     viewModel.seekStepSeconds.collectAsState().value, viewModel::setSeekStepSeconds)
-                SettingsSwitchRow("Resume on launch", "Restore the last queue and position when the app starts",
+                SettingsSwitchRow("Resume on launch", "Restore your last queue and position",
                     viewModel.resumeOnLaunch.collectAsState().value, viewModel::setResumeOnLaunch)
-                SettingsSwitchRow("Endless radio", "Automatically queue similar songs near the end",
+                SettingsSwitchRow("Endless radio", "Add similar songs when the queue ends",
                     viewModel.autoplayRadio.collectAsState().value, viewModel::setAutoplayRadio)
-                SettingsSwitchRow("Keep shuffle & repeat", "Keep modes when starting a new queue or restarting",
+                SettingsSwitchRow("Keep shuffle & repeat", "Keep modes for new queues and restarts",
                     viewModel.persistShuffleRepeat.collectAsState().value, viewModel::setPersistShuffleRepeat)
-                SettingsSwitchRow("Pause on mute", "Pause at zero volume; resume on unmute only if mute paused playback",
+                SettingsSwitchRow("Pause on mute", "Pause at zero volume; resume if mute paused playback",
                     viewModel.pauseOnMute.collectAsState().value, viewModel::setPauseOnMute)
             }
             if (category == SettingsCategory.LYRICS) SettingsGroup("Lyrics & Providers") {
@@ -229,7 +229,7 @@ fun SettingsScreen(
                     viewModel.preferredProvider.collectAsState().value, { viewModel.setPreferredProvider(it) })
                 listOf("lrclib" to "LRCLIB", "ytm" to "YouTube Music",
                     "lrclib_search" to "LRCLIB search", "kugou" to "KuGou").forEach { (id, label) ->
-                    SettingsSwitchRow(label, "Include as a fallback after the preferred provider",
+                    SettingsSwitchRow(label, "Use after the preferred provider",
                         id in viewModel.providerOrder.collectAsState().value.split(',')) {
                         viewModel.setProviderEnabled(id, it)
                     }
@@ -237,28 +237,28 @@ fun SettingsScreen(
                 SettingsNavigationRow("Clear lyrics cache", "Refresh automatic lyrics; keep song choices", { confirmLyricsClear = true })
                 SettingsSwitchRow("Prefer synced lyrics", "Use timestamped lyrics when available",
                     viewModel.lyricsPreferSynced.collectAsState().value, viewModel::setLyricsPreferSynced)
-                SettingsSwitchRow("Auto-scroll synced lyrics", "Follow the current line until you scroll manually",
+                SettingsSwitchRow("Auto-scroll synced lyrics", "Follow the current line until you scroll",
                     viewModel.lyricsAutoScroll.collectAsState().value, viewModel::setLyricsAutoScroll)
                 OptionRow("Lyrics text size", listOf("small" to "Small", "default" to "Default", "large" to "Large"),
                     viewModel.lyricsTextSize.collectAsState().value, viewModel::setLyricsTextSize)
             }
             if (category == SettingsCategory.CONTENT) SettingsGroup("Content, Region & Discovery") {
                 CountryRegionPicker(viewModel)
-                SettingsSwitchRow("Explicit content", "Allow explicit tracks in search, home and radio",
+                SettingsSwitchRow("Explicit content", "Allow explicit tracks",
                     viewModel.explicitContent.collectAsState().value, viewModel::setExplicitContent)
             }
             if (category == SettingsCategory.PLAYBACK && equalizerSession != null) SettingsGroup("Equalizer & Sound Processing") {
                 EqualizerSection(equalizerSession)
             }
             if (category == SettingsCategory.PRIVACY) SettingsGroup("Privacy & History") {
-                SettingsSwitchRow("Record listening history", "Save new plays locally; turning off keeps existing history and queue restore",
+                SettingsSwitchRow("Record listening history", "Save new plays on this device",
                     viewModel.recordListeningHistory.collectAsState().value, viewModel::setRecordListeningHistory)
-                Text("This is not incognito: queue restore, caches and provider requests still work. Plays skipped while off are not added later.",
+                Text("Not incognito: other data still works. Plays made while off aren’t added later.",
                     modifier = Modifier.padding(horizontal = DhunSpacing.screenPadding),
                     style = MaterialTheme.typography.bodySmall, color = DhunColors.textSecondary)
                 SettingsNavigationRow("Clear search history", "Remove recent searches", { confirmHistory = "search" })
                 SettingsNavigationRow("Clear play history", "Remove listening history", { confirmHistory = "play" })
-                SettingsNavigationRow("Privacy & Legal", "Review provider requests and on-device data", onOpenAboutLegal)
+                SettingsNavigationRow("Privacy & Legal", "Provider requests and on-device data", onOpenAboutLegal)
             }
             if (category == SettingsCategory.STORAGE) SettingsGroup("Storage, Cache & Data") {
                 CacheBudgetRow(viewModel)
@@ -595,10 +595,9 @@ private fun BackdropControls(viewModel: SettingsViewModel) {
             BackgroundSwitchRow(
                 title = "Adaptive blur",
                 subtitle = when {
-                    !blurOn -> "Paused while Background blur is off. Your choice is remembered."
-                    backgrounds.adaptiveBlur ->
-                        "Bright, busy covers keep the full frost; dark, calm ones are blurred a little less so they stay recognisable."
-                    else -> "One steady frost for every cover, at the strength below."
+                    !blurOn -> "Paused while Background blur is off"
+                    backgrounds.adaptiveBlur -> "Adjust frost to each cover"
+                    else -> "Use the same frost for every cover"
                 },
                 checked = backgrounds.adaptiveBlur,
                 enabled = blurOn,
@@ -616,9 +615,9 @@ private fun BackdropControls(viewModel: SettingsViewModel) {
             )
             Text(
                 text = if (blurOn) {
-                    "How heavily the cover is frosted. Turn Background blur off above to remove it entirely."
+                    "Set how strongly artwork is frosted"
                 } else {
-                    "Background blur is off above, so nothing is frosted. Your strength is kept for when it is back on."
+                    "Saved while Background blur is off"
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = if (blurOn) DhunColors.textSecondary else DhunColors.textTertiary,
@@ -628,9 +627,10 @@ private fun BackdropControls(viewModel: SettingsViewModel) {
                     value = effective.toFloat(),
                     onValueChange = { value ->
                         val percent = value.toInt().coerceIn(floor, 100)
-                        viewModel.setBackdropBlurPercent(percent)
+                        viewModel.previewBackdropBlurPercent(percent)
                         DhunAppearance.setBackdropPrefs(blurPercent = percent)
                     },
+                    onValueChangeFinished = { viewModel.saveBackdropBlurPercent() },
                     valueRange = floor.toFloat()..100f,
                     enabled = blurOn,
                     modifier = Modifier.weight(1f),
@@ -649,7 +649,7 @@ private fun BackdropControls(viewModel: SettingsViewModel) {
                 color = DhunColors.textPrimary,
             )
             Text(
-                text = if (supportsRealtimeBlur) "Dim the blurred artwork independently of blur." else "Hardware blur is unavailable on this Android version; dim the sharp cover instead.",
+                text = "Dim the artwork background",
                 style = MaterialTheme.typography.bodySmall,
                 color = DhunColors.textSecondary,
             )
@@ -658,9 +658,10 @@ private fun BackdropControls(viewModel: SettingsViewModel) {
                     value = brightness.toFloat(),
                     onValueChange = { value ->
                         val percent = value.toInt().coerceIn(0, 100)
-                        viewModel.setBackdropBrightnessPercent(percent)
+                        viewModel.previewBackdropBrightnessPercent(percent)
                         DhunAppearance.setBackdropPrefs(brightnessPercent = percent)
                     },
+                    onValueChangeFinished = { viewModel.saveBackdropBrightnessPercent() },
                     valueRange = 0f..100f,
                     modifier = Modifier.weight(1f),
                 )
@@ -684,9 +685,7 @@ private fun VisualTuningControls(viewModel: SettingsViewModel) {
         verticalArrangement = Arrangement.spacedBy(DhunSpacing.md),
     ) {
         Text(
-            "Test baseline: every component 15%, including tonal surfaces, page artwork, mini-player, navigation and queue. " +
-                "The three removed controls are fixed; the remaining sliders preview live and save on release. " +
-                "Use the labels and percentages when reporting what looks too dark or too white.",
+            "Preview live; values save on release. Include labels and percentages in feedback.",
             style = MaterialTheme.typography.bodySmall, color = DhunColors.textSecondary,
         )
         DhunVisualTuning.adjustableParts.forEach { part ->

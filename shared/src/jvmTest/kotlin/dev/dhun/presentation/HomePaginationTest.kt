@@ -26,6 +26,7 @@ import dev.dhun.presentation.home.HomeViewModel
 import dev.dhun.provider.MusicProvider
 import dev.dhun.ui.home.quickPickShelfAlreadyShown
 import dev.dhun.ui.home.remainingHomeSections
+import dev.dhun.ui.home.shouldShowLocalHomeOnError
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -56,6 +57,15 @@ class HomePaginationTest {
             scope = scope,
         )
     private fun HomeViewModel.feed() = (uiState.value as HomeUiState.Success).feed
+
+    @Test
+    fun homeRequestFailureKeepsOnlyUsefulLocalShelves() {
+        val recent = listOf(Track("recent", "Recent", "Artist"))
+        assertTrue(shouldShowLocalHomeOnError(HomeMood.FOR_YOU, recent, emptyList()))
+        assertTrue(shouldShowLocalHomeOnError(HomeMood.FOR_YOU, emptyList(), recent))
+        assertFalse(shouldShowLocalHomeOnError(HomeMood.FOR_YOU, emptyList(), emptyList()))
+        assertFalse(shouldShowLocalHomeOnError(HomeMood.FOCUS, recent, recent))
+    }
 
     @Test
     fun rapidLoadMoreEventsMakeOneRequestAndAppendThePage() = runTest {

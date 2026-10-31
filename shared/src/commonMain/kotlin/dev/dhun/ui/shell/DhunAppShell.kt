@@ -358,11 +358,7 @@ fun DhunAppShell(
             isOnline = isOnline,
             fullPlayerVisible = playerOverlayVisible,
         )
-        val sleepRemaining by playerViewModel.sleepTimerRemainingMs.collectAsState()
-        val sleepLabel = sleepRemaining?.let { ms ->
-            val mins = ((ms + 59_999L) / 60_000L).toInt().coerceAtLeast(1)
-            "Sleep · ${mins}m"
-        }
+        val sleepLabel by playerViewModel.sleepTimerLabel.collectAsState()
         val accentMode = DhunAppearance.accentMode
         val selectedAccentColor = DhunAppearance.selectedAccentColor
         // Publish the active track tint into the shared appearance tokens so

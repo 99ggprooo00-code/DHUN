@@ -24,6 +24,10 @@ import kotlin.test.assertTrue
 class InnerTubeRequestTest {
     private fun obj(json: String) = Json.parseToJsonElement(json) as JsonObject
 
+    private fun homeFixture(): String = javaClass.classLoader
+        .getResourceAsStream("fixtures/home-pagination/initial-feed-and-shelf-token.json")!!
+        .bufferedReader().use { it.readText() }
+
     @Test
     fun homeContinuationUsesTheBrowseQueryWireContract() = runBlocking {
         var posts = 0
@@ -136,6 +140,35 @@ class InnerTubeRequestTest {
     }
 
     @Test
+    fun rejectedHomeBrowseUsesFreshRealHomepageInitialData() = runBlocking {
+        var homepageRequests = 0
+        val engine = MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/" -> {
+                    homepageRequests++
+                    val config = """{"INNERTUBE_CLIENT_VERSION":"1.20261027.10.00"}"""
+                    if (homepageRequests == 1) respond(config)
+                    else respond("$config<script>var ytInitialData = ${homeFixture()};</script>")
+                }
+                "/youtubei/v1/browse" -> respond(
+                    """{"error":{"status":"INVALID_ARGUMENT","message":"bad request"}}""",
+                    status = HttpStatusCode.BadRequest,
+                )
+                else -> error("Unexpected request: ${request.url.encodedPath}")
+            }
+        }
+        val http = HttpClient(engine) { install(HttpTimeout) }
+        try {
+            val result = InnerTubeClient(http).homeFeedPage() as DhunResult.Success
+            assertEquals(listOf("a"), result.value.sections.single().tracks.map { it.id })
+            assertEquals("page-two", result.value.continuationToken)
+            assertEquals(2, homepageRequests, "fallback must fetch fresh content rather than replay a cached success")
+        } finally {
+            http.close()
+        }
+    }
+
+    @Test
     fun missingHomeClientVersionReportsHomepageHttpStatusNotJustRegexFailure() = runBlocking {
         val engine = MockEngine { request ->
             when (request.url.encodedPath) {
@@ -239,6 +272,23 @@ class InnerTubeRequestTest {
             body.obj("playbackContext").obj("contentPlaybackContext").str("signatureTimestamp"),
         )
         assertEquals("CgtFaK3zEXAMPLE", visitorHeader)
+    }
+
+    @Test
+    fun httpErrorSummaryUsesAllowlistedServiceFieldsOnly() {
+        val detail = innerTubeHttpErrorDetail(
+            400,
+            "browse",
+            """{"error":{"status":"INVALID_ARGUMENT","message":"Request contains an invalid argument.","reason":"badRequest","debugInfo":"secret-debug","context":{"visitorData":"secret-visitor"}},"request":{"visitorData":"also-secret"}}""",
+        )!!
+        assertTrue(detail.contains("HTTP 400 from /browse"))
+        assertTrue(detail.contains("status=INVALID_ARGUMENT"))
+        assertTrue(detail.contains("reason=badRequest"))
+        assertTrue(detail.contains("Request contains an invalid argument"))
+        for (secret in listOf("debugInfo", "secret-debug", "visitorData", "secret-visitor", "also-secret", "request")) {
+            assertTrue(!detail.contains(secret), "HTTP detail leaked $secret: $detail")
+        }
+        assertEquals("HTTP 400 from /browse", innerTubeHttpErrorDetail(400, "browse", "not-json"))
     }
 
     @Test

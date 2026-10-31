@@ -9,18 +9,18 @@ import dev.dhun.data.SettingsKeys
 
 /** Test-only UI tuning keys. Retired parts stay keyed so old settings can be ignored/reset. */
 enum class VisualPart(val key: String, val label: String, val detail: String) {
-    PAGE_BACKDROP(SettingsKeys.TUNE_PAGE_BACKDROP, "Page artwork veil", "Home, Search, Library and browse backgrounds; separate from artwork blur and brightness"),
-    LIST_ROWS(SettingsKeys.TUNE_LIST_ROWS, "Music rows and cards", "Track, album and playlist rows on pages; not the queue"),
-    READING(SettingsKeys.TUNE_READING, "Reading panels", "Settings, About & Legal and other content cards"),
-    CHIPS(SettingsKeys.TUNE_CHIPS, "Filter and action chips", "Category filters and compact unselected buttons"),
-    INPUTS(SettingsKeys.TUNE_INPUTS, "Text fields", "Search and short text-entry backgrounds"),
-    PLAYER(SettingsKeys.TUNE_PLAYER, "Full player backdrop", "The blurred player behind artwork and playback controls"),
-    LYRICS(SettingsKeys.TUNE_LYRICS, "Lyrics panel", "The CC lyrics backdrop; not queue lyrics"),
-    MINI_PLAYER(SettingsKeys.TUNE_MINI_PLAYER, "Mini-player", "The frosted now-playing bar"),
-    NAVIGATION(SettingsKeys.TUNE_NAVIGATION, "Navigation", "Bottom tab bar and desktop navigation rail"),
-    QUEUE_SHEET(SettingsKeys.TUNE_QUEUE_SHEET, "Queue sheet", "The artwork veil of the Queue/Related panel"),
-    QUEUE_ROWS(SettingsKeys.TUNE_QUEUE_ROWS, "Queue rows", "Individual queue track backgrounds"),
-    TONAL_SURFACES(SettingsKeys.TUNE_TONAL_SURFACES, "Tonal surfaces", "Surface, variant and elevated fills (including Settings cards); lower = more artwork visible"),
+    PAGE_BACKDROP(SettingsKeys.TUNE_PAGE_BACKDROP, "Page artwork veil", "Pages and browse backgrounds"),
+    LIST_ROWS(SettingsKeys.TUNE_LIST_ROWS, "Music rows and cards", "Track, album and playlist rows"),
+    READING(SettingsKeys.TUNE_READING, "Reading panels", "Settings and information cards"),
+    CHIPS(SettingsKeys.TUNE_CHIPS, "Filter and action chips", "Filters and compact buttons"),
+    INPUTS(SettingsKeys.TUNE_INPUTS, "Text fields", "Search and text input"),
+    PLAYER(SettingsKeys.TUNE_PLAYER, "Full player backdrop", "Artwork and playback controls"),
+    LYRICS(SettingsKeys.TUNE_LYRICS, "Lyrics panel", "Lyrics backdrop"),
+    MINI_PLAYER(SettingsKeys.TUNE_MINI_PLAYER, "Mini-player", "Now-playing bar"),
+    NAVIGATION(SettingsKeys.TUNE_NAVIGATION, "Navigation", "Tabs and navigation rail"),
+    QUEUE_SHEET(SettingsKeys.TUNE_QUEUE_SHEET, "Queue sheet", "Queue and Related backdrop"),
+    QUEUE_ROWS(SettingsKeys.TUNE_QUEUE_ROWS, "Queue rows", "Queue track backgrounds"),
+    TONAL_SURFACES(SettingsKeys.TUNE_TONAL_SURFACES, "Tonal surfaces", "Cards and elevated fills"),
 }
 
 /**

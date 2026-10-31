@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
 import dev.dhun.core.Track
 import dev.dhun.design.DhunAppearance
+import dev.dhun.design.ArtworkUrls
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
@@ -256,6 +257,7 @@ internal fun TrackMenuHeader(track: Track) {
     ) {
         ArtworkImage(
             imageUrl = track.thumbnailUrl,
+            fallbackImageUrl = ArtworkUrls.videoThumbnail(track.id),
             // The title and artist beside it already label this artwork.
             contentDescription = null,
             modifier = Modifier.size(DhunSpacing.menuArtwork),

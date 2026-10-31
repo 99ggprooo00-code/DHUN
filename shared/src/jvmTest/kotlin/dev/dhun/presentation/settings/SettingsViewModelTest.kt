@@ -186,6 +186,26 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun backdropSliderPreviewsDoNotWriteUntilRelease(): Unit = runBlocking {
+        val d = data()
+        val v = reloaded(d, this)
+        repeat(20) {
+            v.previewBackdropBlurPercent(40 + it)
+            v.previewBackdropBrightnessPercent(20 + it)
+        }
+        assertEquals(59, v.backdropBlurPercent.value)
+        assertEquals(39, v.backdropBrightnessPercent.value)
+        assertEquals(-1, d.settings.getInt(SettingsKeys.BACKDROP_BLUR, -1))
+        assertEquals(-1, d.settings.getInt(SettingsKeys.BACKDROP_BRIGHTNESS, -1))
+
+        v.saveBackdropBlurPercent()
+        v.saveBackdropBrightnessPercent()
+        val restored = reloaded(d, this)
+        assertEquals(59, restored.backdropBlurPercent.value)
+        assertEquals(39, restored.backdropBrightnessPercent.value)
+    }
+
+    @Test
     fun newPreferencesPersistAndReset(): Unit = runBlocking {
         val d = data()
         val v = reloaded(d, this)

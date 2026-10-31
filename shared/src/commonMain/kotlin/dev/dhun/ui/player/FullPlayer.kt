@@ -216,8 +216,6 @@ fun FullPlayer(
     val state by viewModel.state.collectAsState()
     val track by viewModel.currentTrack.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
-    val positionMs by viewModel.positionMs.collectAsState()
-    val durationMs by viewModel.durationMs.collectAsState()
     val repeatMode by viewModel.repeatMode.collectAsState()
     val shuffleEnabled by viewModel.shuffleEnabled.collectAsState()
     val volume by viewModel.volume.collectAsState()
@@ -498,8 +496,6 @@ fun FullPlayer(
                         viewModel = viewModel,
                         state = state,
                         current = current,
-                        positionMs = positionMs,
-                        durationMs = durationMs,
                         repeatMode = repeatMode,
                         shuffleEnabled = shuffleEnabled,
                         volume = volume,
@@ -675,8 +671,6 @@ private fun PlayerControlCluster(
     viewModel: PlayerViewModel,
     state: PlaybackState,
     current: Track?,
-    positionMs: Long,
-    durationMs: Long,
     repeatMode: RepeatMode,
     shuffleEnabled: Boolean,
     volume: Float,
@@ -808,9 +802,8 @@ private fun PlayerControlCluster(
         // Cancel scrubbing on a new queue occurrence, even for
         // equal-duration tracks.
         key(current?.id, queueIndex) {
-            PlayerTimeline(
-                positionMs = positionMs,
-                durationMs = durationMs,
+            ObservedPlayerTimeline(
+                viewModel = viewModel,
                 accent = accent,
                 onSeek = { target ->
                     if (viewModel.currentTrack.value?.id == current?.id &&
@@ -1103,6 +1096,7 @@ private fun PlayerArtworkStage(
         LyricsCardOverlay(
             visible = lyricsDominant,
             artworkUrl = artworkUrl,
+            fallbackArtworkUrl = track?.thumbnailUrl ?: ArtworkUrls.videoThumbnail(track?.id),
             cacheKey = cacheKey,
             viewModel = viewModel,
             accent = accent,
@@ -1503,6 +1497,7 @@ private fun ArtworkBackdrop(
             key(cacheKey) {
                 PlayerBackdrop(
                     artworkUrl = ArtworkUrls.nowPlaying(track?.thumbnailUrl),
+                    fallbackArtworkUrl = track?.thumbnailUrl ?: ArtworkUrls.videoThumbnail(track?.id),
                     cacheKey = cacheKey,
                 )
             }
@@ -1640,6 +1635,7 @@ private fun ArtworkHeroField(
             ) {
                 ArtworkImage(
                     imageUrl = ArtworkUrls.nowPlaying(t?.thumbnailUrl),
+                    fallbackImageUrl = t?.thumbnailUrl ?: ArtworkUrls.videoThumbnail(t?.id),
                     contentDescription = t?.title,
                     modifier = Modifier.fillMaxSize(),
                     shape = DhunShapes.artwork,
@@ -1672,6 +1668,7 @@ private fun ArtworkHeroField(
 private fun LyricsCardOverlay(
     visible: Boolean,
     artworkUrl: String?,
+    fallbackArtworkUrl: String?,
     cacheKey: String,
     viewModel: PlayerViewModel,
     accent: Color,
@@ -1687,6 +1684,7 @@ private fun LyricsCardOverlay(
     ) {
         LyricsCard(
             artworkUrl = artworkUrl,
+            fallbackArtworkUrl = fallbackArtworkUrl,
             cacheKey = cacheKey,
             viewModel = viewModel,
             accent = accent,
@@ -1714,6 +1712,7 @@ internal fun shouldRenderPlayerBackdrop(artworkUrl: String?): Boolean =
 @Composable
 private fun PlayerBackdrop(
     artworkUrl: String?,
+    fallbackArtworkUrl: String?,
     cacheKey: String,
 ) {
     if (!shouldRenderPlayerBackdrop(artworkUrl)) return
@@ -1754,6 +1753,7 @@ private fun PlayerBackdrop(
     )
     ArtworkImage(
         imageUrl = artworkUrl,
+        fallbackImageUrl = fallbackArtworkUrl,
         contentDescription = null,
         modifier = Modifier
             .fillMaxSize()
@@ -1776,6 +1776,7 @@ private fun PlayerBackdrop(
 @Composable
 private fun LyricsCard(
     artworkUrl: String?,
+    fallbackArtworkUrl: String?,
     cacheKey: String,
     viewModel: PlayerViewModel,
     accent: Color,
@@ -1802,6 +1803,7 @@ private fun LyricsCard(
             if (paintsArtwork && shouldRenderPlayerBackdrop(artworkUrl)) {
                 ArtworkImage(
                     imageUrl = artworkUrl,
+                    fallbackImageUrl = fallbackArtworkUrl,
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxSize()

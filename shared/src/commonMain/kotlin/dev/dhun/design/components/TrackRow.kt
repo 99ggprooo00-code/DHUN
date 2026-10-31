@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.dhun.core.Track
+import dev.dhun.design.ArtworkUrls
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
@@ -60,6 +61,7 @@ fun TrackRow(
     ) {
         ArtworkImage(
             imageUrl = track.thumbnailUrl,
+            fallbackImageUrl = ArtworkUrls.videoThumbnail(track.id),
             contentDescription = track.title,
             modifier = Modifier.size(DhunSpacing.artworkThumb),
             shape = DhunShapes.medium,
@@ -122,6 +124,7 @@ fun TrackRowCompact(
     ) {
         ArtworkImage(
             imageUrl = track.thumbnailUrl,
+            fallbackImageUrl = ArtworkUrls.videoThumbnail(track.id),
             contentDescription = null,
             modifier = Modifier.size(40.dp),
             shape = DhunShapes.small,

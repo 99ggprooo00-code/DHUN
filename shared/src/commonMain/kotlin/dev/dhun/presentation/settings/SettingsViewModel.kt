@@ -377,6 +377,19 @@ class SettingsViewModel(
         }
     }
 
+    /** Drag previews update state but do not enqueue a database write per frame. */
+    fun previewBackdropBlurPercent(percent: Int) {
+        _backdropBlurPercent.value = percent.coerceIn(0, 100)
+    }
+
+    fun saveBackdropBlurPercent() = setBackdropBlurPercent(_backdropBlurPercent.value)
+
+    fun previewBackdropBrightnessPercent(percent: Int) {
+        _backdropBrightnessPercent.value = percent.coerceIn(0, 100)
+    }
+
+    fun saveBackdropBrightnessPercent() = setBackdropBrightnessPercent(_backdropBrightnessPercent.value)
+
     /** Preview continuously, but write once on slider release (not per drag frame). */
     fun previewVisualTuning(part: VisualPart, percent: Int) {
         if (part !in DhunVisualTuning.adjustableParts) return

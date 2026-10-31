@@ -13,6 +13,7 @@ import dev.dhun.download.DownloadProgress
 import dev.dhun.player.DhunPlayer
 import dev.dhun.presentation.library.LibraryViewModel
 import dev.dhun.presentation.library.StorageSummary
+import dev.dhun.presentation.library.preferredArtworkUrl
 import dev.dhun.presentation.library.toTrack
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -311,6 +312,21 @@ class LibraryDownloadsViewModelTest {
         } finally {
             scope.cancel()
         }
+    }
+
+    @Test
+    fun downloadedPlaybackUsesSavedArtworkBeforeNetwork() {
+        val row = downloaded("art", DownloadState.COMPLETED, 1_000L).copy(
+            thumbnailUrl = "https://i.ytimg.com/vi/art/hqdefault.jpg",
+            localArtworkPath = "/storage/emulated/0/DHUN/art work#1.jpg",
+        )
+        val local = "file:///storage/emulated/0/DHUN/art%20work%231.jpg"
+        assertEquals(local, row.preferredArtworkUrl)
+        assertEquals(local, row.toTrack().thumbnailUrl)
+        assertEquals(
+            "https://i.ytimg.com/vi/art/hqdefault.jpg",
+            row.copy(localArtworkPath = null).toTrack().thumbnailUrl,
+        )
     }
 
     @Test
