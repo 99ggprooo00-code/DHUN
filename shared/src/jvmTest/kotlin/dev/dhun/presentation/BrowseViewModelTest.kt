@@ -497,7 +497,7 @@ class BrowseViewModelTest {
             eventually { library.deletingPlaylist.value == null }
             eventually {
                 val state = detail.state.value as? PlaylistUiState.Local
-                state?.playlist == null && state.tracks.isEmpty()
+                state != null && state.playlist == null && state.tracks.isEmpty()
             }
             val state = detail.state.value as PlaylistUiState.Local
             assertNull(state.playlist, "an externally deleted playlist must not remain as a saved detail")
