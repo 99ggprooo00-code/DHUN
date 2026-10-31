@@ -90,6 +90,8 @@ class BuildWorkflowTest(unittest.TestCase):
     def test_installer_is_a_pull_request_check_before_merge(self):
         self.assertIn("  pull_request:\n    branches: [main]", self.text)
         self.assertIn("- name: Check install-over and userdata on disposable Windows", self.text)
+        self.assertIn("needs.msi.result == 'failure'", self.text)
+        self.assertIn("safeLaunchDiagnostics", self.text)
         self.assertIn("    needs: [release_plan, apk, msi]", self.publish)
 
     def test_unsigned_msi_is_finalized_before_checksum_and_upload(self):

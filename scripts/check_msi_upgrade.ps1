@@ -99,6 +99,63 @@ public static class DhunWindowNative {
     }
 }
 
+function Write-DhunSafeLaunchDiagnostics {
+    param(
+        [System.Diagnostics.Process]$Launcher,
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string[]]$StartupLogCandidates
+    )
+    $processes = @()
+    foreach ($process in Get-Process) {
+        try {
+            $title = $process.MainWindowTitle
+            if ($process.ProcessName -notmatch '^(DHUN|java|javaw)$' -and $title -notlike 'DHUN*') { continue }
+            $processes += [PSCustomObject]@{
+                name = $process.ProcessName
+                id = $process.Id
+                mainWindowHandle = $process.MainWindowHandle.ToInt64()
+                mainWindowTitle = ([string]$title -replace '[\r\n;=]', ' ')
+                responding = $process.Responding
+            }
+        } catch { continue }
+    }
+    $startup = @()
+    foreach ($candidate in $StartupLogCandidates) {
+        if (-not (Test-Path -LiteralPath $candidate)) { continue }
+        $text = [IO.File]::ReadAllText($candidate)
+        $classes = @([regex]::Matches($text, 'FAILURE:\s+([A-Za-z0-9_.$]+)') | ForEach-Object { $_.Groups[1].Value })
+        $startup += [PSCustomObject]@{
+            location = if ($candidate.StartsWith($userdata, [StringComparison]::OrdinalIgnoreCase)) { 'userdata' } else { 'temp' }
+            bytes = (Get-Item -LiteralPath $candidate).Length
+            lastWriteUtc = (Get-Item -LiteralPath $candidate).LastWriteTimeUtc.ToString('o')
+            mainStarted = $text.Contains('DHUN main starting')
+            jdbcProbeAvailable = $text.Contains('DHUN probe: java.sql.Driver available')
+            failureClasses = $classes
+        }
+    }
+    $launcherInfo = $null
+    if ($null -ne $Launcher) {
+        $Launcher.Refresh()
+        $launcherInfo = [PSCustomObject]@{
+            id = $Launcher.Id
+            exited = $Launcher.HasExited
+            mainWindowHandle = $Launcher.MainWindowHandle.ToInt64()
+            mainWindowTitle = ([string]$Launcher.MainWindowTitle -replace '[\r\n;=]', ' ')
+        }
+    }
+    $lines = @('note=Metadata only: no command lines, paths, log messages, URLs or stack traces.')
+    if ($null -ne $launcherInfo) {
+        $lines += "launcher=id=$($launcherInfo.id);exited=$($launcherInfo.exited);handle=$($launcherInfo.mainWindowHandle);title=$($launcherInfo.mainWindowTitle)"
+    }
+    foreach ($process in $processes) {
+        $lines += "process=name=$($process.name);id=$($process.id);handle=$($process.mainWindowHandle);responding=$($process.responding);title=$($process.mainWindowTitle)"
+    }
+    foreach ($entry in $startup) {
+        $lines += "startup=location=$($entry.location);bytes=$($entry.bytes);lastWriteUtc=$($entry.lastWriteUtc);mainStarted=$($entry.mainStarted);jdbcProbeAvailable=$($entry.jdbcProbeAvailable);failureClasses=$($entry.failureClasses -join ',')"
+    }
+    $lines | Set-Content -LiteralPath $Path -Encoding utf8
+}
+
 # Prefer the newest published fixed public release. Until v1.00.002 exists,
 # the published v1.00.001 release (whose actual asset is `dhun.msi`) is used.
 # Accept its older versioned filename too if the asset is renamed back. A
@@ -222,6 +279,35 @@ try {
         $appLaunchResult = 'passed: installed DHUN.exe opened a native main window'
         $audioVisualResult = 'window PNG captured; visual review and audible playback not tested'
         Write-Host "::notice title=MSI installed-app launch PASS::Native DHUN.exe window opened after upgrade; captured app-launch.png. Audible playback and visual review are not claimed."
+    } catch {
+        $appLaunchResult = 'failed'
+        $audioVisualResult = 'not tested'
+        try {
+            Write-DhunSafeLaunchDiagnostics `
+                -Launcher $app `
+                -Path (Join-Path $logs 'app-diagnostics.txt') `
+                -StartupLogCandidates @((Join-Path $userdata 'dhun-startup.log'), (Join-Path $env:TEMP 'dhun-startup.log'))
+        } catch {
+            Write-Host '::warning title=MSI launch diagnostics::Safe metadata could not be written; preserving the original launch failure.'
+        }
+        Write-DhunInstallResult ([ordered]@{
+            status = 'failed'
+            requiredForThisBuild = [string][bool]$RequireInstallOver
+            sourceSha = $env:GITHUB_SHA
+            baselineTag = $baselineReleaseTag
+            baselineVersion = $old['ProductVersion']
+            baselineSha256 = $baselineHash
+            candidateVersion = $new['ProductVersion']
+            perUserInstall = 'passed'
+            installOver = 'passed'
+            userdataSentinel = 'preserved'
+            cacheSentinel = 'preserved'
+            futureUpgradeRemoval = 'not tested'
+            uninstallCleanup = 'not tested'
+            appLaunch = $appLaunchResult
+            audioAndVisuals = $audioVisualResult
+        })
+        throw
     } finally {
         if ($null -ne $app) {
             $app.Refresh()
