@@ -71,6 +71,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -99,7 +100,14 @@ class VisualAppEvidenceTest {
                     val driver = SceneDriver(composeScene)
                     driver.capture("app-home-${mode.id}.png", settleFrames = 40)
                     nav.selectTab(AppTab.SEARCH)
-                    driver.capture("app-search-${mode.id}.png")
+                    val searchFrame = driver.capture("app-search-${mode.id}.png")
+                    driver.tap(355f, 255f)
+                    val menuFrame = driver.capture("app-shell-track-menu-${mode.id}.png")
+                    assertTrue(!searchFrame.contentEquals(menuFrame), "Search overflow did not visibly open")
+                    driver.tap(150f, 485f)
+                    val addFrame = driver.capture("app-shell-add-playlist-${mode.id}.png", settleFrames = 60)
+                    assertTrue(!menuFrame.contentEquals(addFrame), "Add to playlist did not visibly open")
+                    driver.tap(24f, 120f) // outside the dialog: exercise real dismissal
                     nav.selectTab(AppTab.LIBRARY)
                     driver.capture("app-library-${mode.id}.png")
                     nav.push(DetailRoute.ArtistPage(QUEEN_ID))
@@ -122,7 +130,14 @@ class VisualAppEvidenceTest {
                     nav.detailStack.clear()
                     nav.selectTab(AppTab.HOME)
                     nav.playerExpanded = true
-                    driver.capture("app-player-${mode.id}.png", settleFrames = 24)
+                    val playerFrame = driver.capture("app-player-${mode.id}.png", settleFrames = 24)
+                    driver.tap(355f, 879f)
+                    val lyricsFrame = driver.capture("app-player-lyrics-${mode.id}.png", settleFrames = 24)
+                    assertTrue(!playerFrame.contentEquals(lyricsFrame), "Lyrics input did not visibly change the player")
+                    driver.tap(355f, 879f)
+                    driver.tap(55f, 879f)
+                    val queueFrame = driver.capture("app-player-queue-${mode.id}.png", settleFrames = 24)
+                    assertTrue(!playerFrame.contentEquals(queueFrame), "Queue input did not visibly change the player")
                     assertEquals(RECORDED_TRACKS.first(), fixture.player.currentTrack.value)
                     assertIs<PlaybackState.Playing>(fixture.player.state.value)
                 }
@@ -134,6 +149,9 @@ class VisualAppEvidenceTest {
     fun `render existing track menus and add-to-playlist dialogs`() {
         for (mode in listOf(DhunThemeMode.DARK, DhunThemeMode.LIGHT)) {
             withFixture(mode) { fixture ->
+                runBlocking {
+                    assertEquals(fixture.localPlaylistId, fixture.data.playlists.observePlaylists().first().single().id)
+                }
                 scene(width = 412, height = 915) {
                     DhunTheme(mode = mode) {
                         Box(Modifier.fillMaxSize().background(DhunColors.background))
@@ -161,7 +179,7 @@ class VisualAppEvidenceTest {
                         )
                     }
                 }.use { composeScene ->
-                    SceneDriver(composeScene).capture("app-add-playlist-${mode.id}.png", settleFrames = 24)
+                    SceneDriver(composeScene).capture("app-add-playlist-${mode.id}.png", settleFrames = 60)
                 }
             }
         }
