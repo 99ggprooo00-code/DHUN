@@ -14,10 +14,10 @@
 | Pull request | #217, branch `arena/09e5238e-dhun` |
 | **Take the APK from** | the **`Build APK`** (artifact `debug-apk`) or **`test-release` → `apk`** run whose commit is **the PR head shown on the PR page**. Any older run is a different build; a docs-only commit still moves the head, so check the commit, not the date. |
 | Artifact contents | `dhun-test.apk` (universal), `dhun-test-arm64-v8a.apk`, `dhun-test-armeabi-v7a.apk`, each with a `.sha256` and a `.provenance.txt`. The `debug-apk` artifact holds the same three files under Gradle names (`app-android-universal-debug.apk`, …). |
-| Package name | `dev.dhun.android` |
-| Version shown by Android | `1.00.002`, version code `7` |
-| Minimum Android | 8.0 (API 24) |
-| Signing | `app-android/keystores/dhun-test.p12`, the committed test key — the same one every CI build uses |
+| Package name | `dev.dhun.android` — unchanged, so an upgrade keeps settings |
+| Version shown by Android | `1.00.<workflow-run>-test.<attempt>`; the increasing integer versionCode is allocated from the build time |
+| Minimum Android | 7.0 (API 24) |
+| Signing | `app-android/keystores/dhun-test.p12`, the committed test key; CI verifies its certificate on every APK variant |
 
 The procedure deliberately names no run number: PR artifacts expire after 14
 days and every push produces new ones, so a hard-coded run id is how a
@@ -36,25 +36,36 @@ zip contains only the three APKs, so keep its Actions run page as the build
 identity and record the exact file you installed.
 
 **Which file to install:** the universal one — `dhun-test.apk` in the `apk`
-artifact, or `app-android-universal-debug.apk` in `debug-apk`. It works on every
-phone that can run DHUN. The per-ABI files are only smaller.
+artifact, or `app-android-universal-debug.apk` in `debug-apk` — works on every
+phone that can run DHUN. On an arm64-v8a phone, `dhun-test-arm64-v8a.apk` or
+`app-android-arm64-v8a-debug.apk` is the equivalent smaller choice. All variants
+from one run carry the same package name, version identity and signing key.
 
 ## 1. Will it install over the DHUN you already have?
 
-Every CI build — the rolling `test` release and these artifacts — is signed with
-the same committed test key (`app-android/keystores/dhun-test.p12`), so Android
-will not refuse it for a **signature** mismatch.
+Use a **newly built** artifact after the packaging fix. Older `debug-apk`
+artifacts used public versionCode `7`; Android can reject one over a newer test
+build with the generic "package appears to be invalid" message. New Build APK and
+test-release packages instead allocate versionCode from the same Unix-time
+sequence, so their universal, ARM64 and ARM32 variants do not downgrade merely
+because the two workflows have different run counters.
 
-What can still refuse it is the **version code**, which is `7` in these artifacts:
+Every variant keeps `dev.dhun.android` and is signed with the committed test key.
+CI runs both `aapt dump badging` and `apksigner verify --print-certs` on all three
+APKs. This checks the actual uploaded candidates rather than inferring their
+identity from Gradle inputs. A same-second CI build can have the same versionCode,
+which Android permits as a reinstall.
 
-| What is installed now | What happens when you install this build |
+| What is installed now | What a current test artifact should do |
 |---|---|
-| nothing | installs normally |
-| the public `v1.00.002` prerelease (code 7) | installs as an update, settings kept |
-| a rolling `test` build (code `1000 + run × 1000`, so > 1000) | **refused: it is a downgrade**. Use the ADB path in §3 (`adb install -r -d`), which keeps your settings, or uninstall first — uninstalling erases saved settings and therefore loses the upgrade test (Check G). |
+| nothing | install normally |
+| public `v1.00.002` (code 7) | install as an update and keep settings |
+| an older rolling-test or PR test build | install as an update when the candidate was allocated later; do not install an older artifact over a newer one |
+| a locally built APK with another certificate | still refuse the update; changing versionCode cannot bypass Android's signature protection |
 
-If you want Check G (upgrade keeps your colours), keep the old build installed
-and use §3.
+This is a packaging correction, not proof that the reported phone install has
+succeeded. Keep the old app installed for Check G; do not uninstall it merely to
+retry an obsolete artifact.
 
 ## 2. No cable — the simplest path
 
@@ -73,10 +84,11 @@ and use §3.
    settings are kept.
 9. Tap **Open**.
 
-## 3. With a computer and a cable (keeps your settings, enables Check G)
+## 3. With a computer and a cable (diagnostic option)
 
-Do this if §2 ends in "App not installed", or if you want to test the upgrade
-from an older build without losing data.
+Do this only if a **current** artifact still ends in "App not installed". ADB can
+show Android's precise error and `-r` keeps settings; it is no longer the normal
+way to bypass the old artifact's versionCode downgrade.
 
 **One-time phone setup**
 
@@ -111,22 +123,30 @@ from an older build without losing data.
 5. In that folder:
 
    ```
-   adb install -r -d app-android-universal-debug.apk
+   adb install -r app-android-universal-debug.apk
    ```
 
-   `-r` reinstalls and keeps data; `-d` allows the version-code downgrade
-   described in §1. Expect `Success`.
-6. Launch it from the phone's app drawer.
+   `-r` reinstalls and keeps data. Do **not** add `-d` to hide a downgrade: use
+   the latest artifact instead. If it fails, record the complete
+   `INSTALL_FAILED_...` reason; that is more useful than the phone's generic dialog.
+6. Launch it from the phone's app drawer only after `Success`.
 
 ## 4. If Android refuses to install
 
 | Message | What it means | What to do |
 |---|---|---|
-| `App not installed` with no detail | usually the version-code downgrade | §3, or uninstall the old DHUN first (and say so in §7 — Check G becomes untested) |
-| `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | the old build was signed with a different key (for example a locally built debug APK from Android Studio) | uninstall the old DHUN, then install |
+| `App not installed` / `package appears to be invalid` | generic Android message; the old code-7 artifact could cause a downgrade, but corruption and signature conflicts are also possibilities | retry only with the new artifact; if it persists, use §3 to capture the exact reason rather than uninstalling first |
+| `INSTALL_FAILED_VERSION_DOWNGRADE` | the candidate is older than the installed package | download the latest run's artifact; do not use an older frozen link |
+| `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | the old build was signed with a different key (for example a locally built debug APK from Android Studio) | report it; uninstalling erases settings and is a separate, explicit choice |
 | `INSTALL_FAILED_INSUFFICIENT_STORAGE` | no space | free ~150 MB |
 | "For your security, your phone is not allowed to install unknown apps from this source" | the toggle in §2 step 7 | turn it on for the app you are installing from |
 | `adb: no devices found` | cable/driver/authorisation | re-plug, unlock the phone, `adb kill-server`, accept the prompt |
+
+**Observed report (2026-10-31):** an arm64-v8a phone showed "App not installed —
+package appears to be invalid" for the earlier PR artifact. No ADB failure code
+was captured, so downgrade is a supported packaging suspect, not a proven device
+root cause. The replacement build must still be installed on that phone before
+this section can be marked verified.
 
 ## 5. What to check once it opens
 

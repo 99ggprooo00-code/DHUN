@@ -22,6 +22,22 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Android test-package upgrade and signature gates (2026-10-31, session `arena/09e5238e-dhun`)
+
+- An arm64-v8a phone reported Android's generic "package appears to be invalid"
+  while installing the earlier PR artifact. The exact PackageInstaller failure
+  code was not captured, so this is not yet a proven on-device root cause or fix.
+- The fast Build APK path no longer packages public versionCode `7` over newer
+  test installations. Build APK and test-release now allocate test APK versionCodes
+  from one Unix-time sequence while retaining readable run/attempt versionNames;
+  universal, arm64-v8a and armeabi-v7a variants from one job share that identity.
+  Public `1.00.002` versionCode `7`, existing releases, tags and assets are unchanged.
+- Both APK workflows now check the actual universal and per-ABI packages with
+  `aapt` and require DHUN's expected test certificate through `apksigner`.
+  Regression tests cover cross-workflow version ordering, clock bounds, complete
+  package sets and wrong/missing/extra signers. Device installation remains open
+  in `docs/verification/36-pr217-device-install.md`.
+
 ### Simpler surface colours with custom HSL sliders (2026-10-31, session `arena/09e5238e-dhun`)
 
 - **Quick colours** keeps the named swatches as a one-tap choice. **More colours**

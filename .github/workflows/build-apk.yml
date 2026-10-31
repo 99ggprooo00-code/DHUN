@@ -13,6 +13,8 @@ name: Build APK
 # `*universal*`, `*arm64-v8a*` and `*armeabi-v7a*` APKs under
 # `app-android/build/outputs/apk/debug/`; test-release.yml stages those three
 # as the rolling-release names. This job only uploads the raw outputs.
+# Every variant receives the same time-ordered test versionCode as test-release;
+# public versionCode 7 must not make a PR artifact a downgrade over a test build.
 
 on:
   push:
@@ -40,11 +42,40 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Allocate increasing Android test identity
+        id: test_version
+        run: python scripts/test_version.py "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+
       - name: Assemble debug APK
-        run: ./gradlew :app-android:assembleDebug --no-daemon
+        env:
+          TEST_VERSION_NAME: ${{ steps.test_version.outputs.version_name }}
+          TEST_VERSION_CODE: ${{ steps.test_version.outputs.version_code }}
+        run: |
+          ./gradlew :app-android:assembleDebug \
+            "-PdhunReleaseChannel=test" \
+            "-PdhunTestVersionName=$TEST_VERSION_NAME" \
+            "-PdhunTestVersionCode=$TEST_VERSION_CODE" \
+            --no-daemon
+
+      - name: Verify all APK packages and signatures
+        env:
+          TEST_VERSION_NAME: ${{ steps.test_version.outputs.version_name }}
+          TEST_VERSION_CODE: ${{ steps.test_version.outputs.version_code }}
+        run: |
+          aapt=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)
+          apksigner=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
+          test -n "$aapt"
+          test -n "$apksigner"
+          python scripts/check_android_identity.py "$aapt" \
+            app-android/build/outputs/apk/debug \
+            "$TEST_VERSION_NAME" "$TEST_VERSION_CODE" --apksigner "$apksigner"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v6
