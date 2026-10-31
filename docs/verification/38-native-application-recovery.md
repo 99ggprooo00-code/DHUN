@@ -6,8 +6,10 @@
 > The R9–R12 fixes and status below describe the superseded recovery line, not
 > the current app implementation or an accepted phone recovery.
 
-**Date:** 2026-10-31  
-**PR:** #217 (open; not merged)  
+**Date:** 2026-10-31
+
+**PR:** #217 (open; not merged)
+
 **Recovery commits:** `1158b33`, `10400ca`, `dbc3e20`, `9be284c`, `30f4a1a`, `1abbc47`, `30fb887`
 
 **Overall:** 🔴 **new compatibility fixes await exact-head gates and Android acceptance**
