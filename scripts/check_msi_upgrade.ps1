@@ -99,6 +99,44 @@ public static class DhunWindowNative {
     }
 }
 
+function Find-DhunMainWindow {
+    param([int[]]$ExcludedProcessIds = @())
+    # jpackage's native launcher can remain alive while a child DHUN.exe owns
+    # the Compose window. Watch the normal application window, not whichever
+    # PID Start-Process returned. A startup-error window is never acceptance.
+    $candidates = @(Get-Process -Name 'DHUN' -ErrorAction SilentlyContinue |
+        Where-Object { $_.Id -notin $ExcludedProcessIds })
+    foreach ($process in $candidates) {
+        try {
+            $process.Refresh()
+            if (-not $process.HasExited -and
+                $process.MainWindowHandle -ne [IntPtr]::Zero -and
+                $process.MainWindowTitle -eq 'DHUN' -and
+                $process.Responding) {
+                return $process
+            }
+        } catch { continue }
+    }
+    return $null
+}
+
+function Stop-DhunLaunchedProcess {
+    param([System.Diagnostics.Process]$Process)
+    if ($null -eq $Process) { return }
+    try {
+        $Process.Refresh()
+        if (-not $Process.HasExited) {
+            [void]$Process.CloseMainWindow()
+            if (-not $Process.WaitForExit(15000)) {
+                $Process.Kill()
+                $Process.WaitForExit()
+            }
+        }
+    } finally {
+        $Process.Dispose()
+    }
+}
+
 function Write-DhunSafeLaunchDiagnostics {
     param(
         [System.Diagnostics.Process]$Launcher,
@@ -263,19 +301,23 @@ try {
     # native window and PNG establish startup only; audible playback and visual
     # acceptance still require their own evidence.
     $app = $null
+    $windowProcess = $null
     try {
         $executable = Join-Path $installDirectory 'DHUN.exe'
+        $preLaunchProcessIds = @(Get-Process -Name 'DHUN' -ErrorAction SilentlyContinue |
+            ForEach-Object { $_.Id })
         $app = Start-Process -FilePath $executable -WorkingDirectory $installDirectory -PassThru
         $windowDeadline = [DateTime]::UtcNow.AddSeconds(90)
         do {
             Start-Sleep -Seconds 2
-            $app.Refresh()
-            if ($app.HasExited) { throw "Installed DHUN.exe exited before opening a window (code $($app.ExitCode)); see dhun-startup.log" }
-        } while ($app.MainWindowHandle -eq [IntPtr]::Zero -and [DateTime]::UtcNow -lt $windowDeadline)
-        if ($app.MainWindowHandle -eq [IntPtr]::Zero) { throw 'Installed DHUN.exe did not expose a main window within 90 seconds' }
+            $windowProcess = Find-DhunMainWindow -ExcludedProcessIds $preLaunchProcessIds
+        } while ($null -eq $windowProcess -and [DateTime]::UtcNow -lt $windowDeadline)
+        if ($null -eq $windowProcess) {
+            throw 'Installed DHUN.exe did not expose a normal main window within 90 seconds'
+        }
         Start-Sleep -Seconds 15
         $appShot = Join-Path $logs 'app-launch.png'
-        Save-DhunAppWindow -Process $app -Path $appShot
+        Save-DhunAppWindow -Process $windowProcess -Path $appShot
         $appLaunchResult = 'passed: installed DHUN.exe opened a native main window'
         $audioVisualResult = 'window PNG captured; visual review and audible playback not tested'
         Write-Host "::notice title=MSI installed-app launch PASS::Native DHUN.exe window opened after upgrade; captured app-launch.png. Audible playback and visual review are not claimed."
@@ -309,13 +351,10 @@ try {
         })
         throw
     } finally {
-        if ($null -ne $app) {
-            $app.Refresh()
-            if (-not $app.HasExited) {
-                [void]$app.CloseMainWindow()
-                if (-not $app.WaitForExit(15000)) { $app.Kill(); $app.WaitForExit() }
-            }
-            $app.Dispose()
+        $windowProcessId = if ($null -ne $windowProcess) { $windowProcess.Id } else { -1 }
+        Stop-DhunLaunchedProcess -Process $windowProcess
+        if ($null -eq $app -or $app.Id -ne $windowProcessId) {
+            Stop-DhunLaunchedProcess -Process $app
         }
     }
 

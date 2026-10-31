@@ -112,6 +112,21 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn("appLaunch = $appLaunchResult", smoke)
         self.assertIn("visual review and audible playback not tested", smoke)
 
+    def test_installed_launch_tracks_the_jpackage_window_process(self):
+        smoke = (WORKFLOW.parents[2] / "scripts/check_msi_upgrade.ps1").read_text()
+        # A native launcher may remain alive while its child DHUN.exe owns the
+        # Compose window. Do not fail a real window merely because its PID is
+        # different, and never accept a pre-existing or startup-error window.
+        self.assertIn("function Find-DhunMainWindow", smoke)
+        self.assertIn("Get-Process -Name 'DHUN'", smoke)
+        self.assertIn("$preLaunchProcessIds", smoke)
+        self.assertIn("$process.MainWindowTitle -eq 'DHUN'", smoke)
+        self.assertIn("$process.Responding", smoke)
+        self.assertIn("Save-DhunAppWindow -Process $windowProcess", smoke)
+        self.assertIn("Stop-DhunLaunchedProcess -Process $windowProcess", smoke)
+        self.assertIn("Stop-DhunLaunchedProcess -Process $app", smoke)
+        self.assertNotIn("while ($app.MainWindowHandle", smoke)
+
     def test_build_jobs_do_not_get_contents_write(self):
         before_publish = self.text.split("\n  publish_test:\n", 1)[0]
         self.assertIn("permissions:\n  contents: read", before_publish)
