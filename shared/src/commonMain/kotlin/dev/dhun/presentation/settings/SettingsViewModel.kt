@@ -146,10 +146,9 @@ class SettingsViewModel(
             _lyricsTextSize.value = get.string(SettingsKeys.LYRICS_TEXT_SIZE, SettingsKeys.LYRICS_TEXT_SIZE_DEFAULT)
             _providerOrder.value = get.string(SettingsKeys.LYRICS_PROVIDER_ORDER, SettingsKeys.LYRICS_PROVIDER_ORDER_DEFAULT)
             _preferredProvider.value = get.string(SettingsKeys.LYRICS_PREFERRED_PROVIDER, SettingsKeys.LYRICS_PREFERRED_PROVIDER_DEFAULT)
-            _countryCode.value = get.string(SettingsKeys.COUNTRY_CODE, SettingsKeys.COUNTRY_CODE_DEFAULT)
-                .uppercase()
-                .takeIf(CountryRegions::isSupportedCode)
-                ?: SettingsKeys.COUNTRY_CODE_DEFAULT
+            _countryCode.value = CountryRegions.normalize(
+                get.string(SettingsKeys.COUNTRY_CODE, SettingsKeys.COUNTRY_CODE_DEFAULT),
+            ) ?: SettingsKeys.COUNTRY_CODE_DEFAULT
             _explicitContent.value = get.boolean(SettingsKeys.EXPLICIT_CONTENT, SettingsKeys.EXPLICIT_CONTENT_DEFAULT)
             _pauseOnMute.value = get.boolean(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME, SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME_DEFAULT)
             _persistShuffleRepeat.value = get.boolean(SettingsKeys.PERSIST_SHUFFLE_REPEAT, SettingsKeys.PERSIST_SHUFFLE_REPEAT_DEFAULT)
@@ -322,8 +321,7 @@ class SettingsViewModel(
         }
     }
     fun setCountryCode(id: String) {
-        val code = id.trim().uppercase()
-        if (!CountryRegions.isSupportedCode(code)) return
+        val code = CountryRegions.normalize(id) ?: return
         onCountryCodeChange(code)
         _countryCode.value = code
         enqueueWrite { update.string(SettingsKeys.COUNTRY_CODE, code) }

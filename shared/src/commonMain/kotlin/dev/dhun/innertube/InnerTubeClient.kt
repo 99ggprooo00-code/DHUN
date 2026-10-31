@@ -1,5 +1,6 @@
 package dev.dhun.innertube
 
+import dev.dhun.core.CountryRegions
 import dev.dhun.core.DhunError
 import dev.dhun.core.DhunException
 import dev.dhun.core.DhunResult
@@ -84,10 +85,15 @@ class InnerTubeClient(
     private val httpClient: HttpClient = defaultHttpClient(),
     private val country: String = "US",
 ) {
-    @Volatile private var liveCountry: String = country
+    @Volatile private var liveCountry: String =
+        CountryRegions.normalize(country) ?: CountryRegions.default.code
 
     fun setCountryCode(code: String?) {
-        if (code != null && code.length == 2 && code.all { it in 'A'..'Z' }) liveCountry = code
+        // The Settings screen already renders unsupported persisted values as
+        // the default. Apply the SAME rule to the wire request: previously it
+        // showed US while still sending an invalid old value such as ZZ, which
+        // reproducibly makes anonymous Search fail with HTTP 400.
+        liveCountry = CountryRegions.normalize(code) ?: CountryRegions.default.code
     }
 
     @Volatile

@@ -7,6 +7,7 @@ import dev.dhun.extraction.StreamResolver
 /** In-memory [DownloadStorage] for tests; avoids real file IO flakiness. */
 class TestDownloadStorage(override val root: String = "/test") : DownloadStorage {
     val files = LinkedHashMap<String, ByteArray>()
+    val textFiles = LinkedHashMap<String, String>()
 
     override fun audioPath(trackId: String, mimeType: String): String =
         "${root}/audio/${safeTrackId(trackId)}.${extensionForMimeType(mimeType)}"
@@ -21,12 +22,21 @@ class TestDownloadStorage(override val root: String = "/test") : DownloadStorage
         files[path] = (files[path] ?: ByteArray(0)) + bytes
     }
 
+    override suspend fun readText(path: String): String? = textFiles[path]
+
+    override suspend fun writeText(path: String, text: String) {
+        textFiles[path] = text
+    }
+
     override suspend fun commit(part: String, final: String): Unit {
         val data = files.remove(part) ?: return
         files[final] = data
     }
 
-    override suspend fun delete(path: String): Unit { files.remove(path) }
+    override suspend fun delete(path: String): Unit {
+        files.remove(path)
+        textFiles.remove(path)
+    }
 
     override suspend fun ensureDirExists(path: String): Unit {}
 }

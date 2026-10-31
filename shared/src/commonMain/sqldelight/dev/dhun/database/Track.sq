@@ -20,8 +20,10 @@ INSERT OR IGNORE INTO Track(id, title, artistName, artistId, albumName, albumId,
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 update:
-UPDATE Track SET title = ?, artistName = ?, artistId = ?, albumName = ?, albumId = ?,
-    durationSeconds = ?, thumbnailUrl = ?, explicit = ?, updatedAt = ?
+UPDATE Track SET title = ?, artistName = ?,
+    artistId = COALESCE(?, artistId), albumName = COALESCE(?, albumName),
+    albumId = COALESCE(?, albumId), durationSeconds = COALESCE(?, durationSeconds),
+    thumbnailUrl = COALESCE(?, thumbnailUrl), explicit = ?, updatedAt = ?
 WHERE id = ?;
 
 selectById:

@@ -19,6 +19,12 @@ interface DownloadStorage {
     /** Append bytes to [path], creating parents if missing. */
     suspend fun append(path: String, bytes: ByteArray)
 
+    /** Read a small temporary-file metadata record; null when it is absent. */
+    suspend fun readText(path: String): String?
+
+    /** Replace a small temporary-file metadata record. */
+    suspend fun writeText(path: String, text: String)
+
     /** Atomically move [part] to [final] (delete [final] first if present). */
     suspend fun commit(part: String, final: String)
 

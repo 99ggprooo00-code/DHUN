@@ -31,6 +31,16 @@ class JvmDownloadStorage(override val root: String) : DownloadStorage {
         f.appendBytes(bytes)
     }
 
+    override suspend fun readText(path: String): String? = withContext(Dispatchers.IO) {
+        File(path).takeIf { it.isFile }?.readText(Charsets.UTF_8)
+    }
+
+    override suspend fun writeText(path: String, text: String): Unit = withContext(Dispatchers.IO) {
+        val f = File(path)
+        f.parentFile?.mkdirs()
+        f.writeText(text, Charsets.UTF_8)
+    }
+
     override suspend fun commit(part: String, final: String): Unit = withContext(Dispatchers.IO) {
         val p = File(part)
         val f = File(final)

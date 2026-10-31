@@ -12,6 +12,7 @@ import dev.dhun.data.PlayContext
 import dev.dhun.data.PlaylistRepository
 import dev.dhun.download.DownloadManager
 import dev.dhun.download.DownloadProgress
+import dev.dhun.extraction.localAudioFileUri
 import dev.dhun.domain.GetHistoryUseCase
 import dev.dhun.domain.HistoryDay
 import dev.dhun.player.DhunPlayer
@@ -606,5 +607,9 @@ internal fun DownloadedTrack.toTrack(): Track = Track(
     artistName = artistName,
     albumName = albumName,
     durationSeconds = durationSeconds,
-    thumbnailUrl = thumbnailUrl,
+    thumbnailUrl = preferredArtworkUrl,
 )
+
+/** Use the cover saved with the download before depending on image network. */
+internal val DownloadedTrack.preferredArtworkUrl: String?
+    get() = localArtworkPath?.takeIf { it.isNotBlank() }?.let(::localAudioFileUri) ?: thumbnailUrl
