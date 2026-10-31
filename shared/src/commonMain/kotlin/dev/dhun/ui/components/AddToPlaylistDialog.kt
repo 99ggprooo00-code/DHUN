@@ -73,7 +73,11 @@ fun AddToPlaylistDialog(
     /** Phase 09: breadcrumb into the local playlist page after adding. */
     onOpenPlaylist: ((playlistId: String) -> Unit)? = null,
 ) {
-    val playlists by playlistRepository.observePlaylists().collectAsState(initial = emptyList())
+    // This is a cold SQLDelight flow. Remember it across animated dialog
+    // recompositions; otherwise each recomposition can restart collection at
+    // the empty initial value and the picker never shows existing playlists.
+    val playlistFlow = remember(playlistRepository) { playlistRepository.observePlaylists() }
+    val playlists by playlistFlow.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
     // Result-driven, like every other mutation in the app: `onAdded` and
     // `onDismiss` run only after the write returned normally, a failure is
