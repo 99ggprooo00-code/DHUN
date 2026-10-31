@@ -1,12 +1,12 @@
 name: diag-home-live
 
 # TEMPORARY diagnostic (session arena/09e5238e-dhun, Home-loading failure).
-# Deleted before this branch is proposed for merge. It answers three questions
-# the sandbox cannot: does the InnerTube client-version scrape still match
-# today's music.youtube.com HTML, what envelope does an anonymous WEB_REMIX
-# FEmusic_home browse return now, and does adding visitorData to the request
-# context change that envelope. Results are printed as check-run annotations
-# because artifact and job-log downloads are unreachable from the agent.
+# Deleted before this branch is proposed for merge.
+#
+# Probe 2 answers what probe 1 could not: does DHUN's own parser accept a
+# *live* anonymous FEmusic_home response, and does the country context change
+# the answer (the failing device is in Nepal, the runner is in the US).
+# The live JSON never leaves the runner; only the parse verdict is annotated.
 
 on:
   push:
@@ -19,137 +19,156 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
-      - name: Probe anonymous Home browse
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Capture live Home responses for two country contexts
         shell: bash
         run: |
           set +e
           python3 - <<'PY'
-          import json, re, sys, urllib.request, urllib.error
+          import json, re, urllib.request, urllib.error, os
 
           UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                 "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
 
-          def emit(level, text):
+          def emit(text):
               text = text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
-              print(f"::{level} title=home-probe::{text}", flush=True)
+              print(f"::warning title=home-probe::{text}", flush=True)
 
-          def get(url):
-              req = urllib.request.Request(url, headers={"User-Agent": UA,
-                  "Accept-Language": "en-US,en;q=0.9"})
-              with urllib.request.urlopen(req, timeout=30) as r:
-                  return r.status, r.read().decode("utf-8", "replace")
+          req = urllib.request.Request("https://music.youtube.com/",
+                                       headers={"User-Agent": UA, "Accept-Language": "en-US,en;q=0.9"})
+          with urllib.request.urlopen(req, timeout=30) as r:
+              html = r.read().decode("utf-8", "replace")
+          version = re.search(r'"INNERTUBE_CLIENT_VERSION":"([0-9.]+)"', html).group(1)
+          visitor = re.search(r'"visitorData"\s*:\s*"([^"]+)"', html).group(1)
+          emit(f"clientVersion={version} visitorPresent=True")
 
-          def post(url, body, headers):
+          def fetch(gl, path):
+              body = {"context": {"client": {"clientName": "WEB_REMIX", "clientVersion": version,
+                                             "hl": "en", "gl": gl},
+                                  "user": {}},
+                      "browseId": "FEmusic_home"}
+              headers = {"Content-Type": "application/json", "User-Agent": UA,
+                         "Accept-Language": "en-US,en;q=0.9", "X-YouTube-Client-Name": "67",
+                         "X-YouTube-Client-Version": version, "X-Goog-Visitor-Id": visitor,
+                         "Origin": "https://music.youtube.com",
+                         "Referer": "https://music.youtube.com/"}
               data = json.dumps(body).encode()
-              req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+              r = urllib.request.Request("https://music.youtube.com/youtubei/v1/browse?alt=json",
+                                         data=data, headers=headers, method="POST")
               try:
-                  with urllib.request.urlopen(req, timeout=30) as r:
-                      return r.status, r.read().decode("utf-8", "replace")
+                  with urllib.request.urlopen(r, timeout=40) as resp:
+                      status, text = resp.status, resp.read().decode("utf-8", "replace")
               except urllib.error.HTTPError as e:
-                  return e.code, e.read().decode("utf-8", "replace")
+                  status, text = e.code, e.read().decode("utf-8", "replace")
               except Exception as e:
-                  return -1, f"{type(e).__name__}: {e}"
+                  status, text = -1, f"{type(e).__name__}: {e}"
+              emit(f"gl={gl} http={status} bytes={len(text)}")
+              if status == 200:
+                  open(path, "w").write(text)
+                  raw = json.loads(text)
+                  c = raw.get("contents") or {}
+                  b = c.get("singleColumnBrowseResultsRenderer") or c.get("twoColumnBrowseResultsRenderer") or {}
+                  tabs = b.get("tabs") or []
+                  ren = []
+                  for t in tabs:
+                      if isinstance(t, dict):
+                          x = t.get("tabRenderer") or t.get("musicTabRenderer")
+                          if isinstance(x, dict):
+                              ren.append(x)
+                  slr = {}
+                  for x in ren:
+                      slr = (x.get("content") or {}).get("sectionListRenderer") or {}
+                      if slr:
+                          break
+                  items = slr.get("contents") or []
+                  emit(f"gl={gl} sections={len(items)} kinds=" +
+                       ",".join(sorted({k for i in items if isinstance(i, dict) for k in i})) +
+                       f" sectionContinuations={len(slr.get('continuations') or [])} " +
+                       f"actions={[k for k in ('onResponseReceivedActions','onResponseReceivedCommands') if k in raw]}")
+              else:
+                  emit(f"gl={gl} errorBody={text[:240]}")
 
-          # --- 1. the client-version scrape DHUN performs ---------------------
-          version = None
-          visitor = None
-          try:
-              status, html = get("https://music.youtube.com/")
-              m = re.search(r'"INNERTUBE_CLIENT_VERSION":"([0-9.]+)"', html)
-              version = m.group(1) if m else None
-              v = (re.search(r'"visitorData"\s*:\s*"([^"]+)"', html)
-                   or re.search(r'"VISITOR_DATA"\s*:\s*"([^"]+)"', html))
-              visitor = v.group(1) if v else None
-              emit("warning", f"homepage http={status} htmlBytes={len(html)} "
-                              f"dhunClientVersionRegex={'match' if version else 'NO MATCH'} "
-                              f"dhunVisitorRegex={'match' if visitor else 'NO MATCH'}")
-          except Exception as e:
-              emit("warning", f"homepage fetch failed: {type(e).__name__}: {str(e)[:160]}")
+          os.makedirs("probe", exist_ok=True)
+          fetch("US", "probe/home-us.json")
+          fetch("NP", "probe/home-np.json")
+          PY
+          ls -la probe 2>/dev/null || true
 
-          # --- 2. shape summary (key names only, never values) ---------------
-          def keys(o):
-              return ",".join(sorted(o.keys())) if isinstance(o, dict) and o else "-"
+      - name: Parse the live responses with DHUN's own parser
+        shell: bash
+        run: |
+          set +e
+          mkdir -p shared/src/jvmTest/kotlin/dev/dhun/innertube
+          cat > shared/src/jvmTest/kotlin/dev/dhun/innertube/LiveHomeShapeProbeTest.kt <<'KT'
+          package dev.dhun.innertube
 
-          def summarize(raw):
-              contents = raw.get("contents") or {}
-              browse = (contents.get("singleColumnBrowseResultsRenderer")
-                        or contents.get("twoColumnBrowseResultsRenderer") or {})
-              tabs = browse.get("tabs") or []
-              renderers = []
-              for tab in tabs:
-                  if isinstance(tab, dict):
-                      r = tab.get("tabRenderer") or tab.get("musicTabRenderer")
-                      if isinstance(r, dict):
-                          renderers.append(r)
-              tab_contents = [r.get("content") for r in renderers if isinstance(r.get("content"), dict)]
-              sections = [c.get("sectionListRenderer") for c in tab_contents
-                          if isinstance(c.get("sectionListRenderer"), dict)]
-              cont = raw.get("continuationContents") or {}
-              actions = [k for k in ("onResponseReceivedActions", "onResponseReceivedEndpoints",
-                                     "onResponseReceivedCommands") if k in raw]
-              return (f"root[{keys(raw)}] contents[{keys(contents)}] browse[{keys(browse)}] "
-                      f"tabs={len(tabs)} tabRenderers[{','.join(sorted({k for r in renderers for k in r})) or '-'}] "
-                      f"tabSections={len(sections)} continuation[{keys(cont)}] actions[{','.join(actions) or '-'}]")
+          import java.io.File
+          import kotlinx.serialization.json.Json
+          import kotlinx.serialization.json.JsonObject
+          import kotlin.test.Test
 
-          def sections_of(raw):
-              contents = raw.get("contents") or {}
-              browse = (contents.get("singleColumnBrowseResultsRenderer")
-                        or contents.get("twoColumnBrowseResultsRenderer") or {})
-              for tab in browse.get("tabs") or []:
-                  r = tab.get("tabRenderer") or tab.get("musicTabRenderer") or {}
-                  slr = (r.get("content") or {}).get("sectionListRenderer") or {}
-                  if slr.get("contents"):
-                      return len(slr["contents"]), ",".join(sorted(
-                          k for item in slr["contents"] if isinstance(item, dict) for k in item))
-              return 0, "-"
+          class LiveHomeShapeProbeTest {
+              @Test
+              fun parseLiveHomeResponses() {
+                  val out = StringBuilder()
+                  for (name in listOf("home-us", "home-np")) {
+                      val file = File(projectRoot(), "probe/$name.json")
+                      if (!file.isFile) { out.appendLine("$name SKIP no file"); continue }
+                      val root = Json.parseToJsonElement(file.readText()) as JsonObject
+                      try {
+                          val page = parseHomeFeedPage(root)
+                          val first = page.sections.firstOrNull()
+                          out.appendLine(
+                              "$name PASS sections=${page.sections.size} " +
+                                  "items=${page.sections.sumOf { it.items.size }} " +
+                                  "token=${page.continuationToken != null} " +
+                                  "firstTitle=${first?.title ?: "-"} " +
+                                  "firstKind=${first?.items?.firstOrNull()?.let { it::class.simpleName } ?: "-"}"
+                          )
+                      } catch (t: Throwable) {
+                          out.appendLine("$name FAIL ${t::class.simpleName}: ${t.message}")
+                      }
+                  }
+                  File(projectRoot(), "probe/parse-result.txt").writeText(out.toString())
+                  println(out)
+              }
 
-          base = {"context": {"client": {"clientName": "WEB_REMIX", "hl": "en", "gl": "US"}},
-                  "browseId": "FEmusic_home"}
-
-          # --- 3. anonymous browse, exactly like DHUN sends it ---------------
-          live_version = version or "1.20250310.01.00"
-          plain = json.loads(json.dumps(base))
-          plain["context"]["client"]["clientVersion"] = live_version
-          headers = {"Content-Type": "application/json", "User-Agent": UA,
-                     "Accept-Language": "en-US,en;q=0.9",
-                     "X-YouTube-Client-Name": "67",
-                     "X-YouTube-Client-Version": live_version,
-                     "Origin": "https://music.youtube.com",
-                     "Referer": "https://music.youtube.com/"}
-          if visitor:
-              headers["X-Goog-Visitor-Id"] = visitor
-          status, text = post("https://music.youtube.com/youtubei/v1/browse?alt=json", plain, headers)
-          emit("warning", f"browse(no context visitorData) http={status} bytes={len(text)}")
-          if status == 200:
-              raw = json.loads(text)
-              emit("warning", "browse(no context visitorData) " + summarize(raw))
-              n, names = sections_of(raw)
-              emit("warning", f"browse(no context visitorData) rawSections={n} itemKinds[{names}]")
-
-          # --- 4. same request with visitorData inside the context ----------
-          if visitor:
-              ctx = json.loads(json.dumps(base))
-              ctx["context"]["client"]["clientVersion"] = live_version
-              ctx["context"]["client"]["visitorData"] = visitor
-              status2, text2 = post("https://music.youtube.com/youtubei/v1/browse?alt=json", ctx, headers)
-              emit("warning", f"browse(with context visitorData) http={status2} bytes={len(text2)}")
-              if status2 == 200:
-                  raw2 = json.loads(text2)
-                  emit("warning", "browse(with context visitorData) " + summarize(raw2))
-                  n2, names2 = sections_of(raw2)
-                  emit("warning", f"browse(with context visitorData) rawSections={n2} itemKinds[{names2}]")
-              if status2 != 200:
-                  emit("warning", f"browse(with context visitorData) errorBody=" + text2[:300].replace("\n", " "))
-          else:
-              emit("warning", "no visitorData scraped; context variant skipped")
-
-          # --- 5. an error-style request, to see how statuses are reported ---
-          bad = json.loads(json.dumps(base))
-          bad["browseId"] = "FEmusic_home"
-          bad["context"]["client"]["clientVersion"] = "0"
-          status3, text3 = post("https://music.youtube.com/youtubei/v1/browse?alt=json", bad, headers)
-          emit("warning", f"browse(bad clientVersion) http={status3} bodyHead="
-                          + text3[:200].replace("\n", " "))
+              private fun projectRoot(): File {
+                  var dir = File(".").absoluteFile
+                  while (dir.parentFile != null && !File(dir, "settings.gradle.kts").isFile) {
+                      dir = dir.parentFile
+                  }
+                  return dir
+              }
+          }
+          KT
+          ./gradlew :shared:jvmTest --tests 'dev.dhun.innertube.LiveHomeShapeProbeTest' --no-daemon --console=plain > probe-gradle.txt 2>&1
+          echo "gradle exit=$?"
+          tail -n 25 probe-gradle.txt
+          echo "--- annotation pass ---"
+          python3 - <<'PY'
+          import os
+          for path in ("probe/parse-result.txt",):
+              if os.path.isfile(path):
+                  for line in open(path):
+                      line = line.rstrip("\n")
+                      if line.strip():
+                          esc = line.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+                          print(f"::warning title=dhun-parser::{esc}", flush=True)
+              else:
+                  print("::warning title=dhun-parser::no parse-result.txt (test did not run)", flush=True)
+          if os.path.isfile("probe-gradle.txt"):
+              errs = [l for l in open("probe-gradle.txt") if "error:" in l or "FAILED" in l]
+              for line in errs[:8]:
+                  esc = line.strip().replace("%", "%25")
+                  print(f"::error title=gradle::{esc}", flush=True)
           PY
