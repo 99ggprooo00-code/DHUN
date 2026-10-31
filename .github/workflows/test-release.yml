@@ -499,3 +499,74 @@ jobs:
             echo "::error::v1.00.002 must stay marked as a prerelease"
             exit 1
           fi
+
+  # Evidence transport only. This runs after a successful same-repository PR
+  # Windows check and never creates, edits or publishes a release.
+  msi_evidence:
+    name: Publish installed Windows evidence
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && needs.msi.result == 'success' }}
+    needs: [msi]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: msi-install-check
+          path: out/installer-check
+
+      - name: Publish immutable installed-app frame and result
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python - <<'PY'
+          import base64
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+
+          root = Path("out/installer-check")
+          result_path = root / "result.txt"
+          result = result_path.read_text(encoding="utf-8") if result_path.exists() else ""
+          images = sorted(root.rglob("*.png"))
+          if "appLaunch = passed" in result and not images:
+              raise SystemExit("Installed-app launch passed but no window PNG was preserved")
+
+          def gh(*args, **kwargs):
+              return subprocess.check_output(["gh", *args], text=True, **kwargs)
+
+          entries = []
+          for path in images:
+              blob = gh(
+                  "api", "repos/$GITHUB_REPOSITORY/git/blobs",
+                  "-f", "content=" + base64.b64encode(path.read_bytes()).decode("ascii"),
+                  "-f", "encoding=base64", "--jq", ".sha",
+              ).strip()
+              if len(blob) != 40:
+                  raise SystemExit(f"Invalid PNG blob SHA for {path}")
+              entries.append({
+                  "name": path.relative_to(root).as_posix(),
+                  "blob": blob,
+                  "bytes": path.stat().st_size,
+                  "kind": "actual upgraded DHUN.exe native window PNG; startup only",
+              })
+          manifest = {
+              "workflow": "test-release.yml",
+              "source": {"sha": os.environ["GITHUB_SHA"], "run": os.environ["GITHUB_RUN_ID"]},
+              "scope": "Installed Windows package startup; no audible playback or visual acceptance claimed",
+              "result": result,
+              "images": entries,
+          }
+          output = Path("build/test-evidence/packaged-windows-manifest.json")
+          output.parent.mkdir(parents=True, exist_ok=True)
+          output.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+          blob = gh(
+              "api", "repos/$GITHUB_REPOSITORY/git/blobs",
+              "-f", "content=" + base64.b64encode(output.read_bytes()).decode("ascii"),
+              "-f", "encoding=base64", "--jq", ".sha",
+          ).strip()
+          if len(blob) != 40:
+              raise SystemExit("Invalid packaged-Windows manifest blob SHA")
+          print(f"::notice title=DHUN packaged Windows evidence::manifest={blob} images={len(entries)}")
+          PY

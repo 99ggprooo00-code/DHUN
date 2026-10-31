@@ -12,7 +12,7 @@ class BuildWorkflowTest(unittest.TestCase):
     def setUp(self):
         self.text = WORKFLOW.read_text()
         self.publish_test = self.text.split("\n  publish_test:\n", 1)[1].split("\n  publish:\n", 1)[0]
-        self.publish = self.text.split("\n  publish:\n", 1)[1]
+        self.publish = self.text.split("\n  publish:\n", 1)[1].split("\n  msi_evidence:\n", 1)[0]
 
     def test_typed_manual_input_defaults_to_build_only(self):
         inputs = self.text.split("  workflow_dispatch:\n", 1)[1].split("  push:\n", 1)[0]
@@ -103,6 +103,12 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn("Get-AuthenticodeSignature", patch)
         self.assertIn("DHUN_UPGRADE_DATA_POLICY", patch)
         self.assertIn("'UPGRADINGPRODUCTCODE'", patch)
+        self.assertIn("Start-Process -FilePath $executable", smoke)
+        self.assertIn("GetWindowRect", smoke)
+        self.assertIn("CopyFromScreen", smoke)
+        self.assertIn("app-launch.png", smoke)
+        self.assertIn("appLaunch = $appLaunchResult", smoke)
+        self.assertIn("visual review and audible playback not tested", smoke)
 
     def test_build_jobs_do_not_get_contents_write(self):
         before_publish = self.text.split("\n  publish_test:\n", 1)[0]

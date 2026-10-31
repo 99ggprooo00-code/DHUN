@@ -51,6 +51,54 @@ function Invoke-MsiCheck {
     throw "msiexec $Operation failed with exit $code; log: $Log"
 }
 
+function Save-DhunAppWindow {
+    param(
+        [Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process,
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+    $Process.Refresh()
+    $handle = $Process.MainWindowHandle
+    if ($handle -eq [IntPtr]::Zero) { throw 'Cannot capture DHUN without a real main-window handle' }
+    Add-Type -AssemblyName System.Drawing
+    Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class DhunWindowNative {
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
+    [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int command);
+}
+'@
+    [void][DhunWindowNative]::ShowWindow($handle, 9) # SW_RESTORE; minimized windows have no useful frame.
+    [void][DhunWindowNative]::SetForegroundWindow($handle)
+    Start-Sleep -Seconds 2
+    $rect = New-Object DhunWindowNative+RECT
+    if (-not [DhunWindowNative]::GetWindowRect($handle, [ref]$rect)) {
+        throw 'GetWindowRect failed for the launched DHUN window'
+    }
+    $width = $rect.Right - $rect.Left
+    $height = $rect.Bottom - $rect.Top
+    if ($width -lt 200 -or $height -lt 150) {
+        throw "Implausible DHUN window bounds ${width}x${height}; refusing to label this an app screenshot"
+    }
+    $bitmap = $null
+    $graphics = $null
+    try {
+        $bitmap = New-Object System.Drawing.Bitmap -ArgumentList $width, $height
+        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+        $graphics.CopyFromScreen($rect.Left, $rect.Top, 0, 0, $bitmap.Size)
+        $bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
+    } finally {
+        if ($null -ne $graphics) { $graphics.Dispose() }
+        if ($null -ne $bitmap) { $bitmap.Dispose() }
+    }
+    if (-not (Test-Path -LiteralPath $Path) -or (Get-Item -LiteralPath $Path).Length -lt 1000) {
+        throw 'The DHUN window capture was not written or is implausibly small'
+    }
+}
+
 # Prefer the newest published fixed public release. Until v1.00.002 exists,
 # the published v1.00.001 release (whose actual asset is `dhun.msi`) is used.
 # Accept its older versioned filename too if the asset is renamed back. A
@@ -133,6 +181,8 @@ $installDirectory = Join-Path $env:LOCALAPPDATA 'DHUN'
 $userdata = Join-Path $installDirectory 'userdata'
 $sentinel = Join-Path $userdata 'upgrade-sentinel.txt'
 $cacheSentinel = Join-Path $userdata 'cache/audio/upgrade-sentinel.txt'
+$appLaunchResult = 'not tested'
+$audioVisualResult = 'not tested'
 try {
     [void](Invoke-MsiCheck '/i' $baseline (Join-Path $logs 'baseline-install.log'))
     if (-not (Test-Path -LiteralPath (Join-Path $installDirectory 'DHUN.exe'))) {
@@ -150,7 +200,38 @@ try {
     if (-not (Test-Path -LiteralPath $cacheSentinel) -or [IO.File]::ReadAllText($cacheSentinel) -ne 'preserve-cache') {
         throw 'In-place MSI upgrade removed/changed existing cache data'
     }
-    Write-Host "::notice title=MSI upgrade smoke PASS::Hosted Windows: $($baselineReleaseTag) $($old['ProductVersion']) -> $($new['ProductVersion']); per-user install and userdata/cache sentinels preserved. Baseline SHA256=$baselineHash. App playback/visuals not tested."
+    Write-Host "::notice title=MSI upgrade smoke PASS::Hosted Windows: $($baselineReleaseTag) $($old['ProductVersion']) -> $($new['ProductVersion']); per-user install and userdata/cache sentinels preserved. Baseline SHA256=$baselineHash. Installed-app launch is checked separately."
+
+    # Launch the actual upgraded per-user package, not a Compose preview. A live
+    # native window and PNG establish startup only; audible playback and visual
+    # acceptance still require their own evidence.
+    $app = $null
+    try {
+        $executable = Join-Path $installDirectory 'DHUN.exe'
+        $app = Start-Process -FilePath $executable -WorkingDirectory $installDirectory -PassThru
+        $windowDeadline = [DateTime]::UtcNow.AddSeconds(90)
+        do {
+            Start-Sleep -Seconds 2
+            $app.Refresh()
+            if ($app.HasExited) { throw "Installed DHUN.exe exited before opening a window (code $($app.ExitCode)); see dhun-startup.log" }
+        } while ($app.MainWindowHandle -eq [IntPtr]::Zero -and [DateTime]::UtcNow -lt $windowDeadline)
+        if ($app.MainWindowHandle -eq [IntPtr]::Zero) { throw 'Installed DHUN.exe did not expose a main window within 90 seconds' }
+        Start-Sleep -Seconds 15
+        $appShot = Join-Path $logs 'app-launch.png'
+        Save-DhunAppWindow -Process $app -Path $appShot
+        $appLaunchResult = 'passed: installed DHUN.exe opened a native main window'
+        $audioVisualResult = 'window PNG captured; visual review and audible playback not tested'
+        Write-Host "::notice title=MSI installed-app launch PASS::Native DHUN.exe window opened after upgrade; captured app-launch.png. Audible playback and visual review are not claimed."
+    } finally {
+        if ($null -ne $app) {
+            $app.Refresh()
+            if (-not $app.HasExited) {
+                [void]$app.CloseMainWindow()
+                if (-not $app.WaitForExit(15000)) { $app.Kill(); $app.WaitForExit() }
+            }
+            $app.Dispose()
+        }
+    }
 
     # Exercise the installed candidate's future-upgrade removal path too.
     # This is the same public flag RemoveExistingProducts gives the old MSI;
@@ -166,7 +247,7 @@ try {
     [void](Invoke-MsiCheck '/i' $candidatePath (Join-Path $logs 'candidate-reinstall.log'))
     [void](Invoke-MsiCheck '/x' $new['ProductCode'] (Join-Path $logs 'candidate-uninstall.log'))
     if (Test-Path -LiteralPath $userdata) { throw 'MSI uninstall left the test userdata directory behind' }
-    Write-Host '::notice title=MSI uninstall smoke PASS::Hosted Windows uninstall removed test userdata. No app launch, audio or visual acceptance claimed.'
+    Write-Host '::notice title=MSI uninstall smoke PASS::Hosted Windows uninstall removed test userdata. Installed-app startup was checked separately; audible playback and visual acceptance are not claimed.'
     Write-DhunInstallResult ([ordered]@{
         status = 'passed'
         requiredForThisBuild = [string][bool]$RequireInstallOver
@@ -181,8 +262,8 @@ try {
         cacheSentinel = 'preserved'
         futureUpgradeRemoval = 'preserved both sentinels'
         uninstallCleanup = 'passed'
-        appLaunch = 'not tested'
-        audioAndVisuals = 'not tested'
+        appLaunch = $appLaunchResult
+        audioAndVisuals = $audioVisualResult
     })
 } finally {
     # Product GUIDs were read from these two verified DHUN packages. Do not
