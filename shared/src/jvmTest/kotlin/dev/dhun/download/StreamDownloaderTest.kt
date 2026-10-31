@@ -63,8 +63,8 @@ class StreamDownloaderTest {
                 content = content.copyOfRange(8, content.size),
                 status = HttpStatusCode.PartialContent,
                 headers = headersOf(
-                    HttpHeaders.ContentLength, (content.size - 8).toString(),
-                    "Content-Range", "bytes 8-15/16",
+                    HttpHeaders.ContentLength to listOf((content.size - 8).toString()),
+                    "Content-Range" to listOf("bytes 8-15/16"),
                 ),
             )
         }

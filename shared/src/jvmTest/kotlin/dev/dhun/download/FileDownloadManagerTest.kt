@@ -3,6 +3,7 @@ package dev.dhun.download
 import dev.dhun.core.DhunError
 import dev.dhun.core.DhunResult
 import dev.dhun.core.DownloadState
+import dev.dhun.core.DownloadedTrack
 import dev.dhun.core.StreamInfo
 import dev.dhun.core.Track
 import dev.dhun.data.DatabaseDriverFactory

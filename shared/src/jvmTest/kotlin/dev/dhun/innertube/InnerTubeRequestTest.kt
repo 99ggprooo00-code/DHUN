@@ -92,7 +92,7 @@ class InnerTubeRequestTest {
             assertTrue(client.search("second") is DhunResult.Success)
             client.setCountryCode(null) // absent row on a fresh install
             assertTrue(client.search("third") is DhunResult.Success)
-            assertEquals(listOf("US", "NP", "US"), countries)
+            assertEquals<List<String?>>(listOf("US", "NP", "US"), countries)
         } finally {
             http.close()
         }
