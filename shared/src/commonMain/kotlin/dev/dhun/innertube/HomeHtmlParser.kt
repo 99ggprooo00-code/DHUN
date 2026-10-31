@@ -105,23 +105,33 @@ private fun decodeJavaScriptString(source: String): String = buildString(source.
             continue
         }
         when (val escape = source[index + 1]) {
-            'x' if index + 3 < source.length -> {
-                val value = source.substring(index + 2, index + 4).toIntOrNull(16)
+            'x' -> {
+                val value = if (index + 3 < source.length) {
+                    source.substring(index + 2, index + 4).toIntOrNull(16)
+                } else {
+                    null
+                }
                 if (value == null) {
-                    append("\\x")
+                    append('\\').append('x')
+                    index += 2
                 } else {
                     append(value.toChar())
+                    index += 4
                 }
-                index += 4
             }
-            'u' if index + 4 < source.length -> {
-                val value = source.substring(index + 2, index + 6).toIntOrNull(16)
+            'u' -> {
+                val value = if (index + 5 < source.length) {
+                    source.substring(index + 2, index + 6).toIntOrNull(16)
+                } else {
+                    null
+                }
                 if (value == null) {
-                    append("\\u")
+                    append('\\').append('u')
+                    index += 2
                 } else {
                     append(value.toChar())
+                    index += 6
                 }
-                index += 6
             }
             '\\' -> append('\\').also { index += 2 }
             '/' -> append('/').also { index += 2 }
