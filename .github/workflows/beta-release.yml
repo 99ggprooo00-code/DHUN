@@ -1,10 +1,10 @@
-name: test-release
+name: DHUN beta
 
-# The rolling `test` tag is a private draft for collaborators. Successful main
-# builds replace it automatically when Android/Desktop/shared app code changes.
-# PRs and non-main refs only upload run-scoped artifacts. The fixed public
-# prerelease can be requested by manual dispatch or by adding the reviewed,
-# one-shot release-intent file in a main merge (see scripts/release_plan.py).
+# The rolling `beta` tag is a public prerelease titled "DHUN beta". Successful
+# main builds replace it after Android/Desktop/shared verification. PRs and
+# non-main refs only upload run-scoped artifacts. The fixed public prerelease
+# remains separate and can be requested by manual dispatch or by adding its
+# reviewed, one-shot release-intent file (see scripts/release_plan.py).
 on:
   workflow_dispatch:
     inputs:
@@ -38,15 +38,23 @@ on:
       - 'gradlew'
       - 'gradlew.bat'
       - 'scripts/**'
-      - '.github/workflows/test-release.yml'
+      - '.github/workflows/beta-release.yml'
       - '.github/release-intent/v1.00.002'
+      # Legacy internal filename retained so the migration is not itself
+      # interpreted as a new build-only intent.
       - '.github/release-intent/preserve-rolling-test-draft'
 
 permissions:
   contents: read
 
+# test-release ended at run 867. Keep the renamed workflow's Android/MSI
+# identities newer whether GitHub resets or continues its raw run counter.
+# Build APK deliberately leaves this unset; Android versionCode uses time.
+env:
+  DHUN_BETA_RUN_OFFSET: '867'
+
 concurrency:
-  group: ${{ github.ref == 'refs/heads/main' && 'test-release' || format('test-build-{0}', github.ref) }}
+  group: ${{ github.ref == 'refs/heads/main' && 'beta-release' || format('beta-build-{0}', github.ref) }}
   cancel-in-progress: true
 
 jobs:
@@ -91,19 +99,19 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Allocate increasing Android test identity
-        id: test_version
-        if: ${{ env.DHUN_RELEASE_CHANNEL == 'test' }}
-        run: python scripts/test_version.py "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+      - name: Allocate increasing Android beta identity
+        id: beta_version
+        if: ${{ env.DHUN_RELEASE_CHANNEL == 'beta' }}
+        run: python scripts/beta_version.py "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
 
       - name: Build debug APK
         env:
-          TEST_VERSION_NAME: ${{ steps.test_version.outputs.version_name }}
-          TEST_VERSION_CODE: ${{ steps.test_version.outputs.version_code }}
+          BETA_VERSION_NAME: ${{ steps.beta_version.outputs.version_name }}
+          BETA_VERSION_CODE: ${{ steps.beta_version.outputs.version_code }}
         run: |
           args=("-PdhunReleaseChannel=$DHUN_RELEASE_CHANNEL")
-          if [ "$DHUN_RELEASE_CHANNEL" = test ]; then
-            args+=("-PdhunTestVersionName=$TEST_VERSION_NAME" "-PdhunTestVersionCode=$TEST_VERSION_CODE")
+          if [ "$DHUN_RELEASE_CHANNEL" = beta ]; then
+            args+=("-PdhunBetaVersionName=$BETA_VERSION_NAME" "-PdhunBetaVersionCode=$BETA_VERSION_CODE")
           fi
           ./gradlew :app-android:assembleDebug "${args[@]}" --no-daemon
 
@@ -112,14 +120,14 @@ jobs:
           python scripts/stage_android_apks.py \
             app-android/build/outputs/apk/debug \
             out
-          python scripts/stage_artifact.py out/dhun-test.apk --build-only "$BUILD_ONLY"
-          python scripts/stage_artifact.py out/dhun-test-arm64-v8a.apk --build-only "$BUILD_ONLY"
-          python scripts/stage_artifact.py out/dhun-test-armeabi-v7a.apk --build-only "$BUILD_ONLY"
+          python scripts/stage_artifact.py out/dhun-beta.apk --build-only "$BUILD_ONLY"
+          python scripts/stage_artifact.py out/dhun-beta-arm64-v8a.apk --build-only "$BUILD_ONLY"
+          python scripts/stage_artifact.py out/dhun-beta-armeabi-v7a.apk --build-only "$BUILD_ONLY"
 
       - name: Verify packaged APK versions (all ABIs)
         env:
-          TEST_VERSION_NAME: ${{ steps.test_version.outputs.version_name }}
-          TEST_VERSION_CODE: ${{ steps.test_version.outputs.version_code }}
+          BETA_VERSION_NAME: ${{ steps.beta_version.outputs.version_name }}
+          BETA_VERSION_CODE: ${{ steps.beta_version.outputs.version_code }}
         run: |
           aapt=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)
           apksigner=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
@@ -128,7 +136,7 @@ jobs:
           if [ "$DHUN_RELEASE_CHANNEL" = public ]; then
             python scripts/check_android_identity.py "$aapt" out '1.00.002' 7 --apksigner "$apksigner"
           else
-            python scripts/check_android_identity.py "$aapt" out "$TEST_VERSION_NAME" "$TEST_VERSION_CODE" --apksigner "$apksigner"
+            python scripts/check_android_identity.py "$aapt" out "$BETA_VERSION_NAME" "$BETA_VERSION_CODE" --apksigner "$apksigner"
           fi
 
       - uses: actions/upload-artifact@v6
@@ -137,15 +145,15 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           path: |
-            out/dhun-test.apk
-            out/dhun-test.apk.sha256
-            out/dhun-test.apk.provenance.txt
-            out/dhun-test-arm64-v8a.apk
-            out/dhun-test-arm64-v8a.apk.sha256
-            out/dhun-test-arm64-v8a.apk.provenance.txt
-            out/dhun-test-armeabi-v7a.apk
-            out/dhun-test-armeabi-v7a.apk.sha256
-            out/dhun-test-armeabi-v7a.apk.provenance.txt
+            out/dhun-beta.apk
+            out/dhun-beta.apk.sha256
+            out/dhun-beta.apk.provenance.txt
+            out/dhun-beta-arm64-v8a.apk
+            out/dhun-beta-arm64-v8a.apk.sha256
+            out/dhun-beta-arm64-v8a.apk.provenance.txt
+            out/dhun-beta-armeabi-v7a.apk
+            out/dhun-beta-armeabi-v7a.apk.sha256
+            out/dhun-beta-armeabi-v7a.apk.provenance.txt
 
   msi:
     needs: release_plan
@@ -209,7 +217,7 @@ jobs:
         run: |
           try {
             $require = $env:REQUIRE_INSTALL_OVER -eq 'true'
-            ./scripts/check_msi_upgrade.ps1 -Candidate out/dhun-test.msi -RequireInstallOver:$require
+            ./scripts/check_msi_upgrade.ps1 -Candidate out/dhun-beta.msi -RequireInstallOver:$require
           } catch {
             $message = $_.ToString().Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
             Write-Host "::error file=scripts/check_msi_upgrade.ps1,title=MSI install-over::$message"
@@ -231,9 +239,9 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           path: |
-            out/dhun-test.msi
-            out/dhun-test.msi.sha256
-            out/dhun-test.msi.provenance.txt
+            out/dhun-beta.msi
+            out/dhun-beta.msi.sha256
+            out/dhun-beta.msi.provenance.txt
             out/READ-ME-FIRST.md
 
   aab:
@@ -258,19 +266,19 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Allocate increasing Android test identity
-        id: test_version
-        if: ${{ env.DHUN_RELEASE_CHANNEL == 'test' }}
-        run: python scripts/test_version.py "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+      - name: Allocate increasing Android beta identity
+        id: beta_version
+        if: ${{ env.DHUN_RELEASE_CHANNEL == 'beta' }}
+        run: python scripts/beta_version.py "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
 
       - name: Build debug-signed AAB
         env:
-          TEST_VERSION_NAME: ${{ steps.test_version.outputs.version_name }}
-          TEST_VERSION_CODE: ${{ steps.test_version.outputs.version_code }}
+          BETA_VERSION_NAME: ${{ steps.beta_version.outputs.version_name }}
+          BETA_VERSION_CODE: ${{ steps.beta_version.outputs.version_code }}
         run: |
           args=("-PdhunReleaseChannel=$DHUN_RELEASE_CHANNEL")
-          if [ "$DHUN_RELEASE_CHANNEL" = test ]; then
-            args+=("-PdhunTestVersionName=$TEST_VERSION_NAME" "-PdhunTestVersionCode=$TEST_VERSION_CODE")
+          if [ "$DHUN_RELEASE_CHANNEL" = beta ]; then
+            args+=("-PdhunBetaVersionName=$BETA_VERSION_NAME" "-PdhunBetaVersionCode=$BETA_VERSION_CODE")
           fi
           ./gradlew :app-android:bundleDebug "${args[@]}" --no-daemon
 
@@ -290,11 +298,10 @@ jobs:
             out/dhun-v1.00.002.aab.sha256
             out/dhun-v1.00.002.aab.provenance.txt
 
-  publish_test:
-    # Ordinary main pushes refresh only the private rolling test draft.
-    # A newly added build-only intent (or public intent) skips this job.
-    # Never delete the existing draft for a build-only run.
-    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.release_plan.outputs.channel == 'test' && needs.release_plan.outputs.build_only == 'false' }}
+  publish_beta:
+    # Ordinary verified main builds replace the public rolling beta. A new
+    # build-only/public-fixed intent skips this job and leaves releases alone.
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.release_plan.outputs.channel == 'beta' && needs.release_plan.outputs.build_only == 'false' }}
     needs: [release_plan, apk, msi]
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -323,51 +330,77 @@ jobs:
             exit 1
           fi
 
-      - name: Replace the private rolling test draft
+      - name: Publish and verify the rolling DHUN beta prerelease
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          gh release delete test --yes --cleanup-tag || true
-          git push origin :refs/tags/test || true
+          # Replace an earlier rolling beta only after all build gates pass and
+          # every required installer is present. The legacy test release stays
+          # until the new public beta has been verified.
+          for asset in dhun-beta.apk dhun-beta-arm64-v8a.apk dhun-beta-armeabi-v7a.apk dhun-beta.msi; do
+            if [ ! -s "dist/$asset" ]; then
+              echo "::error::Required beta installer is missing or empty: $asset"
+              exit 1
+            fi
+          done
+          if gh release view beta --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete beta --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
+          fi
 
-          # Checksums and revision provenance stay in the internal build
-          # artifacts for verification/promotion. The rolling beta itself is
-          # deliberately just the four installers.
-          gh release create test \
-            dist/dhun-test.apk \
-            dist/dhun-test-arm64-v8a.apk \
-            dist/dhun-test-armeabi-v7a.apk \
-            dist/dhun-test.msi \
+          # Checksums and revision provenance stay in internal build artifacts.
+          # The public rolling beta deliberately exposes four installers only.
+          gh release create beta \
+            dist/dhun-beta.apk \
+            dist/dhun-beta-arm64-v8a.apk \
+            dist/dhun-beta-armeabi-v7a.apk \
+            dist/dhun-beta.msi \
+            --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "DHUN beta" \
-            --notes-file docs/releases/rolling-test.md \
-            --draft --prerelease
+            --notes-file docs/releases/rolling-beta.md \
+            --prerelease
 
-          gh release view test --json tagName,isDraft,isPrerelease,targetCommitish --jq '{tagName,isDraft,isPrerelease,targetCommitish}'
-          if [ "$(gh release view test --json isDraft --jq '.isDraft')" != "true" ]; then
-            echo "::error::The rolling test release must remain a private draft"
+          expected_beta_assets=$(printf '%s\n' \
+            "dhun-beta.apk" \
+            "dhun-beta-arm64-v8a.apk" \
+            "dhun-beta-armeabi-v7a.apk" \
+            "dhun-beta.msi" | jq -R . | jq -sc 'sort')
+          actual_beta_assets=$(gh release view beta --repo "$GITHUB_REPOSITORY" --json assets --jq '[.assets[].name] | sort' | jq -c .)
+          if [ "$actual_beta_assets" != "$expected_beta_assets" ]; then
+            echo "::error::DHUN beta must contain exactly the four installers"
+            echo "Expected: $expected_beta_assets"
+            echo "Actual:   $actual_beta_assets"
             exit 1
           fi
-          if [ "$(gh release view test --json isPrerelease --jq '.isPrerelease')" != "true" ]; then
-            echo "::error::The rolling test release must remain marked as a prerelease"
+          if [ "$(gh release view beta --repo "$GITHUB_REPOSITORY" --json name --jq '.name')" != "DHUN beta" ]; then
+            echo "::error::The rolling release title must be exactly DHUN beta"
             exit 1
           fi
-          if [ "$(gh release view test --json targetCommitish --jq '.targetCommitish')" != "$GITHUB_SHA" ]; then
-            echo "::error::The rolling test release does not target this build commit"
+          if [ "$(gh release view beta --repo "$GITHUB_REPOSITORY" --json targetCommitish --jq '.targetCommitish')" != "$GITHUB_SHA" ]; then
+            echo "::error::DHUN beta does not target this build commit"
             exit 1
           fi
-          expected_test_assets=$(printf '%s\n' \
-            "dhun-test.apk" \
-            "dhun-test-arm64-v8a.apk" \
-            "dhun-test-armeabi-v7a.apk" \
-            "dhun-test.msi" | jq -R . | jq -sc 'sort')
-          actual_test_assets=$(gh release view test --json assets --jq '[.assets[] | select(.size > 0) | .name] | sort' | jq -c .)
-          if [ "$actual_test_assets" != "$expected_test_assets" ]; then
-            echo "::error::The rolling test release must contain only the four installers"
-            echo "Expected: $expected_test_assets"
-            echo "Actual:   $actual_test_assets"
+          if [ "$(gh release view beta --repo "$GITHUB_REPOSITORY" --json tagName --jq '.tagName')" != "beta" ]; then
+            echo "::error::The rolling prerelease tag must be exactly beta"
             exit 1
+          fi
+          if [ "$(gh release view beta --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')" != "false" ]; then
+            echo "::error::DHUN beta must be public, not a draft"
+            exit 1
+          fi
+          if [ "$(gh release view beta --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq '.isPrerelease')" != "true" ]; then
+            echo "::error::DHUN beta must be marked as a prerelease"
+            exit 1
+          fi
+          gh release view beta --repo "$GITHUB_REPOSITORY" --json tagName,name,isDraft,isPrerelease,targetCommitish,assets \
+            --jq '{tagName,name,isDraft,isPrerelease,targetCommitish,assets:[.assets[].name]}'
+
+          # Migration is complete only after the replacement is public and
+          # verified. No legacy test release or tag is left advertising the old
+          # channel, and no fixed public release is touched.
+          if gh release view test --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete test --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
           fi
 
   publish:
@@ -598,7 +631,7 @@ jobs:
                       "kind": "actual upgraded DHUN.exe native window PNG; startup only",
                   })
               manifest = {
-                  "workflow": "test-release.yml",
+                  "workflow": "beta-release.yml",
                   "source": {"sha": os.environ["HEAD_SHA"], "run": os.environ["GITHUB_RUN_ID"]},
                   "scope": "Installed Windows package startup; no audible playback or visual acceptance claimed",
                   "result": result,

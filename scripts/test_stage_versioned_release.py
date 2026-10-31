@@ -18,7 +18,7 @@ class StageVersionedReleaseTest(unittest.TestCase):
         "GITHUB_RUN_ID": "12345",
         "GITHUB_RUN_ATTEMPT": "1",
         "GITHUB_REF": "refs/heads/main",
-        "GITHUB_WORKFLOW": "test-release",
+        "GITHUB_WORKFLOW": "DHUN beta",
     }
 
     def setUp(self):
@@ -56,7 +56,7 @@ class StageVersionedReleaseTest(unittest.TestCase):
 
     def _edit_apk_provenance(self, **overrides):
         """Rewrite the APK provenance with one or more fields replaced."""
-        name = "dhun-test.apk"
+        name = "dhun-beta.apk"
         digest = hashlib.sha256((self.source / name).read_bytes()).hexdigest()
         self._write_provenance(name, digest, (self.source / name).stat().st_size, **overrides)
 
@@ -106,14 +106,14 @@ class StageVersionedReleaseTest(unittest.TestCase):
             stage_versioned_release(self.source, self.output, "1.00.001", self.ENVIRONMENT)
 
     def test_rejects_source_bytes_that_do_not_match_provenance(self):
-        binary = self.source / "dhun-test.apk"
+        binary = self.source / "dhun-beta.apk"
         binary.write_bytes(b"changed after provenance was generated")
         with self.assertRaisesRegex(ValueError, "does not match its provenance checksum/size"):
             stage_versioned_release(self.source, self.output, "1.00.001", self.ENVIRONMENT)
 
     def test_rejects_a_mismatched_source_checksum_sidecar(self):
-        sidecar = self.source / "dhun-test.apk.sha256"
-        sidecar.write_text("0" * 64 + "  dhun-test.apk\n", encoding="ascii")
+        sidecar = self.source / "dhun-beta.apk.sha256"
+        sidecar.write_text("0" * 64 + "  dhun-beta.apk\n", encoding="ascii")
         with self.assertRaisesRegex(ValueError, "does not match its checksum sidecar"):
             stage_versioned_release(self.source, self.output, "1.00.001", self.ENVIRONMENT)
 

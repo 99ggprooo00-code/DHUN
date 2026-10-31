@@ -120,7 +120,7 @@ capability and platform. Terms/Privacy marked DRAFT are not adopted agreements.
 4. Open Now Playing, control playback and queue, and enter/exit lyrics mode without stopping audio.
 5. Like tracks, manage playlists, review history and manage downloaded tracks.
 6. Change appearance and playback preferences, clear the intended storage category, and receive honest feedback when an operation succeeds or fails.
-7. On the website, move between Home, Features and Interface pages, return Home, open the repository/issues/changelog and understand that a rolling test build is pre-release.
+7. On the website, move between Home, Features and Interface pages, return Home, open the repository/issues/changelog and understand that both the fixed build and rolling **DHUN beta** are experimental prereleases; beta is public and replaces the previous beta on each publication.
 
 ## 4. Product scope
 

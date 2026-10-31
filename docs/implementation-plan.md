@@ -47,7 +47,7 @@ Tasks:
 4. Build `website/` and crawl every generated page: every internal link must resolve to a generated route or valid in-page anchor.
 5. Verify route direct-load, refresh, back/forward and current-page marker on deployed origin.
 6. Verify Pages workflow configuration and actual served bytes/commit; do not trust stale README or historical `.ai/WEBSITE_PLAN.md` status alone.
-7. Ensure Home, Features and Interface link to each other; 404 has recovery links; CTAs land at the intended repository/issues/changelog/test-release destinations.
+7. Ensure Home, Features and Interface link to each other; 404 has recovery links; CTAs land at the intended repository/issues/changelog/fixed-release destinations, with no link to the removed rolling `test` tag.
 8. The marketing site and `app-web/` share one design system — the site's sheet is generated from the app's tokens — and neither makes a browser-playback claim the repository cannot keep.
 
 **Exit gate:** deployed-origin link walk passes from Home and every secondary route; exact deployed commit and URL recorded.

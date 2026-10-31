@@ -19,11 +19,12 @@ The initial alignment was intentionally unpublished. In the explicit follow-up,
 the owner authorised verification, commits/pushes on `arena/5ced2dbe-dhun`, a PR,
 and autonomous merge **only after the requested work and applicable PR checks
 are complete**. Fix actual causes, never weaken gates. This is not authority for
-new providers, paid services, public app-release publication or bypassing legal/
-hardware gates. Existing main-branch workflows may deploy the site/update the
-private test draft after merge; that is not a new public app release. Future
-sessions must obey their own explicit permissions, not historical autonomous
-merge prompts. Keep legal drafts DRAFT and report risks.
+new providers, paid services, fixed app-release publication or bypassing legal/
+hardware gates. Under the 2026-11-01 release decision, existing main-branch
+workflows may deploy the site and replace the public rolling **DHUN beta**
+prerelease after package gates; beta is not a draft and never rewrites fixed
+versioned releases. Future sessions must obey their own explicit permissions,
+not historical autonomous merge prompts. Keep legal drafts DRAFT and report risks.
 
 ## Binding native recovery gate — 2026-10-31
 
@@ -344,7 +345,7 @@ DHUN/
 ├── web-spike/                  # ADR-008 B1 static probe (run BLOCKED; not served since 2026-10-10); not a product target
 ├── tests/fixtures/             # captured InnerTube JSON for parser tests
 ├── scripts/                    # python packaging/CI/Web-spike contracts (55 tests)
-└── .github/workflows/          # ci.yml · test-release.yml · build-apk.yml ·
+└── .github/workflows/          # ci.yml · beta-release.yml · build-apk.yml ·
                                 # extraction-health.yml (id 360655315 — the
                                 # restored daily drill; superseded the deleted
                                 # rot-drill.yml, schedule fixed 2026-09-17)

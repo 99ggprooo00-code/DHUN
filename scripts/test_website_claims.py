@@ -270,7 +270,7 @@ class BuiltOutput(unittest.TestCase):
 
         A direct link to an artifact implies an endorsement and bypasses the
         warning that belongs with it. The public versioned release page must be
-        reachable; the private rolling `test` draft must not be advertised.
+        reachable; the removed rolling `test` tag must not be advertised.
         """
         for route, markup in self.pages.items():
             artifacts = re.findall(r'href="([^"]*/releases/download/[^"]*)"', markup)

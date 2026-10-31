@@ -30,7 +30,7 @@ class SettingsViewModel(
     private val get: GetSettingUseCase,
     private val update: UpdateSettingUseCase,
     private val scope: CoroutineScope,
-    private val isTestRelease: Boolean = false,
+    private val isBetaRelease: Boolean = false,
     private val clearLyricsCacheAction: (suspend () -> Unit)? = null,
     private val clearSearchHistoryAction: (suspend () -> Unit)? = null,
     private val clearPlayHistoryAction: (suspend () -> Unit)? = null,
@@ -304,9 +304,9 @@ class SettingsViewModel(
         }
     }
 
-    /** Slider baseline: the test channel's 15% or the original public 50%. */
+    /** Slider baseline: the beta channel's 15% or the original public 50%. */
     private val tuningBaseline: Int
-        get() = if (isTestRelease) DhunVisualTuning.TEST_DEFAULT else DhunVisualTuning.NEUTRAL
+        get() = if (isBetaRelease) DhunVisualTuning.BETA_DEFAULT else DhunVisualTuning.NEUTRAL
 
     private suspend fun readStoredTuning(): Map<VisualPart, Int> {
         val stored = mutableMapOf<VisualPart, Int>()
@@ -319,7 +319,7 @@ class SettingsViewModel(
     /** Publishes a tuning snapshot to both the sliders and the live appearance. */
     private fun publishTuning(values: Map<VisualPart, Int>) {
         _visualTuning.value = values
-        DhunVisualTuning.restore(values, isTestRelease)
+        DhunVisualTuning.restore(values, isBetaRelease)
     }
 
     /**
@@ -333,9 +333,9 @@ class SettingsViewModel(
      * defaults in place.
      */
     private suspend fun loadPersistedValues() {
-        // One-shot test-profile migration must run before the values are read,
+        // One-shot beta-profile migration must run before the values are read,
         // so old saved experiments cannot mask the requested 15% baseline.
-        if (isTestRelease && get.int(SettingsKeys.TUNE_PROFILE_VERSION, 0) < 1) {
+        if (isBetaRelease && get.int(SettingsKeys.TUNE_PROFILE_VERSION, 0) < 1) {
             writeMutex.withLock {
                 for (part in VisualPart.entries) update.remove(part.key)
                 update.int(SettingsKeys.TUNE_PROFILE_VERSION, 1)

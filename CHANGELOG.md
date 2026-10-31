@@ -9,9 +9,11 @@ otherwise.
 **Release status:** `v1.00.002` is the current fixed **public pre-release**.
 The older `v1.00.001` tag remains immutable (published 2026-10-10). This
 is not a stable or store-ready build; real-device acceptance remains open.
-The rolling `test` tag is a separate private draft and can expose experimental
-UI controls that public builds do not. Both releases use a public Android test
-key; the Windows MSI ProductVersion is an independent increasing sequence.
+The rolling `beta` tag is the separate public **DHUN beta** prerelease, not a
+draft. Each beta publication replaces the previous beta release/tag and can
+expose experimental UI controls that fixed public builds do not. Both channels
+use a public Android test key; the Windows MSI ProductVersion is an independent
+increasing sequence.
 
 The padded release/version strings `1.00.001` and `1.00.002` are preserved
 exactly as requested; they are not silently normalized.
@@ -21,6 +23,30 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 `.ai/RISK_REGISTER.md`).
 
 ## [Unreleased]
+
+### Public rolling DHUN beta (2026-11-01, session `arena/8a70a040-dhun`)
+
+- Renamed the rolling release workflow, version allocator, channel mapping and
+  user-facing test-tools label to beta. Beta/development Android packages use
+  `1.00.<run>-beta.<attempt>`; the rolling tag is `beta`, the release title is
+  **DHUN beta**, and the four installers are `dhun-beta.apk`, both ABI APKs and
+  `dhun-beta.msi`. The renamed workflow carries an explicit 867 run offset so
+  its first Android/MSI identities cannot downgrade the old run-867 packages.
+- Every authorised beta publication replaces the previous `beta` release/tag
+  only after the Android/Windows package gates pass. The new release is directly
+  public and marked as a prerelease, never left as a draft. Migration removes the
+  legacy `test` release/tag only after the replacement beta is verified; fixed
+  releases, including `v1.00.002`, are not rewritten.
+- Rolling beta exposes exactly four installers and no text sidecars. Internal
+  checksum/provenance artifacts remain available to the workflow, and Windows
+  beta-to-beta install-over checks use GitHub's release-asset SHA-256 digest.
+  Android application/signing identity and the Windows UpgradeCode are unchanged;
+  updates must not clear playlists, favourites, settings, downloads, queues or
+  history.
+- Root/documentation indexes, installation/security guidance, release policy,
+  legal parity fixtures and the two existing website status passages now describe
+  the public beta accurately. Dated evidence keeps its original `test` artifact
+  names, and the fixed website release CTA is unchanged.
 
 ### Selective native restoration and DHUN glass (2026-10-31, session `arena/8a70a040-dhun`)
 

@@ -654,7 +654,7 @@ private fun VisualTuningControls(viewModel: SettingsViewModel) {
             style = MaterialTheme.typography.bodySmall, color = DhunColors.textSecondary,
         )
         DhunVisualTuning.adjustableParts.forEach { part ->
-            val percent = values[part] ?: DhunVisualTuning.TEST_DEFAULT
+            val percent = values[part] ?: DhunVisualTuning.BETA_DEFAULT
             Column(verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs)) {
                 Text(part.label, style = MaterialTheme.typography.bodyLarge, color = DhunColors.textPrimary)
                 Text(part.detail, style = MaterialTheme.typography.bodySmall, color = DhunColors.textSecondary)

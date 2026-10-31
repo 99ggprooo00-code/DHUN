@@ -5,13 +5,13 @@ import subprocess
 import unittest
 from pathlib import Path
 
-WORKFLOW = Path(__file__).resolve().parents[1] / ".github/workflows/test-release.yml"
+WORKFLOW = Path(__file__).resolve().parents[1] / ".github/workflows/beta-release.yml"
 
 
 class BuildWorkflowTest(unittest.TestCase):
     def setUp(self):
         self.text = WORKFLOW.read_text()
-        self.publish_test = self.text.split("\n  publish_test:\n", 1)[1].split("\n  publish:\n", 1)[0]
+        self.publish_beta = self.text.split("\n  publish_beta:\n", 1)[1].split("\n  publish:\n", 1)[0]
         self.publish = self.text.split("\n  publish:\n", 1)[1].split("\n  msi_evidence:\n", 1)[0]
 
     def test_typed_manual_input_defaults_to_build_only(self):
@@ -34,26 +34,26 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn("python scripts/release_plan.py", self.text)
         self.assertIn("- '.github/release-intent/v1.00.002'", self.text)
 
-    def test_ordinary_app_code_merge_updates_only_the_private_rolling_test_release(self):
+    def test_ordinary_app_code_merge_updates_only_the_public_rolling_beta_release(self):
         push = self.text.split("  push:\n", 1)[1].split("\n\npermissions:", 1)[0]
         self.assertIn("branches: [main]", push)
         for path in ("shared/**", "app-android/**", "app-desktop/**", "gradle/**"):
             self.assertIn(f"- '{path}'", push)
-        self.assertIn("github.event_name == 'push'", self.publish_test)
-        self.assertIn("github.ref == 'refs/heads/main'", self.publish_test)
-        self.assertIn("needs: [release_plan, apk, msi]", self.publish_test)
-        self.assertIn("needs.release_plan.outputs.channel == 'test'", self.publish_test)
-        self.assertIn("needs.release_plan.outputs.build_only == 'false'", self.publish_test)
-        self.assertIn("gh release create test", self.publish_test)
-        self.assertNotIn("Stage, verify and publish the fixed v1.00.002", self.publish_test)
+        self.assertIn("github.event_name == 'push'", self.publish_beta)
+        self.assertIn("github.ref == 'refs/heads/main'", self.publish_beta)
+        self.assertIn("needs: [release_plan, apk, msi]", self.publish_beta)
+        self.assertIn("needs.release_plan.outputs.channel == 'beta'", self.publish_beta)
+        self.assertIn("needs.release_plan.outputs.build_only == 'false'", self.publish_beta)
+        self.assertIn("gh release create beta", self.publish_beta)
+        self.assertNotIn("Stage, verify and publish the fixed v1.00.002", self.publish_beta)
         # Only a newly added marker can select public on a main push.
         self.assertIn("github.event_name == 'workflow_dispatch' && inputs.build_only == false", self.publish)
 
-    def test_test_catalogue_uses_explicit_build_channel_and_public_does_not(self):
+    def test_beta_catalogue_uses_explicit_build_channel_and_public_does_not(self):
         self.assertIn("DHUN_RELEASE_CHANNEL:", self.text)
         self.assertEqual(3, self.text.count("DHUN_RELEASE_CHANNEL: ${{ needs.release_plan.outputs.channel }}"))
         self.assertEqual(3, self.text.count("BUILD_ONLY: ${{ needs.release_plan.outputs.build_only }}"))
-        self.assertIn("if: ${{ env.DHUN_RELEASE_CHANNEL == 'test' }}", self.text)
+        self.assertIn("if: ${{ env.DHUN_RELEASE_CHANNEL == 'beta' }}", self.text)
         self.assertIn('"-PdhunReleaseChannel=$DHUN_RELEASE_CHANNEL"', self.text)
         self.assertIn('"-PdhunReleaseChannel=$env:DHUN_RELEASE_CHANNEL"', self.text)
         android = (WORKFLOW.parents[2] / "app-android/build.gradle.kts").read_text()
@@ -62,30 +62,30 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn('jvmArgs += "-Ddhun.release.channel=$dhunReleaseChannel"', desktop)
         activity = (WORKFLOW.parents[2] / "app-android/src/main/kotlin/dev/dhun/android/MainActivity.kt").read_text()
         desktop_main = (WORKFLOW.parents[2] / "app-desktop/src/jvmMain/kotlin/dev/dhun/desktop/Main.kt").read_text()
-        self.assertIn('"test" -> DhunAppInfo.TEST_RELEASE_CHANNEL', activity)
-        self.assertIn('"test" -> DhunAppInfo.TEST_RELEASE_CHANNEL', desktop_main)
+        self.assertIn('"beta" -> DhunAppInfo.BETA_RELEASE_CHANNEL', activity)
+        self.assertIn('"beta" -> DhunAppInfo.BETA_RELEASE_CHANNEL', desktop_main)
         shell = (WORKFLOW.parents[2] / "shared/src/commonMain/kotlin/dev/dhun/ui/shell/DhunAppShell.kt").read_text()
         settings = (WORKFLOW.parents[2] / "shared/src/commonMain/kotlin/dev/dhun/ui/settings/SettingsScreen.kt").read_text()
         hub = (WORKFLOW.parents[2] / "shared/src/commonMain/kotlin/dev/dhun/ui/settings/SettingsHub.kt").read_text()
         persistence = (WORKFLOW.parents[2] / "app-android/src/main/kotlin/dev/dhun/android/ui/NavStatePersistence.kt").read_text()
-        self.assertIn("showThemeCatalogue = appInfo.isTestRelease", shell)
+        self.assertIn("showThemeCatalogue = appInfo.isBetaRelease", shell)
         self.assertIn("showThemeCatalogue: Boolean = false", settings)
         self.assertIn("showThemeCatalogue = showThemeCatalogue", settings)
         self.assertIn("if (showThemeCatalogue)", hub)
         self.assertIn('"Theme catalogue"', hub)
-        # Visual tuning is an experimental companion to the test-only catalogue.
+        # Visual tuning is an experimental companion to the beta-only catalogue.
         self.assertIn('if (category == SettingsCategory.APPEARANCE && showThemeCatalogue)', settings)
         self.assertIn('VisualTuningControls(viewModel)', settings)
-        self.assertIn('DhunVisualTuning.restore(settingsVm.visualTuning.value, appInfo.isTestRelease)', shell)
-        self.assertIn("allowThemeCatalogue = BuildConfig.DHUN_RELEASE_CHANNEL == \"test\"", activity)
+        self.assertIn('DhunVisualTuning.restore(settingsVm.visualTuning.value, appInfo.isBetaRelease)', shell)
+        self.assertIn("allowThemeCatalogue = BuildConfig.DHUN_RELEASE_CHANNEL == \"beta\"", activity)
         self.assertIn(".filter { allowThemeCatalogue || it != DetailRoute.ThemeCatalogPage }", persistence)
         self.assertIn("viewModel.setThemeId(mode.id)", shell)
         self.assertIn("viewModel.setAccentId(accent.id)", shell)
 
-    def test_automatic_test_release_guard_is_main_push_only(self):
-        self.assertIn("github.ref == 'refs/heads/main'", self.publish_test)
-        self.assertIn("github.event_name == 'push'", self.publish_test)
-        self.assertIn("needs.release_plan.outputs.channel == 'test'", self.publish_test)
+    def test_automatic_beta_release_guard_is_main_push_only(self):
+        self.assertIn("github.ref == 'refs/heads/main'", self.publish_beta)
+        self.assertIn("github.event_name == 'push'", self.publish_beta)
+        self.assertIn("needs.release_plan.outputs.channel == 'beta'", self.publish_beta)
 
     def test_installer_is_a_pull_request_check_before_merge(self):
         self.assertIn("  pull_request:\n    branches: [main]", self.text)
@@ -128,24 +128,33 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertNotIn("while ($app.MainWindowHandle", smoke)
 
     def test_build_jobs_do_not_get_contents_write(self):
-        before_publish = self.text.split("\n  publish_test:\n", 1)[0]
+        before_publish = self.text.split("\n  publish_beta:\n", 1)[0]
         self.assertIn("permissions:\n  contents: read", before_publish)
         self.assertNotIn("contents: write", before_publish)
-        self.assertIn("    permissions:\n      contents: write", self.publish_test)
+        self.assertIn("    permissions:\n      contents: write", self.publish_beta)
         self.assertIn("    permissions:\n      contents: write", self.publish)
 
-    def test_rolling_test_release_stays_a_private_draft(self):
-        self.assertIn("gh release create test", self.publish_test)
-        self.assertIn("--draft --prerelease", self.publish_test)
-        self.assertIn("--notes-file docs/releases/rolling-test.md", self.publish_test)
-        self.assertIn("\"$(gh release view test --json isDraft --jq '.isDraft')\" != \"true\"", self.publish_test)
-        self.assertIn("targetCommitish", self.publish_test)
-        self.assertNotIn("gh release edit test --draft=false", self.publish_test)
+    def test_rolling_beta_is_public_and_replaces_the_previous_beta(self):
+        create = self.publish_beta.split("gh release create beta", 1)[1].split("expected_beta_assets=", 1)[0]
+        self.assertIn("--prerelease", create)
+        self.assertNotIn("--draft", create)
+        self.assertIn('--title "DHUN beta"', create)
+        self.assertIn("--notes-file docs/releases/rolling-beta.md", create)
+        self.assertIn("if gh release view beta", self.publish_beta)
+        self.assertLess(self.publish_beta.index("gh release delete beta"), self.publish_beta.index("gh release create beta"))
+        self.assertIn('for asset in dhun-beta.apk dhun-beta-arm64-v8a.apk dhun-beta-armeabi-v7a.apk dhun-beta.msi', self.publish_beta)
+        self.assertIn(".isDraft')\" != \"false\"", self.publish_beta)
+        self.assertIn(".isPrerelease')\" != \"true\"", self.publish_beta)
+        self.assertIn(".tagName')\" != \"beta\"", self.publish_beta)
+        self.assertIn(".name')\" != \"DHUN beta\"", self.publish_beta)
+        self.assertIn("targetCommitish", self.publish_beta)
+        self.assertNotIn("gh release edit beta", self.publish_beta)
+        self.assertLess(self.publish_beta.index(".isDraft')\" != \"false\""), self.publish_beta.index("gh release delete test"))
 
     def test_legacy_release_purge_is_an_explicit_opt_in(self):
         # The legacy dev releases are irreversible to delete. They may be removed
         # only when the maintainer ticks a typed, default-off input on a manual
-        # public release. Automatic rolling-test updates never purge legacy tags.
+        # public release. Automatic rolling-beta updates never purge legacy tags.
         inputs = self.text.split("  workflow_dispatch:\n", 1)[1].split("  pull_request:\n", 1)[0]
         self.assertIn("      purge_legacy_dev_releases:", inputs)
         block = inputs.split("      purge_legacy_dev_releases:", 1)[1]
@@ -156,10 +165,10 @@ class BuildWorkflowTest(unittest.TestCase):
         for tag in ("dev-v0.1.0", "dev-v0.1.1", "dev"):
             self.assertIn(f"gh release delete {tag} --yes --cleanup-tag", purge)
         self.assertIn("git push origin :refs/tags/dev", purge)
-        self.assertNotIn("gh release delete test", self.publish)
-        self.assertIn("gh release delete test --yes --cleanup-tag", self.publish_test)
+        self.assertNotIn("gh release delete beta", self.publish)
+        self.assertIn('gh release delete beta --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag', self.publish_beta)
         for tag in ("dev-v0.1.0", "dev-v0.1.1", "dev"):
-            self.assertNotIn(f"gh release delete {tag} ", self.publish_test)
+            self.assertNotIn(f"gh release delete {tag} ", self.publish_beta)
 
     @unittest.skipUnless(shutil.which("jq"), "jq is available on the Ubuntu release runner")
     def test_draft_asset_comparison_normalizes_json_presentation(self):
@@ -204,9 +213,14 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn("@{ Tag = 'v1.00.002'; Name = 'dhun-v1.00.002.msi' }", smoke)
         self.assertIn("@{ Tag = 'v1.00.001'; Name = 'dhun.msi' }", smoke)
         self.assertIn("@{ Tag = 'v1.00.001'; Name = 'dhun-v1.00.001.msi' }", smoke)
-        self.assertIn("@{ Tag = 'test'; Name = 'dhun-test.msi' }", smoke)
+        self.assertIn("@{ Tag = 'beta'; Name = 'dhun-beta.msi' }", smoke)
+        self.assertLess(smoke.index("Name = 'dhun-beta.msi'"), smoke.index("Name = 'dhun-v1.00.002.msi'"))
         self.assertLess(smoke.index("Name = 'dhun-v1.00.002.msi'"), smoke.index("Name = 'dhun.msi'"))
-        self.assertLess(smoke.index("Name = 'dhun.msi'"), smoke.index("Name = 'dhun-test.msi'"))
+        self.assertIn("if ($tag -eq 'beta')", smoke)
+        self.assertIn('releases/tags/$tag', smoke)
+        self.assertIn('| .digest', smoke)
+        self.assertIn("StartsWith('sha256:'", smoke)
+        self.assertNotIn("baselineSidecar", smoke)
         self.assertIn("Published baseline MSI checksum did not match", smoke)
         self.assertIn('gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $assetName', smoke)
         # The skip is announced once, as a warning, and never as a pass.
@@ -222,27 +236,28 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn("do not attempt a downgrade", smoke)
 
     def test_branch_build_cannot_cancel_the_main_release_group(self):
-        self.assertIn("github.ref == 'refs/heads/main' && 'test-release' || format('test-build-{0}', github.ref)", self.text)
+        self.assertIn("github.ref == 'refs/heads/main' && 'beta-release' || format('beta-build-{0}', github.ref)", self.text)
 
     def test_rolling_release_publishes_universal_and_both_abi_apks(self):
         apk = self.text.split("\n  apk:\n", 1)[1].split("\n  msi:\n", 1)[0]
         self.assertIn("python scripts/stage_android_apks.py", apk)
         self.assertIn("app-android/build/outputs/apk/debug", apk)
         self.assertNotIn("cp app-android/build/outputs/apk/debug/app-android-debug.apk", apk)
-        create = self.publish_test.split("gh release create test", 1)[1].split("--target", 1)[0]
-        for name in ("dhun-test.apk", "dhun-test-arm64-v8a.apk", "dhun-test-armeabi-v7a.apk"):
+        create = self.publish_beta.split("gh release create beta", 1)[1].split("--target", 1)[0]
+        for name in ("dhun-beta.apk", "dhun-beta-arm64-v8a.apk", "dhun-beta-armeabi-v7a.apk"):
             self.assertIn(f"python scripts/stage_artifact.py out/{name}", apk)
             self.assertIn(name, create)
-        self.assertIn("dist/dhun-test.msi", create)
+        self.assertIn("dist/dhun-beta.msi", create)
         # Internal checksums/provenance still protect build promotion, but the
         # rolling beta exposes exactly its four installers and no text sidecars.
         self.assertNotIn(".sha256", create)
         self.assertNotIn(".provenance.txt", create)
-        self.assertIn("expected_test_assets=", self.publish_test)
-        self.assertIn("actual_test_assets=", self.publish_test)
-        self.assertIn("The rolling test release must contain only the four installers", self.publish_test)
+        self.assertIn("expected_beta_assets=", self.publish_beta)
+        self.assertIn("actual_beta_assets=", self.publish_beta)
+        self.assertIn("DHUN beta must contain exactly the four installers", self.publish_beta)
 
-    def test_msi_uses_the_existing_packaging_workflow_counter(self):
+    def test_msi_uses_the_offset_aware_packaging_workflow_counter(self):
+        self.assertIn("DHUN_BETA_RUN_OFFSET: '867'", self.text)
         self.assertIn("python scripts/installer_version.py $env:GITHUB_RUN_NUMBER $env:GITHUB_RUN_ATTEMPT", self.text)
         self.assertIn('"-PdhunInstallerVersion=$version"', self.text)
         self.assertIn("-ExpectedVersion $env:INSTALLER_VERSION", self.text)
@@ -253,8 +268,8 @@ class BuildWorkflowTest(unittest.TestCase):
         # (The published v1.00.001 .build-info.json files are historical and untouched.)
         self.assertNotIn(".json", self.publish)
         self.assertIn("dist/$version/dhun-v1.00.002.msi.provenance.txt", self.publish)
-        create_test = self.publish_test.split("gh release create test", 1)[1].split("--target", 1)[0]
-        self.assertNotIn(".provenance.txt", create_test)
+        create_beta = self.publish_beta.split("gh release create beta", 1)[1].split("--target", 1)[0]
+        self.assertNotIn(".provenance.txt", create_beta)
         for line in self.text.splitlines():
             if "upload" in line or "gh release create" in line:
                 self.assertNotIn(".json", line)

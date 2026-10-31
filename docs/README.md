@@ -8,6 +8,15 @@
 
 These documents describe the current Kotlin Multiplatform product, the static marketing website, and the separate browser build at `/app/` — a real client sharing design tokens, not the native code or all its features. Native currently uses YouTube Music; browser JioSaavn; Spotify remains planned/deferred. The record for that workstream is in [`web-player/`](web-player/README.md). Read these alongside the live source, accepted ADRs, and current verification evidence; current code is evidence of behaviour, while owner direction/PRD controls intent. Investigate conflicts instead of turning an implementation gap into a new product definition.
 
+## Current native releases and installation
+
+- [Installation guide](INSTALL.md) — fixed `v1.00.002` downloads plus the rolling **DHUN beta** asset, upgrade and data-preservation rules.
+- [DHUN beta](https://github.com/99ggprooo00-code/DHUN/releases/tag/beta) — public rolling prerelease at tag `beta`; every publication replaces the previous beta release/tag after the Android and Windows gates pass. It is not a private draft.
+- [Rolling beta notes](releases/rolling-beta.md) — the four `dhun-beta*` installers, beta version format, replacement behavior and fixed-release boundary.
+- [Release policy](releases/RELEASE-POLICY.md) — fixed-release immutability, the explicit rolling-beta replacement exception, signing and publication gates.
+- [Fixed `v1.00.002`](https://github.com/99ggprooo00-code/DHUN/releases/tag/v1.00.002) — separate fixed public build; beta migration does not rewrite it or other historical releases.
+- [Security policy](../SECURITY.md) — supported experimental channels, signing limits and safe reporting.
+
 ## Product and design specifications
 
 - [PRD](PRD.md) — product scope, users, quality bar, action contracts and acceptance criteria.

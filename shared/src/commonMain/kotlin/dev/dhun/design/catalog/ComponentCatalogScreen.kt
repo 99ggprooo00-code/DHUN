@@ -66,7 +66,7 @@ import dev.dhun.design.components.TrackRowShimmer
  * surface: blur visibly real, no raw tokens outside design, artwork color
  * extraction sanity.
  *
- * Exposed from Settings only in explicitly channelled test-release builds; the
+ * Exposed from Settings only in explicitly channelled beta-release builds; the
  * public pre-release and ordinary development builds do not get this entry point.
  */
 @Composable

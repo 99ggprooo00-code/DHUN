@@ -25,7 +25,7 @@ if ($upgradeCode -ne '31ddb86b-9666-4071-b11c-45f16fa4682d') {
 if ($properties['ProductName'] -ne 'DHUN') { throw 'Unexpected MSI product name' }
 $out = Join-Path $repository 'out'
 New-Item -ItemType Directory -Force -Path $out | Out-Null
-$staged = Join-Path $out 'dhun-test.msi'
+$staged = Join-Path $out 'dhun-beta.msi'
 Copy-Item -LiteralPath $msi.FullName -Destination $staged
 Copy-Item -LiteralPath (Join-Path $repository 'docs/verification/windows-candidate.md') -Destination (Join-Path $out 'READ-ME-FIRST.md')
 python (Join-Path $PSScriptRoot 'stage_artifact.py') $staged --build-only $BuildOnly --installer-version $properties['ProductVersion'] --upgrade-code $upgradeCode

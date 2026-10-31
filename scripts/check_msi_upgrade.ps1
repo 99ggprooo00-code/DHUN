@@ -1,6 +1,6 @@
 # A disposable hosted-Windows check, NOT an installer to run on a user's PC.
 param(
-    [string]$Candidate = 'out/dhun-test.msi',
+    [string]$Candidate = 'out/dhun-beta.msi',
     # On main (the only path that can publish) a SKIPPED install-over is a
     # failure, not a pass. PR/branch builds may still skip, visibly.
     [switch]$RequireInstallOver
@@ -26,7 +26,6 @@ function Write-DhunInstallResult {
 $baselineDir = Join-Path $env:RUNNER_TEMP 'dhun-msi-baseline'
 New-Item -ItemType Directory -Force -Path $baselineDir | Out-Null
 $baseline = $null
-$baselineSidecar = $null
 $candidatePath = (Resolve-Path -LiteralPath $Candidate).Path
 
 function Invoke-MsiCheck {
@@ -194,21 +193,21 @@ function Write-DhunSafeLaunchDiagnostics {
     $lines | Set-Content -LiteralPath $Path -Encoding utf8
 }
 
-# Prefer the newest published fixed public release. Until v1.00.002 exists,
-# the published v1.00.001 release (whose actual asset is `dhun.msi`) is used.
-# Accept its older versioned filename too if the asset is renamed back. A
-# public test release used to be the fallback; the current `test` is a private
-# draft and can be unreadable by the read-scoped job. Never weaken this gate
-# to use an unverified/local MSI just because a download is unavailable.
-# A missing baseline is SKIPPED (and a failure on main); contradictory bytes
-# or checksums fail outright below.
+# Prefer the previous rolling beta so every later package exercises the real
+# beta-to-beta upgrade path. The first beta migration falls back to fixed public
+# releases. Beta deliberately has no sidecars, so verify its downloaded bytes
+# against GitHub's release-asset digest; fixed releases keep their .sha256 check.
+# Never substitute an unverified/local MSI when no published baseline is readable.
+# A missing baseline is SKIPPED (and a failure on main); contradictory bytes or
+# digests fail outright below.
 $baselineOptions = @(
+    @{ Tag = 'beta'; Name = 'dhun-beta.msi' },
     @{ Tag = 'v1.00.002'; Name = 'dhun-v1.00.002.msi' },
     @{ Tag = 'v1.00.001'; Name = 'dhun.msi' },
-    @{ Tag = 'v1.00.001'; Name = 'dhun-v1.00.001.msi' },
-    @{ Tag = 'test'; Name = 'dhun-test.msi' }
+    @{ Tag = 'v1.00.001'; Name = 'dhun-v1.00.001.msi' }
 )
 $baselineReleaseTag = $null
+$baselineExpectedHash = $null
 $downloadFailures = @()
 foreach ($option in $baselineOptions) {
     $tag = $option.Tag
@@ -217,20 +216,39 @@ foreach ($option in $baselineOptions) {
     $sidecarPath = "$assetPath.sha256"
     Remove-Item -LiteralPath $assetPath -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $sidecarPath -Force -ErrorAction SilentlyContinue
-    gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $assetName --pattern "$assetName.sha256" --dir $baselineDir
+    if ($tag -eq 'beta') {
+        gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $assetName --dir $baselineDir
+    } else {
+        gh release download $tag --repo $env:GITHUB_REPOSITORY --pattern $assetName --pattern "$assetName.sha256" --dir $baselineDir
+    }
     $downloadExit = $LASTEXITCODE
     if ($downloadExit -ne 0) {
-        $downloadFailures += "${tag}: gh release download exited $downloadExit (absent, private/draft, or not readable)"
+        $downloadFailures += "${tag}: gh release download exited $downloadExit (absent or not readable)"
         continue
     }
-    if (-not (Test-Path -LiteralPath $assetPath) -or -not (Test-Path -LiteralPath $sidecarPath)) {
-        throw "gh release download $tag reported success but the baseline MSI/checksum is missing"
+    if (-not (Test-Path -LiteralPath $assetPath)) {
+        throw "gh release download $tag reported success but the baseline MSI is missing"
     }
-    if ([string]::IsNullOrWhiteSpace((Get-Content -LiteralPath $sidecarPath -Raw))) {
-        throw "The $tag baseline checksum sidecar is empty"
+    if ($tag -eq 'beta') {
+        $digest = gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/$tag" --jq ".assets[] | select(.name == `"$assetName`") | .digest" | Select-Object -First 1
+        if ($LASTEXITCODE -ne 0) { throw "Could not read the $tag baseline asset digest" }
+        $baselineExpectedHash = ([string]$digest).Trim()
+        if ($baselineExpectedHash.StartsWith('sha256:', [StringComparison]::OrdinalIgnoreCase)) {
+            $baselineExpectedHash = $baselineExpectedHash.Substring(7)
+        }
+        if ($baselineExpectedHash -notmatch '^[0-9a-fA-F]{64}$') {
+            throw "The $tag baseline asset digest is absent or not SHA-256"
+        }
+    } else {
+        if (-not (Test-Path -LiteralPath $sidecarPath)) {
+            throw "gh release download $tag reported success but the baseline checksum is missing"
+        }
+        if ([string]::IsNullOrWhiteSpace((Get-Content -LiteralPath $sidecarPath -Raw))) {
+            throw "The $tag baseline checksum sidecar is empty"
+        }
+        $baselineExpectedHash = ((Get-Content -LiteralPath $sidecarPath -Raw).Trim() -split '\s+')[0]
     }
     $baseline = $assetPath
-    $baselineSidecar = $sidecarPath
     $baselineReleaseTag = $tag
     break
 }
@@ -263,9 +281,8 @@ if ($baselineReason) {
     Write-Host '::notice title=MSI install-over NOT RUN (build-verified only)::No readable baseline, so no install or uninstall was attempted. Never report this run as an install-over pass.'
     exit 0
 }
-$expectedHash = ((Get-Content -LiteralPath $baselineSidecar -Raw).Trim() -split '\s+')[0]
 $baselineHash = (Get-FileHash -LiteralPath $baseline -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($baselineHash -ne $expectedHash.ToLowerInvariant()) { throw 'Published baseline MSI checksum did not match' }
+if ($baselineHash -ne $baselineExpectedHash.ToLowerInvariant()) { throw 'Published baseline MSI checksum did not match' }
 $old = Get-DhunMsiProperties -Path $baseline
 $new = Get-DhunMsiProperties -Path $candidatePath
 if ($old['UpgradeCode'] -ne $new['UpgradeCode']) { throw 'Candidate and baseline do not share an upgrade identity' }

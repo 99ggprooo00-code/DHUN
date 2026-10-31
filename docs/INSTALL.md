@@ -6,38 +6,46 @@
 > uses JioSaavn and has no offline audio. Native downloads and extraction have unresolved
 > [permissions/policy risks](research/03-youtube-youtube-music.md); installation does not establish approval.
 
-DHUN 1.00.002 is an **experimental public build for testing**, not a stable, store-signed, or hardware-accepted release. GitHub currently marks the published release as a regular release rather than a prerelease; that label is not hardware acceptance. Use it only if you are comfortable with experimental software and possible playback breakage. The release is built from this repository; DHUN is not affiliated with YouTube or Google.
+DHUN 1.00.002 is an **experimental public build for testing**, not a stable, store-signed, or hardware-accepted release. GitHub currently marks the published release as a prerelease; that label is not hardware acceptance. Use it only if you are comfortable with experimental software and possible playback breakage. The release is built from this repository; DHUN is not affiliated with YouTube or Google.
 
 ## Which file to download
 
 | Platform | File | Notes |
 |---|---|---|
-| Android (most devices) | `dhun-universal-v1.00.002.apk` | Universal APK. Use this unless you know you need a split. |
+| Android (most devices) | `dhun-v1.00.002.apk` | Universal APK. Use this unless you know you need a split. |
 | Android, 64-bit ARM | `dhun-v1.00.002-arm64-v8a.apk` | Optional split. Same app version. |
 | Android, 32-bit ARM | `dhun-v1.00.002-armeabi-v7a.apk` | Optional split. Same app version. |
 | Windows (desktop) | `dhun-v1.00.002.msi` | Per-user installer, built on a hosted x64 Windows runner. Unsigned. Windows versions and the MSI architecture have not been verified on user hardware. |
 
-Each published binary has a `.sha256` sidecar. The four `.provenance.txt` records staged in the original draft are **not currently listed** among the published v1.00.002 assets; do not rely on them being available. The older v1.00.001 release keeps its historical `*.build-info.json` files.
+Each published binary has a `.sha256` sidecar and a `.provenance.txt` record: 12 assets in total (four installers, four checksums and four provenance records), verified from the release API on 2026-11-01.
 
 Open the [DHUN v1.00.002 release page](https://github.com/99ggprooo00-code/DHUN/releases/tag/v1.00.002) to download the files.
 
-## Verify the checksum first
+## Rolling DHUN beta
+
+[DHUN beta](https://github.com/99ggprooo00-code/DHUN/releases/tag/beta) is a separate **public rolling prerelease**, not a draft. Each successful beta publication deletes and replaces the previous `beta` release/tag after the package gates pass; fixed releases such as `v1.00.002` are not rewritten.
+
+The beta release has exactly four installers and **no `.sha256` or `.provenance.txt` release sidecars**:
+
+| Platform | File | Notes |
+|---|---|---|
+| Android (most devices) | `dhun-beta.apk` | Universal APK; preferred unless you know you need a split. |
+| Android, 64-bit ARM | `dhun-beta-arm64-v8a.apk` | Optional split from the same beta build. |
+| Android, 32-bit ARM | `dhun-beta-armeabi-v7a.apk` | Optional split from the same beta build. |
+| Windows | `dhun-beta.msi` | Per-user, unsigned installer; VLC is separate. |
+
+Beta checksums/provenance stay in internal workflow artifacts. Do not follow the fixed-release sidecar commands below with beta filenames. Install a newer beta over the previous one without clearing data or uninstalling: Android retains application ID `dev.dhun.android` and its signing identity, while Windows retains its MSI UpgradeCode. This update path is designed to preserve playlists, favourites, settings, downloads, queues and history. Uninstalling is not an update step and can remove app-private data.
+
+Rolling beta Android versions use `1.00.<run>-beta.<attempt>` and much higher versionCodes than the fixed public package. Android therefore cannot directly replace a newer beta with the lower fixed `v1.00.002` APK. Back up anything you cannot replace before any uninstall; never use clearing data as update recovery.
+
+## Verify a fixed-release checksum first
 
 A checksum proves the file you downloaded is byte-identical to the file the release page published. It does **not** prove who built the file. Do not install a file whose checksum does not match.
 
 Linux or macOS (run in the folder that contains both files):
 
 ```sh
-# The universal APK asset was renamed after publication, but its checksum
-# sidecar still names the original filename. Compare the digests explicitly.
-expected=$(awk '{print $1}' dhun-universal-v1.00.002.apk.sha256)
-actual=$(sha256sum dhun-universal-v1.00.002.apk | awk '{print $1}')
-if [ -n "$expected" ] && [ "$actual" = "$expected" ]; then
-    echo 'OK: checksum matches'
-else
-    echo 'MISMATCH: do not install' >&2
-    exit 1
-fi
+sha256sum -c dhun-v1.00.002.apk.sha256
 ```
 
 Windows PowerShell (run in the folder that contains both files):
@@ -56,9 +64,9 @@ Replace the file name with the file you downloaded.
 2. Open the APK on the device. If prompted, allow your browser or file manager to install unknown apps, then return to the installer and confirm.
 3. Launch DHUN. The minimum supported Android version is 7.0 (API 24).
 
-Signing: the APK is signed with DHUN's **public throwaway test key**, committed at `app-android/keystores/dhun-test.p12`. Its certificate is `CN=DHUN Test Build, O=DHUN` with SHA-256 digest `d8e57ec69f40956d34adff137872db9fec3b817e149e2d0c33af5924142468c3`, derived from the committed keystore. That key is public, so **anyone can sign a file with it**. The signature only lets later test builds update an existing install. It is not evidence that a file came from the DHUN maintainers. It is not a Google Play signing key, and this build is not Play-upload-ready.
+Signing: the APK is signed with DHUN's **public throwaway test key**, committed at `app-android/keystores/dhun-test.p12`. Its certificate is `CN=DHUN Test Build, O=DHUN` with SHA-256 digest `d8e57ec69f40956d34adff137872db9fec3b817e149e2d0c33af5924142468c3`, derived from the committed keystore. That key is public, so **anyone can sign a file with it**. The signature only lets later builds signed with the same key update an existing install. It is not evidence that a file came from the DHUN maintainers. It is not a Google Play signing key, and this build is not Play-upload-ready.
 
-The public APK has versionCode 7 and can replace public v1.00.001 (6) when signatures match. Rolling test APKs use much higher versionCodes: Android rejects replacing them directly with this public APK. Back up anything you cannot replace before uninstalling a test build; uninstalling removes the app-private database, cached audio and downloaded tracks.
+The fixed public APK has versionCode 7 and can replace public v1.00.001 (6) when signatures match. Rolling beta APKs use much higher versionCodes: Android rejects replacing them directly with this fixed public APK. Back up anything you cannot replace before uninstalling a beta; uninstalling removes the app-private database, cached audio and downloaded tracks.
 
 ## Windows
 
@@ -68,7 +76,7 @@ The public APK has versionCode 7 and can replace public v1.00.001 (6) when signa
 4. Install VLC separately if you want desktop audio playback. DHUN does not bundle or install VLC.
 5. The optional desktop extraction fallback is not bundled. If needed, install the official `yt-dlp.exe` on `PATH`, or set `DHUN_YTDLP` to its full path, then restart DHUN. VLC and yt-dlp do different jobs.
 
-Upgrading: the installer's internal ProductVersion is an increasing sequence, not the app version. Do not expect the Windows installer version to read `1.00.002`. A hosted Windows check verifies installation over v1.00.001 with seeded userdata/cache sentinels; it does not prove preservation of your actual library or a successful GUI launch. Back up `userdata` first. Uninstall from **Settings → Apps → DHUN**.
+Upgrading: the installer's internal ProductVersion is an increasing sequence, not the app version. Do not expect the Windows installer version to read `1.00.002`. Hosted Windows checks verify installation over a published baseline with seeded userdata/cache sentinels and startup of the installed native window; they do not prove preservation of your actual library, audible playback, or the full visual/hardware acceptance matrix. Back up `userdata` first. Uninstall from **Settings → Apps → DHUN**.
 
 Do not share cookies, credentials, signed stream URLs, or unredacted logs when reporting a problem.
 

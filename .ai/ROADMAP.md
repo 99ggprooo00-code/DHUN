@@ -1,31 +1,36 @@
-# CURRENT ACTIVE TASK — 2026-10-31: persistent-update recovery + selective native/glass restoration
+# CURRENT ACTIVE TASK — 2026-11-01: public rolling DHUN beta + PR #218 delivery
 
-**Branch/base:** `arena/8a70a040-dhun` / `main` `1e2f7cb` (PR #217 baseline).
-The rollback baseline remains `12498ca`. No public release, provider expansion,
-website work, data wipe, or wholesale historical restoration is authorised.
+**Branch/base:** `arena/8a70a040-dhun`; reviewed recovery/documentation head
+`a21b5236ca156a07832b0bea64555af5048ce074`. The user installed/tested the supplied
+arm64 package and explicitly authorised merging PR #218 and publishing the rolling
+channel publicly as **DHUN beta**. That statement is not a full device, audible,
+accessibility or performance acceptance matrix.
 
-**Two acceptance bars remain linked:** establish persistent-update causes and
-real fresh/update functionality while preserving user data; and restore the
-authorised mutation/settings/Library behaviors with the new DHUN glass design.
-Clearing/reinstalling, green CI, source tests, packaging, or a screenshot alone
-is not full recovery or device acceptance. Read verification §40–§42.
+**Release contract:** use tag `beta`, title **DHUN beta**, public prerelease
+(`isDraft=false`), and exactly four `dhun-beta*` installers with no release text
+sidecars. Every beta publication replaces the previous beta release/tag after
+package gates. Migrate the legacy `test` release/tag only after the replacement
+is verified. Fixed releases, especially `v1.00.002`, stay unchanged. Android
+application/signing identity and Windows UpgradeCode stay unchanged; updates must
+preserve playlists, favourites, settings, downloads, queue and history without
+clearing data.
 
-**Implementation status:** restoration stages 1–4 and glass stages 5–8 are
-separate commits on this branch. Stage 9 aligns the authoritative specification
-and active guidance with the actual tree. Background preferences intentionally
-remain simple: Background blur + Background brightness, not the historical
-five-palette or four-surface custom-colour models. Exact-head CI must be checked
-for the commit under review; do not infer it from an earlier commit.
+**Implementation status:** beta workflow/scripts/channel/assets/docs and the two
+existing website status passages are migrated. Background preferences remain
+**Background blur + Background brightness**; the five-palette/four-surface custom
+colour models are not restoration targets. The beta workflow carries the old
+run-867 continuity offset, and Windows beta-to-beta checks use GitHub asset
+digests because beta has no sidecars. Local evidence: 520/520 Python guards,
+340/340 app-web tests, 63/63 website rules, website build/minify/docs checks,
+legal generation and workflow YAML/publish-shell syntax all pass. No local JDK,
+Android SDK, emulator, ADB/phone, interactive desktop or pwsh is available;
+Kotlin/MSI/runtime checks require the hosted workflows.
 
-**Verification limits:** no local JDK/Android SDK, emulator, ADB/phone, or
-interactive desktop is available. Kotlin compilation/tests are CI-only here;
-visual, artwork, navigation, IME, update, queue, download, and audible-playback
-acceptance on real targets remains open unless separately evidenced.
-
-**Next:** finish the documentation/guardrail diff, run available tests, inspect
-only the CI results needed for failures/final verification, and keep separately
-reviewable stage scopes. Do not merge recovery work until its cause, regression
-coverage, and actual fresh/update functionality are established.
+**Next:** inspect the complete staged diff, commit/push this beta change separately,
+obtain exact-head green PR checks, merge PR #218 with a merge commit, then verify
+the public beta target/title/prerelease/four assets and fixed-release immutability.
+Do not claim merge, publication, replacement or device acceptance before the
+corresponding GitHub result exists.
 
 ---
 

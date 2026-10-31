@@ -163,7 +163,7 @@ Exact transport-added headers and every third-party response are not verified.
 
 ### Developer-only exception
 
-Only the explicitly channelled test release offers the Settings → Test tools →
+Only the explicitly channelled beta release offers the Settings → Beta tools →
 Theme catalogue preview. Opening it loads sample images from `picsum.photos`.
 Ordinary development and public-release builds do not offer the entry, and public
 Android builds discard a restored catalogue route. **[source]**

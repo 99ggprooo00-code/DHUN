@@ -216,7 +216,7 @@ class MainActivity : ComponentActivity() {
                 val nav = androidx.compose.runtime.remember {
                     NavStatePersistence.restore(
                         lastSavedState,
-                        allowThemeCatalogue = BuildConfig.DHUN_RELEASE_CHANNEL == "test",
+                        allowThemeCatalogue = BuildConfig.DHUN_RELEASE_CHANNEL == "beta",
                     )
                 }
                 currentNav = nav
@@ -540,7 +540,7 @@ class MainActivity : ComponentActivity() {
             // PackageInfoCompat, not the API-28 `longVersionCode`: minSdk is 24.
             versionCode = PackageInfoCompat.getLongVersionCode(info).toString(),
             releaseChannel = when (BuildConfig.DHUN_RELEASE_CHANNEL) {
-                "test" -> DhunAppInfo.TEST_RELEASE_CHANNEL
+                "beta" -> DhunAppInfo.BETA_RELEASE_CHANNEL
                 "public" -> "public pre-release"
                 else -> if (debuggable) "development (debug build)" else "development (release build)"
             },

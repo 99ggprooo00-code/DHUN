@@ -5,8 +5,8 @@ plugins {
 }
 
 val dhunReleaseChannel = providers.gradleProperty("dhunReleaseChannel").getOrElse("development")
-require(dhunReleaseChannel in setOf("development", "test", "public")) {
-    "dhunReleaseChannel must be development, test, or public"
+require(dhunReleaseChannel in setOf("development", "beta", "public")) {
+    "dhunReleaseChannel must be development, beta, or public"
 }
 
 android {
@@ -23,28 +23,28 @@ android {
         targetSdk = 35
         versionCode = 7
         versionName = "1.00.002"
-        // Test builds advance on every workflow run/rerun; public identity stays fixed.
-        val testName = providers.gradleProperty("dhunTestVersionName").orNull
-        val testCode = providers.gradleProperty("dhunTestVersionCode").orNull
-        require((testName == null) == (testCode == null)) { "Supply both test version properties" }
-        if (testName != null && testCode != null) {
+        // Beta builds advance on every workflow run/rerun; public identity stays fixed.
+        val betaName = providers.gradleProperty("dhunBetaVersionName").orNull
+        val betaCode = providers.gradleProperty("dhunBetaVersionCode").orNull
+        require((betaName == null) == (betaCode == null)) { "Supply both beta version properties" }
+        if (betaName != null && betaCode != null) {
             // Version identity and experimental feature flags are independent:
             // Build APK keeps the development channel while receiving an
-            // upgrade-safe test version. Only the fixed public channel is forbidden.
-            require(dhunReleaseChannel != "public") { "Test identity requires a non-public channel" }
-            require(Regex("1\\.00\\.[1-9][0-9]*-test\\.[1-9][0-9]*").matches(testName)) { "Invalid test version name" }
-            val code = testCode.toIntOrNull()
-            require(code != null && code in 1001..2_100_000_000) { "Invalid test version code" }
-            versionName = testName
+            // upgrade-safe beta version. Only the fixed public channel is forbidden.
+            require(dhunReleaseChannel != "public") { "Beta identity requires a non-public channel" }
+            require(Regex("1\\.00\\.[1-9][0-9]*-beta\\.[1-9][0-9]*").matches(betaName)) { "Invalid beta version name" }
+            val code = betaCode.toIntOrNull()
+            require(code != null && code in 1001..2_100_000_000) { "Invalid beta version code" }
+            versionName = betaName
             versionCode = code
         }
         buildConfigField("String", "DHUN_RELEASE_CHANNEL", "\"$dhunReleaseChannel\"")
     }
 
     // ABI splits plus a universal APK. The rolling release publishes all three:
-    // dhun-test.apk (universal) + dhun-test-arm64-v8a.apk + dhun-test-armeabi-v7a.apk.
+    // dhun-beta.apk (universal) + dhun-beta-arm64-v8a.apk + dhun-beta-armeabi-v7a.apk.
     // Do not assume the per-ABI APKs match the universal. The repo has no
-    // jniLibs, but test-release 37748364969 measured them ~50KB apart (the
+    // jniLibs, but packaging run 37748364969 measured them ~50KB apart (the
     // apk job prints size + SHA-256; a difference does not fail the build).
     // Version codes are intentionally NOT overridden:
     // these are sideload alternatives of one build, not Play multi-APK, and a
@@ -63,13 +63,13 @@ android {
     }
 
     signingConfigs {
-        // Stable signing for debug/test builds.
+        // Stable signing for debug/beta builds.
         //
         // WHY: with no explicit config, AGP signs debug builds with a
         // per-machine ~/.android/debug.keystore. CI runners are ephemeral, so
-        // every CI-built dhun-test.apk had a DIFFERENT signature and Android
+        // every CI-built development APK had a DIFFERENT signature and Android
         // refused updates over an existing install ("package conflicts with an
-        // existing package"). This committed key makes all debug/test builds —
+        // existing package"). This committed key makes all debug/beta builds —
         // CI or local — share one signature so updates install cleanly.
         //
         // It is a PUBLIC throwaway test key (passwords 'android', repo is
@@ -174,7 +174,7 @@ dependencies {
 //
 // ci.yml now names `:app-android:testDebugUnitTest` as its own step (session
 // arena/01a0aa5e-dhun), so a red Android suite fails a step called "Unit
-// tests — Android" instead of masquerading as a compile error. test-release.yml
+// tests — Android" instead of masquerading as a compile error. beta-release.yml
 // and build-apk.yml still invoke ONLY assembleDebug; without this dependsOn a
 // red suite would still produce a downloadable APK. The extra CI cost is
 // UP-TO-DATE: the named test step runs first, assembleDebug then finds the

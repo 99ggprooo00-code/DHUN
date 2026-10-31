@@ -24,45 +24,45 @@ enum class VisualPart(val key: String, val label: String, val detail: String) {
 }
 
 /**
- * Live snapshot state. Nothing outside the test channel loads saved values or
+ * Live snapshot state. Nothing outside the beta channel loads saved values or
  * exposes the controls. The 50% midpoint remains the original opacity curve.
- * Test builds default every component to 15% and persist later adjustments;
+ * Beta builds default every component to 15% and persist later adjustments;
  * public builds keep the original component settings except for the permanent
  * 15% tonal-surface treatment requested for both release channels.
  */
 object DhunVisualTuning {
     const val NEUTRAL = 50 // Old appearance and public-build fallback.
-    const val TEST_DEFAULT = 15 // Test-only baseline; does not change the interpolation pivot.
+    const val BETA_DEFAULT = 15 // Beta-only baseline; does not change the interpolation pivot.
     /** Retired sliders remain keyed for migration, but cannot be edited or restored. */
     val adjustableParts: List<VisualPart> = VisualPart.entries.filterNot {
         it == VisualPart.PAGE_BACKDROP || it == VisualPart.MINI_PLAYER || it == VisualPart.NAVIGATION
     }
-    private var testEnabled by mutableStateOf(false)
+    private var betaEnabled by mutableStateOf(false)
     private val percentages = mutableStateMapOf<VisualPart, Int>()
 
     fun value(part: VisualPart): Int = when (part) {
         VisualPart.PAGE_BACKDROP, VisualPart.MINI_PLAYER, VisualPart.NAVIGATION ->
-            if (testEnabled) TEST_DEFAULT else NEUTRAL
-        else -> percentages[part] ?: if (testEnabled) TEST_DEFAULT else NEUTRAL
+            if (betaEnabled) BETA_DEFAULT else NEUTRAL
+        else -> percentages[part] ?: if (betaEnabled) BETA_DEFAULT else NEUTRAL
     }
 
     fun set(part: VisualPart, percent: Int) {
         if (part !in adjustableParts) return
         val safe = percent.coerceIn(0, 100)
-        if (safe == TEST_DEFAULT) percentages.remove(part) else percentages[part] = safe
+        if (safe == BETA_DEFAULT) percentages.remove(part) else percentages[part] = safe
     }
 
     fun restore(values: Map<VisualPart, Int>, enabled: Boolean) {
-        testEnabled = enabled
+        betaEnabled = enabled
         percentages.clear()
         if (enabled) values.forEach { (part, percent) -> set(part, percent) }
     }
 
     fun reset() = percentages.clear()
 
-    /** Public tonal surfaces are fixed at 15%; the test slider can override them. */
+    /** Public tonal surfaces are fixed at 15%; the beta slider can override them. */
     fun tonalSurface(color: Color, isLight: Boolean): Color {
-        val percent = if (testEnabled) value(VisualPart.TONAL_SURFACES) else TEST_DEFAULT
+        val percent = if (betaEnabled) value(VisualPart.TONAL_SURFACES) else BETA_DEFAULT
         val base = if (isLight) 0.82f else 0.76f
         val minimum = if (isLight) 0.65f else 0.52f
         val opacity = if (percent < NEUTRAL) {

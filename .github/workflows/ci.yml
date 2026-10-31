@@ -31,7 +31,7 @@ jobs:
 
       # Named explicitly so a red Android suite cannot hide behind the
       # assembleDebug coupling (app-android/build.gradle.kts). That
-      # dependsOn stays: packaging jobs (test-release / Build APK) still
+      # dependsOn stays: packaging jobs (beta-release / Build APK) still
       # invoke only assembleDebug, and must keep failing on a red test.
       - name: "Unit tests — Android (Robolectric)"
         run: ./gradlew :app-android:testDebugUnitTest --no-daemon
@@ -40,10 +40,10 @@ jobs:
         run: ./gradlew :app-android:assembleDebug --no-daemon
 
       # S6 requires a clean-target install of APK + AAB + MSI. The AAB is only
-      # ever built by test-release.yml's `aab` job, which is
+      # ever built by beta-release.yml's `aab` job, which is
       # `workflow_dispatch`-gated — and the maintenance agent's token gets
-      # HTTP 403 on dispatch (verified: `gh workflow run test-release.yml` →
-      # "Resource not accessible by integration"). So `:app-android:bundleDebug`
+      # HTTP 403 on dispatch (verified for legacy `test-release.yml`; no new
+      # dispatch is claimed). So `:app-android:bundleDebug`
       # had NO automated coverage, while PR #131 added a `splits { abi }` block
       # to this module after that job last ran. A bundle path that only breaks
       # at release time is the worst place to discover it.

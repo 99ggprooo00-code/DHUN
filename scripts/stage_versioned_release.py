@@ -16,10 +16,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from stage_artifact import PROVENANCE_SUFFIX, parse_provenance, stage_artifact  # noqa: E402
 
 ASSETS = (
-    ("dhun-test.apk", "dhun-v{version}.apk"),
-    ("dhun-test-arm64-v8a.apk", "dhun-v{version}-arm64-v8a.apk"),
-    ("dhun-test-armeabi-v7a.apk", "dhun-v{version}-armeabi-v7a.apk"),
-    ("dhun-test.msi", "dhun-v{version}.msi"),
+    ("dhun-beta.apk", "dhun-v{version}.apk"),
+    ("dhun-beta-arm64-v8a.apk", "dhun-v{version}-arm64-v8a.apk"),
+    ("dhun-beta-armeabi-v7a.apk", "dhun-v{version}-armeabi-v7a.apk"),
+    ("dhun-beta.msi", "dhun-v{version}.msi"),
 )
 VERSION_PATTERN = re.compile(r"\d+\.\d+\.\d+\Z")
 

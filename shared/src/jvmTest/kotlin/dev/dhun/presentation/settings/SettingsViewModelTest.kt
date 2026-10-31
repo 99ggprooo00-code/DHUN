@@ -38,20 +38,20 @@ class SettingsViewModelTest {
     private fun data() =
         DataLayer(DatabaseFactory.create(DatabaseDriverFactory.inMemory().createDriver()), FakeClock())
 
-    private fun vm(d: DataLayer, scope: kotlinx.coroutines.CoroutineScope, testRelease: Boolean = false) =
+    private fun vm(d: DataLayer, scope: kotlinx.coroutines.CoroutineScope, betaRelease: Boolean = false) =
         SettingsViewModel(GetSettingUseCase(d.settings), UpdateSettingUseCase(d.settings), scope,
-            isTestRelease = testRelease)
+            isBetaRelease = betaRelease)
 
     private suspend fun loaded(vm: SettingsViewModel): SettingsViewModel {
         vm.loaded.first { it }
         return vm
     }
 
-    private suspend fun reloaded(d: DataLayer, scope: CoroutineScope, testRelease: Boolean = false): SettingsViewModel {
+    private suspend fun reloaded(d: DataLayer, scope: CoroutineScope, betaRelease: Boolean = false): SettingsViewModel {
         // UI-facing flows are optimistic. A fresh ViewModel must not read the
         // DB until the asynchronous preference writes under test have finished.
         scope.coroutineContext[Job]!!.children.toList().joinAll()
-        return loaded(vm(d, scope, testRelease))
+        return loaded(vm(d, scope, betaRelease))
     }
 
     @Test
@@ -69,8 +69,8 @@ class SettingsViewModelTest {
     @Test
     fun testVisualSlidersPersistIndependentlyAndResetToFifteen(): Unit = runBlocking {
         val d = data()
-        val v = loaded(vm(d, this, testRelease = true))
-        assertTrue(DhunVisualTuning.adjustableParts.all { v.visualTuning.value[it] == DhunVisualTuning.TEST_DEFAULT })
+        val v = loaded(vm(d, this, betaRelease = true))
+        assertTrue(DhunVisualTuning.adjustableParts.all { v.visualTuning.value[it] == DhunVisualTuning.BETA_DEFAULT })
         assertTrue(listOf(VisualPart.PAGE_BACKDROP, VisualPart.MINI_PLAYER, VisualPart.NAVIGATION).all { it !in v.visualTuning.value })
         v.previewVisualTuning(VisualPart.LIST_ROWS, 86)
         v.previewVisualTuning(VisualPart.QUEUE_ROWS, -1)
@@ -81,12 +81,12 @@ class SettingsViewModelTest {
         assertEquals(0, v.visualTuning.value[VisualPart.QUEUE_ROWS])
         v.saveVisualTuning(VisualPart.LIST_ROWS)
         v.saveVisualTuning(VisualPart.QUEUE_ROWS)
-        val restored = reloaded(d, this, testRelease = true)
+        val restored = reloaded(d, this, betaRelease = true)
         assertEquals(86, restored.visualTuning.value[VisualPart.LIST_ROWS])
         assertEquals(0, restored.visualTuning.value[VisualPart.QUEUE_ROWS])
         restored.resetVisualTuning()
-        val reset = reloaded(d, this, testRelease = true)
-        assertTrue(DhunVisualTuning.adjustableParts.all { reset.visualTuning.value[it] == DhunVisualTuning.TEST_DEFAULT })
+        val reset = reloaded(d, this, betaRelease = true)
+        assertTrue(DhunVisualTuning.adjustableParts.all { reset.visualTuning.value[it] == DhunVisualTuning.BETA_DEFAULT })
     }
 
     @Test
@@ -95,13 +95,13 @@ class SettingsViewModelTest {
         d.settings.putInt(SettingsKeys.TUNE_LIST_ROWS, 90)
         d.settings.putInt(SettingsKeys.TUNE_TONAL_SURFACES, 100)
         d.settings.putInt(SettingsKeys.TUNE_NAVIGATION, 0)
-        val first = loaded(vm(d, this, testRelease = true))
+        val first = loaded(vm(d, this, betaRelease = true))
         assertTrue(DhunVisualTuning.adjustableParts.all { first.visualTuning.value[it] == 15 })
         assertEquals(1, d.settings.getInt(SettingsKeys.TUNE_PROFILE_VERSION, 0))
         assertEquals(-1, d.settings.getInt(SettingsKeys.TUNE_NAVIGATION, -1))
         first.previewVisualTuning(VisualPart.TONAL_SURFACES, 37)
         first.saveVisualTuning(VisualPart.TONAL_SURFACES)
-        val again = reloaded(d, this, testRelease = true)
+        val again = reloaded(d, this, betaRelease = true)
         assertEquals(37, again.visualTuning.value[VisualPart.TONAL_SURFACES])
         assertEquals(15, again.visualTuning.value[VisualPart.LIST_ROWS])
         // Public builds do not migrate and ignore experimental values in the shell.

@@ -12,7 +12,7 @@ import unittest
 
 
 REPO = Path(__file__).resolve().parents[1]
-WORKFLOW = REPO / ".github/workflows/test-release.yml"
+WORKFLOW = REPO / ".github/workflows/beta-release.yml"
 STEP = "      - name: Publish immutable installed-app frame and result\n"
 
 

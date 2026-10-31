@@ -173,7 +173,7 @@ fun DhunAppShell(
     equalizerSession: EqualizerSession? = null,
     /**
      * This build's version/channel, read from build metadata by the platform
-     * shell. About & Legal reports it, and the test channel gates the internal
+     * shell. About & Legal reports it, and the beta channel gates the internal
      * Theme Catalogue entry. It defaults to the honest "unknown" sentinel so
      * an unwired caller shows that rather than a plausible-looking wrong version.
      */
@@ -219,7 +219,7 @@ fun DhunAppShell(
             GetSettingUseCase(dataLayer.settings),
             UpdateSettingUseCase(dataLayer.settings),
             scope,
-            isTestRelease = appInfo.isTestRelease,
+            isBetaRelease = appInfo.isBetaRelease,
             clearLyricsCacheAction = { playerViewModel.clearLyricsCache() },
             clearSearchHistoryAction = { dataLayer.search.clearRecentSearches() },
             clearPlayHistoryAction = { dataLayer.history.clear() },
@@ -259,10 +259,10 @@ fun DhunAppShell(
     val explicitContent by settingsVm.explicitContent.collectAsState()
     val preferredLyricsProvider by settingsVm.preferredProvider.collectAsState()
     val settingsLoaded by settingsVm.loaded.collectAsState()
-    // Stored experiments are applied only in the test channel. Public builds
-    // render the original 50% appearance even after installing over a test APK.
-    LaunchedEffect(settingsLoaded, appInfo.isTestRelease) {
-        if (settingsLoaded) DhunVisualTuning.restore(settingsVm.visualTuning.value, appInfo.isTestRelease)
+    // Stored experiments are applied only in the beta channel. Public builds
+    // render the original 50% appearance even after installing over a beta APK.
+    LaunchedEffect(settingsLoaded, appInfo.isBetaRelease) {
+        if (settingsLoaded) DhunVisualTuning.restore(settingsVm.visualTuning.value, appInfo.isBetaRelease)
     }
     LaunchedEffect(countryCode, explicitContent, settingsLoaded) {
         if (settingsLoaded) {
@@ -950,21 +950,21 @@ private fun ShellMasterPane(
                 isDesktop = isDesktop,
                 equalizerSession = equalizerSession,
                 onOpenAboutLegal = { nav.push(DetailRoute.AboutLegalPage) },
-                showThemeCatalogue = appInfo.isTestRelease,
+                showThemeCatalogue = appInfo.isBetaRelease,
                 onOpenThemeCatalogue = { nav.push(DetailRoute.ThemeCatalogPage) },
             )
         }
         is DetailRoute.ThemeCatalogPage -> {
-            if (appInfo.isTestRelease) {
+            if (appInfo.isBetaRelease) {
                 SettingsThemeCatalogue(
                     viewModel = settingsVm,
                     onClose = { nav.popDetail() },
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {
-                // A stale route from an older test install must not expose a
-                // test-only destination (or even its placeholder) in public.
-                LaunchedEffect(nav, appInfo.isTestRelease) {
+                // A stale route from an older beta install must not expose a
+                // beta-only destination (or even its placeholder) in public.
+                LaunchedEffect(nav, appInfo.isBetaRelease) {
                     nav.detailStack.removeAll { it == DetailRoute.ThemeCatalogPage }
                 }
             }
@@ -1061,21 +1061,21 @@ private fun ShellDetailPane(
                 isDesktop = isDesktop,
                 equalizerSession = equalizerSession,
                 onOpenAboutLegal = { nav.push(DetailRoute.AboutLegalPage) },
-                showThemeCatalogue = appInfo.isTestRelease,
+                showThemeCatalogue = appInfo.isBetaRelease,
                 onOpenThemeCatalogue = { nav.push(DetailRoute.ThemeCatalogPage) },
             )
         }
         is DetailRoute.ThemeCatalogPage -> {
-            if (appInfo.isTestRelease) {
+            if (appInfo.isBetaRelease) {
                 SettingsThemeCatalogue(
                     viewModel = settingsVm,
                     onClose = { nav.popDetail() },
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {
-                // A stale route from an older test install must not expose a
-                // test-only destination (or even its placeholder) in public.
-                LaunchedEffect(nav, appInfo.isTestRelease) {
+                // A stale route from an older beta install must not expose a
+                // beta-only destination (or even its placeholder) in public.
+                LaunchedEffect(nav, appInfo.isBetaRelease) {
                     nav.detailStack.removeAll { it == DetailRoute.ThemeCatalogPage }
                 }
             }

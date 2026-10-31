@@ -42,6 +42,7 @@ canonical-origin verification states separate.
   TASK at the top; mark EXACTLY which steps are done) and
   `.ai/KNOWN_LIMITATIONS.md` (honest > complete).
 - **Done is scope- and evidence-specific.** Report edited/tested/untested separately. Do not claim pushed, CI-green, hardware or deployed-origin results without actually obtaining them. Commit/push/merge/release only with current authorisation.
+- **Release identity:** the rolling `beta` tag is the public **DHUN beta** prerelease, not a private draft. Each authorised publication replaces the previous beta release/tag only after its package gates pass; fixed versioned releases/tags remain immutable. Current workflow/script names are `beta-release.yml` and `scripts/beta_version.py`. Historical `test`/`dhun-test*` mentions in dated evidence describe old artifacts and must not be copied into current guidance.
 - **Before every push / PR merge:** run the pre-push ritual at the top of
   `.ai/ROADMAP.md` — verify on GitHub (not locally) what is pushed and
   green, rewrite CURRENT ACTIVE TASK (file · last error · exact next

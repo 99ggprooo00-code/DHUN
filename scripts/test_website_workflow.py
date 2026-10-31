@@ -133,7 +133,7 @@ class Triggers(WorkflowText):
 
     def test_app_workflows_are_not_touched_by_this_file(self):
         """The site workflow must stay the only site-owned workflow."""
-        for other in ("ci.yml", "build-apk.yml", "test-release.yml", "extraction-health.yml"):
+        for other in ("ci.yml", "build-apk.yml", "beta-release.yml", "extraction-health.yml"):
             path = REPO_ROOT / ".github" / "workflows" / other
             self.assertTrue(path.is_file(), f"{other} disappeared")
 

@@ -1,11 +1,12 @@
 # Windows candidate — quick test
 
-> **Historical guide (2026-09 candidate era).** Current status as of 2026-10-10:
-> the rolling `test` release is a **private draft for repository collaborators**,
-> not a public download. The public Windows build is the
-> [`v1.00.001` pre-release](../releases/v1.00.001.md), which is unsigned and
-> experimental. Verify it against the `.sha256` file on the same release page.
-> The steps below describe the earlier candidate and are kept for the record.
+> **Historical guide (2026-09 candidate era).** Current channel status as of
+> 2026-11-01: the rolling [DHUN beta](https://github.com/99ggprooo00-code/DHUN/releases/tag/beta)
+> is a public prerelease, not a draft, and each publication replaces the previous
+> beta. Its Windows asset is `dhun-beta.msi`; the rolling release has no checksum
+> sidecars. The separate fixed `v1.00.002` release retains its own assets and
+> checksum instructions. The `test` links, filenames and sidecar steps below
+> describe the earlier candidate and are kept only for the record.
 
 This is an **unsigned development MSI**, not a stable release. The repair
 code was merged in PR #30 (2026-09-06). At the time of this guide it was
