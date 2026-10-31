@@ -35,9 +35,9 @@ these paths have no diff from the pre-rollback head:
 - `web-spike/`
 - `docs/web-player/`
 
-Three shared native files remain current instead of being restored, because they
-serve the preserved website/legal corpus rather than reintroducing the rolled-back
-app screens or recovery behaviour:
+Three shared production files and one legal test remain current instead of being
+restored, because they serve the preserved website/legal corpus rather than
+reintroducing the rolled-back app screens or recovery behaviour:
 
 - `shared/src/commonMain/kotlin/dev/dhun/design/DhunIcons.kt` — the current web
   build generates `app-web/src/js/icons.js` directly from this catalogue.
@@ -48,6 +48,10 @@ app screens or recovery behaviour:
   pre-#196 screen and its existing divider, with only the current legal status
   wording required by that corpus. The newer `DhunDivider` dependency is not
   retained; exact-head CI run `41184568603` identified that incompatibility.
+- `shared/src/jvmTest/kotlin/dev/dhun/legal/MarkdownParserTest.kt` — checks the
+  current nine-control Support table. Restoring the obsolete three-control
+  expectation caused the shared-test failure in exact-head CI run `41184736659`;
+  it did not indicate an app-source rollback difference.
 
 The current Android/Desktop Gradle files and Actions workflows also remain.
 They are packaging/identity infrastructure, not a restoration of post-#196 app
@@ -67,8 +71,8 @@ No release, tag, publication, protected asset, or existing APK was changed.
 - ✅ `git diff --check` — no whitespace errors.
 - ✅ Byte/tree comparison confirmed no rollback diff in `website/`, `app-web/`,
   `web-spike/`, or `docs/web-player/`.
-- ✅ Apart from the three documented shared website/legal exceptions above, the
-  native source paths have no diff from `12498ca`.
+- ✅ Apart from the documented shared website/legal production and test exceptions
+  above, the native source paths have no diff from `12498ca`.
 
 ## 4. Limits and acceptance status
 
