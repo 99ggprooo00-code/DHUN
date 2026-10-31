@@ -194,6 +194,8 @@ Windows, artwork or audible-playback acceptance.
   DHUN's filtered params and current upstream params differ, but sanitized live CI
   accepted both in US and NP, so stale params are a compatibility candidate, not a
   proven device root cause. No region, visitor or server-only conclusion is made.
+- **Files:** `shared/src/commonMain/kotlin/dev/dhun/innertube/InnerTubeClient.kt`;
+  regressions in `shared/src/jvmTest/kotlin/dev/dhun/innertube/InnerTubeRequestTest.kt`.
 - **Fix:** `30fb887` keeps the existing params first. Only a filtered `/search`
   HTTP 400 tries the current upstream params for the **same** filter, retaining one
   bounded fresh-session retry. It never drops the filter, substitutes unfiltered
@@ -215,6 +217,10 @@ Windows, artwork or audible-playback acceptance.
   new row could remain `localArtworkPath=null`. Separately, `NowPlayingBackdrop`
   made one direct `AsyncImage` request while Full Player used shared bounded
   candidates and a genuine video-cover fallback.
+- **Files:** `download/FileDownloadManager.kt`, `design/components/ArtworkImage.kt`,
+  `design/components/NowPlayingBackdrop.kt`, `design/ArtworkUrls.kt` and
+  `ui/shell/DhunAppShell.kt` under `shared/src/commonMain/kotlin/dev/dhun/`;
+  download/policy regressions under `shared/src/jvmTest/kotlin/dev/dhun/`.
 - **Fix:** `1abbc47` uses `ArtworkUrls.loadingCandidates` in both the download
   writer and shell backdrop. Downloads persist the first real candidate, including
   `i.ytimg.com` video art; the backdrop reuses `ArtworkImage` with terminal load
@@ -234,6 +240,9 @@ Windows, artwork or audible-playback acceptance.
 - **Confirmed cause:** brightness reached `NowPlayingBackdropPolicy.veilStops`, but
   only the artwork veil consumed it. `AmbientBackdrop`'s colour-only/custom palette
   path had no brightness input.
+- **Files:** `shared/src/commonMain/kotlin/dev/dhun/design/components/NowPlayingBackdrop.kt`
+  (`AmbientBackdrop` / `AmbientBackdropPolicy`) and
+  `shared/src/jvmTest/kotlin/dev/dhun/design/GlassSystemTest.kt`.
 - **Fix:** `1abbc47` adds a shared bounded relative overlay to `AmbientBackdrop`.
   The neutral value 55 is transparent (preserving PR #216's established palette);
   lower values darken and higher values lighten without rewriting the chosen base
@@ -255,6 +264,11 @@ Windows, artwork or audible-playback acceptance.
   persistent-panel/audio/tuner fields. Live responses still use
   `playlistPanelVideoRenderer`, so a renderer rename is not a supported cause.
   The precise reason the affected phone receives/parses an empty page is unproven.
+- **Files:** request change in `shared/src/commonMain/kotlin/dev/dhun/innertube/InnerTubeClient.kt`;
+  unchanged contracts in `shared/src/commonMain/kotlin/dev/dhun/innertube/Parsers.kt`
+  and `shared/src/commonMain/kotlin/dev/dhun/presentation/player/PlayerViewModel.kt`;
+  request/fixture regression in
+  `shared/src/jvmTest/kotlin/dev/dhun/innertube/InnerTubeRequestTest.kt`.
 - **Fix:** `30fb887` adds the current persistent audio-panel fields to the shared
   radio request. It deliberately leaves the working parser, continuation endpoint,
   ViewModel queue operations and explicit-content filters unchanged.
