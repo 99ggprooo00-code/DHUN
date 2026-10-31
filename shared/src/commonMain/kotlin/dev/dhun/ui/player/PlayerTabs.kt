@@ -570,7 +570,7 @@ internal fun LyricsProviderPicker(
                 TrackMenuSurface(artworkUrl = null, modifier = Modifier.width(DhunSpacing.menuMinWidth)) {
                     lyricsProviderOptions.forEach { (id, label) ->
                         MenuActionRow(
-                            text = label,
+                            label = label,
                             modifier = Modifier.semantics { selected = id == selectedProvider },
                             onClick = {
                                 expanded = false

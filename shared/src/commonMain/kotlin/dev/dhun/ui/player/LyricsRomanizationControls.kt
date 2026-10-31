@@ -82,7 +82,7 @@ internal fun LyricsRomanizationControls(controller: LyricsRomanizationController
                         )
                         RomanizationMode.entries.forEach { value ->
                             MenuActionRow(
-                                text = value.label,
+                                label = value.label,
                                 modifier = Modifier.semantics { selected = value == mode },
                                 onClick = { controller.setMode(value); menu = false },
                             )
