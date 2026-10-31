@@ -22,10 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -57,7 +54,9 @@ import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.dhunContentRowSurface
 import dev.dhun.design.components.DhunButton
+import dev.dhun.design.components.DhunCheckbox
 import dev.dhun.design.components.DhunFilterChip
+import dev.dhun.design.components.DhunProgressBar
 import dev.dhun.design.components.DhunTextField
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.DhunOutlinedButton
@@ -1099,11 +1098,10 @@ private fun StorageManageView(
                     val volumeUsed = (storage.device.totalBytes - storage.device.freeBytes).coerceAtLeast(0L)
                     StorageStatRow("Used by apps & system", formatBytes(volumeUsed))
                     Spacer(modifier = Modifier.height(DhunSpacing.sm))
-                    LinearProgressIndicator(
-                        progress = { storage.deviceUsedFraction ?: 0f },
-                        modifier = Modifier.fillMaxWidth().height(DhunSpacing.progressStroke * 2).clip(DhunShapes.full),
-                        color = DhunColors.accent,
-                        trackColor = DhunColors.surfaceElevated,
+                    DhunProgressBar(
+                        progress = storage.deviceUsedFraction ?: 0f,
+                        modifier = Modifier.fillMaxWidth(),
+                        trackHeight = DhunSpacing.progressStroke * 2,
                     )
                 } else {
                     Text(
@@ -1166,13 +1164,9 @@ private fun StorageManageView(
                     .padding(vertical = DhunSpacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Checkbox(
+                DhunCheckbox(
                     checked = selected.size == downloads.size && downloads.isNotEmpty(),
                     onCheckedChange = { onSelectAll() },
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = DhunColors.accent,
-                        uncheckedColor = DhunColors.textTertiary,
-                    ),
                 )
                 Text(
                     if (selected.isEmpty()) "Select all" else "Selected ${selected.size}",
@@ -1245,13 +1239,9 @@ private fun ManageableDownloadRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
     ) {
-        Checkbox(
+        DhunCheckbox(
             checked = selected,
             onCheckedChange = { onToggle() },
-            colors = CheckboxDefaults.colors(
-                checkedColor = DhunColors.accent,
-                uncheckedColor = DhunColors.textTertiary,
-            ),
         )
         ArtworkImage(
             imageUrl = download.preferredArtworkUrl,
@@ -1415,20 +1405,10 @@ private fun DownloadRow(
         if (download.downloadState == DownloadState.DOWNLOADING) {
             val fraction = progress?.fraction
             Spacer(modifier = Modifier.height(DhunSpacing.xs))
-            if (fraction != null) {
-                LinearProgressIndicator(
-                    progress = { fraction },
-                    modifier = Modifier.fillMaxWidth().height(DhunSpacing.progressStroke).clip(DhunShapes.full),
-                    color = DhunColors.accent,
-                    trackColor = DhunColors.surfaceElevated,
-                )
-            } else {
-                LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth().height(DhunSpacing.progressStroke).clip(DhunShapes.full),
-                    color = DhunColors.accent,
-                    trackColor = DhunColors.surfaceElevated,
-                )
-            }
+            DhunProgressBar(
+                progress = fraction,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
