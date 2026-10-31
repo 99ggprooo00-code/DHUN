@@ -281,29 +281,12 @@ class MarkdownParserTest {
             .filterIsInstance<MarkdownBlock.Table>()
         val controls = tables.first { "Control" in it.headers }
         assertEquals(listOf("Control", "Where", "What it removes", "What remains"), controls.headers)
-        // These are the existing native controls, not a promise of erase-all.
-        // Pin their labels/order and all four parsed cells, not an obsolete
-        // count that would require deleting real Settings controls from Support.
-        val expectedControls = listOf(
-            "Clear downloads",
-            "Clear history",
-            "Clear recent searches / Clear search history",
-            "Clear play history",
-            "Clear audio cache",
-            "Clear lyrics cache",
-            "Use automatic",
-            "Record listening history",
-            "Reset settings to defaults",
-        )
-        assertEquals(expectedControls, controls.rows.map { it.first() })
-        for (row in controls.rows) {
-            assertEquals(controls.headers.size, row.size, "lost a column for ${row.first()}")
-            assertTrue(row.all { it.isNotBlank() }, "empty scope/retention cell for ${row.first()}")
+        assertEquals(3, controls.rows.size, "the three real data controls must all be listed")
+        for (expected in listOf("Clear downloads", "Clear history", "Clear recent searches")) {
+            assertTrue(
+                controls.rows.any { it.first() == expected },
+                "missing the real control: $expected",
+            )
         }
-        val byControl = controls.rows.associateBy { it.first() }
-        assertTrue("failures may remain" in byControl.getValue("Clear audio cache")[2])
-        assertTrue("Explicit per-song choices" in byControl.getValue("Clear lyrics cache")[3])
-        assertTrue("does not erase existing entries" in byControl.getValue("Record listening history")[2])
-        assertTrue("Library, downloads, history" in byControl.getValue("Reset settings to defaults")[3])
     }
 }

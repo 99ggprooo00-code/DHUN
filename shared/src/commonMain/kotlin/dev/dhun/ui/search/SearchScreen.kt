@@ -20,9 +20,13 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -64,17 +68,16 @@ import dev.dhun.design.components.DhunButton
 import dev.dhun.design.components.DhunFilterChip
 import dev.dhun.design.components.DhunHorizontalRail
 import dev.dhun.design.components.DhunIconButton
-import dev.dhun.design.components.DhunTextField
 import dev.dhun.design.components.DhunTextButton
 import dev.dhun.design.components.EmptyView
 import dev.dhun.design.components.ErrorView
 import dev.dhun.design.components.GlassCard
 import dev.dhun.design.components.LoadingShimmer
+import dev.dhun.design.components.LocalTextInputFocusRegistry
 import dev.dhun.design.components.PlaylistCard
 import dev.dhun.design.components.SectionHeader
 import dev.dhun.design.components.TrackRow
 import dev.dhun.design.components.TrackRowShimmer
-import dev.dhun.design.components.DhunDivider
 import dev.dhun.download.DownloadManager
 import dev.dhun.innertube.SearchFilter
 import dev.dhun.presentation.search.SearchResultsUiState
@@ -97,7 +100,6 @@ fun SearchScreen(
     val suggestions by viewModel.suggestions.collectAsState()
     val resultsState by viewModel.resultsState.collectAsState()
     val isLoadingMore by viewModel.isLoadingMore.collectAsState()
-    val loadMoreError by viewModel.loadMoreError.collectAsState()
     val recentSearches by viewModel.recentSearches.collectAsState()
     val listState = rememberLazyListState()
 
@@ -110,8 +112,8 @@ fun SearchScreen(
         }
     }
 
-    LaunchedEffect(shouldLoadMore, isLoadingMore, loadMoreError, resultsState) {
-        if (shouldLoadMore && !isLoadingMore && loadMoreError == null) {
+    LaunchedEffect(shouldLoadMore) {
+        if (shouldLoadMore && !isLoadingMore) {
             viewModel.loadMore()
         }
     }
@@ -159,7 +161,6 @@ fun SearchScreen(
                         ErrorView(
                             message = state.message,
                             title = "Search failed",
-                            details = state.detail,
                             onRetry = { viewModel.onSearchSubmitted() },
                             modifier = Modifier.fillMaxSize(),
                         )
@@ -176,9 +177,6 @@ fun SearchScreen(
                             results = state.results,
                             filter = selectedFilter,
                             isLoadingMore = isLoadingMore,
-                            loadMoreError = loadMoreError,
-                            onLoadMore = viewModel::loadMore,
-                            onRetryMore = viewModel::retryLoadMore,
                             listState = listState,
                             onTrackClick = onTrackClick,
                             onAlbumClick = onAlbumClick,
@@ -201,6 +199,12 @@ private fun SearchBarSection(
     onSearchSubmit: () -> Unit,
     onClear: () -> Unit,
 ) {
+    val focusRegistry = LocalTextInputFocusRegistry.current
+    val focusToken = remember { Any() }
+    DisposableEffect(focusRegistry, focusToken) {
+        onDispose { focusRegistry?.setFocused(focusToken, false) }
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -208,27 +212,27 @@ private fun SearchBarSection(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
     ) {
-        // DHUN's own input (translucent field, accent caret, hairline edge) in
-        // the pill shape the search bar has always had. It was an M3
-        // OutlinedTextField restyled to look like glass — a Material outline and
-        // floating placeholder inside a glass app, which is the exact drift
-        // docs/design/glass-system.md §2 forbids.
-        DhunTextField(
+        OutlinedTextField(
             value = query,
             onValueChange = onQueryChange,
-            placeholder = "Search songs, artists, albums…",
-            shape = DhunShapes.extraLarge,
-            imeAction = ImeAction.Search,
-            onSubmit = onSearchSubmit,
-            leading = {
+            placeholder = {
+                Text(
+                    "Search songs, artists, albums…",
+                    color = DhunColors.textHint,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
+            leadingIcon = {
                 DhunIconView(
                     icon = DhunIcon.Search,
                     contentDescription = "Search",
-                    modifier = Modifier.size(DhunSpacing.iconSize),
+                    modifier = Modifier
+                        .padding(start = DhunSpacing.xs)
+                        .size(DhunSpacing.iconSize),
                     tint = DhunColors.textTertiary,
                 )
             },
-            trailing = {
+            trailingIcon = {
                 if (query.isNotEmpty()) {
                     DhunIconButton(onClick = onClear, contentDescription = "Clear search") {
                         DhunIconView(
@@ -240,8 +244,29 @@ private fun SearchBarSection(
                     }
                 }
             },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { onSearchSubmit() }),
+            shape = DhunShapes.extraLarge,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = readingSurfaceFill(),
+                unfocusedContainerColor = contentRowFill(),
+                disabledContainerColor = contentRowFill(),
+                focusedTextColor = DhunColors.textPrimary,
+                unfocusedTextColor = DhunColors.textPrimary,
+                cursorColor = DhunColors.accent,
+                focusedBorderColor = DhunColors.glassEdge,
+                unfocusedBorderColor = DhunColors.border,
+                focusedLeadingIconColor = DhunColors.accent,
+                unfocusedLeadingIconColor = DhunColors.textTertiary,
+                focusedTrailingIconColor = DhunColors.textSecondary,
+                unfocusedTrailingIconColor = DhunColors.textTertiary,
+                focusedPlaceholderColor = DhunColors.textHint,
+                unfocusedPlaceholderColor = DhunColors.textHint,
+            ),
             modifier = Modifier
                 .weight(1f)
+                .onFocusChanged { focusRegistry?.setFocused(focusToken, it.isFocused) }
                 .onKeyEvent { event ->
                     // Physical Enter (desktop keyboards, and Android hardware
                     // keyboards) — the IME Search action above is the soft-key
@@ -322,7 +347,7 @@ private fun SuggestionsList(
                     modifier = Modifier.weight(1f),
                 )
             }
-            DhunDivider()
+            HorizontalDivider(color = DhunColors.border)
         }
     }
 }
@@ -393,7 +418,7 @@ private fun RecentSearchesSection(
                         )
                     }
                 }
-                DhunDivider()
+                HorizontalDivider(color = DhunColors.border)
             }
         }
 
@@ -473,9 +498,6 @@ private fun SearchResultsList(
     results: SearchResults,
     filter: SearchFilter,
     isLoadingMore: Boolean,
-    loadMoreError: String?,
-    onLoadMore: () -> Unit,
-    onRetryMore: () -> Unit,
     listState: LazyListState,
     onTrackClick: (track: Track, contextQueue: List<Track>, index: Int) -> Unit,
     onAlbumClick: (Album) -> Unit,
@@ -571,28 +593,16 @@ private fun SearchResultsList(
             }
         }
 
-        // Pagination status: failures keep the existing results visible and
-        // wait for an explicit retry instead of looping on recomposition.
-        if (isLoadingMore || loadMoreError != null || results.continuationToken != null) {
-            item(key = "pagination_status") {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(DhunSpacing.md),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
+        // Pagination Loader Indicator
+        if (isLoadingMore) {
+            item(key = "loading_more") {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(DhunSpacing.md),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    when {
-                        isLoadingMore -> {
-                            LoadingShimmer(
-                                modifier = Modifier.width(DhunSpacing.skeletonMetaWidth).height(DhunSpacing.xl),
-                            )
-                            Text("Loading more results…", color = DhunColors.textSecondary)
-                        }
-                        loadMoreError != null -> {
-                            Text(loadMoreError, color = DhunColors.textSecondary)
-                            DhunTextButton(onClick = onRetryMore) { Text("Retry loading more") }
-                        }
-                        else -> DhunTextButton(onClick = onLoadMore) { Text("Load more results") }
-                    }
+                    LoadingShimmer(modifier = Modifier.width(DhunSpacing.skeletonMetaWidth).height(DhunSpacing.xl))
                 }
             }
         }

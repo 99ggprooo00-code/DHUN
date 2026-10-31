@@ -9,7 +9,6 @@ import dev.dhun.data.DatabaseDriverFactory
 import dev.dhun.data.DatabaseFactory
 import dev.dhun.data.EpochClock
 import dev.dhun.data.PlayContext
-import dev.dhun.data.PlaylistRepository
 import dev.dhun.data.SettingsKeys
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -70,17 +69,6 @@ class UseCasesTest {
 
         DeletePlaylistUseCase(d.playlists)(pl.id)
         assertNull(ObservePlaylistsUseCase(d.playlists).one(pl.id).first())
-    }
-
-    @Test
-    fun deletePlaylistUseCaseDoesNotHideStorageFailure(): Unit = runBlocking {
-        val d = data()
-        val created = d.playlists.create("Retain on error")
-        val repo = object : PlaylistRepository by d.playlists {
-            override suspend fun delete(id: String): Unit = throw IllegalStateException("storage unavailable")
-        }
-        assertFailsWith<IllegalStateException> { DeletePlaylistUseCase(repo)(created.id) }
-        assertEquals(created.id, d.playlists.observePlaylist(created.id).first()?.id)
     }
 
     @Test

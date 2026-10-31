@@ -27,8 +27,6 @@ object ArtworkUrls {
 
     private val sizedParam = Regex("w\\d+-h\\d+")
     private val avatarParam = Regex("=s\\d+(-c)?")
-    private val originalProxySuffix = Regex("=(?:w\\d+-h\\d+|s\\d+)(?:-[A-Za-z0-9]+)*(?=[?#]|$)")
-    private val youtubeVideoId = Regex("[A-Za-z0-9_-]{11}")
 
     /**
      * Normalizes [url] for image loading: `//` → `https://`, and proxy-host
@@ -53,43 +51,6 @@ object ArtworkUrls {
 
     /** Full-resolution tier for the Now Playing artwork + backdrop. */
     fun nowPlaying(url: String?): String? = list(url, NOW_PLAYING_SIZE_PX)
-
-    /**
-     * Removes only YouTube's proxy sizing suffix, preserving the source host,
-     * path and any query/fragment. This is a compatibility fallback, not a
-     * claim that the returned image has a particular width or crop.
-     */
-    fun original(url: String?): String? {
-        val normalized = normalizeScheme(url) ?: return null
-        if (!isProxyHost(normalized)) return normalized
-        return originalProxySuffix.replace(normalized, "")
-    }
-
-    /**
-     * One bounded loading strategy for every artwork surface. The requested
-     * URL is always first; more expensive compatibility candidates are tried
-     * only after a Coil error. Duplicate URLs and blank values are removed.
-     */
-    fun loadingCandidates(imageUrl: String?, fallbackImageUrl: String? = null): List<String> {
-        val primary = normalizeScheme(imageUrl)
-        return listOfNotNull(
-            primary,
-            nowPlaying(primary),
-            original(primary),
-            normalizeScheme(fallbackImageUrl),
-        ).map { it.trim() }.filter { it.isNotEmpty() }.distinct()
-    }
-
-    /** Real YouTube cover for a sparse persisted track whose URL was lost. */
-    fun videoThumbnail(videoId: String?): String? {
-        val id = videoId?.trim()?.takeIf { youtubeVideoId.matches(it) } ?: return null
-        return "https://i.ytimg.com/vi/$id/hqdefault.jpg"
-    }
-
-    private fun normalizeScheme(url: String?): String? {
-        val out = url?.trim() ?: return null
-        return if (out.startsWith("//")) "https:$out" else out
-    }
 
     private fun isProxyHost(url: String): Boolean =
         url.contains("googleusercontent.com") || url.contains("ggpht.com")

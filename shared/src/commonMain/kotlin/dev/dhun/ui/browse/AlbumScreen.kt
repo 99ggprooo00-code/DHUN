@@ -33,7 +33,6 @@ import dev.dhun.core.Artist
 import dev.dhun.core.Track
 import dev.dhun.design.ArtworkColorExtractor
 import dev.dhun.design.DhunAnimations
-import dev.dhun.design.ArtworkUrls
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
@@ -311,7 +310,6 @@ private fun AlbumTrackRow(
         // placeholder glyph.
         ArtworkImage(
             imageUrl = track.thumbnailUrl,
-            fallbackImageUrl = ArtworkUrls.videoThumbnail(track.id),
             contentDescription = track.title,
             modifier = Modifier.size(DhunSpacing.touchTarget),
             shape = DhunShapes.medium,

@@ -12,7 +12,6 @@ import dev.dhun.core.SearchResults
 import dev.dhun.core.StreamInfo
 import dev.dhun.core.Track
 import dev.dhun.data.DataLayer
-import dev.dhun.data.LibraryRepository
 import dev.dhun.data.DatabaseDriverFactory
 import dev.dhun.data.DatabaseFactory
 import dev.dhun.domain.GetHomeFeedUseCase
@@ -22,7 +21,6 @@ import dev.dhun.innertube.SearchFilter
 import dev.dhun.presentation.home.HomeUiState
 import dev.dhun.presentation.home.HomeViewModel
 import dev.dhun.provider.MusicProvider
-import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -33,7 +31,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class HomeViewModelTest {
@@ -46,20 +43,16 @@ class HomeViewModelTest {
     private class FakeMusicProvider(
         var feedResult: DhunResult<List<HomeSection>> = DhunResult.Success(emptyList()),
     ) : MusicProvider {
-        var homeRequests: Int = 0
-            private set
         override suspend fun search(query: String, filter: SearchFilter) = DhunResult.Success(SearchResults(query))
         override suspend fun searchContinuation(continuationToken: String) = DhunResult.Success(SearchResults(""))
         override suspend fun searchSuggestions(query: String) = DhunResult.Success(emptyList<String>())
         override suspend fun homeFeed(): DhunResult<List<HomeSection>> = feedResult
-        override suspend fun homeFeedPage(): DhunResult<dev.dhun.core.HomeFeedPage> {
-            homeRequests++
-            return when (val r = feedResult) {
+        override suspend fun homeFeedPage(): DhunResult<dev.dhun.core.HomeFeedPage> =
+            when (val r = feedResult) {
                 is DhunResult.Success ->
                     DhunResult.Success(dev.dhun.core.HomeFeedPage(sections = r.value))
                 is DhunResult.Failure -> DhunResult.Failure(r.error)
             }
-        }
         override suspend fun homeFeedContinuation(continuationToken: String): DhunResult<dev.dhun.core.HomeFeedPage> =
             DhunResult.Success(dev.dhun.core.HomeFeedPage())
         override suspend fun relatedTracks(videoId: String) = DhunResult.Success(emptyList<Track>())
@@ -166,46 +159,6 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun homeErrorKeepsSanitizedDetailAndRetryReallyRequestsAgain(): Unit = runBlocking {
-        val testScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        try {
-            val data = testData()
-            val provider = FakeMusicProvider(
-                DhunResult.Failure(
-                    DhunError.Parse("HTTP 400 from /browse; signed=https://example.com/?signature=SECRET"),
-                ),
-            )
-            val logs = mutableListOf<String>()
-            val vm = HomeViewModel(
-                getHomeFeed = GetHomeFeedUseCase(provider, data.history),
-                getRecommendations = GetRecommendationsUseCase(provider, data.history, data.library),
-                historyRepository = data.history,
-                libraryRepository = data.library,
-                scope = testScope,
-                errorLogger = { logs += it },
-            )
-
-            eventually { vm.uiState.value is HomeUiState.Error }
-            val error = vm.uiState.value as HomeUiState.Error
-            assertEquals("The music service sent something DHUN couldn't read. Try again in a moment.", error.message)
-            assertTrue(error.detail.orEmpty().contains("HTTP 400 from /browse"))
-            assertTrue(error.detail.orEmpty().contains("<url>"))
-            assertTrue(!error.detail.orEmpty().contains("SECRET"))
-            assertEquals(1, provider.homeRequests)
-            assertEquals(1, logs.size)
-            assertTrue(logs.single().contains("Home load failed (Parse)"))
-            assertTrue(!logs.single().contains("SECRET"))
-
-            provider.feedResult = DhunResult.Success(emptyList())
-            vm.load()
-            eventually { vm.uiState.value is HomeUiState.Empty }
-            assertEquals(2, provider.homeRequests, "Retry must issue a fresh Home request")
-        } finally {
-            testScope.cancel()
-        }
-    }
-
-    @Test
     fun homeViewModelTogglesFavorites(): Unit = runBlocking {
         val testScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         try {
@@ -240,45 +193,5 @@ class HomeViewModelTest {
         assertEquals(HomeShelfKind.MOOD, GetHomeFeedUseCase.classifySection("Moods & genres"))
         assertEquals(HomeShelfKind.QUICK_PICKS, GetHomeFeedUseCase.classifySection("Quick picks"))
         assertEquals(HomeShelfKind.OTHER, GetHomeFeedUseCase.classifySection("Something else"))
-    }
-
-    /**
-     * The Like control routes through this model from Home, the queue and the
-     * full player. A failed write used to escape an unguarded `scope.launch`
-     * (an Android crash) or vanish; it is a reported message now.
-     */
-    @Test
-    fun aFailedFavoriteIsReportedOnHome(): Unit = runBlocking {
-        val uncaught = mutableListOf<Throwable>()
-        val testScope = CoroutineScope(
-            SupervisorJob() + Dispatchers.Default +
-                CoroutineExceptionHandler { _, error -> uncaught += error },
-        )
-        try {
-            val data = testData()
-            val provider = FakeMusicProvider(DhunResult.Success(emptyList()))
-            val failingLibrary = object : LibraryRepository by data.library {
-                override suspend fun isFavorite(trackId: String): Boolean = false
-                override suspend fun addFavorite(track: Track) {
-                    error("disk full")
-                }
-            }
-            val vm = HomeViewModel(
-                getHomeFeed = GetHomeFeedUseCase(provider, data.history),
-                getRecommendations = GetRecommendationsUseCase(provider, data.history, failingLibrary),
-                historyRepository = data.history,
-                libraryRepository = failingLibrary,
-                scope = testScope,
-            )
-            vm.toggleFavorite(sampleTrack("like-1"))
-            eventually { vm.mutation.value.errorMessage != null }
-            assertEquals("Could not update Liked Songs. Try again.", vm.mutation.value.errorMessage)
-            assertTrue(uncaught.isEmpty(), "the failure must not escape the coroutine: $uncaught")
-
-            vm.dismissMutationError()
-            assertNull(vm.mutation.value.errorMessage)
-        } finally {
-            testScope.cancel()
-        }
     }
 }

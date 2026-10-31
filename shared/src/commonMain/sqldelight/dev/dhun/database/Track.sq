@@ -21,7 +21,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 update:
 UPDATE Track SET title = ?, artistName = ?, artistId = ?, albumName = ?, albumId = ?,
-    durationSeconds = ?, thumbnailUrl = COALESCE(?, thumbnailUrl), explicit = ?, updatedAt = ?
+    durationSeconds = ?, thumbnailUrl = ?, explicit = ?, updatedAt = ?
 WHERE id = ?;
 
 selectById:

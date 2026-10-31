@@ -8,7 +8,6 @@ import dev.dhun.core.HomeItem
 import dev.dhun.data.SettingsRepository
 import dev.dhun.data.SettingsKeys
 import dev.dhun.core.Lyrics
-import dev.dhun.core.PlaylistTracksPage
 import dev.dhun.core.RadioQueuePage
 import dev.dhun.core.SearchResults
 import dev.dhun.core.StreamInfo
@@ -17,21 +16,13 @@ import dev.dhun.core.map
 import dev.dhun.innertube.SearchFilter
 
 /**
- * Existing native metadata/playback seam; currently implemented only by
- * YouTubeMusicProvider. It is NOT source-neutral yet: SearchFilter is imported
- * from InnerTube, arguments/ids are video/browse-shaped, and callers/storage
- * assume that identity. Provider-scoped ids/capabilities and auth/player adapters
- * need a separately reviewed design/migration before adding another source.
- * See docs/PRD.md §1 and ADR-010 D5; Spotify is planned, not implemented.
- * Resolver fallback within YouTube is distinct from adding a music provider.
+ * The provider abstraction — the ONLY music-source API the application and
+ * UI layers are allowed to see. YouTube-specific types never cross this
+ * boundary.
  */
 interface MusicProvider {
     suspend fun search(query: String, filter: SearchFilter = SearchFilter.SONGS): DhunResult<SearchResults>
     suspend fun searchContinuation(continuationToken: String): DhunResult<SearchResults>
-    suspend fun searchContinuation(
-        continuationToken: String,
-        filter: SearchFilter,
-    ): DhunResult<SearchResults> = searchContinuation(continuationToken)
     suspend fun searchSuggestions(query: String): DhunResult<List<String>>
     /**
      * First page of home shelves plus the continuation token for the next
@@ -67,10 +58,6 @@ interface MusicProvider {
     suspend fun artistPage(browseId: String): DhunResult<dev.dhun.core.ArtistPage>
     suspend fun albumPage(browseId: String): DhunResult<dev.dhun.core.AlbumDetail>
     suspend fun playlistPage(browseId: String): DhunResult<dev.dhun.core.PlaylistDetail>
-
-    /** Next ordered track page; unsupported keeps older provider fakes/source ports source-compatible. */
-    suspend fun playlistContinuation(continuationToken: String): DhunResult<PlaylistTracksPage> =
-        DhunResult.Failure(DhunError.Unavailable("playlist continuation unsupported"))
 }
 
 /**
@@ -110,16 +97,6 @@ class YouTubeMusicProvider(
                 videos = results.videos.filterNot { it.explicit },
             )
         }
-
-    override suspend fun searchContinuation(
-        continuationToken: String,
-        filter: SearchFilter,
-    ): DhunResult<SearchResults> = client.searchContinuation(continuationToken, filter).map { results ->
-        if (allowExplicit()) results else results.copy(
-            songs = results.songs.filterNot { it.explicit },
-            videos = results.videos.filterNot { it.explicit },
-        )
-    }
 
     override suspend fun searchSuggestions(query: String): DhunResult<List<String>> =
         client.searchSuggestions(query)
@@ -164,11 +141,6 @@ class YouTubeMusicProvider(
 
     override suspend fun playlistPage(browseId: String): DhunResult<dev.dhun.core.PlaylistDetail> =
         client.playlistPage(browseId).map { page ->
-            if (allowExplicit()) page else page.copy(tracks = page.tracks.filterNot { it.explicit })
-        }
-
-    override suspend fun playlistContinuation(continuationToken: String): DhunResult<PlaylistTracksPage> =
-        client.playlistContinuation(continuationToken).map { page ->
             if (allowExplicit()) page else page.copy(tracks = page.tracks.filterNot { it.explicit })
         }
 

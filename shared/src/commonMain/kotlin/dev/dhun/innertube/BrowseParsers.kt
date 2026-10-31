@@ -6,7 +6,6 @@ import dev.dhun.core.ArtistPage
 import dev.dhun.core.AlbumDetail
 import dev.dhun.core.Playlist
 import dev.dhun.core.PlaylistDetail
-import dev.dhun.core.PlaylistTracksPage
 import dev.dhun.core.Track
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -39,8 +38,64 @@ internal fun browseIdsOf(node: JsonElement?): Pair<String?, String?> {
     return artist to album
 }
 
-/** Largest thumbnail URL from the same extractor used by Home and Search. */
-private fun thumbnailsLastUrl(node: JsonObject?): String? = node?.let(::thumbnailOf)
+/** Largest thumbnail URL from any nearby thumbnail renderer. */
+private fun thumbnailsLastUrl(node: JsonObject?): String? {
+    if (node == null) return null
+    val paths = listOf(
+        listOf("thumbnail", "musicThumbnailRenderer", "thumbnail", "thumbnails"),
+        listOf("thumbnail", "croppedSquareThumbnailRenderer", "thumbnail", "thumbnails"),
+        listOf("foregroundThumbnail", "musicThumbnailRenderer", "thumbnail", "thumbnails"),
+        listOf("thumbnailRenderer", "musicThumbnailRenderer", "thumbnail", "thumbnails"),
+        listOf("thumbnail", "thumbnails"),
+    )
+    for (path in paths) {
+        val arr = descend(node, path) as? JsonArray ?: continue
+        val last = arr.lastOrNull() as? JsonObject
+        val url = last?.str("url")
+        if (!url.isNullOrBlank()) return normalizeRemoteUrl(url)
+    }
+    // Nothing named above matched. Real browse headers ship their cover under
+    // arrangements this list has never enumerated (album headers in
+    // particular), and the old code returned null there — losing the cover,
+    // the page backdrop, and every row that inherits it, with no error.
+    // Fall back to the shallowest `thumbnails` array anywhere in the header:
+    // same "largest entry" rule, same normalization, and it can only fire
+    // where we previously gave up, so no working page can change behaviour.
+    return firstThumbnailsUrl(node)
+}
+
+/**
+ * Breadth-first search for the shallowest `thumbnails` array in [node],
+ * returning its largest (last) entry's URL.
+ *
+ * Breadth-first, not depth-first, so the array nearest the header root wins:
+ * on a header that carries both a portrait and a cover, the one the page is
+ * actually about sits closest to the top.
+ */
+private fun firstThumbnailsUrl(node: JsonElement): String? {
+    val queue = ArrayDeque<JsonElement>()
+    queue += node
+    while (queue.isNotEmpty()) {
+        when (val current = queue.removeFirst()) {
+            is JsonObject -> {
+                val arr = current["thumbnails"] as? JsonArray
+                if (arr != null) {
+                    val url = (arr.lastOrNull() as? JsonObject)?.str("url")
+                    if (!url.isNullOrBlank()) return normalizeRemoteUrl(url)
+                }
+                for (value in current.values) queue += value
+            }
+            is JsonArray -> for (value in current) queue += value
+            else -> {}
+        }
+    }
+    return null
+}
+
+private fun normalizeRemoteUrl(url: String): String =
+    // List tier via the shared helper: scheme fix + generic w/h rewrite on
+    // proxy hosts (covers w176/w192/… sizes the old literal replaces missed).
+    dev.dhun.design.ArtworkUrls.list(url) ?: url
 
 /**
  * Browsable sections of any page layout, normalized so each entry is a
@@ -391,7 +446,6 @@ internal fun parseAlbumPage(root: JsonObject, browseId: String): AlbumDetail {
 internal fun parsePlaylistPage(root: JsonObject, browseId: String): PlaylistDetail {
     val header = pageHeader(root)
     val title = header?.firstRunText("title", "runs") ?: "Playlist"
-    val coverUrl = thumbnailsLastUrl(header)
 
     val subtitleText = header?.allRunsText("subtitle", "runs")
     val parts = subtitleText?.split("•")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
@@ -408,64 +462,22 @@ internal fun parsePlaylistPage(root: JsonObject, browseId: String): PlaylistDeta
             descShelves.firstNotNullOfOrNull { it.allRunsText("description", "runs") }
         }
 
-    val page = parsePlaylistTracksPage(root, fallbackArtist = author, fallbackThumbnail = coverUrl)
+    // musicPlaylistShelfRenderer contents carry the ordered track list.
+    val shelfRows = mutableListOf<JsonObject>()
+    root.collectObjects("musicPlaylistShelfRenderer", shelfRows)
+    val tracks = shelfRows.flatMap { shelf ->
+        shelf.arr("contents").orEmpty()
+            .mapNotNull { (it as? JsonObject)?.obj("musicResponsiveListItemRenderer") }
+            .mapNotNull { parseBrowseSongRow(it) }
+    }.distinctBy { it.id }
+
     return PlaylistDetail(
         id = browseId,
         title = title,
         authorName = author,
         trackCountText = countText,
         description = description,
-        thumbnailUrl = coverUrl,
-        tracks = page.tracks,
-        continuationToken = page.continuationToken,
+        thumbnailUrl = thumbnailsLastUrl(header),
+        tracks = tracks,
     )
-}
-
-/** Initial or continuation playlist rows plus only their own list cursor. */
-internal fun parsePlaylistTracksPage(
-    root: JsonObject,
-    fallbackArtist: String? = null,
-    fallbackThumbnail: String? = null,
-): PlaylistTracksPage {
-    val playlistShelves = mutableListOf<JsonObject>()
-    root.collectObjects("musicPlaylistShelfRenderer", playlistShelves)
-    if (playlistShelves.isEmpty()) root.collectObjects("musicShelfRenderer", playlistShelves)
-    val continuation = root.obj("continuationContents")
-    val continuationShelves = listOfNotNull(
-        continuation.obj("musicPlaylistShelfContinuation"),
-        continuation.obj("musicShelfContinuation"),
-    )
-    val containers = playlistShelves + continuationShelves
-
-    // Some browse continuations use one append action instead of a named
-    // continuation wrapper. Accept a single unambiguous action only.
-    val appendActions = listOf("onResponseReceivedActions", "onResponseReceivedEndpoints")
-        .flatMap { root.arr(it).orEmpty() }
-        .mapNotNull { (it as? JsonObject)?.obj("appendContinuationItemsAction") }
-    val actionItems = appendActions.singleOrNull()?.arr("continuationItems").orEmpty()
-    val rows = if (containers.isEmpty()) actionItems else containers.flatMap { it.arr("contents").orEmpty() }
-    val tracks = rows.mapNotNull { (it as? JsonObject)?.obj("musicResponsiveListItemRenderer") }
-        .mapNotNull { parseBrowseSongRow(it, fallbackArtist, fallbackThumbnail) }
-        .distinctBy { it.id }
-    val token = containers.firstNotNullOfOrNull(::playlistShelfContinuation)
-        ?: playlistItemsContinuation(rows)
-    return PlaylistTracksPage(tracks, token)
-}
-
-private fun playlistShelfContinuation(shelf: JsonObject): String? {
-    shelf.arr("continuations").orEmpty().forEach { entry ->
-        (entry as? JsonObject).obj("nextContinuationData").str("continuation")
-            ?.takeIf { it.isNotBlank() }?.let { return it }
-    }
-    return playlistItemsContinuation(shelf.arr("contents").orEmpty())
-}
-
-private fun playlistItemsContinuation(items: List<JsonElement>): String? {
-    for (entry in items) {
-        val renderer = (entry as? JsonObject).obj("continuationItemRenderer") ?: continue
-        val command = renderer.obj("continuationEndpoint").obj("continuationCommand")
-        val token = command.str("token") ?: command.str("continuation")
-        if (!token.isNullOrBlank()) return token
-    }
-    return null
 }

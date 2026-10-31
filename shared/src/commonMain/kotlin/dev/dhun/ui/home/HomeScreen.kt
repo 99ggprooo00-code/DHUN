@@ -16,13 +16,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -51,7 +53,6 @@ import dev.dhun.core.HomeItem
 import dev.dhun.core.HomeSection
 import dev.dhun.core.Playlist
 import dev.dhun.core.Track
-import dev.dhun.design.ArtworkUrls
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
@@ -64,7 +65,6 @@ import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.dhunContentRowSurface
 import dev.dhun.design.components.DhunAssistChip
 import dev.dhun.design.components.DhunFilterChip
-import dev.dhun.design.components.DhunSpinner
 import dev.dhun.design.components.DhunHorizontalRail
 import dev.dhun.design.components.EmptyView
 import dev.dhun.design.components.ErrorView
@@ -73,8 +73,6 @@ import dev.dhun.design.components.PlaylistCard
 import dev.dhun.design.components.SectionHeader
 import dev.dhun.design.components.SectionShimmer
 import dev.dhun.design.components.TrackCard
-import dev.dhun.design.components.DhunTextButton
-import dev.dhun.design.components.DhunPullToRefresh
 import dev.dhun.domain.HomeMood
 import dev.dhun.domain.GetHomeFeedUseCase
 import dev.dhun.domain.HomeShelfKind
@@ -126,7 +124,6 @@ fun HomeScreen(
     val recentlyPlayed by viewModel.recentlyPlayed.collectAsState()
     val recommendedSongs by viewModel.recommendedSongs.collectAsState()
     val isLoadingRecommended by viewModel.isLoadingRecommended.collectAsState()
-    val feedListStates = remember { mutableMapOf<HomeMood, LazyListState>() }
 
     // Persistent controls remain usable while a category is loading/empty/error.
     Column(modifier = modifier.fillMaxSize().onPreviewKeyEvent { event ->
@@ -170,7 +167,7 @@ fun HomeScreen(
                 )
             }
         }
-        DhunPullToRefresh(
+        PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = viewModel::refresh,
             modifier = Modifier.fillMaxWidth().weight(1f),
@@ -180,42 +177,13 @@ fun HomeScreen(
                     HomeShimmerSkeleton(modifier = Modifier.fillMaxSize())
                 }
                 is HomeUiState.Error -> {
-                    if (shouldShowLocalHomeOnError(selectedMood, recentlyPlayed, recommendedSongs)) {
-                        key(selectedMood) {
-                            HomeFeedContent(
-                                feed = HomeFeed(greeting = ""),
-                                recentlyPlayed = recentlyPlayed,
-                                recommendedSongs = recommendedSongs,
-                                isLoadingRecommended = isLoadingRecommended,
-                                isRefreshing = isRefreshing,
-                                isLoadingMore = false,
-                                loadMoreError = null,
-                                onLoadMore = {},
-                                onRetryMore = {},
-                                onRefresh = { viewModel.load() },
-                                onTrackClick = onTrackClick,
-                                onAlbumClick = onAlbumClick,
-                                onPlaylistClick = onPlaylistClick,
-                                onArtistClick = onArtistClick,
-                                onTrackOverflow = onTrackOverflow,
-                                downloadManager = downloadManager,
-                                onOpenLiked = onOpenLiked,
-                                onOpenOffline = onOpenOffline,
-                                sleepTimerLabel = sleepTimerLabel,
-                                onCycleSleepTimer = onCycleSleepTimer,
-                                feedError = state,
-                            )
-                        }
-                    } else {
-                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                            ErrorView(
-                                message = state.message,
-                                title = "Could not load Home",
-                                onRetry = { viewModel.load() },
-                                details = state.detail,
-                                modifier = Modifier.fillMaxSize(),
-                            )
-                        }
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                        ErrorView(
+                            message = state.message,
+                            title = "Could not load Home",
+                            onRetry = { viewModel.load() },
+                            modifier = Modifier.fillMaxSize(),
+                        )
                     }
                 }
                 is HomeUiState.Empty -> {
@@ -233,7 +201,6 @@ fun HomeScreen(
                     key(selectedMood) {
                         HomeFeedContent(
                             feed = state.feed,
-                            listState = feedListStates.getOrPut(selectedMood) { LazyListState() },
                             recentlyPlayed = if (selectedMood == HomeMood.FOR_YOU) recentlyPlayed else emptyList(),
                             recommendedSongs = if (selectedMood == HomeMood.FOR_YOU) recommendedSongs else emptyList(),
                             isLoadingRecommended = selectedMood == HomeMood.FOR_YOU && isLoadingRecommended,
@@ -264,7 +231,6 @@ fun HomeScreen(
 @Composable
 private fun HomeFeedContent(
     feed: HomeFeed,
-    listState: LazyListState = rememberLazyListState(),
     recentlyPlayed: List<Track>,
     recommendedSongs: List<Track>,
     isLoadingRecommended: Boolean,
@@ -284,7 +250,6 @@ private fun HomeFeedContent(
     onOpenOffline: () -> Unit,
     sleepTimerLabel: String?,
     onCycleSleepTimer: () -> Unit,
-    feedError: HomeUiState.Error? = null,
 ) {
     val classified = remember(feed.sections) {
         feed.sections.map { it to GetHomeFeedUseCase.classifySection(it.title) }
@@ -295,6 +260,8 @@ private fun HomeFeedContent(
     val otherSections = remember(feed.sections, feed.quickPicks) {
         remainingHomeSections(feed)
     }
+
+    val listState = rememberLazyListState()
 
     // Endless scroll: ask for the next page of shelves once the user gets
     // near the end of what we already have. `feed.continuationToken == null`
@@ -318,18 +285,6 @@ private fun HomeFeedContent(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = DhunSpacing.contentBottomInset),
     ) {
-        if (feedError != null) {
-            item(key = "home_feed_error") {
-                ErrorView(
-                    message = feedError.message,
-                    title = "Could not refresh Home",
-                    onRetry = onRefresh,
-                    details = feedError.detail,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        }
-
         // ---- Quick-action chips (rail, same pattern as the mood row:
         // symmetric edge padding via contentPadding holds while scrolling —
         // horizontalScroll + padding drops the trailing inset at scroll end,
@@ -521,7 +476,7 @@ private fun HomeFeedContent(
 
         // Visible retry/end states: a failed continuation must not look like
         // an exhausted feed, or retry automatically on every recomposition.
-        if (feedError == null) item(key = "pagination_status") {
+        item(key = "pagination_status") {
             Column(
                 modifier = Modifier.fillMaxWidth().padding(DhunSpacing.screenPadding),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -529,21 +484,24 @@ private fun HomeFeedContent(
             ) {
                 when {
                     isLoadingMore -> {
-                        // DHUN spinner: thin accent arc in a glass track.
-                        DhunSpinner()
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                            strokeWidth = DhunSpacing.iconStroke,
+                            color = DhunColors.accent,
+                        )
                         Text("Loading more music…", color = DhunColors.textSecondary)
                     }
                     loadMoreError != null -> {
                         Text(loadMoreError, color = DhunColors.textSecondary)
-                        DhunTextButton(onClick = onRetryMore, enabled = !isRefreshing) { Text("Retry loading more") }
+                        TextButton(onClick = onRetryMore, enabled = !isRefreshing) { Text("Retry loading more") }
                     }
-                    canLoadMore -> DhunTextButton(onClick = onLoadMore, enabled = !isRefreshing) { Text("Load more music") }
+                    canLoadMore -> TextButton(onClick = onLoadMore, enabled = !isRefreshing) { Text("Load more music") }
                     else -> {
                         Text("You're all caught up", color = DhunColors.textTertiary)
                     }
                 }
                 // Mouse/keyboard/accessibility fallback; no header refresh icon.
-                DhunTextButton(onClick = onRefresh, enabled = !isRefreshing) { Text("Refresh music") }
+                TextButton(onClick = onRefresh, enabled = !isRefreshing) { Text("Refresh music") }
             }
         }
     }
@@ -661,7 +619,6 @@ private fun QuickPickItem(
     ) {
         ArtworkImage(
             imageUrl = track.thumbnailUrl,
-            fallbackImageUrl = ArtworkUrls.videoThumbnail(track.id),
             contentDescription = track.title,
             modifier = Modifier.size(DhunSpacing.touchTarget),
             shape = DhunShapes.medium,
@@ -717,13 +674,6 @@ private fun HomeShimmerSkeleton(modifier: Modifier = Modifier) {
         SectionShimmer()
     }
 }
-
-/** Real local shelves remain useful during a For You request failure; other moods have no local feed. */
-internal fun shouldShowLocalHomeOnError(
-    mood: HomeMood,
-    recentlyPlayed: List<Track>,
-    recommendedSongs: List<Track>,
-): Boolean = mood == HomeMood.FOR_YOU && (recentlyPlayed.isNotEmpty() || recommendedSongs.isNotEmpty())
 
 /** Hide only music actually promoted into the hero, not every later shelf with the same label. */
 internal fun quickPickShelfAlreadyShown(section: HomeSection, quickPicks: List<Track>): Boolean {

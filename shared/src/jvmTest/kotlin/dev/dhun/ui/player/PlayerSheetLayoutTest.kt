@@ -664,9 +664,6 @@ class PlayerSheetLayoutTest {
         assertFalse(shouldRenderPlayerBackdrop(null))
         assertFalse(shouldRenderPlayerBackdrop(""))
         assertFalse(shouldRenderPlayerBackdrop("   "))
-        assertTrue(shouldRenderPlayerBackdrop(null, "https://i.ytimg.com/vi/utwMHfDZ6SA/hqdefault.jpg"))
-        assertTrue(shouldRenderPlayerBackdrop("", "file:///saved/cover.jpg"))
-        assertFalse(shouldRenderPlayerBackdrop(null, "  "))
     }
 
     /* -------- queue rows ------------------------------------------------- */

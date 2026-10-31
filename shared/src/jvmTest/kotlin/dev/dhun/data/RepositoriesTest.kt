@@ -1,14 +1,11 @@
 package dev.dhun.data
 
 import dev.dhun.core.RepeatMode
-import dev.dhun.core.DownloadedTrack
-import dev.dhun.core.DownloadState
 import dev.dhun.core.Track
 import dev.dhun.database.DhunDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -43,19 +40,6 @@ class RepositoriesTest {
         assertEquals("Renamed", repo.get("a1x")?.title)
         repo.delete("a1x")
         assertNull(repo.get("a1x"))
-    }
-
-    @Test
-    fun sparseTrackUpdateDoesNotEraseKnownArtwork(): Unit = runBlocking {
-        val repo = SqlDelightTrackRepository(newDb(), FakeClock(), Dispatchers.Unconfined)
-        val full = track("artwork")
-        repo.save(full)
-        repo.save(full.copy(title = "Sparse replay", thumbnailUrl = null))
-        assertEquals(full.thumbnailUrl, repo.get(full.id)?.thumbnailUrl)
-        assertEquals("Sparse replay", repo.get(full.id)?.title)
-
-        repo.save(full.copy(thumbnailUrl = "https://i/new.jpg"))
-        assertEquals("https://i/new.jpg", repo.get(full.id)?.thumbnailUrl)
     }
 
     @Test
@@ -125,98 +109,6 @@ class RepositoriesTest {
         repo.delete("pl1")
         assertNull(repo.observePlaylist("pl1").first())
         assertTrue(repo.observeTracks("pl1").first().isEmpty())
-    }
-
-    @Test
-    fun playlistCoverFollowsOrderedTrackArtworkWithoutAMigration(): Unit = runBlocking {
-        val db = newDb()
-        val clock = FakeClock()
-        val repo = SqlDelightPlaylistRepository(db, clock, Dispatchers.Unconfined, idGenerator = { "cover" })
-        val tracks = SqlDelightTrackRepository(db, clock, Dispatchers.Unconfined)
-        repo.create("Covers")
-        val sparse = track("a").copy(thumbnailUrl = null)
-        repo.addTrack("cover", sparse)
-        repo.addTrack("cover", track("b"))
-        assertEquals("https://i/b.jpg", repo.observePlaylist("cover").first()?.thumbnailUrl)
-
-        tracks.save(track("a"))
-        assertEquals("https://i/a.jpg", repo.observePlaylist("cover").first()?.thumbnailUrl)
-        repo.move("cover", 0, 1)
-        assertEquals(listOf("b", "a"), repo.observeTracks("cover").first().map { it.id })
-        assertEquals("https://i/b.jpg", repo.observePlaylist("cover").first()?.thumbnailUrl)
-        repo.removeTrack("cover", "b")
-        assertEquals("https://i/a.jpg", repo.observePlaylist("cover").first()?.thumbnailUrl)
-        repo.removeTrack("cover", "a")
-        assertNull(repo.observePlaylist("cover").first()?.thumbnailUrl)
-    }
-
-    @Test
-    fun deletingPlaylistPreservesRelatedDataAcrossDatabaseReopen(): Unit = runBlocking {
-        val dir = Files.createTempDirectory("dhun-playlist-delete").toFile()
-        val dbFile = dir.resolve("library.db")
-        val audio = dir.resolve("track.webm").apply { writeText("synthetic audio") }
-        var driver = DatabaseDriverFactory(dbFile).createDriver()
-        try {
-            var data = DataLayer(DatabaseFactory.create(driver))
-            val first = data.playlists.create("Delete")
-            val second = data.playlists.create("Keep")
-            val song = track("shared")
-            data.playlists.addTrack(first.id, song)
-            data.playlists.addTrack(second.id, song)
-            data.library.addFavorite(song)
-            data.history.recordPlay(song, PlayContext.PLAYLIST)
-            data.downloads.upsert(DownloadedTrack(
-                trackId = song.id, title = song.title, artistName = song.artistName,
-                localAudioPath = audio.absolutePath, mimeType = "audio/webm",
-                downloadState = DownloadState.COMPLETED,
-            ))
-            data.nowPlaying.saveQueue(listOf(song), 0, 12_000L, RepeatMode.ONE, false)
-            data.playlists.delete(first.id)
-            data.playlists.delete("missing") // idempotent, cannot affect other rows
-            driver.close()
-            driver = DatabaseDriverFactory(dbFile).createDriver()
-            data = DataLayer(DatabaseFactory.create(driver))
-            assertNull(data.playlists.observePlaylist(first.id).first())
-            assertEquals(listOf(song.id), data.playlists.observeTracks(second.id).first().map { it.id })
-            assertNotNull(data.tracks.get(song.id))
-            assertTrue(data.library.isFavorite(song.id))
-            assertEquals(listOf(song.id), data.history.observeHistory(10).first().map { it.track.id })
-            assertTrue(data.downloads.isDownloaded(song.id))
-            assertEquals(listOf(song), data.nowPlaying.load()?.queue)
-            assertEquals(12_000L, data.nowPlaying.load()?.positionMs)
-            assertEquals("synthetic audio", audio.readText())
-        } finally {
-            driver.close()
-            dir.deleteRecursively()
-        }
-    }
-
-    @Test
-    fun playlistDeletionRollsBackMembershipWhenRowDeleteFails(): Unit = runBlocking {
-        // A BEFORE DELETE trigger aborts the second statement of the transaction,
-        // after deleteAllTracks has run. Without a transaction, membership is lost.
-        val driver = DatabaseDriverFactory.inMemory().createDriver()
-        try {
-            val data = DataLayer(DatabaseFactory.create(driver))
-            val playlist = data.playlists.create("Keep on failure")
-            val other = data.playlists.create("Another playlist")
-            val song = track("rollback")
-            data.playlists.addTrack(playlist.id, song)
-            data.playlists.addTrack(other.id, song)
-            data.library.addFavorite(song)
-            driver.execute(null,
-                "CREATE TRIGGER abort_playlist_delete BEFORE DELETE ON Playlist " +
-                    "BEGIN SELECT RAISE(ABORT, 'injected storage failure'); END", 0)
-            kotlin.test.assertFailsWith<Exception> { data.playlists.delete(playlist.id) }
-            assertEquals(playlist.id, data.playlists.observePlaylist(playlist.id).first()?.id)
-            assertEquals(listOf(song.id), data.playlists.observeTracks(playlist.id).first().map { it.id })
-            assertEquals(listOf(song.id), data.playlists.observeTracks(other.id).first().map { it.id })
-            assertTrue(data.library.isFavorite(song.id))
-            driver.execute(null, "DROP TRIGGER abort_playlist_delete", 0)
-            data.playlists.delete(playlist.id)
-            assertNull(data.playlists.observePlaylist(playlist.id).first())
-            assertEquals(listOf(song.id), data.playlists.observeTracks(other.id).first().map { it.id })
-        } finally { driver.close() }
     }
 
     @Test

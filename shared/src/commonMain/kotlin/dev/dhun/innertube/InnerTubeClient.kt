@@ -7,7 +7,6 @@ import dev.dhun.core.diagnosticText
 import dev.dhun.core.HomeFeedPage
 import dev.dhun.core.HomeSection
 import dev.dhun.core.Lyrics
-import dev.dhun.core.PlaylistTracksPage
 import dev.dhun.core.RateLimitGate
 import dev.dhun.core.map
 import dev.dhun.core.SearchResults
@@ -43,32 +42,13 @@ import kotlinx.serialization.json.putJsonObject
  * Search-result filter params. These are YTM's filter protos, base64-encoded.
  * Values verified live against every filter in Phase 02 (see verification doc).
  */
-enum class SearchFilter(
-    internal val params: String?,
-    /** Current upstream equivalent, tried only if the first params are rejected. */
-    internal val compatibilityParams: String? = null,
-) {
+enum class SearchFilter(internal val params: String?) {
     ALL(null),
-    SONGS(
-        "EgWKAQIIAWoKEAkQBRAKEAMQBA%3D%3D",
-        "EgWKAQIIAWoMEA4QChADEAQQCRAF",
-    ),
-    VIDEOS(
-        "EgWKAQIQAWoKEAkQChAFEAMQBA%3D%3D",
-        "EgWKAQIQAWoMEA4QChADEAQQCRAF",
-    ),
-    ARTISTS(
-        "EgWKAQIgAWoKEAkQChAFEAMQBA%3D%3D",
-        "EgWKAQIgAWoMEA4QChADEAQQCRAF",
-    ),
-    ALBUMS(
-        "EgWKAQIYAWoKEAkQChAFEAMQBA%3D%3D",
-        "EgWKAQIYAWoMEA4QChADEAQQCRAF",
-    ),
-    PLAYLISTS(
-        "EgWKAQIOAWoKEAkQChAFEAMQBA%3D%3D",
-        "Eg-KAQwIABAAGAAgACgBMABqChAEEAMQCRAFEAo%3D",
-    ),
+    SONGS("EgWKAQIIAWoKEAkQBRAKEAMQBA%3D%3D"),
+    VIDEOS("EgWKAQIQAWoKEAkQChAFEAMQBA%3D%3D"),
+    ARTISTS("EgWKAQIgAWoKEAkQChAFEAMQBA%3D%3D"),
+    ALBUMS("EgWKAQIYAWoKEAkQChAFEAMQBA%3D%3D"),
+    PLAYLISTS("EgWKAQIOAWoKEAkQChAFEAMQBA%3D%3D"),
 }
 
 internal const val INNERTUBE_USER_AGENT =
@@ -119,12 +99,6 @@ class InnerTubeClient(
     @Volatile
     private var cachedMusicVisitorData: String? = null
 
-    @Volatile
-    private var cachedMusicContext: JsonObject? = null
-
-    @Volatile
-    private var cachedHomeInitialData: JsonObject? = null
-
     /** Player-JS URL to the `signatureTimestamp` extracted from it. */
     @Volatile
     private var cachedSts: Pair<String, String>? = null
@@ -142,25 +116,17 @@ class InnerTubeClient(
 
     suspend fun clientVersion(forceRefresh: Boolean = false): String {
         cachedClientVersion?.takeIf { !forceRefresh }?.let { return it }
-        val (status, html) = try {
-            val response = httpClient.get("${MUSIC_BASE}/") { browserHeaders() }
-            response.status.value to response.bodyAsText()
+        val html = try {
+            httpClient.get("${MUSIC_BASE}/") { browserHeaders() }.bodyAsText()
         } catch (e: CancellationException) {
             throw e
         } catch (t: Throwable) {
             throw DhunException(classify(t))
         }
-        val version = Regex("\"INNERTUBE_CLIENT_VERSION\"\\s*:\\s*\"([0-9.]+)\"")
+        val version = Regex("\"INNERTUBE_CLIENT_VERSION\":\"([0-9.]+)\"")
             .find(html)?.groupValues?.get(1)
-            ?: throw DhunException(
-                DhunError.Parse(
-                    "client version missing from homepage HTML (HTTP $status, ${html.length} chars)",
-                ),
-            )
-        cachedMusicContext = parseInnertubeContext(html)
+            ?: throw DhunException(DhunError.Parse("client version missing from homepage HTML"))
         cachedMusicVisitorData = parseVisitorDataFromHomepage(html)
-            ?: cachedMusicContext?.obj("client")?.str("visitorData")
-        cachedHomeInitialData = parseHomeInitialData(html)
         cachedClientVersion = version
         return version
     }
@@ -169,46 +135,21 @@ class InnerTubeClient(
 
     suspend fun search(query: String, filter: SearchFilter = SearchFilter.SONGS): DhunResult<SearchResults> =
         resultify {
-            fun bodyWithParams(params: String?) = buildJsonObject {
+            val body = buildJsonObject {
                 put("context", context())
                 put("query", query)
-                params?.let { put("params", it) }
+                filter.params?.let { put("params", it) }
             }
-
-            val response = try {
-                postJson(
-                    endpoint = "search",
-                    body = bodyWithParams(filter.params),
-                    // A rejected filtered request has a more useful bounded
-                    // recovery below: the current params for the SAME filter.
-                    refreshSessionOnBadRequest = filter.compatibilityParams == null,
-                )
-            } catch (rejected: DhunException) {
-                val compatibilityParams = filter.compatibilityParams
-                val badRequest = (rejected.error as? DhunError.Parse)?.detail
-                    ?.startsWith("HTTP 400 from /search") == true
-                if (!badRequest || compatibilityParams == null) throw rejected
-
-                // Both params versions are accepted by the live service in some
-                // sessions, but the phone report proves that is not universal.
-                // Never drop the filter or invent results: only a real HTTP 200
-                // for the requested type can recover the page. The alternate
-                // request retains the one bounded fresh-session retry.
-                postJson("search", bodyWithParams(compatibilityParams))
-            }
-            parseSearchResults(query, response, filter)
+            parseSearchResults(query, postJson("search", body))
         }
 
-    suspend fun searchContinuation(
-        continuationToken: String,
-        filter: SearchFilter = SearchFilter.SONGS,
-    ): DhunResult<SearchResults> =
+    suspend fun searchContinuation(continuationToken: String): DhunResult<SearchResults> =
         resultify {
             val body = buildJsonObject {
                 put("context", context())
                 put("continuation", continuationToken)
             }
-            parseSearchResults("", postJson("search", body), filter)
+            parseSearchResults("", postJson("search", body))
         }
 
     suspend fun searchSuggestions(query: String): DhunResult<List<String>> =
@@ -237,31 +178,7 @@ class InnerTubeClient(
                 put("context", context())
                 put("browseId", "FEmusic_home")
             }
-            val response = try {
-                postJson("browse", body, refreshSessionOnBadRequest = false)
-            } catch (rejected: DhunException) {
-                val detail = (rejected.error as? DhunError.Parse)?.detail
-                if (detail?.startsWith("HTTP 400 from /browse") != true) throw rejected
-
-                // The music homepage carries the same real ytInitialData Home
-                // envelope. Some sessions reject the anonymous browse POST
-                // while still serving that page; refresh it on every fallback
-                // so Retry is a real request, never a cached success. If the
-                // fallback is absent or malformed, preserve the original 400.
-                val fallback = try {
-                    clientVersion(forceRefresh = true)
-                    cachedHomeInitialData?.let(::parseHomeFeedPage)
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (_: Exception) {
-                    null
-                }
-                if (fallback != null && (fallback.sections.isNotEmpty() || fallback.continuationToken != null)) {
-                    return@resultify fallback
-                }
-                throw rejected
-            }
-            parseHomeFeedPage(response)
+            parseHomeFeedPage(postJson("browse", body))
         }
 
     /**
@@ -313,13 +230,6 @@ class InnerTubeClient(
             parsePlaylistPage(postJson("browse", body), browseId)
         }
 
-    /** Next ordered playlist track page; the opaque cursor stays in the query. */
-    suspend fun playlistContinuation(continuationToken: String): DhunResult<PlaylistTracksPage> =
-        resultify {
-            val body = buildJsonObject { put("context", context()) }
-            parsePlaylistTracksPage(postJson("browse", body, continuationToken))
-        }
-
     /** Radio queue for a track (RDAMVM playlist = "start radio from this"). */
     suspend fun relatedTracks(videoId: String): DhunResult<List<Track>> =
         radioQueuePage(videoId).map { it.tracks }
@@ -335,20 +245,6 @@ class InnerTubeClient(
                 put("context", context())
                 put("videoId", videoId)
                 put("playlistId", "RDAMVM$videoId")
-                // Current WEB_REMIX watch contract: ask for the persistent
-                // audio queue explicitly instead of relying on the legacy
-                // implicit panel. The response still uses the same
-                // playlistPanelVideoRenderer / nextRadioContinuationData
-                // parser and keeps the existing queue continuation chain.
-                put("enablePersistentPlaylistPanel", true)
-                put("isAudioOnly", true)
-                put("tunerSettingValue", "AUTOMIX_SETTING_NORMAL")
-                putJsonObject("watchEndpointMusicSupportedConfigs") {
-                    putJsonObject("watchEndpointMusicConfig") {
-                        put("hasPersistentPlaylistPanel", true)
-                        put("musicVideoType", "MUSIC_VIDEO_TYPE_ATV")
-                    }
-                }
             }
             parseRadioQueuePage(postJson("next", body))
         }
@@ -609,14 +505,12 @@ class InnerTubeClient(
         endpoint: String,
         body: JsonObject,
         continuationToken: String? = null,
-        refreshSessionOnBadRequest: Boolean = true,
     ): JsonObject {
         val version = clientVersion()
         val visitorData = cachedMusicVisitorData
         // context() may have been built BEFORE the first version discovery.
-        // Rebuild it with the complete session context and keep the body,
-        // client-version header and visitor header aligned on every request.
-        val requestBody = bodyWithClientVersion(body, version, cachedMusicContext, visitorData)
+        // Keep body and X-YouTube-Client-Version aligned on the very first request.
+        val requestBody = bodyWithClientVersion(body, version)
         var lastError: DhunError = DhunError.Unknown()
         repeat(MAX_ATTEMPTS) { attempt ->
             globalRateGate.await() // Phase 14: 429 global backoff — all calls wait out a tripped gate
@@ -641,43 +535,8 @@ class InnerTubeClient(
                 when {
                     code == 429 -> lastError = onRateLimited(response.headers["Retry-After"])
                     code in 500..599 -> lastError = DhunError.Network("HTTP $code from /$endpoint")
-                    code != 200 -> {
-                        val detail = innerTubeHttpErrorDetail(code, endpoint, response.bodyAsText())
-                        if (code == 400 && refreshSessionOnBadRequest) {
-                            // A session can expire or be rejected independently
-                            // of the endpoint. Refresh YouTube's own context and
-                            // retry once; never loop on a deterministic 400.
-                            val refreshed = try {
-                                clientVersion(forceRefresh = true)
-                                true
-                            } catch (cancelled: CancellationException) {
-                                throw cancelled
-                            } catch (_: Exception) {
-                                false
-                            }
-                            if (refreshed) {
-                                return postJson(
-                                    endpoint = endpoint,
-                                    body = body,
-                                    continuationToken = continuationToken,
-                                    refreshSessionOnBadRequest = false,
-                                )
-                            }
-                        }
-                        throw DhunException(DhunError.Parse(detail))
-                    }
-                    else -> {
-                        val text = response.bodyAsText()
-                        try {
-                            return Json.parseToJsonElement(text).jsonObject
-                        } catch (e: kotlinx.serialization.SerializationException) {
-                            throw DhunException(DhunError.Parse("Malformed JSON from /$endpoint"))
-                        } catch (e: IllegalArgumentException) {
-                            // A valid JSON array/scalar is still the wrong
-                            // response contract; never report it as Unknown.
-                            throw DhunException(DhunError.Parse("Expected a JSON object from /$endpoint"))
-                        }
-                    }
+                    code != 200 -> throw DhunException(DhunError.Parse("HTTP $code from /$endpoint"))
+                    else -> return Json.parseToJsonElement(response.bodyAsText()).jsonObject
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -937,49 +796,10 @@ internal fun parseSignatureTimestampFromPlayerJs(playerJs: String): String? {
         .find(playerJs)?.groupValues?.get(1)
 }
 
-/**
- * Standard InnerTube error fields only. Never include the raw response,
- * debugInfo, request context or visitor/session values in phone diagnostics.
- */
-internal fun innerTubeHttpErrorDetail(code: Int, endpoint: String, responseBody: String): String {
-    val base = "HTTP $code from /$endpoint"
-    val error = runCatching {
-        (Json.parseToJsonElement(responseBody) as? JsonObject)?.obj("error")
-    }.getOrNull() ?: return base
-    val firstCause = error.arr("errors")?.firstOrNull() as? JsonObject
-    val summary = listOfNotNull(
-        base,
-        error.str("status")?.takeIf { it.isNotBlank() }?.let { "status=$it" },
-        firstCause?.str("reason")?.takeIf { it.isNotBlank() }?.let { "reason=$it" },
-        error.str("message")?.takeIf { it.isNotBlank() },
-    )
-    return diagnosticText(summary.joinToString("; "))
-}
-
-/**
- * Keep endpoint fields unchanged while aligning the request with the session
- * YouTube actually served. The explicit body client keeps DHUN's language and
- * region choices; the served context contributes request/user fields and its
- * visitor identity is mirrored into both body and header.
- */
-internal fun bodyWithClientVersion(
-    body: JsonObject,
-    version: String,
-    sessionContext: JsonObject? = null,
-    visitorData: String? = null,
-): JsonObject {
-    val existingContext = body.obj("context").orEmpty()
-    val existingClient = (existingContext["client"] as? JsonObject).orEmpty()
-    val context = sessionContext?.takeIf {
-        it.obj("client")?.str("clientName") == "WEB_REMIX"
-    } ?: existingContext
-    val sessionClient = (context["client"] as? JsonObject).orEmpty()
-    val visitor = visitorData?.takeIf { it.isNotBlank() }?.let {
-        mapOf("visitorData" to JsonPrimitive(it))
-    }.orEmpty()
-    val client = sessionClient + existingClient +
-        mapOf("clientVersion" to JsonPrimitive(version)) + visitor
+internal fun bodyWithClientVersion(body: JsonObject, version: String): JsonObject {
+    val context = body.obj("context").orEmpty()
+    val client = (context["client"] as? JsonObject).orEmpty()
     return JsonObject(body + ("context" to JsonObject(
-        context + ("client" to JsonObject(client)),
+        context + ("client" to JsonObject(client + ("clientVersion" to JsonPrimitive(version)))),
     )))
 }

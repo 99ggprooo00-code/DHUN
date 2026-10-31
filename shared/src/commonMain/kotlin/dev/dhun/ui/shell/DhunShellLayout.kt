@@ -138,12 +138,11 @@ object DhunShellPolicy {
 
     /**
      * Width the rail occupies when it is shown instead of the bottom bar.
-     * [DhunSpacing.bottomNavHeight] (80dp) is the app's own dock measure, and
-     * `DhunNavigationPolicy.railWidth` is set to it — the same 80dp strip
-     * rotated — so the rail and this budget cannot disagree (pinned by
-     * `GlassSystemTest`). It comfortably covers the 64dp item height
+     * [DhunSpacing.bottomNavHeight] (80dp) is the app's own dock measure and the
+     * M3 navigation-rail width — the token is shared because it is the same
+     * 80dp strip rotated, and it comfortably covers the 64dp item height
      * [DhunSpacing.navigationBarContent] gives the bottom bar. The pane seam's
-     * [DhunSpacing.divider] comes off the same budget.
+     * [DhunSpacing.border] comes off the same budget.
      */
     fun railAllowance(hasRail: Boolean): Dp =
         if (hasRail) maxOf(DhunSpacing.bottomNavHeight, DhunSpacing.divider) else 0.dp

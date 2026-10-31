@@ -6,14 +6,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -27,8 +22,6 @@ fun ErrorView(
     modifier: Modifier = Modifier,
     title: String = "Something went wrong",
     onRetry: (() -> Unit)? = null,
-    /** Sanitized technical evidence, optional for ordinary transient errors. */
-    details: String? = null,
 ) {
     Column(
         modifier = modifier.fillMaxWidth().padding(DhunSpacing.xxl),
@@ -58,24 +51,6 @@ fun ErrorView(
             Spacer(modifier = Modifier.height(DhunSpacing.lg))
             DhunButton(onClick = onRetry) {
                 Text("Retry")
-            }
-        }
-        if (!details.isNullOrBlank()) {
-            var showDetails by remember(details) { mutableStateOf(false) }
-            Spacer(modifier = Modifier.height(DhunSpacing.sm))
-            DhunTextButton(onClick = { showDetails = !showDetails }) {
-                Text(if (showDetails) "Hide technical details" else "Show technical details")
-            }
-            if (showDetails) {
-                SelectionContainer {
-                    Text(
-                        text = details,
-                        modifier = Modifier.fillMaxWidth(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = DhunColors.textTertiary,
-                        textAlign = TextAlign.Start,
-                    )
-                }
             }
         }
     }

@@ -26,7 +26,6 @@ import dev.dhun.presentation.home.HomeViewModel
 import dev.dhun.provider.MusicProvider
 import dev.dhun.ui.home.quickPickShelfAlreadyShown
 import dev.dhun.ui.home.remainingHomeSections
-import dev.dhun.ui.home.shouldShowLocalHomeOnError
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -57,15 +56,6 @@ class HomePaginationTest {
             scope = scope,
         )
     private fun HomeViewModel.feed() = (uiState.value as HomeUiState.Success).feed
-
-    @Test
-    fun homeRequestFailureKeepsOnlyUsefulLocalShelves() {
-        val recent = listOf(Track("recent", "Recent", "Artist"))
-        assertTrue(shouldShowLocalHomeOnError(HomeMood.FOR_YOU, recent, emptyList()))
-        assertTrue(shouldShowLocalHomeOnError(HomeMood.FOR_YOU, emptyList(), recent))
-        assertFalse(shouldShowLocalHomeOnError(HomeMood.FOR_YOU, emptyList(), emptyList()))
-        assertFalse(shouldShowLocalHomeOnError(HomeMood.FOCUS, recent, recent))
-    }
 
     @Test
     fun rapidLoadMoreEventsMakeOneRequestAndAppendThePage() = runTest {
@@ -203,27 +193,6 @@ class HomePaginationTest {
     }
 
     @Test
-    fun returningToACategoryRestoresItsOwnFeedWithoutAnotherRequest() = runTest {
-        val provider = PagingProvider(DhunResult.Success(page("home", "home-next")))
-        val vm = model(provider, backgroundScope)
-        runCurrent()
-        vm.selectMood(HomeMood.FOCUS)
-        runCurrent()
-        vm.selectMood(HomeMood.CHILL)
-        runCurrent()
-        vm.selectMood(HomeMood.FOCUS)
-        runCurrent()
-
-        assertEquals(listOf(HomeMood.FOCUS.query, HomeMood.CHILL.query), provider.searches)
-        assertEquals(listOf(HomeMood.FOCUS.query), vm.feed().sections.flatMap { it.tracks }.map { it.id })
-        vm.selectMood(HomeMood.FOR_YOU)
-        runCurrent()
-        assertEquals(1, provider.homeRequests)
-        assertEquals("home-next", vm.feed().continuationToken)
-        assertEquals("home", vm.feed().sections.single().tracks.single().id)
-    }
-
-    @Test
     fun selectingTheAlreadySelectedMoodDoesNotIssueAnotherRequest() = runTest {
         val provider = PagingProvider(DhunResult.Success(page("home", null)))
         val vm = model(provider, backgroundScope)
@@ -343,12 +312,7 @@ class HomePaginationTest {
     private class PagingProvider(var first: DhunResult<HomeFeedPage>) : MusicProvider {
         val requests = mutableListOf<String>()
         var more: suspend (String) -> DhunResult<HomeFeedPage> = { DhunResult.Success(HomeFeedPage()) }
-        var homeRequests: Int = 0
-            private set
-        override suspend fun homeFeedPage(): DhunResult<HomeFeedPage> {
-            homeRequests++
-            return first
-        }
+        override suspend fun homeFeedPage() = first
         override suspend fun homeFeedContinuation(continuationToken: String): DhunResult<HomeFeedPage> {
             requests += continuationToken
             return more(continuationToken)

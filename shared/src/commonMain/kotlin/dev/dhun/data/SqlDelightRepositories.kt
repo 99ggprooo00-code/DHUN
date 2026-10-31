@@ -50,8 +50,7 @@ internal fun DhunDatabase.upsertTrack(track: Track, now: Long) {
         albumName = track.albumName,
         albumId = track.albumId,
         durationSeconds = track.durationSeconds?.toLong(),
-        // SQLDelight names the COALESCE bind `value`; null keeps stored art.
-        value = track.thumbnailUrl,
+        thumbnailUrl = track.thumbnailUrl,
         explicit = track.explicit,
         updatedAt = now,
         id = track.id,

@@ -20,24 +20,25 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.window.Dialog
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import dev.dhun.design.components.GlassCard
 import dev.dhun.design.components.dhunContentSurface
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -47,19 +48,13 @@ import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunSpacing
-import dev.dhun.design.background.BackgroundBlurPolicy
 import dev.dhun.design.DhunThemeMode
 import dev.dhun.design.DhunVisualTuning
 import dev.dhun.design.VisualPart
 import dev.dhun.design.supportsRealtimeBlur
 import dev.dhun.design.components.DhunAppearanceControls
 import dev.dhun.design.components.DhunFilterChip
-import dev.dhun.design.components.DhunButton
 import dev.dhun.design.components.DhunIconButton
-import dev.dhun.design.components.DhunSlider
-import dev.dhun.design.components.DhunSwitch
-import dev.dhun.design.components.DhunTextField
-import dev.dhun.design.components.DhunTextButton
 import dev.dhun.design.components.DhunTonalButton
 import dev.dhun.design.components.SectionHeader
 import dev.dhun.design.components.dhunMouseDragScroll
@@ -134,11 +129,6 @@ fun SettingsScreen(
         }
 
         val systemDark = isSystemInDarkTheme()
-        // Pending/failure state for every destructive action here. The dialogs
-        // below are result-driven: they stay open while the clear runs and show
-        // a retryable message if it fails (the same contract the library's
-        // clear-history and the playlist delete dialogs use).
-        val maintenance by viewModel.maintenanceState.collectAsState()
         var confirmReset by remember { mutableStateOf(false) }
         var confirmLyricsClear by remember { mutableStateOf(false) }
         var confirmAudioClear by remember { mutableStateOf(false) }
@@ -148,12 +138,6 @@ fun SettingsScreen(
                 .padding(horizontal = DhunSpacing.screenPadding),
             verticalArrangement = Arrangement.spacedBy(DhunSpacing.md),
         ) {
-            maintenance.screenErrorMessage?.let { message ->
-                SettingsFailureNotice(
-                    message = message,
-                    onDismiss = viewModel::dismissMaintenanceError,
-                )
-            }
             if (category == null) SettingsHub(
                 isDesktop = isDesktop,
                 themeId = themeId,
@@ -186,16 +170,11 @@ fun SettingsScreen(
                     DhunAppearance.setAccentMode(it)
                 }
                 Text(
-                    text = "Dynamic follows artwork; Static uses your selected accent.",
+                    text = "Dynamic tints accent-colored controls throughout the app from the current track; static keeps the selected color.",
                     style = MaterialTheme.typography.bodySmall,
                     color = DhunColors.textSecondary,
                     modifier = Modifier.padding(horizontal = DhunSpacing.screenPadding),
                 )
-            }
-            if (category == SettingsCategory.APPEARANCE) SettingsGroup("Backgrounds") {
-                BackgroundSettingsSection(viewModel)
-            }
-            if (category == SettingsCategory.APPEARANCE) SettingsGroup("Backdrop detail") {
                 BackdropControls(viewModel)
             }
             if (category == SettingsCategory.APPEARANCE && showThemeCatalogue) SettingsGroup("Test build · UI tuning") {
@@ -207,13 +186,13 @@ fun SettingsScreen(
                     viewModel.audioQuality.collectAsState().value, viewModel::setAudioQuality)
                 OptionRow("Keyboard seek step", listOf(5 to "5s", 10 to "10s", 15 to "15s", 30 to "30s"),
                     viewModel.seekStepSeconds.collectAsState().value, viewModel::setSeekStepSeconds)
-                SettingsSwitchRow("Resume on launch", "Restore your last queue and position",
+                SettingsSwitchRow("Resume on launch", "Restore the last queue and position when the app starts",
                     viewModel.resumeOnLaunch.collectAsState().value, viewModel::setResumeOnLaunch)
-                SettingsSwitchRow("Endless radio", "Add similar songs when the queue ends",
+                SettingsSwitchRow("Endless radio", "Automatically queue similar songs near the end",
                     viewModel.autoplayRadio.collectAsState().value, viewModel::setAutoplayRadio)
-                SettingsSwitchRow("Keep shuffle & repeat", "Keep modes for new queues and restarts",
+                SettingsSwitchRow("Keep shuffle & repeat", "Keep modes when starting a new queue or restarting",
                     viewModel.persistShuffleRepeat.collectAsState().value, viewModel::setPersistShuffleRepeat)
-                SettingsSwitchRow("Pause on mute", "Pause at zero volume; resume if mute paused playback",
+                SettingsSwitchRow("Pause on mute", "Pause at zero volume; resume on unmute only if mute paused playback",
                     viewModel.pauseOnMute.collectAsState().value, viewModel::setPauseOnMute)
             }
             if (category == SettingsCategory.LYRICS) SettingsGroup("Lyrics & Providers") {
@@ -229,7 +208,7 @@ fun SettingsScreen(
                     viewModel.preferredProvider.collectAsState().value, { viewModel.setPreferredProvider(it) })
                 listOf("lrclib" to "LRCLIB", "ytm" to "YouTube Music",
                     "lrclib_search" to "LRCLIB search", "kugou" to "KuGou").forEach { (id, label) ->
-                    SettingsSwitchRow(label, "Use after the preferred provider",
+                    SettingsSwitchRow(label, "Include as a fallback after the preferred provider",
                         id in viewModel.providerOrder.collectAsState().value.split(',')) {
                         viewModel.setProviderEnabled(id, it)
                     }
@@ -237,44 +216,39 @@ fun SettingsScreen(
                 SettingsNavigationRow("Clear lyrics cache", "Refresh automatic lyrics; keep song choices", { confirmLyricsClear = true })
                 SettingsSwitchRow("Prefer synced lyrics", "Use timestamped lyrics when available",
                     viewModel.lyricsPreferSynced.collectAsState().value, viewModel::setLyricsPreferSynced)
-                SettingsSwitchRow("Auto-scroll synced lyrics", "Follow the current line until you scroll",
+                SettingsSwitchRow("Auto-scroll synced lyrics", "Follow the current line until you scroll manually",
                     viewModel.lyricsAutoScroll.collectAsState().value, viewModel::setLyricsAutoScroll)
                 OptionRow("Lyrics text size", listOf("small" to "Small", "default" to "Default", "large" to "Large"),
                     viewModel.lyricsTextSize.collectAsState().value, viewModel::setLyricsTextSize)
             }
             if (category == SettingsCategory.CONTENT) SettingsGroup("Content, Region & Discovery") {
                 CountryRegionPicker(viewModel)
-                SettingsSwitchRow("Explicit content", "Allow explicit tracks",
+                SettingsSwitchRow("Explicit content", "Allow explicit tracks in search, home and radio",
                     viewModel.explicitContent.collectAsState().value, viewModel::setExplicitContent)
             }
             if (category == SettingsCategory.PLAYBACK && equalizerSession != null) SettingsGroup("Equalizer & Sound Processing") {
                 EqualizerSection(equalizerSession)
             }
             if (category == SettingsCategory.PRIVACY) SettingsGroup("Privacy & History") {
-                SettingsSwitchRow("Record listening history", "Save new plays on this device",
+                SettingsSwitchRow("Record listening history", "Save new plays locally; turning off keeps existing history and queue restore",
                     viewModel.recordListeningHistory.collectAsState().value, viewModel::setRecordListeningHistory)
-                Text("Not incognito: other data still works. Plays made while off aren’t added later.",
+                Text("This is not incognito: queue restore, caches and provider requests still work. Plays skipped while off are not added later.",
                     modifier = Modifier.padding(horizontal = DhunSpacing.screenPadding),
                     style = MaterialTheme.typography.bodySmall, color = DhunColors.textSecondary)
                 SettingsNavigationRow("Clear search history", "Remove recent searches", { confirmHistory = "search" })
                 SettingsNavigationRow("Clear play history", "Remove listening history", { confirmHistory = "play" })
-                SettingsNavigationRow("Privacy & Legal", "Provider requests and on-device data", onOpenAboutLegal)
+                SettingsNavigationRow("Privacy & Legal", "Review provider requests and on-device data", onOpenAboutLegal)
             }
             if (category == SettingsCategory.STORAGE) SettingsGroup("Storage, Cache & Data") {
                 CacheBudgetRow(viewModel)
                 if (viewModel.canClearAudioCache) {
-                    SettingsNavigationRow(
-                        "Clear audio cache",
-                        if (maintenance.isRunning(SettingsViewModel.KEY_CLEAR_AUDIO)) "Clearing streamed audio files…" else "Remove streamed audio files",
-                        { confirmAudioClear = true },
-                    )
+                    SettingsNavigationRow("Clear audio cache", "Remove streamed audio files", { confirmAudioClear = true })
                     viewModel.freedAudioBytes.collectAsState().value?.let { freed ->
-                        Text(
-                            if (freed > 0) "Freed ${freed / (1024 * 1024)} MB" else "Audio cache was already empty",
-                            modifier = Modifier.padding(horizontal = DhunSpacing.screenPadding),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = DhunColors.textSecondary,
-                        )
+                        Text("Freed ${freed / (1024 * 1024)} MB", modifier = Modifier.padding(horizontal = DhunSpacing.screenPadding))
+                    }
+                    if (viewModel.audioCacheError.collectAsState().value) {
+                        Text("Could not clear audio in use. Try again after playback stops.",
+                            modifier = Modifier.padding(horizontal = DhunSpacing.screenPadding))
                     }
                 }
             }
@@ -289,164 +263,70 @@ fun SettingsScreen(
             }
             Spacer(modifier = Modifier.height(DhunSpacing.xl))
         }
-        // A confirmation closes only after ITS action completed successfully.
-        // (Previously every dialog closed the instant the button was tapped, so
-        // a failed clear looked exactly like a successful one.)
-        val completedKey by viewModel.lastCompletedKey.collectAsState()
-        LaunchedEffect(completedKey) {
-            when (completedKey) {
-                null -> {}
-                SettingsViewModel.KEY_CLEAR_AUDIO -> {
-                    confirmAudioClear = false
-                    viewModel.consumeCompletedAction()
-                }
-                SettingsViewModel.KEY_CLEAR_LYRICS -> {
-                    confirmLyricsClear = false
-                    viewModel.consumeCompletedAction()
-                }
-                SettingsViewModel.KEY_CLEAR_SEARCH, SettingsViewModel.KEY_CLEAR_PLAY -> {
-                    confirmHistory = ""
-                    viewModel.consumeCompletedAction()
-                }
-                SettingsViewModel.KEY_RESET -> {
-                    confirmReset = false
-                    equalizerSession?.restore(dev.dhun.player.equalizer.EqualizerState())
-                    DhunAppearance.reset()
-                    viewModel.consumeCompletedAction()
-                }
-            }
-        }
         if (confirmAudioClear) SettingsConfirmDialog(
             onDismissRequest = { confirmAudioClear = false },
             title = { Text("Clear audio cache?") },
             text = { Text("Streamed tracks may need to load again.") },
-            isPending = maintenance.isRunning(SettingsViewModel.KEY_CLEAR_AUDIO),
-            errorMessage = maintenance.errorFor(SettingsViewModel.KEY_CLEAR_AUDIO),
-            confirmLabel = "Clear",
-            pendingLabel = "Clearing…",
-            onConfirm = { viewModel.clearAudioCache() },
+            confirmButton = { TextButton(onClick = {
+                viewModel.clearAudioCache()
+                confirmAudioClear = false
+            }) { Text("Clear") } },
+            dismissButton = { TextButton(onClick = { confirmAudioClear = false }) { Text("Cancel") } },
         )
-        if (confirmHistory.isNotEmpty()) {
-            val historyKey = if (confirmHistory == "search") {
-                SettingsViewModel.KEY_CLEAR_SEARCH
-            } else {
-                SettingsViewModel.KEY_CLEAR_PLAY
-            }
-            SettingsConfirmDialog(
-                onDismissRequest = { confirmHistory = "" },
-                title = { Text("Clear ${confirmHistory} history?") },
-                text = { Text("This cannot be undone.") },
-                isPending = maintenance.isRunning(historyKey),
-                errorMessage = maintenance.errorFor(historyKey),
-                confirmLabel = "Clear",
-                pendingLabel = "Clearing…",
-                onConfirm = {
-                    if (confirmHistory == "search") viewModel.clearSearchHistory() else viewModel.clearPlayHistory()
-                },
-            )
-        }
+        if (confirmHistory.isNotEmpty()) SettingsConfirmDialog(
+            onDismissRequest = { confirmHistory = "" },
+            title = { Text("Clear ${confirmHistory} history?") },
+            text = { Text("This cannot be undone.") },
+            confirmButton = { TextButton(onClick = {
+                if (confirmHistory == "search") viewModel.clearSearchHistory() else viewModel.clearPlayHistory()
+                confirmHistory = ""
+            }) { Text("Clear") } },
+            dismissButton = { TextButton(onClick = { confirmHistory = "" }) { Text("Cancel") } },
+        )
         if (confirmLyricsClear) SettingsConfirmDialog(
             onDismissRequest = { confirmLyricsClear = false },
             title = { Text("Clear lyrics cache?") },
             text = { Text("Automatic lyrics will be fetched again. Saved per-song choices remain; use Use automatic in the lyrics match picker to reset one.") },
-            isPending = maintenance.isRunning(SettingsViewModel.KEY_CLEAR_LYRICS),
-            errorMessage = maintenance.errorFor(SettingsViewModel.KEY_CLEAR_LYRICS),
-            confirmLabel = "Clear",
-            pendingLabel = "Clearing…",
-            onConfirm = { viewModel.clearLyricsCache() },
+            confirmButton = { TextButton(onClick = {
+                viewModel.clearLyricsCache()
+                confirmLyricsClear = false
+            }) { Text("Clear") } },
+            dismissButton = { TextButton(onClick = { confirmLyricsClear = false }) { Text("Cancel") } },
         )
         if (confirmReset) SettingsConfirmDialog(
             onDismissRequest = { confirmReset = false },
             title = { Text("Reset settings?") },
             text = { Text("All preferences will return to their defaults.") },
-            isPending = maintenance.isRunning(SettingsViewModel.KEY_RESET),
-            errorMessage = maintenance.errorFor(SettingsViewModel.KEY_RESET),
-            confirmLabel = "Reset",
-            pendingLabel = "Resetting…",
-            // Live appearance/EQ state is reset in the LaunchedEffect above,
-            // only after the persisted reset reports success.
-            onConfirm = { viewModel.reset() },
+            confirmButton = { TextButton(onClick = {
+                viewModel.reset()
+                equalizerSession?.restore(dev.dhun.player.equalizer.EqualizerState())
+                DhunAppearance.reset()
+                confirmReset = false
+            }) { Text("Reset") } },
+            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Cancel") } },
         )
     }
 }
 
-/**
- * One confirmation surface for every destructive Settings action.
- *
- * It is result-driven, not tap-driven: while [isPending] the confirm button
- * shows [pendingLabel] and cannot be tapped again; when [errorMessage] is set
- * the message stays on screen and the button offers a retry. The caller closes
- * the dialog when its action actually succeeded.
- */
 @Composable
 private fun SettingsConfirmDialog(
     onDismissRequest: () -> Unit,
     title: @Composable () -> Unit,
     text: @Composable () -> Unit,
-    isPending: Boolean = false,
-    errorMessage: String? = null,
-    confirmLabel: String = "Clear",
-    pendingLabel: String = "Clearing…",
-    onConfirm: () -> Unit,
-    dismissLabel: String = "Cancel",
+    confirmButton: @Composable () -> Unit,
+    dismissButton: @Composable () -> Unit,
 ) {
-    Dialog(onDismissRequest = { if (!isPending) onDismissRequest() }) {
-        GlassCard(
-            modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
-            opaqueBase = true,
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(DhunSpacing.lg),
-                verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
-            ) {
+    Dialog(onDismissRequest = onDismissRequest) {
+        GlassCard(modifier = Modifier.fillMaxWidth(), opaqueBase = true) {
+            Column(modifier = Modifier.fillMaxWidth().padding(DhunSpacing.lg),
+                verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm)) {
                 title()
                 text()
-                if (errorMessage != null) {
-                    Text(
-                        text = errorMessage,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = DhunColors.error,
-                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                    )
-                }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    DhunTextButton(onClick = onDismissRequest, enabled = !isPending) { Text(dismissLabel) }
-                    Spacer(modifier = Modifier.weight(1f))
-                    DhunButton(
-                        onClick = onConfirm,
-                        enabled = !isPending,
-                        loading = isPending,
-                    ) {
-                        Text(
-                            when {
-                                isPending -> pendingLabel
-                                errorMessage != null -> "Try again"
-                                else -> confirmLabel
-                            },
-                        )
-                    }
+                    dismissButton()
+                    confirmButton()
                 }
             }
-        }
-    }
-}
-
-/** A screen-level failure that no dialog owns (e.g. a preference write). */
-@Composable
-private fun SettingsFailureNotice(message: String, onDismiss: () -> Unit) {
-    GlassCard(modifier = Modifier.fillMaxWidth(), elevated = false) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(DhunSpacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
-        ) {
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodySmall,
-                color = DhunColors.error,
-                modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
-            )
-            DhunTextButton(onClick = onDismiss) { Text("Dismiss") }
         }
     }
 }
@@ -525,14 +405,12 @@ private fun CountryRegionPicker(viewModel: SettingsViewModel) {
                 verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
             ) {
                 Text("Choose a country or region", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
-                // DHUN's own input, not Material's 56dp outlined box: this
-                // dialog is glass, and an OutlinedTextField dropped into it was
-                // one of the places this screen still read as stock Material 3.
-                DhunTextField(
+                OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = "Search by name or code",
+                    label = { Text("Search by name or code") },
+                    singleLine = true,
                 )
                 if (matches.isEmpty()) {
                     Text(
@@ -580,64 +458,35 @@ private fun CountryRegionPicker(viewModel: SettingsViewModel) {
 private fun BackdropControls(viewModel: SettingsViewModel) {
     val blur by viewModel.backdropBlurPercent.collectAsState()
     val brightness by viewModel.backdropBrightnessPercent.collectAsState()
-    val backgrounds by viewModel.backgrounds.collectAsState()
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = DhunSpacing.screenPadding),
         verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
     ) {
         if (supportsRealtimeBlur) {
-            val blurOn = backgrounds.blurEnabled
-            // A detail of blur, not a third global switch: it only changes *how
-            // much* an enabled frost blurs, is suspended (not cleared) while
-            // Background blur is off, and lives next to the strength it scales.
-            // Keeping it out of the two-switch block is what lets the user read
-            // that block as exactly two independent decisions.
-            BackgroundSwitchRow(
-                title = "Adaptive blur",
-                subtitle = when {
-                    !blurOn -> "Paused while Background blur is off"
-                    backgrounds.adaptiveBlur -> "Adjust frost to each cover"
-                    else -> "Use the same frost for every cover"
-                },
-                checked = backgrounds.adaptiveBlur,
-                enabled = blurOn,
-                onCheckedChange = viewModel::setBackgroundAdaptiveBlur,
-            )
-            // The master switch is the off switch, so the strength slider has no
-            // zero: a slider that could reach it would let "Background blur: on"
-            // and "nothing is frosted" both be true, which reads as a bug.
-            val floor = BackgroundBlurPolicy.MIN_EFFECTIVE_STRENGTH
-            val effective = BackgroundBlurPolicy.effectiveStrength(blur)
             Text(
-                text = "Blur strength",
+                text = "Background blur",
                 style = MaterialTheme.typography.bodyLarge,
-                color = if (blurOn) DhunColors.textPrimary else DhunColors.textDisabled,
+                color = DhunColors.textPrimary,
             )
             Text(
-                text = if (blurOn) {
-                    "Set how strongly artwork is frosted"
-                } else {
-                    "Saved while Background blur is off"
-                },
+                text = "How heavily the now-playing cover is frosted behind the app.",
                 style = MaterialTheme.typography.bodySmall,
-                color = if (blurOn) DhunColors.textSecondary else DhunColors.textTertiary,
+                color = DhunColors.textSecondary,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
-                DhunSlider(
-                    value = effective.toFloat(),
+                Slider(
+                    value = blur.toFloat(),
                     onValueChange = { value ->
-                        val percent = value.toInt().coerceIn(floor, 100)
-                        viewModel.previewBackdropBlurPercent(percent)
+                        val percent = value.toInt().coerceIn(0, 100)
+                        viewModel.setBackdropBlurPercent(percent)
                         DhunAppearance.setBackdropPrefs(blurPercent = percent)
                     },
-                    onValueChangeFinished = { viewModel.saveBackdropBlurPercent() },
-                    valueRange = floor.toFloat()..100f,
-                    enabled = blurOn,
+                    valueRange = 0f..100f,
                     modifier = Modifier.weight(1f),
                 )
                 Spacer(modifier = Modifier.width(DhunSpacing.sm))
                 Text(
-                    text = "$effective%",
+                    text = "$blur%",
                     style = MaterialTheme.typography.bodySmall,
                     color = DhunColors.textSecondary,
                 )
@@ -649,19 +498,18 @@ private fun BackdropControls(viewModel: SettingsViewModel) {
                 color = DhunColors.textPrimary,
             )
             Text(
-                text = "Dim the artwork background",
+                text = if (supportsRealtimeBlur) "Dim the blurred artwork independently of blur." else "Hardware blur is unavailable on this Android version; dim the sharp cover instead.",
                 style = MaterialTheme.typography.bodySmall,
                 color = DhunColors.textSecondary,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
-                DhunSlider(
+                Slider(
                     value = brightness.toFloat(),
                     onValueChange = { value ->
                         val percent = value.toInt().coerceIn(0, 100)
-                        viewModel.previewBackdropBrightnessPercent(percent)
+                        viewModel.setBackdropBrightnessPercent(percent)
                         DhunAppearance.setBackdropPrefs(brightnessPercent = percent)
                     },
-                    onValueChangeFinished = { viewModel.saveBackdropBrightnessPercent() },
                     valueRange = 0f..100f,
                     modifier = Modifier.weight(1f),
                 )
@@ -685,7 +533,9 @@ private fun VisualTuningControls(viewModel: SettingsViewModel) {
         verticalArrangement = Arrangement.spacedBy(DhunSpacing.md),
     ) {
         Text(
-            "Preview live; values save on release. Include labels and percentages in feedback.",
+            "Test baseline: every component 15%, including tonal surfaces, page artwork, mini-player, navigation and queue. " +
+                "The three removed controls are fixed; the remaining sliders preview live and save on release. " +
+                "Use the labels and percentages when reporting what looks too dark or too white.",
             style = MaterialTheme.typography.bodySmall, color = DhunColors.textSecondary,
         )
         DhunVisualTuning.adjustableParts.forEach { part ->
@@ -694,7 +544,7 @@ private fun VisualTuningControls(viewModel: SettingsViewModel) {
                 Text(part.label, style = MaterialTheme.typography.bodyLarge, color = DhunColors.textPrimary)
                 Text(part.detail, style = MaterialTheme.typography.bodySmall, color = DhunColors.textSecondary)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    DhunSlider(
+                    Slider(
                         value = percent.toFloat(),
                         onValueChange = { value ->
                             val next = value.toInt().coerceIn(0, 100)
@@ -711,9 +561,7 @@ private fun VisualTuningControls(viewModel: SettingsViewModel) {
                 }
             }
         }
-        DhunTextButton(onClick = viewModel::resetVisualTuning, enabled = loaded) {
-            Text("Reset adjustable sliders to 15%")
-        }
+        TextButton(onClick = viewModel::resetVisualTuning, enabled = loaded) { Text("Reset adjustable sliders to 15%") }
     }
 }
 
@@ -776,7 +624,7 @@ private fun SettingsSwitchRow(
             )
         }
         Spacer(modifier = Modifier.width(DhunSpacing.md))
-        DhunSwitch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
@@ -831,7 +679,7 @@ private fun EqualizerSection(session: EqualizerSession) {
                 color = DhunColors.textPrimary,
                 modifier = Modifier.weight(1f),
             )
-            DhunSwitch(
+            Switch(
                 checked = model.enabled,
                 onCheckedChange = session::setEnabled,
             )
@@ -903,7 +751,7 @@ private fun EqualizerSliderRow(
             color = DhunColors.textPrimary,
             modifier = Modifier.width(DhunSpacing.touchTarget),
         )
-        DhunSlider(
+        Slider(
             value = value,
             onValueChange = onChange,
             valueRange = min..max,

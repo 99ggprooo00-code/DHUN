@@ -9,9 +9,9 @@ package dev.dhun.legal
  *
  * The values differ per platform and deliberately stay that way — Android reads
  * the installed package, Windows reads the installer version handed to the JVM.
- * Do not pin a historical Android or MSI number in policy text. Desktop
- * installer-upgrade versions and public app tags have different roles; report
- * the metadata supplied by the running binary rather than inventing parity.
+ * They do not match each other today (`1.00.001` vs `1.0.6`); that is an open
+ * maintainer decision, and showing each platform's own number honestly is better
+ * than showing one invented shared number.
  *
  * @param versionName Human version. Never blank: a platform that cannot read its
  *   metadata must pass an explicit sentinel such as `"unknown"`.

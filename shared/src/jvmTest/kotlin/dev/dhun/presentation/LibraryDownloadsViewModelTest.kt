@@ -13,9 +13,7 @@ import dev.dhun.download.DownloadProgress
 import dev.dhun.player.DhunPlayer
 import dev.dhun.presentation.library.LibraryViewModel
 import dev.dhun.presentation.library.StorageSummary
-import dev.dhun.presentation.library.preferredArtworkUrl
 import dev.dhun.presentation.library.toTrack
-import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -315,21 +313,6 @@ class LibraryDownloadsViewModelTest {
     }
 
     @Test
-    fun downloadedPlaybackUsesSavedArtworkBeforeNetwork() {
-        val row = downloaded("art", DownloadState.COMPLETED, 1_000L).copy(
-            thumbnailUrl = "https://i.ytimg.com/vi/art/hqdefault.jpg",
-            localArtworkPath = "/storage/emulated/0/DHUN/art work#1.jpg",
-        )
-        val local = "file:///storage/emulated/0/DHUN/art%20work%231.jpg"
-        assertEquals(local, row.preferredArtworkUrl)
-        assertEquals(local, row.toTrack().thumbnailUrl)
-        assertEquals(
-            "https://i.ytimg.com/vi/art/hqdefault.jpg",
-            row.copy(localArtworkPath = null).toTrack().thumbnailUrl,
-        )
-    }
-
-    @Test
     fun playDownloadedQueuesCompletedDownloadsAsContext(): Unit = runBlocking {
         val dm = FakeDownloadManager()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
@@ -407,43 +390,6 @@ class LibraryDownloadsViewModelTest {
             vm.clearDownloads()
             assertTrue(vm.clearDownloadsUiState.value.errorMessage != null)
             assertNull(vm.progressFor("a").first())
-        } finally {
-            scope.cancel()
-        }
-    }
-
-    /**
-     * Single-row download removal used to be `scope.launch { runCatching { … } }`:
-     * a failure deleted nothing and said nothing, so the row that stayed looked
-     * like a UI refresh problem. It is a reported, retryable failure now.
-     */
-    @Test
-    fun aFailedDownloadRemovalIsReportedAndRetryable(): Unit = runBlocking {
-        val dm = FakeDownloadManager().apply { failRemove = true }
-        val uncaught = mutableListOf<Throwable>()
-        val scope = CoroutineScope(
-            SupervisorJob() + Dispatchers.Unconfined +
-                CoroutineExceptionHandler { _, error -> uncaught += error },
-        )
-        try {
-            val vm = LibraryViewModel(
-                dataLayer = dataLayer(), player = NoopPlayer(), scope = scope,
-                downloadManager = dm,
-            )
-            vm.removeDownload("a")
-            eventually { vm.mutation.value.errorMessage != null }
-            assertEquals(
-                "Could not delete that download. The file may still be on disk.",
-                vm.mutation.value.errorMessage,
-            )
-            assertTrue(uncaught.isEmpty(), "the failure must not escape the coroutine: $uncaught")
-            assertTrue(dm.removed.isEmpty())
-
-            // Retry after the storage recovers.
-            dm.failRemove = false
-            vm.removeDownload("a")
-            eventually { dm.removed.contains("a") }
-            assertNull(vm.mutation.value.errorMessage, "a successful retry clears the message")
         } finally {
             scope.cancel()
         }

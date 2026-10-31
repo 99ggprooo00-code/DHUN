@@ -9,9 +9,6 @@ import dev.dhun.data.DatabaseFactory
 import dev.dhun.data.PlayContext
 import dev.dhun.player.DhunPlayer
 import dev.dhun.player.NowPlayingPersistence
-import dev.dhun.data.HistoryRepository
-import dev.dhun.data.LibraryRepository
-import kotlinx.coroutines.CoroutineExceptionHandler
 import dev.dhun.domain.RecordPlayUseCase
 import dev.dhun.domain.RestoreNowPlayingUseCase
 import dev.dhun.domain.SaveNowPlayingUseCase
@@ -30,7 +27,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.assertFalse
 import kotlin.test.fail
-import kotlin.test.assertNull
 
 class LibraryViewModelTest {
 
@@ -354,102 +350,6 @@ class LibraryViewModelTest {
             vm.playHistoryDay(dev.dhun.domain.HistoryDay(0, emptyList()), 0)
             delay(100)
             assertEquals(0, player.prepareCalls)
-        } finally {
-            scope.cancel()
-        }
-    }
-
-    /* ---------------- mutation feedback (native audit 2026-10-29) ------------- */
-
-    /**
-     * Before this change `toggleFavorite` was `scope.launch { … }` with no
-     * handling at all: a failed write reached the thread's uncaught-exception
-     * handler (an app crash on Android) and the heart stayed as it was with no
-     * explanation. The failure is now a banner message and nothing escapes.
-     */
-    @Test
-    fun aFailedFavoriteIsReportedInsteadOfThrown(): Unit = runBlocking {
-        val data = dataLayer()
-        val uncaught = mutableListOf<Throwable>()
-        val scope = CoroutineScope(
-            SupervisorJob() + Dispatchers.Default +
-                CoroutineExceptionHandler { _, error -> uncaught += error },
-        )
-        try {
-            val failingLibrary = object : LibraryRepository by data.library {
-                override suspend fun isFavorite(trackId: String): Boolean = false
-                override suspend fun addFavorite(track: Track) {
-                    error("disk full")
-                }
-            }
-            val vm = LibraryViewModel(
-                playlists = data.playlists,
-                library = failingLibrary,
-                history = data.history,
-                player = FakePlayer(),
-                scope = scope,
-            )
-            vm.toggleFavorite(track("fav-1"))
-            eventually { vm.mutation.value.errorMessage != null }
-            assertEquals("Could not update Liked Songs. Try again.", vm.mutation.value.errorMessage)
-            assertTrue(uncaught.isEmpty(), "the failure must not escape the coroutine: $uncaught")
-
-            vm.dismissMutationError()
-            assertNull(vm.mutation.value.errorMessage)
-        } finally {
-            scope.cancel()
-        }
-    }
-
-    @Test
-    fun aFailedHistoryRemovalIsReportedAndTheRowStays(): Unit = runBlocking {
-        val data = dataLayer()
-        val uncaught = mutableListOf<Throwable>()
-        val scope = CoroutineScope(
-            SupervisorJob() + Dispatchers.Default +
-                CoroutineExceptionHandler { _, error -> uncaught += error },
-        )
-        try {
-            data.history.recordPlay(track("kept"), PlayContext.HOME)
-            val failingHistory = object : HistoryRepository by data.history {
-                override suspend fun remove(entryId: Long) {
-                    error("database is locked")
-                }
-            }
-            val vm = LibraryViewModel(
-                playlists = data.playlists,
-                library = data.library,
-                history = failingHistory,
-                player = FakePlayer(),
-                scope = scope,
-            )
-            eventually { vm.historyEntries.value.isNotEmpty() }
-            val entryId = vm.historyEntries.value.first().entryId!!
-
-            vm.removeHistoryEntry(entryId)
-            eventually { vm.mutation.value.errorMessage != null }
-            assertEquals("Could not remove that play from history. Try again.", vm.mutation.value.errorMessage)
-            assertTrue(uncaught.isEmpty(), "the failure must not escape the coroutine: $uncaught")
-            // The row is still there, so "removed" was never implied.
-            assertTrue(vm.historyEntries.value.any { it.entryId == entryId })
-        } finally {
-            scope.cancel()
-        }
-    }
-
-    @Test
-    fun aSuccessfulActionLeavesNoMessageBehind(): Unit = runBlocking {
-        val data = dataLayer()
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        try {
-            val vm = LibraryViewModel(data, FakePlayer(), scope)
-            data.history.recordPlay(track("clean"), PlayContext.HOME)
-            eventually { vm.historyEntries.value.isNotEmpty() }
-            val entryId = vm.historyEntries.value.first().entryId!!
-            vm.removeHistoryEntry(entryId)
-            eventually { vm.historyEntries.value.none { it.entryId == entryId } }
-            assertNull(vm.mutation.value.errorMessage, "a completed removal says nothing")
-            assertFalse(vm.mutation.value.isBusy)
         } finally {
             scope.cancel()
         }

@@ -20,7 +20,7 @@ import androidx.compose.ui.graphics.Color
  * With the default appearance — [DhunThemeMode.DARK] + [DhunAccent.BRAND] —
  * most values below follow the shipped palette. Tonal surface accessors now
  * keep the 15% treatment in public builds, while the raw token palette and
- * Material scheme stay opaque for safe base layers. The 2026-09-21 UI-polish
+ * Material3 scheme stay opaque for safe base layers. The 2026-09-21 UI-polish
  * pass lifted the dark surfaces (16 → 36, each rung
  * +0x0C from the original 0A → 2A) so Home/Search/Library sit closer to the
  * full player's backdrop brightness. Glass (translucent fills with a 10%-white
@@ -40,7 +40,7 @@ object DhunColors {
     val surfaceHighest: Color get() = DhunAppearance.tokens.surfaceHighest
     val surfaceCard: Color get() = DhunAppearance.tokens.surfaceCard
 
-    // The glass tokens (translucent, frosted, artwork-led — see glass-system.md).
+    // Glass-morphism tokens (M3 translucent atmosphere — not Liquid Glass).
     // Stack: sheen → highlight → body → deep so backdrops read through.
     /** Upper glass fill (~55% near-black with cool lift; translucent white in light). */
     val glassHighlight: Color get() = DhunAppearance.tokens.glassHighlight

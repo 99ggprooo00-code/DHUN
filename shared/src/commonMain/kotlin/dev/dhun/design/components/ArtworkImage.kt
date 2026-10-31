@@ -28,7 +28,6 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.Alignment
-import dev.dhun.design.ArtworkUrls
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
@@ -61,67 +60,35 @@ fun ArtworkImage(
      * shows the same artwork: the letterbox bands then reveal that backdrop
      * (FullPlayer's blurred bleed) instead of a flat grey bar, and nothing is
      * ever cropped to avoid the bands. Null/blank/failed URLs still get the
-     * glyph placeholder unless [showFailurePlaceholder] is disabled.
+     * glyph placeholder either way.
      */
     placeholderBase: Boolean = true,
-    /**
-     * Original image to try when a derived [imageUrl] fails. Full Player uses
-     * this for its enlarged artwork: a working mini-player URL remains a
-     * fallback instead of turning the hero into a placeholder.
-     */
-    fallbackImageUrl: String? = null,
-    /**
-     * Full-screen atmospheric backdrops reveal the ambient surface on final
-     * failure rather than painting a giant placeholder glyph. Ordinary artwork
-     * keeps the default glyph.
-     */
-    showFailurePlaceholder: Boolean = true,
-    /** Terminal load notifications; intermediate candidate failures are hidden. */
-    onArtworkLoaded: (() -> Unit)? = null,
-    onArtworkFailed: (() -> Unit)? = null,
 ) {
     val resolvedShape: Shape = if (cornerRadius != null) RoundedCornerShape(cornerRadius) else shape
-    val candidates = remember(imageUrl, fallbackImageUrl) {
-        ArtworkUrls.loadingCandidates(imageUrl, fallbackImageUrl)
-    }
 
-    if (candidates.isEmpty()) {
-        if (showFailurePlaceholder) {
-            ArtworkPlaceholder(modifier = modifier, shape = resolvedShape)
-        }
+    if (imageUrl.isNullOrBlank()) {
+        ArtworkPlaceholder(modifier = modifier, shape = resolvedShape)
         return
     }
 
-    var candidateIndex by remember(candidates) { mutableStateOf(0) }
-    val currentImageUrl = candidates[candidateIndex]
     val context = LocalPlatformContext.current
-    val request = remember(context, currentImageUrl) {
-        ImageRequest.Builder(context)
-            .data(currentImageUrl)
-            .crossfade(true)
-            .build()
-    }
+    val request = ImageRequest.Builder(context)
+        .data(imageUrl)
+        .crossfade(true)
+        .build()
 
     // Load phase drives the placeholder: pulse only while the fetch is in
     // flight; a failed load settles to a static gradient instead of pulsing
-    // forever (which read as a "skeleton that never resolves"). A failed
-    // derived URL advances through the bounded shared compatibility chain
-    // before the failure is final.
-    var phase by remember(candidates) { mutableStateOf(LoadPhase.Loading) }
-    val placeholderAlpha = if (phase == LoadPhase.Loading) {
-        // Compose the infinite transition only while it is visible. Keeping
-        // one alive in every loaded/failed row made long lists animate forever.
-        val pulse by rememberInfiniteTransition(label = "artwork-pulse")
-            .animateFloat(
-                initialValue = 0.6f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
-                label = "alpha",
-            )
-        pulse
-    } else {
-        1f
-    }
+    // forever (which read as a "skeleton that never resolves").
+    var phase by remember(imageUrl) { mutableStateOf(LoadPhase.Loading) }
+    val pulse by rememberInfiniteTransition(label = "artwork-pulse")
+        .animateFloat(
+            initialValue = 0.6f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
+            label = "alpha",
+        )
+    val placeholderAlpha = if (phase == LoadPhase.Loading) pulse else 1f
 
     Box(
         modifier = modifier.clip(resolvedShape),
@@ -139,7 +106,7 @@ fun ArtworkImage(
                 ),
             )
         }
-        if (phase == LoadPhase.Failed && showFailurePlaceholder) {
+        if (phase == LoadPhase.Failed) {
             // A failed load used to leave a flat grey rectangle — the device
             // screenshots are full of them. Show the same glyph placeholder
             // the null-URL path uses so the grid reads as artwork-shaped.
@@ -153,19 +120,8 @@ fun ArtworkImage(
                 contentScale = contentScale,
                 // Coil handles crossfade; we keep the placeholder underneath.
                 onLoading = { phase = LoadPhase.Loading },
-                onSuccess = {
-                    phase = LoadPhase.Loaded
-                    onArtworkLoaded?.invoke()
-                },
-                onError = {
-                    if (candidateIndex < candidates.lastIndex) {
-                        candidateIndex++
-                        phase = LoadPhase.Loading
-                    } else {
-                        phase = LoadPhase.Failed
-                        onArtworkFailed?.invoke()
-                    }
-                },
+                onSuccess = { phase = LoadPhase.Loaded },
+                onError = { phase = LoadPhase.Failed },
             )
         }
     }

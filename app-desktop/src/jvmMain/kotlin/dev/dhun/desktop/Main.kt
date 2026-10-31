@@ -1,5 +1,6 @@
 package dev.dhun.desktop
 
+import dev.dhun.design.DhunSpacing
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
@@ -15,8 +16,8 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
@@ -27,21 +28,8 @@ import dev.dhun.data.DatabaseDriverFactory
 import dev.dhun.data.DatabaseFactory
 import dev.dhun.data.DhunUserDirs
 import dev.dhun.data.SettingsKeys
-import dev.dhun.design.DhunAppearance
-import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTheme
-import dev.dhun.desktop.native.DhunTray
-import dev.dhun.desktop.native.JumpListArgs
-import dev.dhun.desktop.native.SingleInstance
-import dev.dhun.desktop.player.DesktopDhunPlayer
-import dev.dhun.desktop.smct.Smct
-import dev.dhun.domain.GetHomeFeedUseCase
-import dev.dhun.domain.GetRecommendationsUseCase
-import dev.dhun.domain.GetSettingUseCase
-import dev.dhun.domain.RecordPlayUseCase
-import dev.dhun.domain.RestoreNowPlayingUseCase
-import dev.dhun.domain.SaveNowPlayingUseCase
-import dev.dhun.domain.UpdateSettingUseCase
+import dev.dhun.design.DhunAppearance
 import dev.dhun.download.DownloadManager
 import dev.dhun.download.FileDownloadManager
 import dev.dhun.download.JvmDownloadStorage
@@ -53,7 +41,16 @@ import dev.dhun.extraction.ResolvingStreamResolver
 import dev.dhun.extraction.StreamResolver
 import dev.dhun.extraction.YtDlpStreamResolver
 import dev.dhun.innertube.InnerTubeClient
-import dev.dhun.legal.DhunAppInfo
+import dev.dhun.desktop.native.DhunTray
+import dev.dhun.desktop.native.JumpListArgs
+import dev.dhun.desktop.native.SingleInstance
+import dev.dhun.desktop.player.DesktopDhunPlayer
+import dev.dhun.desktop.smct.Smct
+import dev.dhun.domain.GetHomeFeedUseCase
+import dev.dhun.domain.GetRecommendationsUseCase
+import dev.dhun.domain.RecordPlayUseCase
+import dev.dhun.domain.RestoreNowPlayingUseCase
+import dev.dhun.domain.SaveNowPlayingUseCase
 import dev.dhun.lyrics.LrcLibSource
 import dev.dhun.lyrics.LyricsRepository
 import dev.dhun.lyrics.YouTubeLyricsSource
@@ -64,18 +61,12 @@ import dev.dhun.presentation.home.HomeViewModel
 import dev.dhun.presentation.library.currentUtcOffsetMs
 import dev.dhun.presentation.player.PlayerViewModel
 import dev.dhun.presentation.search.SearchViewModel
-import dev.dhun.presentation.settings.BackgroundPreferences
 import dev.dhun.provider.MusicProvider
 import dev.dhun.provider.YouTubeMusicProvider
+import dev.dhun.legal.DhunAppInfo
 import dev.dhun.ui.shell.AppNavState
 import dev.dhun.ui.shell.AppTab
 import dev.dhun.ui.shell.DhunAppShell
-import java.awt.Frame
-import java.io.File
-import java.time.Instant
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicReference
-import javax.swing.SwingUtilities
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -84,6 +75,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.koin.core.context.startKoin
 import org.koin.dsl.module
+import java.awt.Frame
+import java.io.File
+import java.time.Instant
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
+import javax.swing.SwingUtilities
 
 /**
  * Phase 04 + 07 + 08 + 12 Desktop entry point.
@@ -340,13 +337,6 @@ fun main(args: Array<String>) {
                         settings.getInt(SettingsKeys.BACKDROP_BRIGHTNESS, SettingsKeys.BACKDROP_BRIGHTNESS_DEFAULT),
                         settings.getString(SettingsKeys.ACCENT_MODE),
                         systemDark = false,
-                    )
-                    // Backgrounds before the first frame: the window must open
-                    // with the user's blur + palette, not a default that
-                    // repaints a moment later.
-                    BackgroundPreferences.restoreBeforeFirstFrame(
-                        GetSettingUseCase(settings),
-                        UpdateSettingUseCase(settings),
                     )
                 }
             }

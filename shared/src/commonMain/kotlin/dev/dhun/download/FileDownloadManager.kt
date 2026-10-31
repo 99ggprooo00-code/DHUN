@@ -5,7 +5,6 @@ import dev.dhun.core.DownloadState
 import dev.dhun.core.DownloadedTrack
 import dev.dhun.core.Track
 import dev.dhun.data.EpochClock
-import dev.dhun.design.ArtworkUrls
 import dev.dhun.extraction.StreamResolver
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -254,30 +253,24 @@ class FileDownloadManager(
     }
 
     private suspend fun fetchArtwork(thumbnailUrl: String?, trackId: String): String? {
+        val url = thumbnailUrl ?: return null
         val art = storage.artPath(trackId)
         val part = "$art.part"
-        // A newly downloaded row initially has no local cover. Do not make its
-        // permanent artwork depend on one remote proxy URL: use the same
-        // bounded candidates as Full Player, including the genuine video cover.
-        val candidates = ArtworkUrls.loadingCandidates(
-            imageUrl = thumbnailUrl,
-            fallbackImageUrl = ArtworkUrls.videoThumbnail(trackId),
-        )
-        for (url in candidates) {
-            val result = try {
-                downloader.download(url, null, part) { _, _ -> }
-            } catch (t: CancellationException) {
-                throw t
+        val result = try {
+            downloader.download(url, null, part) { _, _ -> }
+        } catch (t: CancellationException) {
+            throw t
+        }
+        return when (result) {
+            is DhunResult.Success -> {
+                storage.commit(part, art)
+                art
             }
-            when (result) {
-                is DhunResult.Success -> {
-                    storage.commit(part, art)
-                    return art
-                }
-                is DhunResult.Failure -> storage.delete(part)
+            is DhunResult.Failure -> {
+                storage.delete(part)
+                null
             }
         }
-        return null
     }
 
 }

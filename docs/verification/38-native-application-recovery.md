@@ -1,5 +1,11 @@
 # 38 — Native application recovery and root-cause ledger
 
+> **Historical record — superseded on 2026-10-31.** The owner directed a native
+> rollback to the pre-PR #196 snapshot while preserving the current website.
+> See [`39-pre-pr196-native-rollback.md`](39-pre-pr196-native-rollback.md).
+> The R9–R12 fixes and status below describe the superseded recovery line, not
+> the current app implementation or an accepted phone recovery.
+
 **Date:** 2026-10-31  
 **PR:** #217 (open; not merged)  
 **Recovery commits:** `1158b33`, `10400ca`, `dbc3e20`, `9be284c`, `30f4a1a`, `1abbc47`, `30fb887`

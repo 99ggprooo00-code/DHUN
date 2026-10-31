@@ -18,26 +18,23 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.window.Dialog
 import dev.dhun.core.PlaylistDetail
 import dev.dhun.core.Track
-import dev.dhun.design.ArtworkUrls
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
@@ -47,21 +44,18 @@ import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.dhunContentRowSurface
 import dev.dhun.design.components.lyricsVeilBrush
 import dev.dhun.design.components.DhunButton
+import dev.dhun.design.components.DhunTextField
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.DhunOutlinedButton
 import dev.dhun.design.components.DhunTextButton
 import dev.dhun.design.components.EmptyView
 import dev.dhun.design.components.ErrorView
+import dev.dhun.design.components.GlassCard
 import dev.dhun.design.components.LoadingShimmer
 import dev.dhun.design.components.PageArtworkBackdrop
 import dev.dhun.presentation.browse.PlaylistUiState
 import dev.dhun.presentation.browse.PlaylistViewModel
-import dev.dhun.ui.components.ActionErrorBanner
 import dev.dhun.ui.components.DragHandleGrip
-import dev.dhun.ui.components.PlaylistDeleteDialog
-import dev.dhun.ui.components.PlaylistRenameDialog
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
 import dev.dhun.ui.components.ReorderableList
 
 /**
@@ -88,14 +82,7 @@ fun PlaylistScreen(
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsState()
-    val isLoadingMore by viewModel.isLoadingMore.collectAsState()
-    val loadMoreError by viewModel.loadMoreError.collectAsState()
     val deleted by viewModel.deleted.collectAsState()
-    val deletion by viewModel.deletion.collectAsState()
-    val mutation by viewModel.mutation.collectAsState()
-    // Own the dialog above LocalPlaylistContent: the DB observer can emit a
-    // missing row before delete() returns, and must not dismiss a pending dialog.
-    var deletingName by remember(viewModel) { mutableStateOf<String?>(null) }
 
     LaunchedEffect(deleted) { if (deleted) onDeleted() }
 
@@ -109,8 +96,7 @@ fun PlaylistScreen(
     // colour stays the fallback.
     val backdropArtwork = when (val s = state) {
         is PlaylistUiState.Remote -> s.detail.thumbnailUrl
-        is PlaylistUiState.Local -> s.tracks.firstOrNull { !it.thumbnailUrl.isNullOrBlank() }?.thumbnailUrl
-            ?: ArtworkUrls.videoThumbnail(s.tracks.firstOrNull()?.id)
+        is PlaylistUiState.Local -> s.tracks.firstOrNull()?.thumbnailUrl
         is PlaylistUiState.Loading, is PlaylistUiState.Error -> null
     }
 
@@ -129,10 +115,6 @@ fun PlaylistScreen(
             )
             is PlaylistUiState.Remote -> RemotePlaylistContent(
                 detail = s.detail,
-                isLoadingMore = isLoadingMore,
-                loadMoreError = loadMoreError,
-                onLoadMore = viewModel::loadMore,
-                onRetryMore = viewModel::retryLoadMore,
                 onPlayAll = { viewModel.play(0) },
                 onShuffle = { viewModel.playShuffled() },
                 onTrackPlay = onTrackPlay,
@@ -142,8 +124,8 @@ fun PlaylistScreen(
                 val playlist = s.playlist
                 if (playlist == null) {
                     EmptyView(
-                        title = "Playlist unavailable",
-                        message = "This local playlist is no longer available.",
+                        title = "Playlist deleted",
+                        message = "This local playlist no longer exists.",
                         actionLabel = "Back",
                         onAction = onBack,
                         modifier = Modifier.fillMaxSize(),
@@ -157,22 +139,9 @@ fun PlaylistScreen(
                         onPlayAll = { viewModel.play(0) },
                         onShuffle = { viewModel.playShuffled() },
                         onTrackPlay = onTrackPlay,
-                        onDelete = { deletingName = playlist.name },
                     )
                 }
             }
-        }
-
-        // Row-edit failures (swipe-remove, drag-reorder) have no dialog, so
-        // they are reported here; the row itself stays for a retry.
-        mutation.errorMessage?.let { message ->
-            ActionErrorBanner(
-                message = message,
-                onDismiss = viewModel::dismissMutationError,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = DhunSpacing.touchTarget + DhunSpacing.sm),
-            )
         }
 
         // Floating frosted back chip
@@ -198,22 +167,6 @@ fun PlaylistScreen(
             }
         }
     }
-    deletingName?.let { name ->
-        PlaylistDeleteDialog(
-            playlistName = name,
-            isDeleting = deletion.isDeleting,
-            errorMessage = deletion.errorMessage,
-            onDismiss = {
-                // A back press can race Compose's next StateFlow recomposition.
-                // Check the synchronous ViewModel gate, not the collected snapshot.
-                if (!viewModel.deletion.value.isDeleting) {
-                    deletingName = null
-                    viewModel.clearDeletionError()
-                }
-            },
-            onConfirm = { viewModel.delete() },
-        )
-    }
 }
 
 /* ---------------- remote (YTM) --------------------------------------------- */
@@ -221,28 +174,12 @@ fun PlaylistScreen(
 @Composable
 private fun RemotePlaylistContent(
     detail: PlaylistDetail,
-    isLoadingMore: Boolean,
-    loadMoreError: String?,
-    onLoadMore: () -> Unit,
-    onRetryMore: () -> Unit,
     onPlayAll: () -> Unit,
     onShuffle: () -> Unit,
     onTrackPlay: (Track, List<Track>, Int) -> Unit,
     onTrackOverflow: (Track) -> Unit,
 ) {
-    val listState = rememberLazyListState()
-    val shouldLoadMore by remember {
-        derivedStateOf {
-            val total = listState.layoutInfo.totalItemsCount
-            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            total > 0 && lastVisible >= total - 3
-        }
-    }
-    LaunchedEffect(shouldLoadMore, isLoadingMore, loadMoreError, detail.continuationToken) {
-        if (shouldLoadMore && !isLoadingMore && loadMoreError == null) onLoadMore()
-    }
     LazyColumn(
-        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = DhunSpacing.contentBottomInset),
     ) {
@@ -272,27 +209,6 @@ private fun RemotePlaylistContent(
                 )
             }
         }
-        if (isLoadingMore || loadMoreError != null || detail.continuationToken != null) {
-            item(key = "pagination_status") {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(DhunSpacing.md),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
-                ) {
-                    when {
-                        isLoadingMore -> {
-                            LoadingShimmer(modifier = Modifier.width(DhunSpacing.skeletonMetaWidth).height(DhunSpacing.xl))
-                            Text("Loading more tracks…", color = DhunColors.textSecondary)
-                        }
-                        loadMoreError != null -> {
-                            Text(loadMoreError, color = DhunColors.textSecondary)
-                            DhunTextButton(onClick = onRetryMore) { Text("Retry loading more") }
-                        }
-                        else -> DhunTextButton(onClick = onLoadMore) { Text("Load more tracks") }
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -310,7 +226,6 @@ private fun RemoteTrackRow(index: Int, track: Track, onClick: () -> Unit, onOver
     ) {
         ArtworkImage(
             imageUrl = track.thumbnailUrl,
-            fallbackImageUrl = ArtworkUrls.videoThumbnail(track.id),
             contentDescription = track.title,
             modifier = Modifier.size(DhunSpacing.touchTarget),
             shape = DhunShapes.medium,
@@ -360,12 +275,9 @@ private fun LocalPlaylistContent(
     onPlayAll: () -> Unit,
     onShuffle: () -> Unit,
     onTrackPlay: (Track, List<Track>, Int) -> Unit,
-    onDelete: () -> Unit,
 ) {
     var showRename by remember { mutableStateOf(false) }
-    var isRenaming by remember { mutableStateOf(false) }
-    var renameError by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
+    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         PlaylistHeader(
@@ -373,15 +285,14 @@ private fun LocalPlaylistContent(
             subtitle = "Local playlist",
             meta = "${tracks.size} track${if (tracks.size == 1) "" else "s"}",
             description = description,
-            thumbnailUrl = tracks.firstOrNull { !it.thumbnailUrl.isNullOrBlank() }?.thumbnailUrl
-                ?: ArtworkUrls.videoThumbnail(tracks.firstOrNull()?.id),
+            thumbnailUrl = tracks.firstOrNull()?.thumbnailUrl,
             onPlayAll = onPlayAll,
             onShuffle = onShuffle,
             trackCount = tracks.size,
             actions = {
                 Row(horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm)) {
                     DhunOutlinedButton(onClick = { showRename = true }) { Text("Rename") }
-                    DhunOutlinedButton(onClick = onDelete) { Text("Delete") }
+                    DhunOutlinedButton(onClick = { showDeleteConfirm = true }) { Text("Delete") }
                 }
             },
         )
@@ -409,7 +320,6 @@ private fun LocalPlaylistContent(
                 ) {
                     ArtworkImage(
                         imageUrl = track.thumbnailUrl,
-                        fallbackImageUrl = ArtworkUrls.videoThumbnail(track.id),
                         contentDescription = track.title,
                         modifier = Modifier.size(DhunSpacing.compactTarget),
                     )
@@ -436,35 +346,20 @@ private fun LocalPlaylistContent(
     }
 
     if (showRename) {
-        PlaylistRenameDialog(
+        RenameDialog(
             current = title,
-            isSaving = isRenaming,
-            errorMessage = renameError,
-            onDismiss = {
-                if (!isRenaming) {
-                    showRename = false
-                    renameError = null
-                }
-            },
+            onDismiss = { showRename = false },
             onConfirm = { newName ->
-                if (!isRenaming) {
-                    isRenaming = true
-                    renameError = null
-                    scope.launch {
-                        try {
-                            viewModel.rename(newName)
-                            // Closes only for a write that returned normally.
-                            showRename = false
-                        } catch (cancelled: CancellationException) {
-                            throw cancelled
-                        } catch (_: Exception) {
-                            renameError = "Could not rename this playlist. Try again."
-                        } finally {
-                            isRenaming = false
-                        }
-                    }
-                }
+                viewModel.rename(newName)
+                showRename = false
             },
+        )
+    }
+    if (showDeleteConfirm) {
+        DeleteConfirmDialog(
+            playlistName = title,
+            onDismiss = { showDeleteConfirm = false },
+            onConfirm = { viewModel.delete(); showDeleteConfirm = false },
         )
     }
 }
@@ -548,6 +443,80 @@ private fun PlaylistHeader(
             it()
         }
         Spacer(modifier = Modifier.height(DhunSpacing.md))
+    }
+}
+
+@Composable
+private fun RenameDialog(
+    current: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var name by remember(current) { mutableStateOf(current) }
+    Dialog(onDismissRequest = onDismiss) {
+        GlassCard(
+            modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
+            shape = DhunShapes.large,
+            // A dialog floats over a dimmed page — the opaque base is what
+            // keeps the list underneath from reading through its text.
+            opaqueBase = true,
+        ) {
+            Column(modifier = Modifier.padding(DhunSpacing.lg)) {
+                Text(
+                    "Rename playlist",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = DhunColors.textPrimary,
+                )
+                Spacer(modifier = Modifier.height(DhunSpacing.md))
+                DhunTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                )
+                Spacer(modifier = Modifier.height(DhunSpacing.md))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    DhunTextButton(onClick = onDismiss) { Text("Cancel") }
+                    Spacer(modifier = Modifier.weight(1f))
+                    DhunButton(onClick = { onConfirm(name) }, enabled = name.isNotBlank()) { Text("Save") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeleteConfirmDialog(
+    playlistName: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        GlassCard(
+            modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
+            shape = DhunShapes.large,
+            // A dialog floats over a dimmed page — the opaque base is what
+            // keeps the list underneath from reading through its text.
+            opaqueBase = true,
+        ) {
+            Column(modifier = Modifier.padding(DhunSpacing.lg)) {
+                Text(
+                    "Delete \"$playlistName\"?",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = DhunColors.textPrimary,
+                )
+                Spacer(modifier = Modifier.height(DhunSpacing.sm))
+                Text(
+                    "This removes the local playlist. Tracks stay in your favorites/history if saved there.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DhunColors.textSecondary,
+                )
+                Spacer(modifier = Modifier.height(DhunSpacing.md))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    DhunTextButton(onClick = onDismiss) { Text("Cancel") }
+                    Spacer(modifier = Modifier.weight(1f))
+                    DhunButton(onClick = onConfirm) { Text("Delete") }
+                }
+            }
+        }
     }
 }
 

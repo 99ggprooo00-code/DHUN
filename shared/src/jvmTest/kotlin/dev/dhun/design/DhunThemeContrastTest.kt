@@ -228,14 +228,6 @@ class DhunThemeContrastTest {
                 // BLACK is the deliberately OLED-black variant; do not silently
                 // turn it into the standard lifted dark theme.
             }
-            // One veil, and it is the one every artwork layer paints: a picked
-            // colour changes the veil's *hue* only, because
-            // `BackgroundPalettePolicy.veilTintFor` pins its luminance to this
-            // rung. Contrast is a luminance function, so these numbers stay the
-            // measured ones for every colour a user can choose. (A draft allowed
-            // the veil to drift ±0.05 in luminance and those variants had to be
-            // checked here; the light end failed the "no white tiles" line, which
-            // is why the drift is zero.)
             listOf(Color.Black, Color.White).forEach { artwork ->
                 val pageTint = NowPlayingBackdropPolicy.veilTint(tokens)
                 val lowestVeil = NowPlayingBackdropPolicy.veilStops(tokens.isLight, 55)

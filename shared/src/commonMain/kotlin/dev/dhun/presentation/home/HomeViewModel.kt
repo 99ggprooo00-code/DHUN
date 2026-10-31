@@ -3,8 +3,6 @@ package dev.dhun.presentation.home
 import dev.dhun.core.DhunResult
 import dev.dhun.core.DhunError
 import dev.dhun.core.HomeFeed
-import dev.dhun.core.detailString
-import dev.dhun.core.diagnosticText
 import dev.dhun.core.HomeItem
 import dev.dhun.core.Track
 import dev.dhun.core.toUserMessage
@@ -14,8 +12,6 @@ import dev.dhun.domain.HomeMood
 import dev.dhun.domain.GetHomeFeedUseCase
 import dev.dhun.domain.GetRecommendationsUseCase
 import dev.dhun.domain.ToggleFavoriteUseCase
-import dev.dhun.presentation.MutationState
-import dev.dhun.presentation.MutationTracker
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.combine
 import dev.dhun.data.SettingsKeys
@@ -36,7 +32,7 @@ import kotlinx.coroutines.launch
 sealed interface HomeUiState {
     data object Loading : HomeUiState
     data class Success(val feed: HomeFeed) : HomeUiState
-    data class Error(val message: String, val detail: String? = null) : HomeUiState
+    data class Error(val message: String) : HomeUiState
     data object Empty : HomeUiState
 }
 
@@ -47,26 +43,15 @@ class HomeViewModel(
     libraryRepository: LibraryRepository,
     private val scope: CoroutineScope,
     settings: SettingsRepository? = null,
-    /** Receives the same sanitized detail shown by Home; Android routes it to logcat. */
-    private val errorLogger: (String) -> Unit = {},
 ) {
     private val toggleFavoriteUseCase = ToggleFavoriteUseCase(libraryRepository)
 
-    /**
-     * The Like control is on every track row, and it used to be a bare
-     * `scope.launch { toggleFavoriteUseCase(track) }`: a write failure either
-     * vanished or reached the platform's uncaught handler (an app crash on
-     * Android) while the heart simply stayed as it was. Failures are now a
-     * message the shell renders as a banner.
-     */
-    private val mutations = MutationTracker(scope)
-    val mutation: StateFlow<MutationState> = mutations.state
-    fun dismissMutationError() = mutations.dismissError()
-
-    // Each category owns its feed, generation and paging lifecycle. Switching
-    // tabs must not destroy another tab's cursor or let its late response win.
-    private data class CategoryState(
+    // Generation, feed and request flags change atomically. A separate generation
+    // check followed by a UI write could still overwrite a concurrent refresh on
+    // the desktop's Default dispatcher (check-then-write race).
+    private data class State(
         val generation: Long = 0,
+        val mood: HomeMood = HomeMood.FOR_YOU,
         val ui: HomeUiState = HomeUiState.Loading,
         val refreshing: Boolean = false,
         val loadingMore: Boolean = false,
@@ -75,28 +60,19 @@ class HomeViewModel(
         val emptyPageCount: Int = 0,
     )
 
-    private data class State(
-        val mood: HomeMood = HomeMood.FOR_YOU,
-        val categories: Map<HomeMood, CategoryState> = emptyMap(),
-    ) {
-        fun category(mood: HomeMood): CategoryState = categories[mood] ?: CategoryState()
-        fun withCategory(mood: HomeMood, category: CategoryState): State =
-            copy(categories = categories + (mood to category))
-    }
-
     private val state = MutableStateFlow(State())
     val selectedMood: StateFlow<HomeMood> = state.map { it.mood }
         .stateIn(scope, SharingStarted.Eagerly, HomeMood.FOR_YOU)
-    val uiState: StateFlow<HomeUiState> = state.map { it.category(it.mood).ui }
+    val uiState: StateFlow<HomeUiState> = state.map { it.ui }
         .stateIn(scope, SharingStarted.Eagerly, HomeUiState.Loading)
-    val isRefreshing: StateFlow<Boolean> = state.map { it.category(it.mood).refreshing }
+    val isRefreshing: StateFlow<Boolean> = state.map { it.refreshing }
         .stateIn(scope, SharingStarted.Eagerly, false)
-    val isLoadingMore: StateFlow<Boolean> = state.map { it.category(it.mood).loadingMore }
+    val isLoadingMore: StateFlow<Boolean> = state.map { it.loadingMore }
         .stateIn(scope, SharingStarted.Eagerly, false)
-    val loadMoreError: StateFlow<String?> = state.map { it.category(it.mood).pageError }
+    val loadMoreError: StateFlow<String?> = state.map { it.pageError }
         .stateIn(scope, SharingStarted.Eagerly, null)
-    private val feedJobs = mutableMapOf<HomeMood, Job>()
-    private val pageJobs = mutableMapOf<HomeMood, Job>()
+    private var feedJob: Job? = null
+    private var pageJob: Job? = null
     private var recommendJob: Job? = null
 
     private val allowExplicit = settings?.observeString(SettingsKeys.EXPLICIT_CONTENT)
@@ -135,20 +111,14 @@ class HomeViewModel(
 
     fun load() = requestFeed(refresh = false)
     fun refresh() {
-        val active = state.value
-        if (active.category(active.mood).refreshing) return
+        if (state.value.refreshing) return
         requestFeed(refresh = true)
-        if (active.mood == HomeMood.FOR_YOU) refreshRecommendations()
+        if (state.value.mood == HomeMood.FOR_YOU) refreshRecommendations()
     }
 
     fun selectMood(mood: HomeMood) {
-        val before = state.value
-        if (before.mood == mood) return
-        state.update { it.copy(mood = mood) }
-        val existing = state.value.categories[mood]
-        if (existing == null || (existing.ui is HomeUiState.Loading && feedJobs[mood]?.isActive != true)) {
-            requestFeed(refresh = false, mood = mood)
-        }
+        if (state.value.mood == mood) return
+        requestFeed(refresh = false, mood = mood)
     }
 
     /**
@@ -207,8 +177,7 @@ class HomeViewModel(
      */
     private fun currentVisibleTrackIds(): Set<String> {
         val ids = LinkedHashSet<String>()
-        val active = state.value
-        val feed = (active.category(active.mood).ui as? HomeUiState.Success)?.feed ?: return ids
+        val feed = (state.value.ui as? HomeUiState.Success)?.feed ?: return ids
         feed.quickPicks.forEach { ids.add(it.id) }
         feed.sections.forEach { section ->
             section.items.forEach { item ->
@@ -218,70 +187,44 @@ class HomeViewModel(
         return ids
     }
 
-    /**
-     * Keep the friendly headline and the evidence together. The old Error state
-     * dropped [DhunError.detailString], making a shape change, an HTTP rejection
-     * and a missing client version indistinguishable on the phone.
-     *
-     * [diagnosticText] bounds untrusted text and strips URLs before either the
-     * UI or logcat sees it. Home's shape summary itself contains key names only,
-     * never continuation tokens, tracking values or response bodies.
-     */
-    private fun homeError(error: DhunError): HomeUiState.Error {
-        val detail = error.detailString()
-            ?.let { diagnosticText(it, HOME_ERROR_DETAIL_LIMIT) }
-            ?.takeIf { it.isNotBlank() }
-        errorLogger("Home load failed (${error::class.simpleName ?: "Unknown"}): ${detail ?: "no detail"}")
-        return HomeUiState.Error(error.toUserMessage(), detail)
-    }
-
     private fun requestFeed(refresh: Boolean, mood: HomeMood = state.value.mood) {
-        val request = state.updateAndGet { current ->
-            val previous = current.category(mood)
-            val next = CategoryState(
-                generation = previous.generation + 1,
-                ui = if (refresh && previous.ui is HomeUiState.Success) previous.ui else HomeUiState.Loading,
+        val request = state.updateAndGet {
+            State(
+                generation = it.generation + 1,
+                mood = mood,
+                ui = if (refresh && it.ui is HomeUiState.Success) it.ui else HomeUiState.Loading,
                 refreshing = refresh,
             )
-            current.withCategory(mood, next)
-        }.category(mood)
-        feedJobs[mood]?.cancel()
-        pageJobs[mood]?.cancel()
-        feedJobs[mood] = scope.launch {
+        }
+        feedJob?.cancel()
+        pageJob?.cancel()
+        feedJob = scope.launch {
             try {
-                val result = getHomeFeed(mood)
-                val nextUi: HomeUiState = when (result) {
-                    is DhunResult.Success -> {
-                        val feed = result.value
-                        if (feed.quickPicks.isEmpty() && feed.sections.isEmpty() && feed.continuationToken == null) {
-                            HomeUiState.Empty
-                        } else {
-                            HomeUiState.Success(feed)
-                        }
-                    }
-                    is DhunResult.Failure -> homeError(result.error)
-                }
+                val result = getHomeFeed(request.mood)
                 state.update { current ->
-                    val category = current.category(mood)
-                    if (category.generation != request.generation) current
-                    else current.withCategory(mood, category.copy(ui = nextUi))
+                    if (current.generation != request.generation) current else current.copy(
+                        ui = when (result) {
+                            is DhunResult.Success -> {
+                                val feed = result.value
+                                if (feed.quickPicks.isEmpty() && feed.sections.isEmpty() && feed.continuationToken == null) {
+                                    HomeUiState.Empty
+                                } else {
+                                    HomeUiState.Success(feed)
+                                }
+                            }
+                            is DhunResult.Failure -> HomeUiState.Error(result.error.toUserMessage())
+                        },
+                    )
                 }
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
-                val failure = homeError(
-                    DhunError.Unknown("${e::class.simpleName ?: "Exception"}: ${e.message.orEmpty()}"),
-                )
-                state.update { current ->
-                    val category = current.category(mood)
-                    if (category.generation != request.generation) current
-                    else current.withCategory(mood, category.copy(ui = failure))
+            } catch (_: Exception) {
+                state.update {
+                    if (it.generation != request.generation) it else it.copy(ui = HomeUiState.Error(DhunError.Unknown().toUserMessage()))
                 }
             } finally {
-                state.update { current ->
-                    val category = current.category(mood)
-                    if (category.generation != request.generation) current
-                    else current.withCategory(mood, category.copy(refreshing = false))
+                state.update {
+                    if (it.generation != request.generation) it else it.copy(refreshing = false)
                 }
             }
         }
@@ -293,78 +236,60 @@ class HomeViewModel(
     /** One request at a time; failures wait for an explicit retry, not a recomposition loop. */
     private fun requestMore(retry: Boolean) {
         val before = state.value
-        val mood = before.mood
-        val beforeCategory = before.category(mood)
-        val current = (beforeCategory.ui as? HomeUiState.Success)?.feed ?: return
+        val current = (before.ui as? HomeUiState.Success)?.feed ?: return
         val token = current.continuationToken ?: return
-        if (beforeCategory.refreshing || beforeCategory.loadingMore ||
-            token in beforeCategory.completedTokens || (!retry && beforeCategory.pageError != null)
-        ) return
-        val requestCategory = beforeCategory.copy(
+        if (before.refreshing || before.loadingMore || (!retry && before.pageError != null)) return
+        val request = before.copy(
             loadingMore = true,
             pageError = null,
-            emptyPageCount = if (retry) 0 else beforeCategory.emptyPageCount,
+            emptyPageCount = if (retry) 0 else before.emptyPageCount,
         )
-        val request = before.withCategory(mood, requestCategory)
-        // Claim BEFORE coroutine dispatch. A refresh in the same category (or
-        // another rapid scroll event) can invalidate this exact generation.
+        // Claim BEFORE coroutine dispatch. If refresh/another request won the
+        // CAS, let its updated state trigger the next UI event instead.
         if (!state.compareAndSet(before, request)) return
-        pageJobs[mood] = scope.launch {
+        pageJob = scope.launch {
             try {
-                val result = getHomeFeed.loadMore(current, mood)
+                val result = getHomeFeed.loadMore(current, request.mood)
                 state.update { latest ->
-                    val category = latest.category(mood)
-                    if (category.generation != requestCategory.generation) return@update latest
+                    if (latest.generation != request.generation) return@update latest
                     when (result) {
                         is DhunResult.Success -> {
-                            val used = category.completedTokens + token
+                            val used = latest.completedTokens + token
                             val feed = result.value.copy(
                                 continuationToken = result.value.continuationToken?.takeUnless { it in used },
                             )
-                            val emptyPages = if (feed.sections.size == current.sections.size) category.emptyPageCount + 1 else 0
-                            latest.withCategory(mood, category.copy(
+                            val emptyPages = if (feed.sections.size == current.sections.size) latest.emptyPageCount + 1 else 0
+                            latest.copy(
                                 ui = HomeUiState.Success(feed),
                                 completedTokens = used,
                                 emptyPageCount = emptyPages,
                                 pageError = if (feed.continuationToken != null && emptyPages >= MAX_EMPTY_PAGES) {
                                     "No new recommendations arrived. Retry or refresh Home."
                                 } else null,
-                            ))
+                            )
                         }
-                        is DhunResult.Failure -> latest.withCategory(
-                            mood,
-                            category.copy(pageError = result.error.toUserMessage()),
-                        )
+                        is DhunResult.Failure -> latest.copy(pageError = result.error.toUserMessage())
                     }
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                state.update { latest ->
-                    val category = latest.category(mood)
-                    if (category.generation != requestCategory.generation) latest
-                    else latest.withCategory(
-                        mood,
-                        category.copy(pageError = DhunError.Unknown().toUserMessage()),
-                    )
+                state.update {
+                    if (it.generation != request.generation) it else it.copy(pageError = DhunError.Unknown().toUserMessage())
                 }
             } finally {
-                state.update { latest ->
-                    val category = latest.category(mood)
-                    if (category.generation != requestCategory.generation) latest
-                    else latest.withCategory(mood, category.copy(loadingMore = false))
+                state.update {
+                    if (it.generation != request.generation) it else it.copy(loadingMore = false)
                 }
             }
         }
     }
 
     fun toggleFavorite(track: Track) {
-        mutations.run("like:${track.id}", FAVORITE_FAILED) { toggleFavoriteUseCase(track) }
+        scope.launch { toggleFavoriteUseCase(track) }
     }
 
     private companion object {
-        const val FAVORITE_FAILED = "Could not update Liked Songs. Try again."
-        const val HOME_ERROR_DETAIL_LIMIT = 700
         const val MAX_EMPTY_PAGES = 3
         /** Distinct recent plays that form the seed signal for recommendations. */
         const val RECOMMEND_SEED_SIGNAL = 10

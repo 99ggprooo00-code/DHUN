@@ -23,6 +23,7 @@ import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -48,7 +49,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -67,7 +71,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
@@ -112,21 +115,14 @@ import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.DhunVisualTuning
-import dev.dhun.design.FullPlayerLayoutMode
 import dev.dhun.design.VisualPart
-import dev.dhun.design.background.BackgroundBlurPolicy
-import dev.dhun.design.background.BackgroundComponent
-import dev.dhun.design.background.BackgroundPalettePolicy
-import dev.dhun.design.background.DhunBackgrounds
-import dev.dhun.design.components.AmbientBackdrop
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunIconButton
-import dev.dhun.design.components.DhunSlider
-import dev.dhun.design.components.DhunTextButton
+import dev.dhun.design.components.dhunMouseDragScroll
 import dev.dhun.design.components.LyricsArtworkSheet
 import dev.dhun.design.components.NowPlayingBackdropPolicy
-import dev.dhun.design.components.dhunMouseDragScroll
 import dev.dhun.design.components.lyricsVeilBrush
+import dev.dhun.design.FullPlayerLayoutMode
 import dev.dhun.design.fittedPlayerArtworkSize
 import dev.dhun.design.fullPlayerLayoutMode
 import dev.dhun.design.playerWideControlsWidth
@@ -216,6 +212,8 @@ fun FullPlayer(
     val state by viewModel.state.collectAsState()
     val track by viewModel.currentTrack.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
+    val positionMs by viewModel.positionMs.collectAsState()
+    val durationMs by viewModel.durationMs.collectAsState()
     val repeatMode by viewModel.repeatMode.collectAsState()
     val shuffleEnabled by viewModel.shuffleEnabled.collectAsState()
     val volume by viewModel.volume.collectAsState()
@@ -369,10 +367,7 @@ fun FullPlayer(
     Box(
         modifier = modifier
             .fillMaxSize()
-            // No flat fill: the ambient base below paints the theme background
-            // *and* the accent blooms, so a player with no cover (or a device
-            // that cannot blur) is still artwork-coloured rather than one
-            // black rectangle.
+            .background(DhunColors.background)
             .clipToBounds()
             // Swallow gestures so taps don't fall through to the library below.
             .clickable(
@@ -380,14 +375,6 @@ fun FullPlayer(
                 indication = null,
             ) {},
     ) {
-        // ---- ambient base --------------------------------------------------
-        // Under the cover: the page's own colour, so the fallback state is not
-        // a void (docs/design/glass-system.md §1).
-        AmbientBackdrop(
-            modifier = Modifier.fillMaxSize(),
-            component = BackgroundComponent.FULL_PLAYER,
-        )
-
         // ---- artwork backdrop (runs under the status bar) -------------------
         // Blurred once per track, darkened towards the bottom so the control
         // cluster reads over it; the sharp thumbnail never reaches down here.
@@ -496,6 +483,8 @@ fun FullPlayer(
                         viewModel = viewModel,
                         state = state,
                         current = current,
+                        positionMs = positionMs,
+                        durationMs = durationMs,
                         repeatMode = repeatMode,
                         shuffleEnabled = shuffleEnabled,
                         volume = volume,
@@ -671,6 +660,8 @@ private fun PlayerControlCluster(
     viewModel: PlayerViewModel,
     state: PlaybackState,
     current: Track?,
+    positionMs: Long,
+    durationMs: Long,
     repeatMode: RepeatMode,
     shuffleEnabled: Boolean,
     volume: Float,
@@ -727,10 +718,10 @@ private fun PlayerControlCluster(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                DhunTextButton(onClick = { onShowErrorDetails() }) {
+                TextButton(onClick = { onShowErrorDetails() }) {
                     Text("Details", color = DhunColors.textPrimary)
                 }
-                DhunTextButton(onClick = viewModel::retry) {
+                TextButton(onClick = viewModel::retry) {
                     Text("Retry", color = DhunColors.error)
                 }
             }
@@ -802,8 +793,9 @@ private fun PlayerControlCluster(
         // Cancel scrubbing on a new queue occurrence, even for
         // equal-duration tracks.
         key(current?.id, queueIndex) {
-            ObservedPlayerTimeline(
-                viewModel = viewModel,
+            PlayerTimeline(
+                positionMs = positionMs,
+                durationMs = durationMs,
                 accent = accent,
                 onSeek = { target ->
                     if (viewModel.currentTrack.value?.id == current?.id &&
@@ -893,14 +885,16 @@ private fun PlayerControlCluster(
                 tint = DhunColors.textSecondary,
             )
             Spacer(modifier = Modifier.width(DhunSpacing.sm))
-            // The DHUN slider, so the volume groove is the same translucent
-            // glass as every other control instead of an opaque Material track
-            // (glass-system.md §2).
-            DhunSlider(
+            Slider(
                 value = volume.coerceIn(0f, 1f),
                 onValueChange = viewModel::setVolume,
                 valueRange = 0f..1f,
                 modifier = Modifier.weight(1f).semantics { contentDescription = if (isDesktop) "In-app volume" else "Media volume" },
+                colors = SliderDefaults.colors(
+                    thumbColor = accent,
+                    activeTrackColor = accent.copy(alpha = 0.85f),
+                    inactiveTrackColor = DhunColors.border,
+                ),
             )
             Spacer(modifier = Modifier.width(DhunSpacing.sm))
             Text(
@@ -1096,7 +1090,6 @@ private fun PlayerArtworkStage(
         LyricsCardOverlay(
             visible = lyricsDominant,
             artworkUrl = artworkUrl,
-            fallbackArtworkUrl = track?.thumbnailUrl?.takeIf { it.isNotBlank() } ?: ArtworkUrls.videoThumbnail(track?.id),
             cacheKey = cacheKey,
             viewModel = viewModel,
             accent = accent,
@@ -1462,22 +1455,9 @@ private fun ArtworkBackdrop(
     lyricsDominant: Boolean,
     cacheKey: String,
 ) {
-    // With the player's blur off, nothing artwork-derived is painted here — not
-    // the cover, not the scrims that exist only to sit under it. The player's
-    // own colour (AmbientBackdrop, just above) is the background instead.
-    if (!DhunBackgrounds.showsArtwork(BackgroundComponent.FULL_PLAYER)) return
     val brightnessShift = (55 - DhunAppearance.backdropBrightnessPercent) / 100f * 0.12f
-    // The dim and the scrim below are the *player's* colour over its own
-    // artwork, not the theme's neutral rung: with Dynamic colours off that is
-    // the colour the user picked for the full player, which otherwise had no
-    // visible effect at all while blur was on. Luminance stays the theme's veil
-    // luminance, so the measured contrast of the controls is unchanged.
-    val playerVeilTint = BackgroundPalettePolicy.veilTintFor(
-        palette = DhunBackgrounds.paletteFor(BackgroundComponent.FULL_PLAYER),
-        veilTint = NowPlayingBackdropPolicy.veilTint(DhunAppearance.tokens),
-    )
     val dimColor by animateColorAsState(
-        targetValue = playerVeilTint.copy(alpha =
+        targetValue = NowPlayingBackdropPolicy.veilTint(DhunAppearance.tokens).copy(alpha =
             DhunVisualTuning.veilAlpha(VisualPart.PLAYER,
                 ((if (lyricsDominant) PLAYER_BACKDROP_DIM_LYRICS else PLAYER_BACKDROP_DIM) + brightnessShift)
                     .coerceIn(0.02f, 0.54f))),
@@ -1497,7 +1477,6 @@ private fun ArtworkBackdrop(
             key(cacheKey) {
                 PlayerBackdrop(
                     artworkUrl = ArtworkUrls.nowPlaying(track?.thumbnailUrl),
-                    fallbackArtworkUrl = track?.thumbnailUrl?.takeIf { it.isNotBlank() } ?: ArtworkUrls.videoThumbnail(track?.id),
                     cacheKey = cacheKey,
                 )
             }
@@ -1505,7 +1484,7 @@ private fun ArtworkBackdrop(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(ambientScrimBrush(playerVeilTint)),
+                .background(ambientScrimBrush()),
         )
         Box(
             modifier = Modifier
@@ -1554,8 +1533,9 @@ internal fun playerAmbientScrimStops(isLight: Boolean = false): List<Pair<Float,
 
 /** [playerAmbientScrimStops] as the brush the backdrop actually paints. */
 @Composable
-private fun ambientScrimBrush(tint: Color): Brush {
+private fun ambientScrimBrush(): Brush {
     val tokens = DhunAppearance.tokens
+    val tint = NowPlayingBackdropPolicy.veilTint(tokens)
     return Brush.verticalGradient(
         colorStops = playerAmbientScrimStops(tokens.isLight)
             .map { (offset, alpha) -> offset to tint.copy(alpha =
@@ -1635,7 +1615,6 @@ private fun ArtworkHeroField(
             ) {
                 ArtworkImage(
                     imageUrl = ArtworkUrls.nowPlaying(t?.thumbnailUrl),
-                    fallbackImageUrl = t?.thumbnailUrl?.takeIf { it.isNotBlank() } ?: ArtworkUrls.videoThumbnail(t?.id),
                     contentDescription = t?.title,
                     modifier = Modifier.fillMaxSize(),
                     shape = DhunShapes.artwork,
@@ -1668,7 +1647,6 @@ private fun ArtworkHeroField(
 private fun LyricsCardOverlay(
     visible: Boolean,
     artworkUrl: String?,
-    fallbackArtworkUrl: String?,
     cacheKey: String,
     viewModel: PlayerViewModel,
     accent: Color,
@@ -1684,7 +1662,6 @@ private fun LyricsCardOverlay(
     ) {
         LyricsCard(
             artworkUrl = artworkUrl,
-            fallbackArtworkUrl = fallbackArtworkUrl,
             cacheKey = cacheKey,
             viewModel = viewModel,
             accent = accent,
@@ -1697,8 +1674,8 @@ private fun LyricsCardOverlay(
  * A null/blank URL returns false so the screen falls back to the clean dark
  * surface. Platforms without RenderEffect still paint the cover (dimmed).
  */
-internal fun shouldRenderPlayerBackdrop(artworkUrl: String?, fallbackArtworkUrl: String? = null): Boolean =
-    !artworkUrl.isNullOrBlank() || !fallbackArtworkUrl.isNullOrBlank()
+internal fun shouldRenderPlayerBackdrop(artworkUrl: String?): Boolean =
+    !artworkUrl.isNullOrBlank()
 
 /**
  * Blurred-artwork bleed (ADR-002 P4). [ArtworkBackdrop] mounts this inside
@@ -1712,19 +1689,12 @@ internal fun shouldRenderPlayerBackdrop(artworkUrl: String?, fallbackArtworkUrl:
 @Composable
 private fun PlayerBackdrop(
     artworkUrl: String?,
-    fallbackArtworkUrl: String?,
     cacheKey: String,
 ) {
-    if (!shouldRenderPlayerBackdrop(artworkUrl, fallbackArtworkUrl)) return
+    if (!shouldRenderPlayerBackdrop(artworkUrl)) return
 
     val canBlur = supportsRealtimeBlur
-    // The player is its own surface: it has its own blur switch and its own
-    // colour, independent of the page behind it.
-    val blurPercent = DhunBackgrounds.blurPercentFor(
-        component = BackgroundComponent.FULL_PLAYER,
-        strengthPercent = DhunAppearance.backdropBlurPercent,
-    )
-    if (!BackgroundBlurPolicy.paintsArtwork(blurPercent)) return
+    val blurPercent = DhunAppearance.backdropBlurPercent
 
     var prepared by remember {
         mutableStateOf(cacheKey.isNotBlank() && BlurredArtworkCache.isPrepared(cacheKey))
@@ -1753,7 +1723,6 @@ private fun PlayerBackdrop(
     )
     ArtworkImage(
         imageUrl = artworkUrl,
-        fallbackImageUrl = fallbackArtworkUrl,
         contentDescription = null,
         modifier = Modifier
             .fillMaxSize()
@@ -1776,19 +1745,11 @@ private fun PlayerBackdrop(
 @Composable
 private fun LyricsCard(
     artworkUrl: String?,
-    fallbackArtworkUrl: String?,
     cacheKey: String,
     viewModel: PlayerViewModel,
     accent: Color,
     modifier: Modifier = Modifier,
 ) {
-    // The card's frost follows the player's own switches, so the global switch
-    // and the player's adaptive choice both reach it.
-    val blurPercent = DhunBackgrounds.blurPercentFor(
-        component = BackgroundComponent.FULL_PLAYER,
-        strengthPercent = DhunAppearance.backdropBlurPercent,
-    )
-    val paintsArtwork = BackgroundBlurPolicy.paintsArtwork(blurPercent)
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -1800,19 +1761,18 @@ private fun LyricsCard(
         // Blurred artwork inside the card — keyed like the backdrop so the
         // blur is prepared once per track, never per frame.
         key(cacheKey) {
-            if (paintsArtwork && shouldRenderPlayerBackdrop(artworkUrl, fallbackArtworkUrl)) {
+            if (shouldRenderPlayerBackdrop(artworkUrl)) {
                 ArtworkImage(
                     imageUrl = artworkUrl,
-                    fallbackImageUrl = fallbackArtworkUrl,
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxSize()
                         .then(
-                            if (supportsRealtimeBlur && blurPercent > 0) {
+                            if (supportsRealtimeBlur && DhunAppearance.backdropBlurPercent > 0) {
                                 Modifier.blur(
                                     DhunSpacing.glassBlur * 2 *
                                         NowPlayingBackdropPolicy.blurMultiplier(
-                                            blurPercent,
+                                            DhunAppearance.backdropBlurPercent,
                                         ),
                                 )
                             } else {
