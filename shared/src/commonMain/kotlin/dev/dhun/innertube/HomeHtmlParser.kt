@@ -38,6 +38,22 @@ internal fun parseHomeInitialData(html: String): JsonObject? {
     return null
 }
 
+/** The complete WEB_REMIX request context embedded by the music homepage. */
+internal fun parseInnertubeContext(html: String): JsonObject? {
+    if (html.isEmpty()) return null
+    val marker = Regex("\"INNERTUBE_CONTEXT\"\\s*:\\s*")
+    for (match in marker.findAll(html)) {
+        val start = match.range.last + 1
+        if (start >= html.length || html[start] != '{') continue
+        val end = jsonObjectEnd(html, start) ?: continue
+        val candidate = runCatching {
+            Json.parseToJsonElement(html.substring(start, end + 1)) as? JsonObject
+        }.getOrNull() ?: continue
+        if (candidate.obj("client")?.str("clientName") == "WEB_REMIX") return candidate
+    }
+    return null
+}
+
 private fun homeCandidate(source: String): JsonObject? {
     val candidate = runCatching {
         Json.parseToJsonElement(source) as? JsonObject

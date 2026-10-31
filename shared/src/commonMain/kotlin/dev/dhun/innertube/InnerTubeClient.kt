@@ -100,6 +100,9 @@ class InnerTubeClient(
     private var cachedMusicVisitorData: String? = null
 
     @Volatile
+    private var cachedMusicContext: JsonObject? = null
+
+    @Volatile
     private var cachedHomeInitialData: JsonObject? = null
 
     /** Player-JS URL to the `signatureTimestamp` extracted from it. */
@@ -134,7 +137,9 @@ class InnerTubeClient(
                     "client version missing from homepage HTML (HTTP $status, ${html.length} chars)",
                 ),
             )
+        cachedMusicContext = parseInnertubeContext(html)
         cachedMusicVisitorData = parseVisitorDataFromHomepage(html)
+            ?: cachedMusicContext?.obj("client")?.str("visitorData")
         cachedHomeInitialData = parseHomeInitialData(html)
         cachedClientVersion = version
         return version
@@ -188,7 +193,7 @@ class InnerTubeClient(
                 put("browseId", "FEmusic_home")
             }
             val response = try {
-                postJson("browse", body)
+                postJson("browse", body, refreshSessionOnBadRequest = false)
             } catch (rejected: DhunException) {
                 val detail = (rejected.error as? DhunError.Parse)?.detail
                 if (detail?.startsWith("HTTP 400 from /browse") != true) throw rejected
@@ -538,12 +543,14 @@ class InnerTubeClient(
         endpoint: String,
         body: JsonObject,
         continuationToken: String? = null,
+        refreshSessionOnBadRequest: Boolean = true,
     ): JsonObject {
         val version = clientVersion()
         val visitorData = cachedMusicVisitorData
         // context() may have been built BEFORE the first version discovery.
-        // Keep body and X-YouTube-Client-Version aligned on the very first request.
-        val requestBody = bodyWithClientVersion(body, version)
+        // Rebuild it with the complete session context and keep the body,
+        // client-version header and visitor header aligned on every request.
+        val requestBody = bodyWithClientVersion(body, version, cachedMusicContext, visitorData)
         var lastError: DhunError = DhunError.Unknown()
         repeat(MAX_ATTEMPTS) { attempt ->
             globalRateGate.await() // Phase 14: 429 global backoff — all calls wait out a tripped gate
@@ -568,9 +575,31 @@ class InnerTubeClient(
                 when {
                     code == 429 -> lastError = onRateLimited(response.headers["Retry-After"])
                     code in 500..599 -> lastError = DhunError.Network("HTTP $code from /$endpoint")
-                    code != 200 -> throw DhunException(
-                        DhunError.Parse(innerTubeHttpErrorDetail(code, endpoint, response.bodyAsText())),
-                    )
+                    code != 200 -> {
+                        val detail = innerTubeHttpErrorDetail(code, endpoint, response.bodyAsText())
+                        if (code == 400 && refreshSessionOnBadRequest) {
+                            // A session can expire or be rejected independently
+                            // of the endpoint. Refresh YouTube's own context and
+                            // retry once; never loop on a deterministic 400.
+                            val refreshed = try {
+                                clientVersion(forceRefresh = true)
+                                true
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                false
+                            }
+                            if (refreshed) {
+                                return postJson(
+                                    endpoint = endpoint,
+                                    body = body,
+                                    continuationToken = continuationToken,
+                                    refreshSessionOnBadRequest = false,
+                                )
+                            }
+                        }
+                        throw DhunException(DhunError.Parse(detail))
+                    }
                     else -> {
                         val text = response.bodyAsText()
                         try {
@@ -861,10 +890,30 @@ internal fun innerTubeHttpErrorDetail(code: Int, endpoint: String, responseBody:
     return diagnosticText(summary.joinToString("; "))
 }
 
-internal fun bodyWithClientVersion(body: JsonObject, version: String): JsonObject {
-    val context = body.obj("context").orEmpty()
-    val client = (context["client"] as? JsonObject).orEmpty()
+/**
+ * Keep endpoint fields unchanged while aligning the request with the session
+ * YouTube actually served. The explicit body client keeps DHUN's language and
+ * region choices; the served context contributes request/user fields and its
+ * visitor identity is mirrored into both body and header.
+ */
+internal fun bodyWithClientVersion(
+    body: JsonObject,
+    version: String,
+    sessionContext: JsonObject? = null,
+    visitorData: String? = null,
+): JsonObject {
+    val existingContext = body.obj("context").orEmpty()
+    val existingClient = (existingContext["client"] as? JsonObject).orEmpty()
+    val context = sessionContext?.takeIf {
+        it.obj("client")?.str("clientName") == "WEB_REMIX"
+    } ?: existingContext
+    val sessionClient = (context["client"] as? JsonObject).orEmpty()
+    val visitor = visitorData?.takeIf { it.isNotBlank() }?.let {
+        mapOf("visitorData" to JsonPrimitive(it))
+    }.orEmpty()
+    val client = sessionClient + existingClient +
+        mapOf("clientVersion" to JsonPrimitive(version)) + visitor
     return JsonObject(body + ("context" to JsonObject(
-        context + ("client" to JsonObject(client + ("clientVersion" to JsonPrimitive(version)))),
+        context + ("client" to JsonObject(client)),
     )))
 }

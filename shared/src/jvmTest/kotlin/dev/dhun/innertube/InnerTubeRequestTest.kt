@@ -28,6 +28,9 @@ class InnerTubeRequestTest {
         .getResourceAsStream("fixtures/home-pagination/initial-feed-and-shelf-token.json")!!
         .bufferedReader().use { it.readText() }
 
+    private fun homepageWithContext(visitor: String): String =
+        """{"INNERTUBE_CLIENT_VERSION":"1.20261027.10.00","INNERTUBE_CONTEXT":{"client":{"clientName":"WEB_REMIX","clientVersion":"1.20261027.10.00","visitorData":"$visitor","hl":"en","gl":"US"},"request":{"useSsl":true},"user":{"lockedSafetyMode":false}}}"""
+
     @Test
     fun homeContinuationUsesTheBrowseQueryWireContract() = runBlocking {
         var posts = 0
@@ -72,6 +75,44 @@ class InnerTubeRequestTest {
     }
 
     @Test
+    fun homeContinuationRefreshesASRejectedSessionWithoutLosingItsToken() = runBlocking {
+        var homepageRequests = 0
+        var browseRequests = 0
+        val engine = MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/" -> {
+                    homepageRequests++
+                    respond(homepageWithContext(if (homepageRequests == 1) "visitor-old" else "visitor-new"))
+                }
+                "/youtubei/v1/browse" -> {
+                    browseRequests++
+                    val expectedVisitor = if (browseRequests == 1) "visitor-old" else "visitor-new"
+                    val body = obj((request.body as TextContent).text)
+                    assertEquals("next-page", request.url.parameters["ctoken"])
+                    assertEquals("next-page", request.url.parameters["continuation"])
+                    assertEquals("FEmusic_home", body.str("browseId"))
+                    assertEquals(expectedVisitor, body.obj("context").obj("client").str("visitorData"))
+                    assertEquals(expectedVisitor, request.headers["X-Goog-Visitor-Id"])
+                    if (browseRequests == 1) {
+                        respond("{}", status = HttpStatusCode.BadRequest)
+                    } else {
+                        respond("""{"continuationContents":{"sectionListContinuation":{"contents":[]}}}""")
+                    }
+                }
+                else -> error("Unexpected request: ${request.url.encodedPath}")
+            }
+        }
+        val http = HttpClient(engine) { install(HttpTimeout) }
+        try {
+            assertTrue(InnerTubeClient(http).homeFeedContinuation("next-page") is DhunResult.Success)
+            assertEquals(2, homepageRequests)
+            assertEquals(2, browseRequests)
+        } finally {
+            http.close()
+        }
+    }
+
+    @Test
     fun homeClientVersionConfigAllowsJsonWhitespace() = runBlocking {
         val engine = MockEngine { request ->
             when (request.url.encodedPath) {
@@ -89,6 +130,74 @@ class InnerTubeRequestTest {
         val http = HttpClient(engine) { install(HttpTimeout) }
         try {
             assertTrue(InnerTubeClient(http).homeFeedPage() is DhunResult.Success)
+        } finally {
+            http.close()
+        }
+    }
+
+    @Test
+    fun searchUsesServedSessionAndRefreshesItOnceAfterBadRequest() = runBlocking {
+        var homepageRequests = 0
+        var searchRequests = 0
+        val engine = MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/" -> {
+                    homepageRequests++
+                    respond(homepageWithContext(if (homepageRequests == 1) "visitor-old" else "visitor-new"))
+                }
+                "/youtubei/v1/search" -> {
+                    searchRequests++
+                    val expectedVisitor = if (searchRequests == 1) "visitor-old" else "visitor-new"
+                    val body = obj((request.body as TextContent).text)
+                    val context = body.obj("context")
+                    assertEquals(expectedVisitor, context.obj("client").str("visitorData"))
+                    assertEquals(expectedVisitor, request.headers["X-Goog-Visitor-Id"])
+                    assertEquals("true", context.obj("request").str("useSsl"))
+                    assertEquals("false", context.obj("user").str("lockedSafetyMode"))
+                    assertEquals("focus instrumental music", body.str("query"))
+                    if (searchRequests == 1) {
+                        respond("""{"error":{"status":"INVALID_ARGUMENT","message":"bad request"}}""", status = HttpStatusCode.BadRequest)
+                    } else {
+                        respond("{}")
+                    }
+                }
+                else -> error("Unexpected request: ${request.url.encodedPath}")
+            }
+        }
+        val http = HttpClient(engine) { install(HttpTimeout) }
+        try {
+            val result = InnerTubeClient(http).search("focus instrumental music") as DhunResult.Success
+            assertEquals("focus instrumental music", result.value.query)
+            assertEquals(2, homepageRequests)
+            assertEquals(2, searchRequests, "only the fresh-session retry is allowed")
+        } finally {
+            http.close()
+        }
+    }
+
+    @Test
+    fun repeatedBadRequestStopsAfterOneSessionRefresh() = runBlocking {
+        var homepageRequests = 0
+        var searchRequests = 0
+        val engine = MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/" -> {
+                    homepageRequests++
+                    respond(homepageWithContext("visitor-$homepageRequests"))
+                }
+                "/youtubei/v1/search" -> {
+                    searchRequests++
+                    respond("{}", status = HttpStatusCode.BadRequest)
+                }
+                else -> error("Unexpected request: ${request.url.encodedPath}")
+            }
+        }
+        val http = HttpClient(engine) { install(HttpTimeout) }
+        try {
+            val result = InnerTubeClient(http).search("chill music") as DhunResult.Failure
+            assertTrue(result.error is DhunError.Parse)
+            assertEquals(2, homepageRequests)
+            assertEquals(2, searchRequests)
         } finally {
             http.close()
         }

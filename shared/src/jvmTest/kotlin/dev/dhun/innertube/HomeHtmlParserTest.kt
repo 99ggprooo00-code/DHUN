@@ -33,6 +33,15 @@ class HomeHtmlParserTest {
     }
 
     @Test
+    fun extractsOnlyTheServedWebRemixContext() {
+        val context = """{"client":{"clientName":"WEB_REMIX","clientVersion":"1.20261027.10.00","visitorData":"visitor"},"request":{"useSsl":true},"user":{"lockedSafetyMode":false}}"""
+        val html = "<script>ytcfg.set({\"INNERTUBE_CONTEXT\":$context});</script>"
+        assertEquals(json(context), parseInnertubeContext(html))
+        assertNull(parseInnertubeContext(html.replace("WEB_REMIX", "WEB")))
+        assertNull(parseInnertubeContext(""))
+    }
+
+    @Test
     fun rejectsUnrelatedMalformedOrIncompleteJson() {
         assertNull(parseHomeInitialData("""<script>var ytInitialData = {"contents":{"other":{}}};</script>"""))
         assertNull(parseHomeInitialData("""<script>var ytInitialData = {not-json};</script>"""))
