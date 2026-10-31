@@ -50,7 +50,9 @@ import dev.dhun.core.Track
 import dev.dhun.data.DataLayer
 import dev.dhun.data.DatabaseDriverFactory
 import dev.dhun.data.DatabaseFactory
+import dev.dhun.data.LocalPlaylist
 import dev.dhun.data.PlayContext
+import dev.dhun.data.PlaylistRepository
 import dev.dhun.data.SettingsKeys
 import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
@@ -79,6 +81,8 @@ import dev.dhun.ui.shell.AppTab
 import dev.dhun.ui.shell.DetailRoute
 import dev.dhun.ui.shell.DhunAppShell
 import java.io.File
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicInteger
 import org.jetbrains.skia.Image
 import org.jetbrains.skia.Surface
 import kotlinx.coroutines.CompletableDeferred
@@ -86,8 +90,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -194,6 +200,17 @@ class VisualAppEvidenceTest {
                 }.use { composeScene ->
                     SceneDriver(composeScene).capture("app-track-menu-${mode.id}.png", settleFrames = 24)
                 }
+                val repository = fixture.data.playlists
+                val flowRequests = AtomicInteger()
+                val flowEmissions = CopyOnWriteArrayList<List<Pair<String, Int>>>()
+                val diagnosticRepository = object : PlaylistRepository by repository {
+                    override fun observePlaylists(): Flow<List<LocalPlaylist>> {
+                        flowRequests.incrementAndGet()
+                        return repository.observePlaylists().onEach { rows ->
+                            flowEmissions += rows.map { it.name to it.trackCount }
+                        }
+                    }
+                }
                 runSkikoComposeUiTest(size = Size(412f, 915f)) {
                     // Artwork/loading indicators intentionally animate forever.
                     // Skiko auto-advance idling has no timeout; manual frames
@@ -204,7 +221,7 @@ class VisualAppEvidenceTest {
                             Box(Modifier.fillMaxSize().background(DhunColors.background))
                             AddToPlaylistDialog(
                                 track = RECORDED_TRACKS.first(),
-                                playlistRepository = fixture.data.playlists,
+                                playlistRepository = diagnosticRepository,
                                 onDismiss = {},
                                 onAdded = {},
                                 onOpenPlaylist = {},
@@ -234,7 +251,12 @@ class VisualAppEvidenceTest {
                             renderCurrentFrame(this, 412, 915),
                         )
                     }
-                    assertTrue(populated, "The playlist dialog did not expose its populated row")
+                    assertTrue(
+                        populated,
+                        "The playlist dialog did not expose its populated row; " +
+                            "requests=${flowRequests.get()}, emissions=$flowEmissions, " +
+                            "library=${fixture.library.playlistsFlow.value.map { it.name to it.trackCount }}",
+                    )
                     onNode(hasText("Visual QA"), useUnmergedTree = true).assertIsDisplayed()
                     onNode(hasText("4 tracks"), useUnmergedTree = true).assertIsDisplayed()
                     mainClock.advanceTimeBy(500)
