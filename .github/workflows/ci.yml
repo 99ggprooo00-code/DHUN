@@ -81,3 +81,58 @@ jobs:
       # break and a red test fail different, honestly-named steps.
       - name: "Unit tests — Desktop (JVM)"
         run: ./gradlew :app-desktop:jvmTest --no-daemon
+
+      # Logs/artifacts are not downloadable in every development environment.
+      # Read the executed JUnit XML, never the number of @Test annotations, and
+      # put exact per-target totals in the check-run annotations. always() makes
+      # partial failure evidence visible without changing the job conclusion.
+      - name: Summarize executed test reports
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import glob
+          import json
+          import os
+          import xml.etree.ElementTree as ET
+
+          targets = {
+              "shared_jvm": "shared/build/test-results/jvmTest/TEST-*.xml",
+              "android_robolectric": "app-android/build/test-results/testDebugUnitTest/TEST-*.xml",
+              "playback_probe": "tools/playback-probe/build/test-results/test/TEST-*.xml",
+              "desktop_jvm": "app-desktop/build/test-results/jvmTest/TEST-*.xml",
+          }
+          evidence = {}
+          for target, pattern in targets.items():
+              paths = sorted(glob.glob(pattern))
+              totals = {"tests": 0, "failures": 0, "errors": 0, "skipped": 0}
+              for path in paths:
+                  suite = ET.parse(path).getroot()
+                  for key in totals:
+                      totals[key] += int(float(suite.attrib.get(key, "0")))
+              evidence[target] = {"reports": len(paths), **totals}
+
+          os.makedirs("build/test-evidence", exist_ok=True)
+          with open("build/test-evidence/test-counts.json", "w", encoding="utf-8") as handle:
+              json.dump(evidence, handle, indent=2, sort_keys=True)
+              handle.write("\n")
+          summary = "; ".join(
+              f"{target}: reports={values['reports']} tests={values['tests']} "
+              f"failures={values['failures']} errors={values['errors']} skipped={values['skipped']}"
+              for target, values in evidence.items()
+          )
+          print(f"::notice title=DHUN executed test counts::{summary}")
+          PY
+
+      - name: Upload executed test reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: test-reports
+          if-no-files-found: warn
+          path: |
+            build/test-evidence/test-counts.json
+            shared/build/test-results/jvmTest/*.xml
+            app-android/build/test-results/testDebugUnitTest/*.xml
+            tools/playback-probe/build/test-results/test/*.xml
+            app-desktop/build/test-results/jvmTest/*.xml
