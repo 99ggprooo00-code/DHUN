@@ -155,16 +155,19 @@ class InnerTubeClient(
                 put("query", query)
                 filter.params?.let { put("params", it) }
             }
-            parseSearchResults(query, postJson("search", body))
+            parseSearchResults(query, postJson("search", body), filter)
         }
 
-    suspend fun searchContinuation(continuationToken: String): DhunResult<SearchResults> =
+    suspend fun searchContinuation(
+        continuationToken: String,
+        filter: SearchFilter = SearchFilter.SONGS,
+    ): DhunResult<SearchResults> =
         resultify {
             val body = buildJsonObject {
                 put("context", context())
                 put("continuation", continuationToken)
             }
-            parseSearchResults("", postJson("search", body))
+            parseSearchResults("", postJson("search", body), filter)
         }
 
     suspend fun searchSuggestions(query: String): DhunResult<List<String>> =

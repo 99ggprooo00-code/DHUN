@@ -78,6 +78,7 @@ class SearchViewModel(
 
     private data class State(
         val generation: Long = 0,
+        val filter: SearchFilter = SearchFilter.SONGS,
         val results: SearchResultsUiState = SearchResultsUiState.Idle,
         val loadingMore: Boolean = false,
         val pageError: String? = null,
@@ -161,9 +162,10 @@ class SearchViewModel(
     }
 
     fun deleteRecentSearch(query: String) {
-        scope.launch {
-            recentSearchesUseCase.remove(query)
-        }
+        mutations.run(
+            key = "search-history-delete:$query",
+            failureMessage = "Could not remove that recent search. Try again.",
+        ) { recentSearchesUseCase.remove(query) }
     }
 
     suspend fun clearAllRecentSearches() {
@@ -192,7 +194,7 @@ class SearchViewModel(
         if (cleanQuery.isBlank()) return
 
         val request = state.updateAndGet {
-            State(generation = it.generation + 1, results = SearchResultsUiState.Loading)
+            State(generation = it.generation + 1, filter = filter, results = SearchResultsUiState.Loading)
         }
         searchJob?.cancel()
         pageJob?.cancel()
@@ -253,7 +255,7 @@ class SearchViewModel(
         if (!state.compareAndSet(before, request)) return
         pageJob = scope.launch {
             try {
-                val result = provider.searchContinuation(token)
+                val result = provider.searchContinuation(token, request.filter)
                 state.update { latest ->
                     if (latest.generation != request.generation) return@update latest
                     val current = (latest.results as? SearchResultsUiState.Success)?.results

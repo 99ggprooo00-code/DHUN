@@ -117,7 +117,11 @@ internal fun parseContinuationToken(root: JsonObject): String? {
     return null
 }
 
-internal fun parseSearchResults(query: String, root: JsonObject): SearchResults {
+internal fun parseSearchResults(
+    query: String,
+    root: JsonObject,
+    filter: SearchFilter = SearchFilter.SONGS,
+): SearchResults {
     val items = mutableListOf<JsonObject>()
     root.collectObjects("musicResponsiveListItemRenderer", items)
 
@@ -138,7 +142,7 @@ internal fun parseSearchResults(query: String, root: JsonObject): SearchResults 
             videoId != null -> {
                 val idsArtist = browseIdsOf(item.searchColumn(1))
                 val idsAlbum = browseIdsOf(item.searchColumn(2))
-                songs += Track(
+                val track = Track(
                     id = videoId,
                     title = title,
                     artistName = parts.firstOrNull() ?: "Unknown artist",
@@ -149,6 +153,7 @@ internal fun parseSearchResults(query: String, root: JsonObject): SearchResults 
                     thumbnailUrl = thumbnailOf(item),
                     explicit = item.hasExplicitBadge(),
                 )
+                if (filter == SearchFilter.VIDEOS) videos += track else songs += track
             }
             browseId != null && browseId.startsWith("MPREb") -> albums += Album(
                 id = browseId,

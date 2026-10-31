@@ -48,6 +48,7 @@ class SearchViewModelTest {
         @Volatile var searchHandler: (suspend (String, SearchFilter) -> DhunResult<SearchResults>)? = null
         @Volatile var continuationHandler: (suspend (String) -> DhunResult<SearchResults>)? = null
         val continuationCalls = java.util.concurrent.ConcurrentLinkedQueue<String>()
+        val continuationFilters = java.util.concurrent.ConcurrentLinkedQueue<SearchFilter>()
 
         override suspend fun search(query: String, filter: SearchFilter): DhunResult<SearchResults> {
             lastQuery = query
@@ -75,6 +76,14 @@ class SearchViewModelTest {
                     continuationToken = null,
                 )
             )
+        }
+
+        override suspend fun searchContinuation(
+            continuationToken: String,
+            filter: SearchFilter,
+        ): DhunResult<SearchResults> {
+            continuationFilters += filter
+            return searchContinuation(continuationToken)
         }
 
         override suspend fun searchSuggestions(query: String): DhunResult<List<String>> {
@@ -158,6 +167,23 @@ class SearchViewModelTest {
             assertEquals(2, results.songs.size)
             assertEquals("s1", results.songs[0].id)
             assertEquals("s2", results.songs[1].id)
+        } finally {
+            testScope.cancel()
+        }
+    }
+
+    @Test
+    fun videoFilterIsPreservedForContinuation(): Unit = runBlocking {
+        val testScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val data = testData()
+            val provider = FakeSearchMusicProvider()
+            val vm = SearchViewModel(provider, data.search, data.library, data.playlists, testScope)
+            vm.performSearch("live", SearchFilter.VIDEOS)
+            eventually { vm.resultsState.value is SearchResultsUiState.Success }
+            vm.loadMore()
+            eventually { provider.continuationFilters.size == 1 }
+            assertEquals(SearchFilter.VIDEOS, provider.continuationFilters.single())
         } finally {
             testScope.cancel()
         }

@@ -28,6 +28,10 @@ import dev.dhun.innertube.SearchFilter
 interface MusicProvider {
     suspend fun search(query: String, filter: SearchFilter = SearchFilter.SONGS): DhunResult<SearchResults>
     suspend fun searchContinuation(continuationToken: String): DhunResult<SearchResults>
+    suspend fun searchContinuation(
+        continuationToken: String,
+        filter: SearchFilter,
+    ): DhunResult<SearchResults> = searchContinuation(continuationToken)
     suspend fun searchSuggestions(query: String): DhunResult<List<String>>
     /**
      * First page of home shelves plus the continuation token for the next
@@ -106,6 +110,16 @@ class YouTubeMusicProvider(
                 videos = results.videos.filterNot { it.explicit },
             )
         }
+
+    override suspend fun searchContinuation(
+        continuationToken: String,
+        filter: SearchFilter,
+    ): DhunResult<SearchResults> = client.searchContinuation(continuationToken, filter).map { results ->
+        if (allowExplicit()) results else results.copy(
+            songs = results.songs.filterNot { it.explicit },
+            videos = results.videos.filterNot { it.explicit },
+        )
+    }
 
     override suspend fun searchSuggestions(query: String): DhunResult<List<String>> =
         client.searchSuggestions(query)

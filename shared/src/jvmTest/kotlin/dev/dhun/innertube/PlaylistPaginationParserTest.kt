@@ -28,7 +28,7 @@ class PlaylistPaginationParserTest {
         assertEquals("next-playlist", page.continuationToken)
         assertEquals(listOf("aaaaaaaaaaa"), page.tracks.map { it.id })
         assertEquals(page.thumbnailUrl, page.tracks.single().thumbnailUrl)
-        assertEquals("Real artist", page.tracks.single().artistName)
+        assertEquals("Artist", page.tracks.single().artistName)
     }
 
     @Test

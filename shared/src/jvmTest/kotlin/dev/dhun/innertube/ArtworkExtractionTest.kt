@@ -36,6 +36,21 @@ class ArtworkExtractionTest {
     }
 
     @Test
+    fun videoFilterPopulatesTheListReadByTheVideosTab() {
+        val root = obj(
+            """{"contents":[{"musicResponsiveListItemRenderer":{""" +
+                """"playlistItemData":{"videoId":"utwMHfDZ6SA"},""" +
+                """"flexColumns":[""" +
+                """{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Video"}]}}},""" +
+                """{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Artist"}]}}}""" +
+                """]}}]}""",
+        )
+        val result = parseSearchResults("video", root, SearchFilter.VIDEOS)
+        assertEquals(emptyList(), result.songs)
+        assertEquals(listOf("utwMHfDZ6SA"), result.videos.map { it.id })
+    }
+
+    @Test
     fun searchResultsUseTheSameAlternateThumbnailExtraction() {
         val root = obj(
             """{"contents":[{"musicResponsiveListItemRenderer":{""" +
