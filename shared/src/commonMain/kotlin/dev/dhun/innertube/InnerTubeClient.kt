@@ -116,16 +116,21 @@ class InnerTubeClient(
 
     suspend fun clientVersion(forceRefresh: Boolean = false): String {
         cachedClientVersion?.takeIf { !forceRefresh }?.let { return it }
-        val html = try {
-            httpClient.get("${MUSIC_BASE}/") { browserHeaders() }.bodyAsText()
+        val (status, html) = try {
+            val response = httpClient.get("${MUSIC_BASE}/") { browserHeaders() }
+            response.status.value to response.bodyAsText()
         } catch (e: CancellationException) {
             throw e
         } catch (t: Throwable) {
             throw DhunException(classify(t))
         }
-        val version = Regex("\"INNERTUBE_CLIENT_VERSION\":\"([0-9.]+)\"")
+        val version = Regex("\"INNERTUBE_CLIENT_VERSION\"\\s*:\\s*\"([0-9.]+)\"")
             .find(html)?.groupValues?.get(1)
-            ?: throw DhunException(DhunError.Parse("client version missing from homepage HTML"))
+            ?: throw DhunException(
+                DhunError.Parse(
+                    "client version missing from homepage HTML (HTTP $status, ${html.length} chars)",
+                ),
+            )
         cachedMusicVisitorData = parseVisitorDataFromHomepage(html)
         cachedClientVersion = version
         return version
@@ -536,7 +541,18 @@ class InnerTubeClient(
                     code == 429 -> lastError = onRateLimited(response.headers["Retry-After"])
                     code in 500..599 -> lastError = DhunError.Network("HTTP $code from /$endpoint")
                     code != 200 -> throw DhunException(DhunError.Parse("HTTP $code from /$endpoint"))
-                    else -> return Json.parseToJsonElement(response.bodyAsText()).jsonObject
+                    else -> {
+                        val text = response.bodyAsText()
+                        try {
+                            return Json.parseToJsonElement(text).jsonObject
+                        } catch (e: kotlinx.serialization.SerializationException) {
+                            throw DhunException(DhunError.Parse("Malformed JSON from /$endpoint"))
+                        } catch (e: IllegalArgumentException) {
+                            // A valid JSON array/scalar is still the wrong
+                            // response contract; never report it as Unknown.
+                            throw DhunException(DhunError.Parse("Expected a JSON object from /$endpoint"))
+                        }
+                    }
                 }
             } catch (e: CancellationException) {
                 throw e

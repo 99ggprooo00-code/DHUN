@@ -1,0 +1,111 @@
+{
+  "futureRootField": {
+    "nullable": null
+  },
+  "contents": {
+    "singleColumnBrowseResultsRenderer": {
+      "tabs": [
+        {
+          "tabRenderer": {
+            "selected": true,
+            "content": {
+              "sectionListRenderer": {
+                "contents": [
+                  {
+                    "musicTastebuilderShelfRenderer": {
+                      "contents": [
+                        {
+                          "musicTastebuilderItemRenderer": {
+                            "title": "Unsupported section content"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "musicShelfRenderer": {
+                      "header": {
+                        "musicShelfBasicHeaderRenderer": {
+                          "title": {
+                            "runs": [
+                              {
+                                "text": "Broken shelf"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "contents": [
+                        {
+                          "musicResponsiveListItemRenderer": {
+                            "playlistItemData": {
+                              "videoId": "broken"
+                            },
+                            "flexColumns": "wrong-type"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "musicCarouselShelfRenderer": {
+                      "header": {
+                        "musicCarouselShelfBasicHeaderRenderer": {
+                          "title": {
+                            "runs": [
+                              {
+                                "text": "Valid shelf"
+                              }
+                            ]
+                          },
+                          "futureHeaderField": null
+                        }
+                      },
+                      "contents": [
+                        {
+                          "musicResponsiveListItemRenderer": {
+                            "playlistItemData": {
+                              "videoId": "survives"
+                            },
+                            "flexColumns": [
+                              {
+                                "musicResponsiveListItemFlexColumnRenderer": {
+                                  "text": {
+                                    "runs": [
+                                      {
+                                        "text": "Track with only required fields"
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            ],
+                            "futureItemField": {
+                              "anything": true
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "musicPlaylistShelfRenderer": {
+                      "contents": null
+                    }
+                  }
+                ],
+                "continuations": [
+                  {
+                    "nextContinuationData": {
+                      "continuation": null
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

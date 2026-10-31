@@ -1,6 +1,8 @@
 package dev.dhun.innertube
 
+import dev.dhun.core.DhunError
 import dev.dhun.core.DhunException
+import dev.dhun.core.detailString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -11,9 +13,13 @@ import kotlinx.serialization.json.JsonObject
 
 /** Synthetic, strictly validated JSON fixtures; not a claim of live pagination success. */
 class HomeFeedParserTest {
-    private fun fixture(name: String): JsonObject = javaClass.classLoader
+    private fun fixtureText(name: String): String = javaClass.classLoader
         .getResourceAsStream("fixtures/home-pagination/$name.json")!!
-        .bufferedReader().use { Json.parseToJsonElement(it.readText()) as JsonObject }
+        .bufferedReader().use { it.readText() }
+
+    private fun fixture(name: String): JsonObject = json(fixtureText(name))
+
+    private fun json(text: String): JsonObject = Json.parseToJsonElement(text) as JsonObject
 
     @Test
     fun usesFeedTokenInsteadOfTheFirstNestedShelfToken() {
@@ -156,5 +162,51 @@ class HomeFeedParserTest {
         )))
         assertEquals(1, result.sections.size)
         assertEquals("page-three", result.continuationToken)
+    }
+
+    @Test
+    fun acceptsMusicTabRendererWithoutConfusingItWithAnUnknownTab() {
+        // Same strictly validated fixture, with only the envelope key changed.
+        val root = json(fixtureText("initial-feed-and-shelf-token").replace("\"tabRenderer\"", "\"musicTabRenderer\""))
+        val parsed = parseHomeFeedPage(root)
+        assertEquals("a", parsed.sections.single().tracks.single().id)
+        assertEquals("page-two", parsed.continuationToken)
+    }
+
+    @Test
+    fun validEmptySectionListIsAnEmptyPageNotMalformedJson() {
+        val parsed = parseHomeFeedPage(json(
+            """{"contents":{"singleColumnBrowseResultsRenderer":{"tabs":[{"musicTabRenderer":{
+               "selected":true,"content":{"sectionListRenderer":{"contents":[]}}}]}}}""",
+        ))
+        assertTrue(parsed.sections.isEmpty())
+        assertNull(parsed.continuationToken)
+    }
+
+    @Test
+    fun emptyEnvelopeReportsAnActionableParseError() {
+        val error = assertFailsWith<DhunException> { parseHomeFeedPage(json("{}")) }.error
+        assertTrue(error is DhunError.Parse)
+        assertTrue(error.detailString().orEmpty().contains("no section list"))
+        assertTrue(error.detailString().orEmpty().contains("shape=top"))
+    }
+
+    @Test
+    fun missingOptionalFieldsAndUnknownKeysKeepAValidTrack() {
+        val parsed = parseHomeFeedPage(fixture("resilient-sections"))
+        val track = parsed.sections.single().tracks.single()
+        assertEquals("survives", track.id)
+        assertEquals("Unknown artist", track.artistName)
+        assertNull(track.thumbnailUrl)
+        assertNull(track.durationSeconds)
+    }
+
+    @Test
+    fun unknownAndBrokenSectionsDoNotDiscardTheValidShelf() {
+        val parsed = parseHomeFeedPage(fixture("resilient-sections"))
+        assertEquals(1, parsed.sections.size)
+        assertEquals("Valid shelf", parsed.sections.single().title)
+        assertEquals(listOf("survives"), parsed.sections.single().tracks.map { it.id })
+        assertNull(parsed.continuationToken)
     }
 }

@@ -40,6 +40,28 @@ Kotlin/Android CI is required for compilation and JVM tests. Slider touch behavi
 preview appearance and saved colours on a real device remain **unverified**; Check
 3c in `docs/verification/35-background-visual-validation.md` records the procedure.
 
+### Home loading diagnostics and response compatibility (2026-10-31, session `arena/09e5238e-dhun`)
+
+- Live anonymous Home responses were parsed by DHUN itself in CI for both US and
+  Nepal contexts (run `41150960094`): US 2 sections/30 items, Nepal 2/20, both
+  with a continuation. This does **not** prove the reported phone is fixed; its
+  exact exception was not available before this change.
+- Home no longer throws away the error detail. A bounded, URL-redacted technical
+  detail is available below Retry and in Android's `DHUN` logcat, so a screenshot
+  can distinguish an HTTP rejection, homepage discovery failure or response-shape
+  mismatch. Retry is pinned to issue a fresh request.
+- Browse accepts `musicTabRenderer` as well as `tabRenderer`; client-version
+  discovery accepts JSON whitespace and reports homepage HTTP status on failure;
+  malformed/non-object JSON is a `Parse` error with its endpoint rather than an
+  `Unknown` error retried as though it were transient.
+- New JVM regressions cover normal/empty/malformed responses, optional and unknown
+  fields, unknown and partially broken shelves, HTTP errors, both tab renderers,
+  sanitized details and Retry. The strict fixture gate validates 40 JSON files.
+  The temporary live-probe workflow was removed after collecting its annotations.
+
+See `docs/verification/37-home-loading-diagnostics.md` for evidence and the simple
+phone screenshot/log procedure. **No on-device Home verification has happened.**
+
 ### Audit of the background controls: the surface colour now reaches every surface (2026-10-30, session `arena/09e5238e-dhun`)
 
 Four defects found reading the shipped feature against the brief, each with a

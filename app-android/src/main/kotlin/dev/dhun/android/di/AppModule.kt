@@ -183,6 +183,7 @@ val appModule = module {
             libraryRepository = get<DataLayer>().library,
             scope = get(),
             settings = get<DataLayer>().settings,
+            errorLogger = { android.util.Log.e("DHUN", it) },
         )
     }
 

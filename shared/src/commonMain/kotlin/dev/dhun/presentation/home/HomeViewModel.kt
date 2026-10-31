@@ -3,6 +3,8 @@ package dev.dhun.presentation.home
 import dev.dhun.core.DhunResult
 import dev.dhun.core.DhunError
 import dev.dhun.core.HomeFeed
+import dev.dhun.core.detailString
+import dev.dhun.core.diagnosticText
 import dev.dhun.core.HomeItem
 import dev.dhun.core.Track
 import dev.dhun.core.toUserMessage
@@ -34,7 +36,7 @@ import kotlinx.coroutines.launch
 sealed interface HomeUiState {
     data object Loading : HomeUiState
     data class Success(val feed: HomeFeed) : HomeUiState
-    data class Error(val message: String) : HomeUiState
+    data class Error(val message: String, val detail: String? = null) : HomeUiState
     data object Empty : HomeUiState
 }
 
@@ -45,6 +47,8 @@ class HomeViewModel(
     libraryRepository: LibraryRepository,
     private val scope: CoroutineScope,
     settings: SettingsRepository? = null,
+    /** Receives the same sanitized detail shown by Home; Android routes it to logcat. */
+    private val errorLogger: (String) -> Unit = {},
 ) {
     private val toggleFavoriteUseCase = ToggleFavoriteUseCase(libraryRepository)
 
@@ -200,6 +204,23 @@ class HomeViewModel(
         return ids
     }
 
+    /**
+     * Keep the friendly headline and the evidence together. The old Error state
+     * dropped [DhunError.detailString], making a shape change, an HTTP rejection
+     * and a missing client version indistinguishable on the phone.
+     *
+     * [diagnosticText] bounds untrusted text and strips URLs before either the
+     * UI or logcat sees it. Home's shape summary itself contains key names only,
+     * never continuation tokens, tracking values or response bodies.
+     */
+    private fun homeError(error: DhunError): HomeUiState.Error {
+        val detail = error.detailString()
+            ?.let { diagnosticText(it, HOME_ERROR_DETAIL_LIMIT) }
+            ?.takeIf { it.isNotBlank() }
+        errorLogger("Home load failed (${error::class.simpleName ?: "Unknown"}): ${detail ?: "no detail"}")
+        return HomeUiState.Error(error.toUserMessage(), detail)
+    }
+
     private fun requestFeed(refresh: Boolean, mood: HomeMood = state.value.mood) {
         val request = state.updateAndGet {
             State(
@@ -214,26 +235,28 @@ class HomeViewModel(
         feedJob = scope.launch {
             try {
                 val result = getHomeFeed(request.mood)
+                val nextUi: HomeUiState = when (result) {
+                    is DhunResult.Success -> {
+                        val feed = result.value
+                        if (feed.quickPicks.isEmpty() && feed.sections.isEmpty() && feed.continuationToken == null) {
+                            HomeUiState.Empty
+                        } else {
+                            HomeUiState.Success(feed)
+                        }
+                    }
+                    is DhunResult.Failure -> homeError(result.error)
+                }
                 state.update { current ->
-                    if (current.generation != request.generation) current else current.copy(
-                        ui = when (result) {
-                            is DhunResult.Success -> {
-                                val feed = result.value
-                                if (feed.quickPicks.isEmpty() && feed.sections.isEmpty() && feed.continuationToken == null) {
-                                    HomeUiState.Empty
-                                } else {
-                                    HomeUiState.Success(feed)
-                                }
-                            }
-                            is DhunResult.Failure -> HomeUiState.Error(result.error.toUserMessage())
-                        },
-                    )
+                    if (current.generation != request.generation) current else current.copy(ui = nextUi)
                 }
             } catch (e: CancellationException) {
                 throw e
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                val failure = homeError(
+                    DhunError.Unknown("${e::class.simpleName ?: "Exception"}: ${e.message.orEmpty()}"),
+                )
                 state.update {
-                    if (it.generation != request.generation) it else it.copy(ui = HomeUiState.Error(DhunError.Unknown().toUserMessage()))
+                    if (it.generation != request.generation) it else it.copy(ui = failure)
                 }
             } finally {
                 state.update {
@@ -304,6 +327,7 @@ class HomeViewModel(
 
     private companion object {
         const val FAVORITE_FAILED = "Could not update Liked Songs. Try again."
+        const val HOME_ERROR_DETAIL_LIMIT = 700
         const val MAX_EMPTY_PAGES = 3
         /** Distinct recent plays that form the seed signal for recommendations. */
         const val RECOMMEND_SEED_SIGNAL = 10

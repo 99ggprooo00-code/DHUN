@@ -9,6 +9,7 @@ import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.TextContent
 import io.ktor.http.headersOf
 import kotlinx.coroutines.runBlocking
@@ -61,6 +62,95 @@ class InnerTubeRequestTest {
             assertEquals("next-page", first.value.continuationToken)
             assertTrue(client.homeFeedContinuation("next-page") is DhunResult.Success)
             assertEquals(2, posts)
+        } finally {
+            http.close()
+        }
+    }
+
+    @Test
+    fun homeClientVersionConfigAllowsJsonWhitespace() = runBlocking {
+        val engine = MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/" -> respond("""{"INNERTUBE_CLIENT_VERSION" : "1.20261027.10.00"}""")
+                "/youtubei/v1/browse" -> {
+                    assertEquals("1.20261027.10.00", request.headers["X-YouTube-Client-Version"])
+                    respond(
+                        """{"contents":{"sectionListRenderer":{"contents":[]}}}""",
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+                else -> error("Unexpected request: ${request.url.encodedPath}")
+            }
+        }
+        val http = HttpClient(engine) { install(HttpTimeout) }
+        try {
+            assertTrue(InnerTubeClient(http).homeFeedPage() is DhunResult.Success)
+        } finally {
+            http.close()
+        }
+    }
+
+    @Test
+    fun malformedOrNonObjectHomeJsonIsParseErrorWithoutDeterministicRetries() = runBlocking {
+        for (payload in listOf("{not-json", "[]")) {
+            var browseCalls = 0
+            val engine = MockEngine { request ->
+                when (request.url.encodedPath) {
+                    "/" -> respond("""{"INNERTUBE_CLIENT_VERSION":"1.20261027.10.00"}""")
+                    "/youtubei/v1/browse" -> {
+                        browseCalls++
+                        respond(payload, headers = headersOf(HttpHeaders.ContentType, "application/json"))
+                    }
+                    else -> error("Unexpected request: ${request.url.encodedPath}")
+                }
+            }
+            val http = HttpClient(engine) { install(HttpTimeout) }
+            try {
+                val failure = InnerTubeClient(http).homeFeedPage() as DhunResult.Failure
+                assertTrue(failure.error is DhunError.Parse, "payload=$payload error=${failure.error}")
+                assertTrue(failure.error.detailString().orEmpty().contains("/browse"))
+                assertEquals(1, browseCalls, "a malformed body cannot be fixed by repeating the same request")
+            } finally {
+                http.close()
+            }
+        }
+    }
+
+    @Test
+    fun homeBrowseHttpErrorKeepsStatusAndEndpoint() = runBlocking {
+        val engine = MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/" -> respond("""{"INNERTUBE_CLIENT_VERSION":"1.20261027.10.00"}""")
+                "/youtubei/v1/browse" -> respond("{}", status = HttpStatusCode.BadRequest)
+                else -> error("Unexpected request: ${request.url.encodedPath}")
+            }
+        }
+        val http = HttpClient(engine) { install(HttpTimeout) }
+        try {
+            val failure = InnerTubeClient(http).homeFeedPage() as DhunResult.Failure
+            assertTrue(failure.error is DhunError.Parse)
+            assertEquals("HTTP 400 from /browse", failure.error.detailString())
+        } finally {
+            http.close()
+        }
+    }
+
+    @Test
+    fun missingHomeClientVersionReportsHomepageHttpStatusNotJustRegexFailure() = runBlocking {
+        val engine = MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/" -> respond("request denied", status = HttpStatusCode.Forbidden)
+                else -> error("Browse must not run without a client version")
+            }
+        }
+        val http = HttpClient(engine) { install(HttpTimeout) }
+        try {
+            val failure = InnerTubeClient(http).homeFeedPage() as DhunResult.Failure
+            assertTrue(failure.error is DhunError.Parse)
+            val detail = failure.error.detailString().orEmpty()
+            assertTrue(detail.contains("HTTP 403"), detail)
+            assertTrue(detail.contains("client version missing"), detail)
+            assertTrue(!detail.contains("request denied"), "response text must not leak into diagnostics")
         } finally {
             http.close()
         }

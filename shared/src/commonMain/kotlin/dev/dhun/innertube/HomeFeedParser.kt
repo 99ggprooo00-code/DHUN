@@ -94,7 +94,12 @@ internal fun parseHomeFeedPage(root: JsonObject): HomeFeedPage {
  */
 private fun homeBrowsePage(browse: JsonObject): HomeFeedPage? {
     val tabs = browse.arr("tabs").orEmpty()
-        .mapNotNull { (it as? JsonObject).obj("tabRenderer") }
+        .flatMap { element ->
+            val tab = element as? JsonObject
+            // The service has used both renderer names for the same browse-tab
+            // contract. Read either, but keep selection scoped to Home's tabs.
+            listOfNotNull(tab.obj("tabRenderer"), tab.obj("musicTabRenderer"))
+        }
     val selected = tabs.firstOrNull { it.str("selected") == "true" } ?: tabs.firstOrNull()
     selected.obj("content").obj("sectionListRenderer")?.let { return homePage(it) }
 

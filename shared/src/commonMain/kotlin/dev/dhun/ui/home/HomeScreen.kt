@@ -182,6 +182,7 @@ fun HomeScreen(
                             message = state.message,
                             title = "Could not load Home",
                             onRetry = { viewModel.load() },
+                            details = state.detail,
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
