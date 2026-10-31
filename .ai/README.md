@@ -21,10 +21,10 @@ directory — the content is branch-ready as-is.
 ## Current binding UI/navigation correction (2026-10-09)
 
 Before acting on old session notes, read the current active task at the top of
-`ROADMAP.md` and the binding correction in `MASTER_PROMPT.md`. The current
-visual target is translucent frosted glass, not “Material 3 only”. Old handoff
-restrictions and old branch/commit snapshots are historical unless the current
-active task explicitly adopts them. The native KMP app and the `app-web/`
+`ROADMAP.md`, the binding correction in `MASTER_PROMPT.md`, and the authoritative
+[DHUN glass specification](../docs/design/glass-system.md). Old handoff
+restrictions, visual models, and branch/commit snapshots are historical unless
+the current active task explicitly adopts them. The native KMP app and the `app-web/`
 browser client are one product with one design system; the static `website/` is
 that product's front door and renders the same shell and tokens (ADR-008
 amendment 2026-10-16). Current browser requests go to unofficial JioSaavn wrappers/CDN, not YouTube.

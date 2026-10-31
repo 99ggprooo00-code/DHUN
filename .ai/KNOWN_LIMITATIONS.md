@@ -1,4 +1,26 @@
-# Current Search verification limits — 2026-10-29
+# Current native recovery and glass verification limits — 2026-10-31
+
+- Persistent-update recovery is not phone-accepted: the underlying device
+  triggers, fresh/update behavior, and independent Home/Search/Related/artwork/
+  downloads/playback/queue/Library checks still require their recorded evidence.
+  Clearing data or reinstalling is not a fix. Green CI alone does not close this.
+- Hosted Compose/Skia evidence at `dc0e506` passed with **62 verified PNGs / 5
+  tests / 0 failures**, and all frames were inspected, including dark/light
+  populated playlist dialogs and controlled black/white artwork. This is not an
+  emulator, physical phone, interactive desktop, large-text/TalkBack, native
+  screen-reader, reduced-motion, audible-playback, or performance pass. Exact-
+  head CI must still be read for the commit under review; earlier green runs are
+  not evidence for a later head. See [verification 43](../docs/verification/43-dhun-glass-restoration.md).
+- The current background model is Background blur + Background brightness.
+  Zero blur keeps sharp, dimmed artwork; unsupported platforms hide only blur.
+  Historical entries below about dynamic surface colours, four surface editors,
+  HSL controls, or five palettes belong to other branches and are not current.
+- Native visual authority is [docs/design/glass-system.md](../docs/design/glass-system.md).
+  Its source guardrail and numeric tests do not claim rendered acceptance.
+
+---
+
+# Search verification limits — 2026-10-29 (historical snapshot)
 
 - Physical native Android Search/keyboard/IME: NOT RUN. No usable ADB/SDK/JDK or
   USB device transport/configured remote target in this workspace. No executed
@@ -146,7 +168,7 @@ Evidence: live `gh` API reads, public-download attempts, CI annotations, source 
 - **Clear all downloads (P0, fix in progress):** source previously swallowed `DownloadManager.clearAll()` errors and the UI dismissed the confirmation before the operation completed. This branch now exposes pending/success/failure state and a retry path; the manager serializes enqueue/resume/removal with clear-all and joins workers before deleting files. JVM regression tests cover failure/retry and successful file/row cleanup. CI must confirm the change, and Android/desktop interaction still needs hardware verification.
 - **Batch download deletion and clear history (P0, fix in progress):** both previously closed their confirmations immediately and hid ViewModel failures. This branch now awaits the suspend operation, keeps the confirmation open during work, and shows retryable failure copy without clearing selection/state until success. Single-item remove, playlist deletion, cache clearing and preference reset remain follow-up audit items; final-head CI and hardware interaction are still required.
 - **Website project-base navigation (P1, fix in progress):** the canonical GitHub Pages URL is beneath `/DHUN/`, while root-hosted local tests run at `/`. The source now has a `sitePath` filter and the workflow builds a separate prefixed Pages artifact. On run `37869983672`, the build/quality/prefix-link smoke job and browser-measurement job passed; Lighthouse is still running. The deploy and served-origin smoke jobs are skipped on pull requests, so the live canonical site must still be verified after merge.
-- **Visual target (current):** DHUN's product identity is translucent frosted glass, artwork-led and dark-first. Use lightweight/cached 2D blur, translucent tint, gradients/scrims, restrained highlights and accessible fallbacks. Material/Compose components may be implementation primitives but Material 3 is not the visual target. The 2026-09-05 “Material 3 only” note below is superseded.
+- **Visual target (current):** DHUN's product identity is translucent frosted glass, artwork-led and dark-first with an independently designed light mode. Use the shared materials, lightweight artwork blur, restrained highlights, and accessible fallbacks in [docs/design/glass-system.md](../docs/design/glass-system.md). Toolkit components are implementation primitives only; older toolkit-as-identity notes below are historical.
 - **API < 31 now-playing backdrop (current):** real frost (`Modifier.blur` / RenderEffect) is still API 31+ and desktop Skiko only. Android 10/11 no longer hide the cover — they paint the same thumbnail dimmed, with a Settings brightness slider. No CPU/StackBlur path. Settings blur slider is shown only where blur is real. Not a hardware eyeball of the dimmed look.
 - **Home greeting (current):** uses the device UTC offset (`currentUtcOffsetMs`), not UTC hour. Nepal morning no longer maps to “Good night”. Untested on a device clock in this sandbox (no JDK).
 - **Evidence boundary:** source changes are not the same as unit-tested, CI-green, hardware-verified or canonical-origin-verified. Record each separately.

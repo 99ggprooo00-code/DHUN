@@ -67,6 +67,38 @@ class InnerTubeRequestTest {
     }
 
     @Test
+    fun persistedCountryUsesTheSameNormalizationAsSettingsOnTheWire() = runBlocking {
+        val countries = mutableListOf<String?>()
+        val engine = MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/" -> respond("""{"INNERTUBE_CLIENT_VERSION":"1.20260906.01.00"}""")
+                "/youtubei/v1/search" -> {
+                    val body = obj((request.body as TextContent).text)
+                    countries += body.obj("context").obj("client").str("gl")
+                    respond(
+                        """{"contents":{}}""",
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+                else -> error("Unexpected request: ${request.url.encodedPath}")
+            }
+        }
+        val http = HttpClient(engine) { install(HttpTimeout) }
+        try {
+            val client = InnerTubeClient(http)
+            client.setCountryCode("ZZ") // old/corrupt row: UI displays US too
+            assertTrue(client.search("first") is DhunResult.Success)
+            client.setCountryCode(" np ")
+            assertTrue(client.search("second") is DhunResult.Success)
+            client.setCountryCode(null) // absent row on a fresh install
+            assertTrue(client.search("third") is DhunResult.Success)
+            assertEquals<List<String?>>(listOf("US", "NP", "US"), countries)
+        } finally {
+            http.close()
+        }
+    }
+
+    @Test
     fun unplayableAndErrorRetainStatusAndServiceReason() {
         for (status in listOf("UNPLAYABLE", "ERROR")) {
             val error = assertFailsWith<DhunException> {

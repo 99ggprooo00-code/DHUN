@@ -331,11 +331,14 @@ jobs:
           gh release delete test --yes --cleanup-tag || true
           git push origin :refs/tags/test || true
 
+          # Checksums and revision provenance stay in the internal build
+          # artifacts for verification/promotion. The rolling beta itself is
+          # deliberately just the four installers.
           gh release create test \
-            dist/dhun-test.apk dist/dhun-test.apk.sha256 dist/dhun-test.apk.provenance.txt \
-            dist/dhun-test-arm64-v8a.apk dist/dhun-test-arm64-v8a.apk.sha256 dist/dhun-test-arm64-v8a.apk.provenance.txt \
-            dist/dhun-test-armeabi-v7a.apk dist/dhun-test-armeabi-v7a.apk.sha256 dist/dhun-test-armeabi-v7a.apk.provenance.txt \
-            dist/dhun-test.msi dist/dhun-test.msi.sha256 dist/dhun-test.msi.provenance.txt \
+            dist/dhun-test.apk \
+            dist/dhun-test-arm64-v8a.apk \
+            dist/dhun-test-armeabi-v7a.apk \
+            dist/dhun-test.msi \
             --target "$GITHUB_SHA" \
             --title "DHUN beta" \
             --notes-file docs/releases/rolling-test.md \
@@ -352,6 +355,18 @@ jobs:
           fi
           if [ "$(gh release view test --json targetCommitish --jq '.targetCommitish')" != "$GITHUB_SHA" ]; then
             echo "::error::The rolling test release does not target this build commit"
+            exit 1
+          fi
+          expected_test_assets=$(printf '%s\n' \
+            "dhun-test.apk" \
+            "dhun-test-arm64-v8a.apk" \
+            "dhun-test-armeabi-v7a.apk" \
+            "dhun-test.msi" | jq -R . | jq -sc 'sort')
+          actual_test_assets=$(gh release view test --json assets --jq '[.assets[] | select(.size > 0) | .name] | sort' | jq -c .)
+          if [ "$actual_test_assets" != "$expected_test_assets" ]; then
+            echo "::error::The rolling test release must contain only the four installers"
+            echo "Expected: $expected_test_assets"
+            echo "Actual:   $actual_test_assets"
             exit 1
           fi
 
@@ -484,3 +499,121 @@ jobs:
             echo "::error::v1.00.002 must stay marked as a prerelease"
             exit 1
           fi
+
+  # Evidence transport only. This runs after a completed same-repository PR
+  # Windows check, including failure diagnostics, and never mutates a release.
+  msi_evidence:
+    name: Publish installed Windows evidence
+    if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && (needs.msi.result == 'success' || needs.msi.result == 'failure') }}
+    needs: [msi]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        continue-on-error: true
+        with:
+          name: msi-install-check
+          path: out/installer-check
+
+      - name: Publish immutable installed-app frame and result
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          python - <<'PY'
+          import base64
+          import json
+          import os
+          from pathlib import Path
+          import re
+          import subprocess
+          import tempfile
+
+          root = Path("out/installer-check")
+          repository = os.environ["GITHUB_REPOSITORY"]
+          class PublicationFailure(Exception):
+              pass
+
+          def sanitized(value, limit=6000):
+              text = str(value)
+              token = os.environ.get("GH_TOKEN", "")
+              if token:
+                  text = text.replace(token, "<redacted>")
+              text = re.sub(r"\b(?:gh[pousr]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+)\b", "<redacted>", text)
+              text = re.sub(r"(?i)(authorization\s*[:=]\s*)(?:bearer\s+|token\s+)?\S+", r"\1<redacted>", text)
+              text = re.sub(r"(?i)(access_token=)[^&\s]+", r"\1<redacted>", text)
+              return text[:limit]
+
+          def annotate(level, title, message):
+              escaped = sanitized(message).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              print(f"::{level} title={title}::{escaped}", flush=True)
+
+          result_path = root / "result.txt"
+          result = result_path.read_text(encoding="utf-8") if result_path.exists() else ""
+          diagnostics_path = root / "app-diagnostics.txt"
+          diagnostics = diagnostics_path.read_text(encoding="utf-8") if diagnostics_path.exists() else ""
+          # These annotations deliberately precede every Git/blob operation.
+          # A publication failure must not hide the completed Windows result.
+          annotate("notice" if result else "warning", "DHUN MSI result",
+                   result.strip() or "result.txt unavailable; installer evidence is incomplete")
+          annotate("notice" if diagnostics else "warning", "DHUN MSI launch diagnostics",
+                   diagnostics.strip() or "app-diagnostics.txt unavailable; startup cause remains unclassified")
+
+          def create_blob(raw, label):
+              payload = json.dumps({
+                  "encoding": "base64",
+                  "content": base64.b64encode(raw).decode("ascii"),
+              }).encode("utf-8")
+              with tempfile.NamedTemporaryFile() as body:
+                  body.write(payload)
+                  body.flush()
+                  completed = subprocess.run(
+                      ["gh", "api", f"repos/{repository}/git/blobs", "--input", body.name, "--jq", ".sha"],
+                      check=False, text=True, capture_output=True,
+                  )
+              if completed.returncode != 0:
+                  detail = completed.stderr.strip() or completed.stdout.strip() or f"gh exited {completed.returncode}"
+                  raise PublicationFailure(f"{label}: {sanitized(detail, 1200)}")
+              blob = completed.stdout.strip()
+              if not re.fullmatch(r"[0-9a-f]{40}", blob):
+                  raise PublicationFailure(f"{label}: Git returned an invalid blob id")
+              return blob
+
+          try:
+              if not result.strip():
+                  raise PublicationFailure("result.txt is unavailable; refusing to publish an empty installer result")
+              fields = dict(line.split("=", 1) for line in result.splitlines() if "=" in line)
+              images = sorted(root.rglob("*.png"))
+              if fields.get("appLaunch", "").startswith("passed") and not images:
+                  raise PublicationFailure("Installed-app launch passed but no window PNG was preserved")
+
+              entries = []
+              for path in images:
+                  blob = create_blob(path.read_bytes(), f"PNG {path.name}")
+                  entries.append({
+                      "name": path.relative_to(root).as_posix(),
+                      "blob": blob,
+                      "bytes": path.stat().st_size,
+                      "kind": "actual upgraded DHUN.exe native window PNG; startup only",
+                  })
+              manifest = {
+                  "workflow": "test-release.yml",
+                  "source": {"sha": os.environ["HEAD_SHA"], "run": os.environ["GITHUB_RUN_ID"]},
+                  "scope": "Installed Windows package startup; no audible playback or visual acceptance claimed",
+                  "result": result,
+                  "safeLaunchDiagnostics": diagnostics,
+                  "images": entries,
+              }
+              output = Path("build/test-evidence/packaged-windows-manifest.json")
+              output.parent.mkdir(parents=True, exist_ok=True)
+              output.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+              manifest_blob = create_blob(output.read_bytes(), "packaged Windows manifest")
+          except Exception as error:
+              # No traceback with command arguments, environment or blob data:
+              # only the sanitized stage/API error, and a failing exit status.
+              annotate("error", "DHUN packaged Windows evidence publication",
+                       f"{type(error).__name__}: {sanitized(error, 1200)}")
+              raise SystemExit(1)
+          print(f"::notice title=DHUN packaged Windows evidence::manifest={manifest_blob} images={len(entries)}")
+          PY

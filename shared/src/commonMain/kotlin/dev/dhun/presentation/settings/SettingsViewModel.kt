@@ -6,6 +6,9 @@ import dev.dhun.design.VisualPart
 import dev.dhun.domain.GetSettingUseCase
 import dev.dhun.domain.UpdateSettingUseCase
 import dev.dhun.player.AudioCacheBudget
+import dev.dhun.presentation.MutationState
+import dev.dhun.presentation.MutationTracker
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -13,6 +16,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -30,16 +35,192 @@ class SettingsViewModel(
     private val clearSearchHistoryAction: (suspend () -> Unit)? = null,
     private val clearPlayHistoryAction: (suspend () -> Unit)? = null,
     private val clearAudioCacheAction: (suspend () -> Long)? = null,
+    /**
+     * Puts the live equalizer engine back to its documented defaults. The EQ
+     * rows are ordinary settings, so [reset] removes them — but its state lives
+     * in a platform engine session, which would otherwise keep the old preset
+     * and write it straight back on the next change.
+     */
+    private val resetEqualizerAction: (suspend () -> Unit)? = null,
     private val onCountryCodeChange: (String) -> Unit = {},
 ) {
     // Settings controls write asynchronously, but rapid changes (especially
     // Reset right after a slider move) must reach the DB in tap order. Start
     // undispatched so each write claims the mutex before returning to the UI.
     private val writeMutex = Mutex()
-    private fun enqueueWrite(action: suspend () -> Unit) {
-        scope.launch(start = CoroutineStart.UNDISPATCHED) {
-            writeMutex.withLock { action() }
+
+    /**
+     * Optimistic setters can queue several values for one key. A failed older
+     * write must not roll back over a newer value whose own write is still
+     * queued. StateFlow's atomic update keeps generation assignment safe even
+     * if a host calls setters from more than one thread.
+     */
+    private val writeGenerations = MutableStateFlow<Map<String, Long>>(emptyMap())
+
+    private fun nextWriteGeneration(key: String): Long =
+        writeGenerations.updateAndGet { current ->
+            current + (key to ((current[key] ?: 0L) + 1L))
+        }.getValue(key)
+
+    private fun invalidateWrites(keys: Iterable<String>) {
+        writeGenerations.update { current ->
+            val next = current.toMutableMap()
+            for (key in keys) next[key] = (next[key] ?: 0L) + 1L
+            next
         }
+    }
+
+    private fun isLatestWrite(key: String, generation: Long): Boolean =
+        writeGenerations.value[key] == generation
+
+    /**
+     * Runs one preference write under the shared write mutex.
+     *
+     * @param onFailure optional rollback, run before the failure is reported. A
+     *   control publishes its new value immediately (a slider must follow the
+     *   finger), so without this a failed write left the UI showing a value the
+     *   database never stored — the screen lied until the next launch. The
+     *   rollback republishes what is actually persisted.
+     *
+     * The action is the first argument on purpose, so a call without a rollback
+     * must pass it in parentheses (`enqueueWrite({ … })`): a bare trailing
+     * lambda binds to [onFailure] instead.
+     */
+    private fun enqueueWrite(action: suspend () -> Unit, onFailure: (suspend () -> Unit)? = null) {
+        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            writeMutex.withLock {
+                try {
+                    action()
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    // A failed preference write used to escape this coroutine
+                    // and reach the platform's uncaught-exception handler (an
+                    // app crash on Android). It is a user-facing failure now:
+                    // the control is put back to the stored value and Settings
+                    // says what happened.
+                    if (onFailure != null) {
+                        try {
+                            onFailure()
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            // Reading back can fail too (the database is what
+                            // just failed). Keep the message; the next launch
+                            // shows the stored value regardless.
+                        }
+                    }
+                    maintenance.report(SAVE_FAILED)
+                }
+            }
+        }
+    }
+
+    /* Typed single-key writes: persist, and on failure republish the stored
+     * value. If the store cannot be read back either, the last confirmed value
+     * is still an honest fallback; another optimistic value is never used. */
+    private val confirmedStrings = MutableStateFlow<Map<String, String>>(emptyMap())
+    private val confirmedInts = MutableStateFlow<Map<String, Int>>(emptyMap())
+    private val confirmedBooleans = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+    private val confirmedTuning = MutableStateFlow<Map<VisualPart, Int>>(emptyMap())
+
+    private fun persistString(
+        key: String,
+        default: String,
+        state: MutableStateFlow<String>,
+        publish: (String) -> Unit = { state.value = it },
+        write: suspend () -> Unit,
+    ) {
+        val attempted = state.value
+        val generation = nextWriteGeneration(key)
+        enqueueWrite({
+            write()
+            confirmedStrings.update { it + (key to attempted) }
+            // A failed reset can have re-read storage after this value was
+            // published optimistically. Repair only a stale visible value;
+            // do not repeat country/provider side effects on ordinary writes.
+            if (isLatestWrite(key, generation) && state.value != attempted) publish(attempted)
+        }, onFailure = {
+            val stored = try {
+                get.string(key, default)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                confirmedStrings.value[key] ?: default
+            }
+            if (isLatestWrite(key, generation)) publish(stored)
+        })
+    }
+
+    private fun persistInt(
+        key: String,
+        default: Int,
+        state: MutableStateFlow<Int>,
+        publish: (Int) -> Unit = { state.value = it },
+        write: suspend () -> Unit,
+    ) {
+        val attempted = state.value
+        val generation = nextWriteGeneration(key)
+        enqueueWrite({
+            write()
+            confirmedInts.update { it + (key to attempted) }
+            if (isLatestWrite(key, generation) && state.value != attempted) publish(attempted)
+        }, onFailure = {
+            val stored = try {
+                get.int(key, default)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                confirmedInts.value[key] ?: default
+            }
+            if (isLatestWrite(key, generation)) publish(stored)
+        })
+    }
+
+    private fun persistBoolean(
+        key: String,
+        default: Boolean,
+        state: MutableStateFlow<Boolean>,
+        publish: (Boolean) -> Unit = { state.value = it },
+        write: suspend () -> Unit,
+    ) {
+        val attempted = state.value
+        val generation = nextWriteGeneration(key)
+        enqueueWrite({
+            write()
+            confirmedBooleans.update { it + (key to attempted) }
+            if (isLatestWrite(key, generation) && state.value != attempted) publish(attempted)
+        }, onFailure = {
+            val stored = try {
+                get.boolean(key, default)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                confirmedBooleans.value[key] ?: default
+            }
+            if (isLatestWrite(key, generation)) publish(stored)
+        })
+    }
+
+    /**
+     * Pending/failure state for the destructive maintenance actions and for
+     * preference writes. The dialogs read [maintenanceState] so a confirm
+     * button can show "Clearing…" and keep its failure on screen for a retry,
+     * the same contract the playlist-delete and clear-history dialogs use.
+     */
+    private val maintenance = MutationTracker(scope)
+    val maintenanceState: StateFlow<MutationState> = maintenance.state
+    fun dismissMaintenanceError() = maintenance.dismissError()
+
+    /**
+     * The key of the last maintenance action that **completed successfully**.
+     * A confirmation dialog closes on this signal, never on the tap — a clear
+     * that failed leaves its dialog open with a retry.
+     */
+    private val _lastCompletedKey = MutableStateFlow<String?>(null)
+    val lastCompletedKey: StateFlow<String?> = _lastCompletedKey.asStateFlow()
+    fun consumeCompletedAction() {
+        _lastCompletedKey.value = null
     }
 
     private val _themeId = MutableStateFlow(SettingsKeys.THEME_DEFAULT)
@@ -104,58 +285,146 @@ class SettingsViewModel(
 
     init {
         scope.launch {
-            _themeId.value = get.string(SettingsKeys.THEME, SettingsKeys.THEME_DEFAULT)
-            _accentId.value = get.string(SettingsKeys.ACCENT, SettingsKeys.ACCENT_DEFAULT)
-            _cacheSizeMb.value = AudioCacheBudget.clampMb(
-                get.int(SettingsKeys.CACHE_SIZE_MB, SettingsKeys.CACHE_SIZE_MB_DEFAULT),
-            )
-            _resumeOnLaunch.value = get.boolean(
-                SettingsKeys.RESUME_ON_LAUNCH, SettingsKeys.RESUME_ON_LAUNCH_DEFAULT,
-            )
-            _closeToTray.value = get.boolean(
-                SettingsKeys.CLOSE_TO_TRAY, SettingsKeys.CLOSE_TO_TRAY_DEFAULT,
-            )
-            _backdropBlurPercent.value = get.int(
-                SettingsKeys.BACKDROP_BLUR, SettingsKeys.BACKDROP_BLUR_DEFAULT,
-            ).coerceIn(0, 100)
-            _backdropBrightnessPercent.value = get.int(
-                SettingsKeys.BACKDROP_BRIGHTNESS, SettingsKeys.BACKDROP_BRIGHTNESS_DEFAULT,
-            ).coerceIn(0, 100)
-            // One-time test-profile migration: old saved experiments must not
-            // mask the requested 15% baseline on install-over. Later slider
-            // edits remain durable, just like backdrop blur and brightness.
-            if (isTestRelease && get.int(SettingsKeys.TUNE_PROFILE_VERSION, 0) < 1) {
-                writeMutex.withLock {
-                    for (part in VisualPart.entries) update.remove(part.key)
-                    update.int(SettingsKeys.TUNE_PROFILE_VERSION, 1)
-                }
+            // Every control on this screen reads a persisted value, and the
+            // whole app waits for [loaded] before it applies appearance and
+            // visual tuning. An unhandled read failure killed this coroutine
+            // (an uncaught exception on Android) and left `loaded` false
+            // forever: Settings never rendered its controls, and the rest of
+            // the app never applied stored preferences. A failed read now
+            // falls back to the documented defaults and says so.
+            try {
+                loadPersistedValues()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                maintenance.report(SETTINGS_LOAD_FAILED)
+            } finally {
+                _loaded.value = true
             }
-            val tuning = mutableMapOf<VisualPart, Int>()
-            val baseline = if (isTestRelease) DhunVisualTuning.TEST_DEFAULT else DhunVisualTuning.NEUTRAL
-            for (part in DhunVisualTuning.adjustableParts) {
-                tuning[part] = get.int(part.key, baseline).coerceIn(0, 100)
-            }
-            _visualTuning.value = tuning
-            _accentMode.value = get.string(SettingsKeys.ACCENT_MODE, SettingsKeys.ACCENT_MODE_DEFAULT)
-            _audioQuality.value = get.string(SettingsKeys.AUDIO_QUALITY, SettingsKeys.AUDIO_QUALITY_DEFAULT)
-            _seekStepSeconds.value = get.int(SettingsKeys.SEEK_STEP_SECONDS, SettingsKeys.SEEK_STEP_SECONDS_DEFAULT)
-            _autoplayRadio.value = get.boolean(SettingsKeys.AUTOPLAY_RADIO_ENABLED, SettingsKeys.AUTOPLAY_RADIO_ENABLED_DEFAULT)
-            _lyricsEnabled.value = get.boolean(SettingsKeys.LYRICS_ENABLED, SettingsKeys.LYRICS_ENABLED_DEFAULT)
-            _lyricsPreferSynced.value = get.boolean(SettingsKeys.LYRICS_PREFER_SYNCED, SettingsKeys.LYRICS_PREFER_SYNCED_DEFAULT)
-            _lyricsAutoScroll.value = get.boolean(SettingsKeys.LYRICS_AUTO_SCROLL, SettingsKeys.LYRICS_AUTO_SCROLL_DEFAULT)
-            _lyricsTextSize.value = get.string(SettingsKeys.LYRICS_TEXT_SIZE, SettingsKeys.LYRICS_TEXT_SIZE_DEFAULT)
-            _providerOrder.value = get.string(SettingsKeys.LYRICS_PROVIDER_ORDER, SettingsKeys.LYRICS_PROVIDER_ORDER_DEFAULT)
-            _preferredProvider.value = get.string(SettingsKeys.LYRICS_PREFERRED_PROVIDER, SettingsKeys.LYRICS_PREFERRED_PROVIDER_DEFAULT)
-            _countryCode.value = get.string(SettingsKeys.COUNTRY_CODE, SettingsKeys.COUNTRY_CODE_DEFAULT)
-                .uppercase()
-                .takeIf(CountryRegions::isSupportedCode)
-                ?: SettingsKeys.COUNTRY_CODE_DEFAULT
-            _explicitContent.value = get.boolean(SettingsKeys.EXPLICIT_CONTENT, SettingsKeys.EXPLICIT_CONTENT_DEFAULT)
-            _pauseOnMute.value = get.boolean(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME, SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME_DEFAULT)
-            _persistShuffleRepeat.value = get.boolean(SettingsKeys.PERSIST_SHUFFLE_REPEAT, SettingsKeys.PERSIST_SHUFFLE_REPEAT_DEFAULT)
-            _recordListeningHistory.value = get.boolean(SettingsKeys.RECORD_LISTENING_HISTORY, SettingsKeys.RECORD_LISTENING_HISTORY_DEFAULT)
-            _loaded.value = true
         }
+    }
+
+    /** Slider baseline: the test channel's 15% or the original public 50%. */
+    private val tuningBaseline: Int
+        get() = if (isTestRelease) DhunVisualTuning.TEST_DEFAULT else DhunVisualTuning.NEUTRAL
+
+    private suspend fun readStoredTuning(): Map<VisualPart, Int> {
+        val stored = mutableMapOf<VisualPart, Int>()
+        for (part in DhunVisualTuning.adjustableParts) {
+            stored[part] = get.int(part.key, tuningBaseline).coerceIn(0, 100)
+        }
+        return stored
+    }
+
+    /** Publishes a tuning snapshot to both the sliders and the live appearance. */
+    private fun publishTuning(values: Map<VisualPart, Int>) {
+        _visualTuning.value = values
+        DhunVisualTuning.restore(values, isTestRelease)
+    }
+
+    /**
+     * Reads every persisted preference and then publishes the snapshot.
+     *
+     * The values are read into locals first on purpose: publishing as each key
+     * arrives meant a read that failed halfway left earlier keys applied
+     * alongside defaults for the rest — a mixed snapshot the user never chose,
+     * which then silently reverted on the next launch. Nothing is published
+     * until the whole snapshot is known, so a failed load leaves the documented
+     * defaults in place.
+     */
+    private suspend fun loadPersistedValues() {
+        // One-shot test-profile migration must run before the values are read,
+        // so old saved experiments cannot mask the requested 15% baseline.
+        if (isTestRelease && get.int(SettingsKeys.TUNE_PROFILE_VERSION, 0) < 1) {
+            writeMutex.withLock {
+                for (part in VisualPart.entries) update.remove(part.key)
+                update.int(SettingsKeys.TUNE_PROFILE_VERSION, 1)
+            }
+        }
+
+        val themeId = get.string(SettingsKeys.THEME, SettingsKeys.THEME_DEFAULT)
+        val accentId = get.string(SettingsKeys.ACCENT, SettingsKeys.ACCENT_DEFAULT)
+        val cacheSizeMb = AudioCacheBudget.clampMb(
+            get.int(SettingsKeys.CACHE_SIZE_MB, SettingsKeys.CACHE_SIZE_MB_DEFAULT),
+        )
+        val resumeOnLaunch = get.boolean(SettingsKeys.RESUME_ON_LAUNCH, SettingsKeys.RESUME_ON_LAUNCH_DEFAULT)
+        val closeToTray = get.boolean(SettingsKeys.CLOSE_TO_TRAY, SettingsKeys.CLOSE_TO_TRAY_DEFAULT)
+        val blur = get.int(SettingsKeys.BACKDROP_BLUR, SettingsKeys.BACKDROP_BLUR_DEFAULT).coerceIn(0, 100)
+        val brightness = get.int(SettingsKeys.BACKDROP_BRIGHTNESS, SettingsKeys.BACKDROP_BRIGHTNESS_DEFAULT).coerceIn(0, 100)
+        val tuning = readStoredTuning()
+        val accentMode = get.string(SettingsKeys.ACCENT_MODE, SettingsKeys.ACCENT_MODE_DEFAULT)
+        val audioQuality = get.string(SettingsKeys.AUDIO_QUALITY, SettingsKeys.AUDIO_QUALITY_DEFAULT)
+        val seekStepSeconds = get.int(SettingsKeys.SEEK_STEP_SECONDS, SettingsKeys.SEEK_STEP_SECONDS_DEFAULT)
+        val autoplayRadio = get.boolean(SettingsKeys.AUTOPLAY_RADIO_ENABLED, SettingsKeys.AUTOPLAY_RADIO_ENABLED_DEFAULT)
+        val lyricsEnabled = get.boolean(SettingsKeys.LYRICS_ENABLED, SettingsKeys.LYRICS_ENABLED_DEFAULT)
+        val lyricsPreferSynced = get.boolean(SettingsKeys.LYRICS_PREFER_SYNCED, SettingsKeys.LYRICS_PREFER_SYNCED_DEFAULT)
+        val lyricsAutoScroll = get.boolean(SettingsKeys.LYRICS_AUTO_SCROLL, SettingsKeys.LYRICS_AUTO_SCROLL_DEFAULT)
+        val lyricsTextSize = get.string(SettingsKeys.LYRICS_TEXT_SIZE, SettingsKeys.LYRICS_TEXT_SIZE_DEFAULT)
+        val providerOrder = get.string(SettingsKeys.LYRICS_PROVIDER_ORDER, SettingsKeys.LYRICS_PROVIDER_ORDER_DEFAULT)
+        val preferredProvider = get.string(SettingsKeys.LYRICS_PREFERRED_PROVIDER, SettingsKeys.LYRICS_PREFERRED_PROVIDER_DEFAULT)
+        val countryCode = CountryRegions.normalize(
+            get.string(SettingsKeys.COUNTRY_CODE, SettingsKeys.COUNTRY_CODE_DEFAULT),
+        ) ?: SettingsKeys.COUNTRY_CODE_DEFAULT
+        val explicitContent = get.boolean(SettingsKeys.EXPLICIT_CONTENT, SettingsKeys.EXPLICIT_CONTENT_DEFAULT)
+        val pauseOnMute = get.boolean(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME, SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME_DEFAULT)
+        val persistShuffleRepeat = get.boolean(SettingsKeys.PERSIST_SHUFFLE_REPEAT, SettingsKeys.PERSIST_SHUFFLE_REPEAT_DEFAULT)
+        val recordListeningHistory = get.boolean(SettingsKeys.RECORD_LISTENING_HISTORY, SettingsKeys.RECORD_LISTENING_HISTORY_DEFAULT)
+
+        // Commit — every read above succeeded, so this is one coherent snapshot.
+        // The confirmed maps are rollback fallbacks only; they are replaced as
+        // one snapshot too and never collect optimistic values from setters.
+        confirmedStrings.value = mapOf(
+            SettingsKeys.THEME to themeId,
+            SettingsKeys.ACCENT to accentId,
+            SettingsKeys.ACCENT_MODE to accentMode,
+            SettingsKeys.AUDIO_QUALITY to audioQuality,
+            SettingsKeys.LYRICS_TEXT_SIZE to lyricsTextSize,
+            SettingsKeys.LYRICS_PROVIDER_ORDER to providerOrder,
+            SettingsKeys.LYRICS_PREFERRED_PROVIDER to preferredProvider,
+            SettingsKeys.COUNTRY_CODE to countryCode,
+        )
+        confirmedInts.value = mapOf(
+            SettingsKeys.CACHE_SIZE_MB to cacheSizeMb,
+            SettingsKeys.BACKDROP_BLUR to blur,
+            SettingsKeys.BACKDROP_BRIGHTNESS to brightness,
+            SettingsKeys.SEEK_STEP_SECONDS to seekStepSeconds,
+        )
+        confirmedBooleans.value = mapOf(
+            SettingsKeys.RESUME_ON_LAUNCH to resumeOnLaunch,
+            SettingsKeys.CLOSE_TO_TRAY to closeToTray,
+            SettingsKeys.AUTOPLAY_RADIO_ENABLED to autoplayRadio,
+            SettingsKeys.LYRICS_ENABLED to lyricsEnabled,
+            SettingsKeys.LYRICS_PREFER_SYNCED to lyricsPreferSynced,
+            SettingsKeys.LYRICS_AUTO_SCROLL to lyricsAutoScroll,
+            SettingsKeys.EXPLICIT_CONTENT to explicitContent,
+            SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME to pauseOnMute,
+            SettingsKeys.PERSIST_SHUFFLE_REPEAT to persistShuffleRepeat,
+            SettingsKeys.RECORD_LISTENING_HISTORY to recordListeningHistory,
+        )
+        confirmedTuning.value = tuning
+        _themeId.value = themeId
+        _accentId.value = accentId
+        _cacheSizeMb.value = cacheSizeMb
+        _resumeOnLaunch.value = resumeOnLaunch
+        _closeToTray.value = closeToTray
+        _backdropBlurPercent.value = blur
+        _backdropBrightnessPercent.value = brightness
+        publishTuning(tuning)
+        _accentMode.value = accentMode
+        _audioQuality.value = audioQuality
+        _seekStepSeconds.value = seekStepSeconds
+        _autoplayRadio.value = autoplayRadio
+        _lyricsEnabled.value = lyricsEnabled
+        _lyricsPreferSynced.value = lyricsPreferSynced
+        _lyricsAutoScroll.value = lyricsAutoScroll
+        _lyricsTextSize.value = lyricsTextSize
+        _providerOrder.value = providerOrder
+        _preferredProvider.value = preferredProvider
+        _countryCode.value = countryCode
+        _explicitContent.value = explicitContent
+        _pauseOnMute.value = pauseOnMute
+        _persistShuffleRepeat.value = persistShuffleRepeat
+        _recordListeningHistory.value = recordListeningHistory
     }
 
     /**
@@ -165,104 +434,171 @@ class SettingsViewModel(
     fun setThemeId(id: String) {
         if (id !in listOf("dark", "light", "black", "system")) return
         _themeId.value = id
-        enqueueWrite { update.string(SettingsKeys.THEME, id) }
+        persistString(SettingsKeys.THEME, SettingsKeys.THEME_DEFAULT, _themeId) {
+            update.string(SettingsKeys.THEME, id)
+        }
     }
 
     fun setAccentId(id: String) {
         if (id.isBlank()) return
         _accentId.value = id
-        enqueueWrite { update.string(SettingsKeys.ACCENT, id) }
+        persistString(SettingsKeys.ACCENT, SettingsKeys.ACCENT_DEFAULT, _accentId) {
+            update.string(SettingsKeys.ACCENT, id)
+        }
     }
 
     /** No-op unless [mb] is one of [CACHE_OPTIONS_MB]. */
     fun setCacheSizeMb(mb: Int) {
         if (mb !in CACHE_OPTIONS_MB) return
         _cacheSizeMb.value = mb
-        enqueueWrite { update.int(SettingsKeys.CACHE_SIZE_MB, mb) }
+        persistInt(SettingsKeys.CACHE_SIZE_MB, SettingsKeys.CACHE_SIZE_MB_DEFAULT, _cacheSizeMb, { _cacheSizeMb.value = AudioCacheBudget.clampMb(it) }) {
+            update.int(SettingsKeys.CACHE_SIZE_MB, mb)
+        }
     }
 
     fun setResumeOnLaunch(enabled: Boolean) {
         _resumeOnLaunch.value = enabled
-        enqueueWrite { update.boolean(SettingsKeys.RESUME_ON_LAUNCH, enabled) }
+        persistBoolean(SettingsKeys.RESUME_ON_LAUNCH, SettingsKeys.RESUME_ON_LAUNCH_DEFAULT, _resumeOnLaunch) {
+            update.boolean(SettingsKeys.RESUME_ON_LAUNCH, enabled)
+        }
     }
 
     fun resetWindowGeometry() {
-        enqueueWrite { update.remove(SettingsKeys.WINDOW_GEOMETRY) }
+        enqueueWrite({ update.remove(SettingsKeys.WINDOW_GEOMETRY) })
     }
 
     fun setCloseToTray(enabled: Boolean) {
         _closeToTray.value = enabled
-        enqueueWrite { update.boolean(SettingsKeys.CLOSE_TO_TRAY, enabled) }
+        persistBoolean(SettingsKeys.CLOSE_TO_TRAY, SettingsKeys.CLOSE_TO_TRAY_DEFAULT, _closeToTray) {
+            update.boolean(SettingsKeys.CLOSE_TO_TRAY, enabled)
+        }
     }
 
     fun setBackdropBlurPercent(percent: Int) {
         val value = percent.coerceIn(0, 100)
         _backdropBlurPercent.value = value
-        enqueueWrite { update.int(SettingsKeys.BACKDROP_BLUR, value) }
+        persistInt(SettingsKeys.BACKDROP_BLUR, SettingsKeys.BACKDROP_BLUR_DEFAULT, _backdropBlurPercent) {
+            update.int(SettingsKeys.BACKDROP_BLUR, value)
+        }
     }
 
     fun setBackdropBrightnessPercent(percent: Int) {
         val value = percent.coerceIn(0, 100)
         _backdropBrightnessPercent.value = value
-        enqueueWrite { update.int(SettingsKeys.BACKDROP_BRIGHTNESS, value) }
+        persistInt(SettingsKeys.BACKDROP_BRIGHTNESS, SettingsKeys.BACKDROP_BRIGHTNESS_DEFAULT, _backdropBrightnessPercent) {
+            update.int(SettingsKeys.BACKDROP_BRIGHTNESS, value)
+        }
     }
 
     /** Preview continuously, but write once on slider release (not per drag frame). */
     fun previewVisualTuning(part: VisualPart, percent: Int) {
         if (part !in DhunVisualTuning.adjustableParts) return
+        // A drag is a newer visible request even before slider release. An
+        // older save completion must not snap the finger's newer preview back.
+        nextWriteGeneration(part.key)
         _visualTuning.value = _visualTuning.value + (part to percent.coerceIn(0, 100))
     }
 
     fun saveVisualTuning(part: VisualPart) {
         if (part !in DhunVisualTuning.adjustableParts) return
-        val value = _visualTuning.value[part] ?: DhunVisualTuning.TEST_DEFAULT
-        enqueueWrite { update.int(part.key, value) }
+        val value = _visualTuning.value[part] ?: tuningBaseline
+        val generation = nextWriteGeneration(part.key)
+        enqueueWrite({
+            update.int(part.key, value)
+            confirmedTuning.update { it + (part to value) }
+            val visible = _visualTuning.value[part] ?: tuningBaseline
+            if (isLatestWrite(part.key, generation) && visible != value) {
+                publishTuning(_visualTuning.value + (part to value))
+            }
+        }) {
+            // The slider already shows the dragged value; put the stored one
+            // back rather than leaving an unsaved experiment applied. If the
+            // readback fails, use only the last confirmed experiment.
+            val stored = try {
+                get.int(part.key, tuningBaseline).coerceIn(0, 100)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                confirmedTuning.value[part] ?: tuningBaseline
+            }
+            if (isLatestWrite(part.key, generation)) {
+                publishTuning(_visualTuning.value + (part to stored))
+            }
+        }
     }
 
     fun resetVisualTuning() {
-        _visualTuning.value = emptyMap()
-        DhunVisualTuning.reset()
-        enqueueWrite { for (part in VisualPart.entries) update.remove(part.key) }
+        invalidateWrites(VisualPart.entries.map { it.key })
+        publishTuning(emptyMap())
+        enqueueWrite({
+            for (part in VisualPart.entries) update.remove(part.key)
+            confirmedTuning.value = emptyMap()
+        }) {
+            // A failed reset must not leave the app on a baseline it did not
+            // persist: re-read the stored experiments and reapply them.
+            val stored = try {
+                readStoredTuning()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                confirmedTuning.value
+            }
+            publishTuning(stored)
+        }
     }
 
     fun setAccentMode(id: String) {
         if (id !in listOf("artwork", "static")) return
         _accentMode.value = id
-        enqueueWrite { update.string(SettingsKeys.ACCENT_MODE, id) }
+        persistString(SettingsKeys.ACCENT_MODE, SettingsKeys.ACCENT_MODE_DEFAULT, _accentMode) {
+            update.string(SettingsKeys.ACCENT_MODE, id)
+        }
     }
     fun setAudioQuality(id: String) {
         if (id !in listOf("low", "medium", "high")) return
         _audioQuality.value = id
-        enqueueWrite { update.string(SettingsKeys.AUDIO_QUALITY, id) }
+        persistString(SettingsKeys.AUDIO_QUALITY, SettingsKeys.AUDIO_QUALITY_DEFAULT, _audioQuality) {
+            update.string(SettingsKeys.AUDIO_QUALITY, id)
+        }
     }
     fun setSeekStepSeconds(seconds: Int) {
         if (seconds !in listOf(5, 10, 15, 30)) return
         _seekStepSeconds.value = seconds
-        enqueueWrite { update.int(SettingsKeys.SEEK_STEP_SECONDS, seconds) }
+        persistInt(SettingsKeys.SEEK_STEP_SECONDS, SettingsKeys.SEEK_STEP_SECONDS_DEFAULT, _seekStepSeconds) {
+            update.int(SettingsKeys.SEEK_STEP_SECONDS, seconds)
+        }
     }
     fun setAutoplayRadio(enabled: Boolean) {
         _autoplayRadio.value = enabled
-        enqueueWrite { update.boolean(SettingsKeys.AUTOPLAY_RADIO_ENABLED, enabled) }
+        persistBoolean(SettingsKeys.AUTOPLAY_RADIO_ENABLED, SettingsKeys.AUTOPLAY_RADIO_ENABLED_DEFAULT, _autoplayRadio) {
+            update.boolean(SettingsKeys.AUTOPLAY_RADIO_ENABLED, enabled)
+        }
     }
     fun setLyricsEnabled(enabled: Boolean) {
         _lyricsEnabled.value = enabled
-        enqueueWrite { update.boolean(SettingsKeys.LYRICS_ENABLED, enabled) }
+        persistBoolean(SettingsKeys.LYRICS_ENABLED, SettingsKeys.LYRICS_ENABLED_DEFAULT, _lyricsEnabled) {
+            update.boolean(SettingsKeys.LYRICS_ENABLED, enabled)
+        }
     }
     fun setLyricsPreferSynced(enabled: Boolean) {
         _lyricsPreferSynced.value = enabled
-        enqueueWrite {
+        persistBoolean(SettingsKeys.LYRICS_PREFER_SYNCED, SettingsKeys.LYRICS_PREFER_SYNCED_DEFAULT, _lyricsPreferSynced) {
             update.boolean(SettingsKeys.LYRICS_PREFER_SYNCED, enabled)
-            clearLyricsCacheAction?.invoke()
+            clearLyricsCacheAfterPreferenceChange()
         }
     }
     fun setLyricsAutoScroll(enabled: Boolean) {
         _lyricsAutoScroll.value = enabled
-        enqueueWrite { update.boolean(SettingsKeys.LYRICS_AUTO_SCROLL, enabled) }
+        persistBoolean(SettingsKeys.LYRICS_AUTO_SCROLL, SettingsKeys.LYRICS_AUTO_SCROLL_DEFAULT, _lyricsAutoScroll) {
+            update.boolean(SettingsKeys.LYRICS_AUTO_SCROLL, enabled)
+        }
     }
     fun setLyricsTextSize(id: String) {
         if (id !in listOf("small", "default", "large")) return
         _lyricsTextSize.value = id
-        enqueueWrite { update.string(SettingsKeys.LYRICS_TEXT_SIZE, id) }
+        persistString(SettingsKeys.LYRICS_TEXT_SIZE, SettingsKeys.LYRICS_TEXT_SIZE_DEFAULT, _lyricsTextSize) {
+            update.string(SettingsKeys.LYRICS_TEXT_SIZE, id)
+        }
     }
     fun setProviderEnabled(id: String, enabled: Boolean) {
         if (id !in listOf("lrclib", "ytm", "lrclib_search", "kugou")) return
@@ -271,38 +607,55 @@ class SettingsViewModel(
         if (next.isEmpty()) return
         _providerOrder.value = next.joinToString(",")
         val order = _providerOrder.value
-        enqueueWrite {
+        persistString(SettingsKeys.LYRICS_PROVIDER_ORDER, SettingsKeys.LYRICS_PROVIDER_ORDER_DEFAULT, _providerOrder) {
             update.string(SettingsKeys.LYRICS_PROVIDER_ORDER, order)
-            clearLyricsCacheAction?.invoke()
+            clearLyricsCacheAfterPreferenceChange()
         }
     }
 
+    /**
+     * Clears the automatic lyrics cache. The Settings dialog keeps its confirm
+     * button pending on [maintenanceState] and shows [LYRICS_CLEAR_FAILED]
+     * instead of closing as if the clear had happened.
+     */
     fun clearLyricsCache() {
         val action = clearLyricsCacheAction ?: return
-        scope.launch { action() }
+        maintenance.run(KEY_CLEAR_LYRICS, LYRICS_CLEAR_FAILED, onSuccess = { _lastCompletedKey.value = KEY_CLEAR_LYRICS }) { action() }
+    }
+
+    /** Cache clear fired by a provider/preference change, after the write. */
+    private suspend fun clearLyricsCacheAfterPreferenceChange() {
+        val action = clearLyricsCacheAction ?: return
+        try {
+            action()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            maintenance.report(LYRICS_CLEAR_FAILED)
+        }
     }
 
     val canClearAudioCache: Boolean get() = clearAudioCacheAction != null
     private val _freedAudioBytes = MutableStateFlow<Long?>(null)
     val freedAudioBytes: StateFlow<Long?> = _freedAudioBytes.asStateFlow()
-    private val _audioCacheError = MutableStateFlow(false)
-    val audioCacheError: StateFlow<Boolean> = _audioCacheError.asStateFlow()
+
     fun clearAudioCache() {
-        clearAudioCacheAction?.let { action ->
-            scope.launch {
-                _audioCacheError.value = false
-                runCatching { withContext(Dispatchers.Default) { action() } }
-                    .onSuccess { _freedAudioBytes.value = it }
-                    .onFailure { _audioCacheError.value = true }
-            }
+        val action = clearAudioCacheAction ?: return
+        _freedAudioBytes.value = null
+        maintenance.run(KEY_CLEAR_AUDIO, AUDIO_CLEAR_FAILED, onSuccess = { _lastCompletedKey.value = KEY_CLEAR_AUDIO }) {
+            val freed = withContext(Dispatchers.Default) { action() }
+            _freedAudioBytes.value = freed
         }
     }
 
     fun clearSearchHistory() {
-        clearSearchHistoryAction?.let { action -> scope.launch { action() } }
+        val action = clearSearchHistoryAction ?: return
+        maintenance.run(KEY_CLEAR_SEARCH, SEARCH_HISTORY_CLEAR_FAILED, onSuccess = { _lastCompletedKey.value = KEY_CLEAR_SEARCH }) { action() }
     }
+
     fun clearPlayHistory() {
-        clearPlayHistoryAction?.let { action -> scope.launch { action() } }
+        val action = clearPlayHistoryAction ?: return
+        maintenance.run(KEY_CLEAR_PLAY, PLAY_HISTORY_CLEAR_FAILED, onSuccess = { _lastCompletedKey.value = KEY_CLEAR_PLAY }) { action() }
     }
 
     fun setPreferredProvider(id: String) = setPreferredProvider(id, afterPersist = {})
@@ -315,50 +668,67 @@ class SettingsViewModel(
     fun setPreferredProvider(id: String, afterPersist: () -> Unit) {
         if (id !in listOf("auto", "lrclib", "ytm", "lrclib_search", "kugou")) return
         _preferredProvider.value = id
-        enqueueWrite {
+        persistString(SettingsKeys.LYRICS_PREFERRED_PROVIDER, SettingsKeys.LYRICS_PREFERRED_PROVIDER_DEFAULT, _preferredProvider) {
             update.string(SettingsKeys.LYRICS_PREFERRED_PROVIDER, id)
-            clearLyricsCacheAction?.invoke()
+            clearLyricsCacheAfterPreferenceChange()
             afterPersist()
         }
     }
     fun setCountryCode(id: String) {
-        val code = id.trim().uppercase()
-        if (!CountryRegions.isSupportedCode(code)) return
+        val code = CountryRegions.normalize(id) ?: return
         onCountryCodeChange(code)
         _countryCode.value = code
-        enqueueWrite { update.string(SettingsKeys.COUNTRY_CODE, code) }
+        persistString(SettingsKeys.COUNTRY_CODE, SettingsKeys.COUNTRY_CODE_DEFAULT, _countryCode, { stored ->
+            // The provider is told the country only for a value it will keep.
+            if (stored != _countryCode.value) onCountryCodeChange(stored)
+            _countryCode.value = stored
+        }) {
+            update.string(SettingsKeys.COUNTRY_CODE, code)
+        }
     }
     fun setExplicitContent(enabled: Boolean) {
         // Publish the new UI value only after the provider's SQLDelight read
-        // can see it; a Home/Search refresh is keyed to this flow.
-        enqueueWrite {
+        // can see it; a Home/Search refresh is keyed to this flow. Reset is a
+        // newer snapshot and must not be overwritten by an older queued write.
+        val generation = nextWriteGeneration(SettingsKeys.EXPLICIT_CONTENT)
+        enqueueWrite({
             update.boolean(SettingsKeys.EXPLICIT_CONTENT, enabled)
-            _explicitContent.value = enabled
-        }
+            if (isLatestWrite(SettingsKeys.EXPLICIT_CONTENT, generation)) {
+                _explicitContent.value = enabled
+            }
+        })
     }
     fun setPauseOnMute(enabled: Boolean) {
         _pauseOnMute.value = enabled
-        enqueueWrite { update.boolean(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME, enabled) }
+        persistBoolean(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME, SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME_DEFAULT, _pauseOnMute) {
+            update.boolean(SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME, enabled)
+        }
     }
 
     fun setPersistShuffleRepeat(enabled: Boolean) {
         _persistShuffleRepeat.value = enabled
-        enqueueWrite { update.boolean(SettingsKeys.PERSIST_SHUFFLE_REPEAT, enabled) }
+        persistBoolean(SettingsKeys.PERSIST_SHUFFLE_REPEAT, SettingsKeys.PERSIST_SHUFFLE_REPEAT_DEFAULT, _persistShuffleRepeat) {
+            update.boolean(SettingsKeys.PERSIST_SHUFFLE_REPEAT, enabled)
+        }
     }
     fun setRecordListeningHistory(enabled: Boolean) {
         _recordListeningHistory.value = enabled
-        enqueueWrite { update.boolean(SettingsKeys.RECORD_LISTENING_HISTORY, enabled) }
+        persistBoolean(SettingsKeys.RECORD_LISTENING_HISTORY, SettingsKeys.RECORD_LISTENING_HISTORY_DEFAULT, _recordListeningHistory) {
+            update.boolean(SettingsKeys.RECORD_LISTENING_HISTORY, enabled)
+        }
     }
 
-    fun reset() {
-        _recordListeningHistory.value = SettingsKeys.RECORD_LISTENING_HISTORY_DEFAULT
+    /**
+     * The one place that knows every documented default. Used by [reset], so a
+     * new setting cannot be added to the load path and forgotten here.
+     */
+    private fun applyDefaults() {
         _themeId.value = SettingsKeys.THEME_DEFAULT
         _accentId.value = SettingsKeys.ACCENT_DEFAULT
         _accentMode.value = SettingsKeys.ACCENT_MODE_DEFAULT
         _backdropBlurPercent.value = SettingsKeys.BACKDROP_BLUR_DEFAULT
         _backdropBrightnessPercent.value = SettingsKeys.BACKDROP_BRIGHTNESS_DEFAULT
-        _visualTuning.value = emptyMap()
-        DhunVisualTuning.reset()
+        publishTuning(emptyMap())
         _cacheSizeMb.value = SettingsKeys.CACHE_SIZE_MB_DEFAULT
         _resumeOnLaunch.value = SettingsKeys.RESUME_ON_LAUNCH_DEFAULT
         _closeToTray.value = SettingsKeys.CLOSE_TO_TRAY_DEFAULT
@@ -376,10 +746,58 @@ class SettingsViewModel(
         _explicitContent.value = SettingsKeys.EXPLICIT_CONTENT_DEFAULT
         _pauseOnMute.value = SettingsKeys.PAUSE_ON_MUTE_OR_ZERO_VOLUME_DEFAULT
         _persistShuffleRepeat.value = SettingsKeys.PERSIST_SHUFFLE_REPEAT_DEFAULT
-        enqueueWrite { SettingsKeys.all.forEach { update.remove(it) } }
+        _recordListeningHistory.value = SettingsKeys.RECORD_LISTENING_HISTORY_DEFAULT
+    }
+
+    fun reset() {
+        invalidateWrites(SettingsKeys.all + VisualPart.entries.map { it.key })
+        applyDefaults()
+        // Same write mutex as every other control, so a slider moved after
+        // Reset cannot be erased by it (and vice versa). The tracker adds the
+        // pending/failure contract the dialog needs.
+        maintenance.run(
+            KEY_RESET,
+            RESET_FAILED,
+            onSuccess = { _lastCompletedKey.value = KEY_RESET },
+            onFailure = {
+                // Every control already shows its default. If the rows could
+                // not be removed they are still stored, so republish what is
+                // actually there instead of a state this launch invented.
+                loadPersistedValues()
+                // applyDefaults also changed the live request region. Restore
+                // that side effect too; a matching label with a different
+                // provider country would still issue the wrong requests.
+                onCountryCodeChange(_countryCode.value)
+            },
+        ) {
+            writeMutex.withLock { SettingsKeys.all.forEach { update.remove(it) } }
+            // Run after the rows are gone: the engine's defaults then persist
+            // through the shell's own observer, and a reset only reports
+            // success once the panel the user sees is back to defaults too.
+            resetEqualizerAction?.invoke()
+            confirmedStrings.value = emptyMap()
+            confirmedInts.value = emptyMap()
+            confirmedBooleans.value = emptyMap()
+            confirmedTuning.value = emptyMap()
+        }
     }
 
     companion object {
+        /* Mutation keys + user-facing failure messages, one pair per action. */
+        const val KEY_CLEAR_LYRICS = "clear-lyrics-cache"
+        const val KEY_CLEAR_AUDIO = "clear-audio-cache"
+        const val KEY_CLEAR_SEARCH = "clear-search-history"
+        const val KEY_CLEAR_PLAY = "clear-play-history"
+        const val KEY_RESET = "reset-settings"
+
+        const val SAVE_FAILED = "Could not save that setting. Check free space and try again."
+        const val LYRICS_CLEAR_FAILED = "Could not clear the lyrics cache. Please try again."
+        const val AUDIO_CLEAR_FAILED = "Could not clear the audio cache. Stop playback and try again."
+        const val SEARCH_HISTORY_CLEAR_FAILED = "Could not clear the search history. Please try again."
+        const val PLAY_HISTORY_CLEAR_FAILED = "Could not clear the play history. Please try again."
+        const val RESET_FAILED = "Could not reset every setting. Please try again."
+        const val SETTINGS_LOAD_FAILED = "Could not read your saved settings, so DHUN is using its defaults."
+
         /**
          * The budget ladder offered by the UI. `0` is the documented
          * "unlimited" sentinel (see [AudioCacheBudget]); every entry survives

@@ -27,17 +27,19 @@ merge prompts. Keep legal drafts DRAFT and report risks.
 
 ## Binding native recovery gate — 2026-10-31
 
-PR #217 is open and unmerged. Its current work is application recovery, not new
-feature development. The user rejected `c8d5dc1` (`13028524117`) and then `2a6038d`
-(`13031609048`): the latter still had filtered Search HTTP 400, no new-download
-blur outside Full Player, ineffective customized-colour Brightness and empty
-Related. Never describe either artifact as fixed. Read
-[verification §38](../docs/verification/38-native-application-recovery.md),
-including R9–R12, before changing Home, Search, artwork, backgrounds or Related.
+PR #217 is merged in the current baseline (`1e2f7cb`). Current work is
+persistent-update recovery plus selective native restoration, not wholesale
+feature or old-visual restoration. The user rejected `c8d5dc1` (`13028524117`)
+and then `2a6038d` (`13031609048`) as recovery; never describe either artifact
+as fixed. Read [verification §40](../docs/verification/40-persistent-update-recovery.md),
+[§41](../docs/verification/41-native-restoration-and-glass-plan.md), and
+[§42](../docs/verification/42-playlist-deletion-restoration.md) before changing
+recovery, Home, Search, artwork, backgrounds or Related.
 
-- Preserve KMP/playback, PR #216 backgrounds and PR #217's corrected independent
-  blur/dynamic-colour behaviour, four component colours, one palette pipeline,
-  seven quick colours/HSL More colours, preferences, downloads and database data.
+- Preserve KMP/playback, playlists, favourites, settings, downloads, queue/history
+  and unrelated data. Keep the current simple Background blur/brightness
+  preferences; do not restore #216's five-palette or later four-surface custom
+  colour models. Clearing data or reinstalling is not update recovery.
 - Use independent generation-scoped category/Search/playlist continuation, real
   bounded retry, stale-response rejection, deduplication and visible sanitized
   errors. Never silently substitute For You, sample content or endless paging.
@@ -92,8 +94,8 @@ including R9–R12, before changing Home, Search, artwork, backgrounds or Relate
 
 This note supersedes older visual wording in this file and historical notes in `.ai/KNOWN_LIMITATIONS.md`, `.ai/HANDOFF_NEXT_SESSION.md`, and `docs/verification/08-player.md`.
 
-- **Visual target:** DHUN uses an artwork-led, dark-first **translucent frosted-glass** visual identity. Use translucent tinted surfaces, restrained highlights/borders, gradients/scrims, legible type, and cached/lightweight 2D artwork blur. Do not describe Material 3 as the product's visual target. Compose/Material components can remain implementation primitives if styled to DHUN's tokens.
-- **The glass system is normative (2026-10-30):** [docs/design/glass-system.md](../docs/design/glass-system.md) is the authoritative description of how a surface looks — frosted artwork, body gradient, specular sheen, gradient hairline edge — and names the component to use for each need (`GlassCard`, `GlassDialog`, `dhunContentRowSurface`, `dhunGlassBody`, `AmbientBackdrop`, `TrackMenuSurface`, `DhunTextField`, `DhunSwitch`, `DhunSlider`, `DhunColourSlider`, `DhunCheckbox`, `DhunProgressBar`, `DhunSpinner`, `DhunPullToRefresh`, `DhunDivider`, `DhunNavigationBar`/`DhunNavigationRail`, `DhunButton`/`DhunTextButton`/`DhunIconButton`, `DhunFilterChip`, …). Raw Material controls (`Switch`, `Slider`, `Checkbox`, `Button`, `TextButton`, `IconButton`, `LinearProgressIndicator`, `CircularProgressIndicator`, `PullToRefreshBox`, `DropdownMenuItem`, `Card`, `Surface`, `AlertDialog`, `OutlinedTextField`, `NavigationBar`/`NavigationRail` — including their items, because the wrong look is *inside* them, not in the container) must not be called from a screen. A flat Material fill, a stock `AlertDialog`/`Card`/`Surface`/`OutlinedTextField`, or a flat `background(DhunColors.surface)` panel is a **defect**, not a shortcut. `scripts/test_design_system.py` fails the repo gate on banned default-Material composables, and `design/GlassSystemTest` asserts the material numbers. If a task prompt, older session note or code comment disagrees with that page about appearance, the page wins.
+- **Visual target:** DHUN uses an artwork-led, dark-first **translucent frosted-glass** visual identity with an independently designed light mode. Use the shared tinted surfaces, restrained highlights/borders, gradients/veils, legible type, and lightweight artwork blur defined by the glass specification. Compose toolkit components can remain implementation primitives only inside the DHUN component contract.
+- **The glass system is normative (2026-10-31):** [docs/design/glass-system.md](../docs/design/glass-system.md) is the single authoritative description of surface classes, component choices, numbers, background preferences, accessibility, fallbacks, and correct/incorrect implementation. Use its actual component map (`GlassCard`, `GlassDialog`, quiet content surfaces, lyrics/queue materials, `TrackMenuSurface`, DHUN inputs/buttons/controls/progress/refresh/navigation). Raw stock controls must not be called from native UI sources; `scripts/test_design_system.py` enforces the ban across shared UI, Android, and desktop. Pure policy and contrast tests supplement that source gate; neither is visual QA. If a task prompt, older session note, or code comment disagrees about appearance, the glass page wins.
 - **Not a heavyweight renderer:** no continuous full-resolution blur, liquid-distortion renderer, or platform-private glass APIs. Low-end/unsupported devices must receive a legible tint/gradient/opaque fallback. Accessibility and contrast take priority over transparency.
 - **Architecture stays Kotlin Multiplatform/Compose:** this visual correction does not authorize React/Tauri migration or a rewrite of player/provider code. The native app, the static `website/` and the `app-web/` browser client are three codebases but **one product**: the site renders the app's shell and its token sheet is generated from `app-web/src/css/tokens.css` (ADR-008 amendment 2026-10-16). Current browser JioSaavn requests may be refused by community hosts/CDN or browser policy: no claim that browser playback is proven, and no DHUN-operated backend or proxy (ADR-008 boundary 1).
 - **Destructive actions must report outcomes:** Clear all downloads, clear history/cache, batch delete, and playlist delete must not close confirmation or clear UI state before persistence/filesystem work succeeds. Every action needs pending, success and failure behavior plus retry/cancel semantics.
@@ -128,13 +130,12 @@ architecture and integrations remain planned/design-only work.
   artwork-driven, dark-first, ViMusic-quality. FullPlayer background is
   real blurred artwork; Home/Search/Library sit on the now-playing
   blurred backdrop (PR #68).
-- **Backgrounds are two independent switches** (docs/design/glass-system.md §3a):
-  *Background blur* (off = no artwork behind the app at all, never a sharper or
-  dimmed copy) and *Dynamic colours* (off = the colour the user picked for each
-  surface). They are orthogonal, and four surfaces are customisable —
-  pages, navigation bar, miniplayer, full player — each with one colour, not a
-  palette the user assembles. Never reintroduce `primary`/`secondary`/`tertiary`
-  as the user-facing customisation model.
+- **Background preferences stay simple:** Appearance & Backdrop exposes
+  *Background blur* and *Background brightness* (defaults 100% and 55%). Zero
+  blur keeps sharp, dimmed artwork; it does not remove artwork. Unsupported
+  platforms hide only the blur slider and retain brightness. Dynamic accents
+  affect controls, not per-surface background palettes. See the authoritative
+  glass specification §6; do not restore historical palette/custom-colour editors.
 - **License:** GPL-3.0. Non-negotiable.
 
 ---

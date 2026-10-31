@@ -1,3 +1,4 @@
+import org.jetbrains.compose.ExperimentalComposeLibrary
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
@@ -51,6 +52,10 @@ kotlin {
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test"))
+                // Headless Compose semantics and geometry checks.
+                // Test-only: no UI-test runtime is packaged into DHUN.
+                @OptIn(ExperimentalComposeLibrary::class)
+                implementation(compose.uiTest)
             }
         }
     }

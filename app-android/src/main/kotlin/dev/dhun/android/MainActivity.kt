@@ -18,17 +18,20 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Surface
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
@@ -59,6 +62,9 @@ import dev.dhun.data.SettingsKeys
 import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunTheme
+import dev.dhun.design.components.DhunTextButton
+import dev.dhun.design.components.GlassCard
+import dev.dhun.design.components.GlassDialog
 import dev.dhun.legal.DhunAppInfo
 import dev.dhun.player.NowPlayingPersistence
 import dev.dhun.presentation.home.HomeViewModel
@@ -283,12 +289,13 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     ready.reason?.let { reason ->
-                        Surface(
-                            color = DhunColors.errorContainer,
+                        GlassCard(
                             modifier = Modifier
                                 .align(Alignment.TopCenter)
                                 .fillMaxWidth()
                                 .semantics { liveRegion = LiveRegionMode.Polite },
+                            tint = DhunColors.errorContainer,
+                            elevated = false,
                         ) {
                             Text(
                                 reason,
@@ -301,23 +308,28 @@ class MainActivity : ComponentActivity() {
                 }
 
                 if (showBatteryRationale) {
-                    AlertDialog(
-                        onDismissRequest = { batteryRationaleVisible.value = false },
-                        title = {
-                            Text(
-                                "Keep playback reliable",
-                                modifier = Modifier.semantics { heading() },
-                            )
-                        },
-                        text = {
-                            Text(
-                                "Android battery optimization can stop background music " +
-                                    "on some phones. Allow DHUN to keep the playback service " +
-                                    "available when the screen is off?",
-                            )
-                        },
-                        confirmButton = {
-                            TextButton(
+                    GlassDialog(onDismissRequest = { batteryRationaleVisible.value = false }) {
+                        Text(
+                            "Keep playback reliable",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = DhunColors.textPrimary,
+                            modifier = Modifier.semantics { heading() },
+                        )
+                        Spacer(modifier = Modifier.height(DhunSpacing.sm))
+                        Text(
+                            "Android battery optimization can stop background music " +
+                                "on some phones. Allow DHUN to keep the playback service " +
+                                "available when the screen is off?",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = DhunColors.textSecondary,
+                        )
+                        Spacer(modifier = Modifier.height(DhunSpacing.lg))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            DhunTextButton(onClick = { batteryRationaleVisible.value = false }) {
+                                Text("Not now")
+                            }
+                            Spacer(modifier = Modifier.width(DhunSpacing.sm))
+                            DhunTextButton(
                                 onClick = {
                                     batteryRationaleVisible.value = false
                                     openBatteryOptimizationSettings()
@@ -325,13 +337,8 @@ class MainActivity : ComponentActivity() {
                             ) {
                                 Text("Allow")
                             }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { batteryRationaleVisible.value = false }) {
-                                Text("Not now")
-                            }
-                        },
-                    )
+                        }
+                    }
                 }
             }
         }

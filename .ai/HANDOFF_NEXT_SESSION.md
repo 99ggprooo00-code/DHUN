@@ -1,19 +1,24 @@
-# HANDOFF — current multi-source alignment (2026-10-28)
+# HANDOFF — current native recovery and glass restoration (2026-10-31)
 
-> **Read first if you touch UI (2026-10-30, `arena/97df3ebc-dhun`):** the native
-> interface is **translucent frosted glass**, and Material 3 is never the visual
-> target. Read [`docs/design/glass-system.md`](../docs/design/glass-system.md)
-> (normative: cues, component map, numbers, legibility floor) and
-> [`docs/verification/34-glass-design-system.md`](../docs/verification/34-glass-design-system.md)
-> before editing a screen. Consequences for new work: use the DHUN components
-> (`GlassCard`, `GlassDialog`, `DhunTextField`, `DhunSwitch`, `DhunSlider`,
-> `DhunCheckbox`, `DhunProgressBar`, `DhunSpinner`, `DhunPullToRefresh`,
-> `DhunNavigationBar`/`DhunNavigationRail`, `DhunDivider`, `dhunContentRowSurface`)
-> instead of the Material widget of the same name; `scripts/test_design_system.py`
-> fails the build if a raw one reaches a screen. The report of that session is
-> honest about evidence: Kotlin compilation came from CI, nothing was run on an
-> emulator, device or Windows desktop.
-
+> **Read first for this branch:** `arena/8a70a040-dhun` is carrying
+> persistent-update recovery, selective native restoration, and separately
+> committed DHUN glass stages. Start with
+> [verification §40](../docs/verification/40-persistent-update-recovery.md),
+> [§41](../docs/verification/41-native-restoration-and-glass-plan.md), and
+> [§42](../docs/verification/42-playlist-deletion-restoration.md), and
+> [§43](../docs/verification/43-dhun-glass-restoration.md). The visual
+> source of truth is [docs/design/glass-system.md](../docs/design/glass-system.md).
+> Its current backdrop model is only Background blur + Background brightness;
+> zero blur keeps sharp, dimmed artwork. Do not restore old palette editors or
+> unimplemented components from dated snapshots below.
+>
+> **Evidence boundary:** local source/Python policy checks do not compile Kotlin
+> or show a screen. Hosted Compose/Skia screenshots and interaction exist and are
+> indexed in verification §43; the `dc0e506` run passed five tests and all 62
+> frames were reviewed. They are not emulator, physical-phone, interactive-desktop, native
+> screen-reader, audible-playback, or performance acceptance. No such hardware
+> acceptance is available in this workspace. Inspect CI for the exact commit
+> being reviewed and keep phone recovery open.
 
 Read [PRD §1](../docs/PRD.md#1-product-definition-and-source-of-truth), ROADMAP's
 current task, [matrix 05](../docs/research/05-source-capability-matrix.md),

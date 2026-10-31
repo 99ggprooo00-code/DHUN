@@ -51,6 +51,14 @@ class FileDownloadManager(
 
     init {
         scope.launch { repository.observeAll().collect { _downloads.value = it } }
+        scope.launch {
+            // An update kills workers but preserves their rows and files. Do
+            // not leave those rows pretending that a worker still exists.
+            val repairs = runCatching { reconcilePersistedRows() }
+                .onFailure { println("DHUN download restart reconciliation failed: ${it.message}") }
+                .getOrDefault(emptyList())
+            repairs.forEach { launchArtworkRepair(it) }
+        }
     }
 
     override val downloads: StateFlow<List<DownloadedTrack>> = _downloads.asStateFlow()
@@ -63,7 +71,24 @@ class FileDownloadManager(
 
     private suspend fun enqueueLocked(track: Track) {
         val existing = repository.get(track.id)
-        if (existing?.isCompleted == true) return
+        if (existing?.isCompleted == true) {
+            val audioPresent = runCatching {
+                storage.exists(existing.localAudioPath) && storage.size(existing.localAudioPath) > 0L
+            }.getOrDefault(true) // a transient IO error must not trigger a redownload
+            if (audioPresent) {
+                val artMissing = existing.localArtworkPath.let { art ->
+                    art == null || runCatching { storage.exists(art) }.getOrDefault(true).not()
+                }
+                if (artMissing) {
+                    val row = existing.copy(localArtworkPath = null)
+                    if (row != existing) repository.upsert(row)
+                    launchArtworkRepair(row)
+                }
+                return
+            }
+            // Keep the metadata, but do not let a stale COMPLETED row suppress
+            // recovery when its audio file is actually absent or empty.
+        }
         // Placeholder row so the download shows immediately; the real path and
         // MIME are written on completion (only known after resolution).
         repository.upsert(placeholder(track))
@@ -92,8 +117,7 @@ class FileDownloadManager(
     override suspend fun cancel(trackId: String): Unit = mutationLock.withLock {
         stopJob(trackId)
         repository.get(trackId)?.let {
-            storage.delete(storage.audioPath(trackId, it.mimeType) + ".part")
-            storage.delete(storage.artPath(trackId) + ".part")
+            deleteTemporaryFiles(it.trackId, it.mimeType, it.localArtworkPath)
         }
         repository.delete(trackId)
         _progress.value = _progress.value - trackId
@@ -104,6 +128,7 @@ class FileDownloadManager(
         repository.get(trackId)?.let {
             storage.delete(it.localAudioPath)
             it.localArtworkPath?.let { art -> storage.delete(art) }
+            deleteTemporaryFiles(it.trackId, it.mimeType, it.localArtworkPath)
         }
         repository.delete(trackId)
         _progress.value = _progress.value - trackId
@@ -125,8 +150,7 @@ class FileDownloadManager(
             row.localArtworkPath?.let { art -> storage.delete(art) }
             // Also remove deterministic temporary paths. A row may point at the
             // final file after a retry while a stale .part file still exists.
-            storage.delete(storage.audioPath(row.trackId, row.mimeType) + ".part")
-            storage.delete(storage.artPath(row.trackId) + ".part")
+            deleteTemporaryFiles(row.trackId, row.mimeType, row.localArtworkPath)
         }
         repository.clearAll()
         _progress.value = emptyMap()
@@ -138,6 +162,21 @@ class FileDownloadManager(
         val job = jobsLock.withLock { jobs.remove(trackId) }
         job?.cancel()
         job?.join()
+    }
+
+    private suspend fun deleteTemporaryFiles(
+        trackId: String,
+        mimeType: String,
+        previousArtworkPath: String? = null,
+    ) {
+        val audioPart = storage.audioPath(trackId, mimeType) + ".part"
+        storage.delete(audioPart)
+        storage.delete(sourceMetadataPath(audioPart))
+        listOfNotNull(storage.artPath(trackId), previousArtworkPath).distinct().forEach { art ->
+            val artPart = "$art.part"
+            storage.delete(artPart)
+            storage.delete(sourceMetadataPath(artPart))
+        }
     }
 
     private fun placeholder(track: Track) = DownloadedTrack(
@@ -209,6 +248,16 @@ class FileDownloadManager(
         val mime = resolved.mimeType.ifBlank { "audio/webm" }
         val final = storage.audioPath(track.id, mime)
         val part = "$final.part"
+        prepareTemporaryFile(
+            part = part,
+            identity = listOf(
+                "audio-v1",
+                track.id,
+                mime,
+                resolved.bitrateKbps?.toString().orEmpty(),
+                resolved.contentLengthBytes?.toString().orEmpty(),
+            ).joinToString("\n"),
+        )
 
         val result: DhunResult<Long> = try {
             downloader.download(resolved.audioUrl, resolved.userAgent, part) { written, total ->
@@ -221,6 +270,13 @@ class FileDownloadManager(
         when (result) {
             is DhunResult.Success -> {
                 storage.commit(part, final)
+                storage.delete(sourceMetadataPath(part))
+                check(storage.exists(final) && storage.size(final) == result.value) {
+                    "committed audio could not be verified"
+                }
+                val existingArt = storage.artPath(track.id).takeIf {
+                    runCatching { storage.exists(it) && storage.size(it) > 0L }.getOrDefault(false)
+                }
                 val base = DownloadedTrack(
                     trackId = track.id,
                     title = track.title,
@@ -229,9 +285,9 @@ class FileDownloadManager(
                     durationSeconds = track.durationSeconds ?: 0,
                     thumbnailUrl = track.thumbnailUrl,
                     localAudioPath = final,
-                    localArtworkPath = null,
+                    localArtworkPath = existingArt,
                     fileSizeBytes = result.value,
-                    mimeType = resolved.mimeType,
+                    mimeType = mime,
                     bitrateKbps = resolved.bitrateKbps,
                     downloadState = DownloadState.COMPLETED,
                     downloadedAtEpochMs = clock.nowMs(),
@@ -240,8 +296,10 @@ class FileDownloadManager(
                 // artwork fetch so pause/cancel can never orphan the audio.
                 repository.upsert(base)
                 println("DHUN download ${track.id}: completed ${result.value} bytes -> $final")
-                val art = fetchArtwork(track.thumbnailUrl, track.id)
-                if (art != null) repository.upsert(base.copy(localArtworkPath = art))
+                if (base.localArtworkPath == null) {
+                    val art = fetchArtwork(track.thumbnailUrl, track.id)
+                    if (art != null) repository.upsert(base.copy(localArtworkPath = art))
+                }
                 _progress.value = _progress.value - track.id
             }
             is DhunResult.Failure -> {
@@ -252,25 +310,136 @@ class FileDownloadManager(
         }
     }
 
+    /**
+     * Reconcile rows written by a process/update that can no longer have live
+     * workers. Only temporary files and download state are changed; library,
+     * queue, playlist, favourite and settings rows are not touched.
+     */
+    private suspend fun reconcilePersistedRows(): List<DownloadedTrack> = mutationLock.withLock {
+        val repairs = mutableListOf<DownloadedTrack>()
+        repository.getAll().forEach { row ->
+            when (row.downloadState) {
+                DownloadState.QUEUED, DownloadState.DOWNLOADING ->
+                    repository.updateState(row.trackId, DownloadState.PAUSED)
+                DownloadState.COMPLETED -> {
+                    val audioHealthy = runCatching {
+                        storage.exists(row.localAudioPath) && storage.size(row.localAudioPath) > 0L
+                    }.getOrNull()
+                    if (audioHealthy == false) {
+                        repository.updateState(row.trackId, DownloadState.FAILED)
+                        return@forEach
+                    }
+                    if (audioHealthy == null) return@forEach // retry on the next launch
+
+                    var repaired = row
+                    val needsVersionedRefresh = row.localArtworkPath != null &&
+                        row.localArtworkPath != storage.artPath(row.trackId)
+                    row.localArtworkPath?.let { art ->
+                        val artHealthy = runCatching { storage.exists(art) && storage.size(art) > 0L }.getOrNull()
+                        if (artHealthy == false) {
+                            repaired = row.copy(localArtworkPath = null)
+                            repository.upsert(repaired)
+                        }
+                        if (artHealthy == null && !needsVersionedRefresh) return@forEach
+                    }
+                    if (repaired.localArtworkPath == null || needsVersionedRefresh) repairs += repaired
+                }
+                DownloadState.PAUSED, DownloadState.FAILED -> Unit
+            }
+        }
+        repairs
+    }
+
+    private suspend fun launchArtworkRepair(row: DownloadedTrack): Unit = jobsLock.withLock {
+        if (jobs.containsKey(row.trackId)) return
+        val job = scope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    semaphore.withPermit { repairArtwork(row) }
+                }
+            } catch (t: CancellationException) {
+                throw t
+            } catch (_: Throwable) {
+                // Artwork is best-effort: never turn a healthy completed audio
+                // download into FAILED just because its cover cannot be fetched.
+                println("DHUN download artwork repair failed for ${row.trackId}")
+            } finally {
+                jobsLock.withLock { jobs.remove(row.trackId) }
+            }
+        }
+        jobs[row.trackId] = job
+    }
+
+    private suspend fun repairArtwork(row: DownloadedTrack) {
+        val art = fetchArtwork(row.thumbnailUrl, row.trackId) ?: return
+        val current = repository.get(row.trackId) ?: return
+        // The user may have removed, restarted or independently repaired the
+        // row while the request was in flight. Never overwrite that newer state.
+        if (!current.isCompleted || current.localAudioPath != row.localAudioPath ||
+            current.localArtworkPath != row.localArtworkPath
+        ) return
+        repository.upsert(current.copy(localArtworkPath = art))
+        val previousArt = row.localArtworkPath
+        if (previousArt != null && previousArt != art && isInsideDownloadRoot(previousArt)) {
+            // The new version is durably referenced before the old file is
+            // removed. A failed refresh never reaches this cleanup.
+            storage.delete(previousArt)
+            storage.delete("$previousArt.part")
+            storage.delete(sourceMetadataPath("$previousArt.part"))
+        }
+    }
+
+    private fun isInsideDownloadRoot(path: String): Boolean {
+        val root = storage.root.trimEnd('/', '\\')
+        return path.startsWith("$root/") || path.startsWith("$root\\")
+    }
+
+    /**
+     * A .part file is resumable only for the same logical source. Older builds
+     * wrote no identity record, so their first update safely restarts just the
+     * temporary file. Completed audio/artwork and all database rows survive.
+     */
+    private suspend fun prepareTemporaryFile(part: String, identity: String) {
+        val metadata = sourceMetadataPath(part)
+        val previous = runCatching { storage.readText(metadata) }.getOrNull()
+        if (previous != identity) {
+            storage.delete(part)
+            storage.writeText(metadata, identity)
+        }
+    }
+
+    private fun sourceMetadataPath(part: String): String = "$part.source"
+
     private suspend fun fetchArtwork(thumbnailUrl: String?, trackId: String): String? {
-        val url = thumbnailUrl ?: return null
         val art = storage.artPath(trackId)
+        if (runCatching { storage.exists(art) && storage.size(art) > 0L }.getOrDefault(false)) return art
         val part = "$art.part"
-        val result = try {
-            downloader.download(url, null, part) { _, _ -> }
-        } catch (t: CancellationException) {
-            throw t
+        val remoteThumbnail = thumbnailUrl?.trim()?.takeIf {
+            it.startsWith("https://", ignoreCase = true) || it.startsWith("http://", ignoreCase = true)
         }
-        return when (result) {
-            is DhunResult.Success -> {
+        val candidates = listOfNotNull(
+            remoteThumbnail,
+            "https://i.ytimg.com/vi/${safeTrackId(trackId)}/hqdefault.jpg",
+        ).distinct()
+        for (url in candidates) {
+            prepareTemporaryFile(part, "artwork-v1\n$trackId\n$url")
+            val result = try {
+                downloader.download(url, null, part) { _, _ -> }
+            } catch (t: CancellationException) {
+                throw t
+            }
+            if (result is DhunResult.Success) {
                 storage.commit(part, art)
-                art
+                storage.delete(sourceMetadataPath(part))
+                if (runCatching { storage.exists(art) && storage.size(art) > 0L }.getOrDefault(false)) {
+                    return art
+                }
+                storage.delete(art)
             }
-            is DhunResult.Failure -> {
-                storage.delete(part)
-                null
-            }
+            // A following candidate has a different identity, so preparation
+            // removes any stale bytes before they can be appended to it.
         }
+        return null
     }
 
 }

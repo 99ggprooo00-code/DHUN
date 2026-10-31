@@ -12,7 +12,7 @@ class BuildWorkflowTest(unittest.TestCase):
     def setUp(self):
         self.text = WORKFLOW.read_text()
         self.publish_test = self.text.split("\n  publish_test:\n", 1)[1].split("\n  publish:\n", 1)[0]
-        self.publish = self.text.split("\n  publish:\n", 1)[1]
+        self.publish = self.text.split("\n  publish:\n", 1)[1].split("\n  msi_evidence:\n", 1)[0]
 
     def test_typed_manual_input_defaults_to_build_only(self):
         inputs = self.text.split("  workflow_dispatch:\n", 1)[1].split("  push:\n", 1)[0]
@@ -90,6 +90,8 @@ class BuildWorkflowTest(unittest.TestCase):
     def test_installer_is_a_pull_request_check_before_merge(self):
         self.assertIn("  pull_request:\n    branches: [main]", self.text)
         self.assertIn("- name: Check install-over and userdata on disposable Windows", self.text)
+        self.assertIn("needs.msi.result == 'failure'", self.text)
+        self.assertIn("safeLaunchDiagnostics", self.text)
         self.assertIn("    needs: [release_plan, apk, msi]", self.publish)
 
     def test_unsigned_msi_is_finalized_before_checksum_and_upload(self):
@@ -103,6 +105,27 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn("Get-AuthenticodeSignature", patch)
         self.assertIn("DHUN_UPGRADE_DATA_POLICY", patch)
         self.assertIn("'UPGRADINGPRODUCTCODE'", patch)
+        self.assertIn("Start-Process -FilePath $executable", smoke)
+        self.assertIn("GetWindowRect", smoke)
+        self.assertIn("CopyFromScreen", smoke)
+        self.assertIn("app-launch.png", smoke)
+        self.assertIn("appLaunch = $appLaunchResult", smoke)
+        self.assertIn("visual review and audible playback not tested", smoke)
+
+    def test_installed_launch_tracks_the_jpackage_window_process(self):
+        smoke = (WORKFLOW.parents[2] / "scripts/check_msi_upgrade.ps1").read_text()
+        # A native launcher may remain alive while its child DHUN.exe owns the
+        # Compose window. Do not fail a real window merely because its PID is
+        # different, and never accept a pre-existing or startup-error window.
+        self.assertIn("function Find-DhunMainWindow", smoke)
+        self.assertIn("Get-Process -Name 'DHUN'", smoke)
+        self.assertIn("$preLaunchProcessIds", smoke)
+        self.assertIn("$process.MainWindowTitle -eq 'DHUN'", smoke)
+        self.assertIn("$process.Responding", smoke)
+        self.assertIn("Save-DhunAppWindow -Process $windowProcess", smoke)
+        self.assertIn("Stop-DhunLaunchedProcess -Process $windowProcess", smoke)
+        self.assertIn("Stop-DhunLaunchedProcess -Process $app", smoke)
+        self.assertNotIn("while ($app.MainWindowHandle", smoke)
 
     def test_build_jobs_do_not_get_contents_write(self):
         before_publish = self.text.split("\n  publish_test:\n", 1)[0]
@@ -210,7 +233,14 @@ class BuildWorkflowTest(unittest.TestCase):
         for name in ("dhun-test.apk", "dhun-test-arm64-v8a.apk", "dhun-test-armeabi-v7a.apk"):
             self.assertIn(f"python scripts/stage_artifact.py out/{name}", apk)
             self.assertIn(name, create)
-            self.assertIn(f"{name}.sha256", create)
+        self.assertIn("dist/dhun-test.msi", create)
+        # Internal checksums/provenance still protect build promotion, but the
+        # rolling beta exposes exactly its four installers and no text sidecars.
+        self.assertNotIn(".sha256", create)
+        self.assertNotIn(".provenance.txt", create)
+        self.assertIn("expected_test_assets=", self.publish_test)
+        self.assertIn("actual_test_assets=", self.publish_test)
+        self.assertIn("The rolling test release must contain only the four installers", self.publish_test)
 
     def test_msi_uses_the_existing_packaging_workflow_counter(self):
         self.assertIn("python scripts/installer_version.py $env:GITHUB_RUN_NUMBER $env:GITHUB_RUN_ATTEMPT", self.text)
@@ -223,7 +253,8 @@ class BuildWorkflowTest(unittest.TestCase):
         # (The published v1.00.001 .build-info.json files are historical and untouched.)
         self.assertNotIn(".json", self.publish)
         self.assertIn("dist/$version/dhun-v1.00.002.msi.provenance.txt", self.publish)
-        self.assertIn("dist/dhun-test.msi.provenance.txt", self.publish_test)
+        create_test = self.publish_test.split("gh release create test", 1)[1].split("--target", 1)[0]
+        self.assertNotIn(".provenance.txt", create_test)
         for line in self.text.splitlines():
             if "upload" in line or "gh release create" in line:
                 self.assertNotIn(".json", line)

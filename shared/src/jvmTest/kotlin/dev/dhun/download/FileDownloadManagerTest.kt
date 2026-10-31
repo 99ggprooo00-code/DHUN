@@ -3,6 +3,7 @@ package dev.dhun.download
 import dev.dhun.core.DhunError
 import dev.dhun.core.DhunResult
 import dev.dhun.core.DownloadState
+import dev.dhun.core.DownloadedTrack
 import dev.dhun.core.StreamInfo
 import dev.dhun.core.Track
 import dev.dhun.data.DatabaseDriverFactory
@@ -205,6 +206,195 @@ class FileDownloadManagerTest {
             val countAfterFirst = repo.count()
             manager.enqueue(track("v5"))
             assertEquals(countAfterFirst, repo.count())
+        } finally { managerScope.cancel() }
+    }
+
+    @Test
+    fun updateRestartPreservesAudioRepairsArtworkAndPausesOrphanedWork(): Unit = runBlocking {
+        val storage = TestDownloadStorage()
+        val repo = repository()
+        val audio = storage.audioPath("old", "audio/webm")
+        val audioBytes = "already-downloaded-audio".encodeToByteArray()
+        storage.append(audio, audioBytes)
+        // An older build left an unversioned artwork fragment behind. It must
+        // not be prefixed to the new response after the update.
+        storage.append(storage.artPath("old") + ".part", "stale-image-fragment".encodeToByteArray())
+        repo.upsert(DownloadedTrack(
+            trackId = "old",
+            title = "Old song",
+            artistName = "Artist",
+            albumName = "Album",
+            durationSeconds = 200,
+            thumbnailUrl = "https://images.example/old.jpg",
+            localAudioPath = audio,
+            localArtworkPath = null,
+            fileSizeBytes = audioBytes.size.toLong(),
+            mimeType = "audio/webm",
+            bitrateKbps = 160,
+            downloadState = DownloadState.COMPLETED,
+            downloadedAtEpochMs = 1,
+        ))
+        repo.upsert(DownloadedTrack(
+            trackId = "interrupted",
+            title = "Interrupted song",
+            artistName = "Artist",
+            albumName = null,
+            durationSeconds = 200,
+            thumbnailUrl = null,
+            localAudioPath = storage.audioPath("interrupted", "audio/webm") + ".part",
+            localArtworkPath = null,
+            fileSizeBytes = 0,
+            mimeType = "audio/webm",
+            bitrateKbps = 160,
+            downloadState = DownloadState.DOWNLOADING,
+            downloadedAtEpochMs = 2,
+        ))
+        val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        // Resolving audio would fail: this restart must need only the artwork
+        // request, not a redownload of the healthy completed song.
+        FileDownloadManager(
+            repo, FakeResolver(DhunResult.Failure(DhunError.Unavailable("must not resolve"))),
+            FakeStreamDownloader(storage), storage, managerScope,
+        )
+        try {
+            withTimeout(15_000) {
+                while (repo.get("old")?.localArtworkPath == null ||
+                    repo.get("interrupted")?.downloadState != DownloadState.PAUSED
+                ) delay(10)
+            }
+            val repaired = repo.get("old") ?: error("old row vanished")
+            assertEquals(DownloadState.COMPLETED, repaired.downloadState)
+            assertEquals(audio, repaired.localAudioPath)
+            assertTrue(storage.files[audio]!!.contentEquals(audioBytes))
+            val artwork = repaired.localArtworkPath ?: error("artwork was not repaired")
+            assertTrue(storage.files[artwork]!!.contentEquals("audio-bytes".encodeToByteArray()))
+            assertEquals(DownloadState.PAUSED, repo.get("interrupted")?.downloadState)
+        } finally { managerScope.cancel() }
+    }
+
+    @Test
+    fun legacyArtworkMovesToTheVersionedFileOnlyAfterSuccessfulRefresh(): Unit = runBlocking {
+        val storage = TestDownloadStorage()
+        val repo = repository()
+        val audio = storage.audioPath("legacy-art", "audio/webm")
+        storage.append(audio, "audio".encodeToByteArray())
+        val oldArt = "${storage.root}/art/legacy-art.jpg"
+        storage.append(oldArt, "old-possibly-damaged-cover".encodeToByteArray())
+        val versionedArt = storage.artPath("legacy-art")
+        assertTrue(oldArt != versionedArt)
+        repo.upsert(DownloadedTrack(
+            trackId = "legacy-art",
+            title = "Legacy cover",
+            artistName = "Artist",
+            durationSeconds = 200,
+            thumbnailUrl = "https://images.example/legacy.jpg",
+            localAudioPath = audio,
+            localArtworkPath = oldArt,
+            fileSizeBytes = 5,
+            mimeType = "audio/webm",
+            downloadState = DownloadState.COMPLETED,
+        ))
+        val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        FileDownloadManager(
+            repo, FakeResolver(DhunResult.Failure(DhunError.Unavailable("must not resolve"))),
+            FakeStreamDownloader(storage), storage, managerScope,
+        )
+        try {
+            withTimeout(15_000) {
+                while (repo.get("legacy-art")?.localArtworkPath != versionedArt) delay(10)
+            }
+            assertTrue(storage.exists(versionedArt))
+            assertTrue(storage.files[versionedArt]!!.contentEquals("audio-bytes".encodeToByteArray()))
+            // Persisting the new path intentionally precedes old-file cleanup.
+            // Wait for that second phase instead of racing it after the DB emit.
+            withTimeout(15_000) {
+                while (storage.exists(oldArt)) delay(10)
+            }
+            assertFalse(storage.exists(oldArt), "old file is removed only after the new path is persisted")
+            assertEquals(DownloadState.COMPLETED, repo.get("legacy-art")?.downloadState)
+        } finally { managerScope.cancel() }
+    }
+
+    @Test
+    fun failedLegacyArtworkRefreshKeepsThePreviousRowAndFile(): Unit = runBlocking {
+        val storage = TestDownloadStorage()
+        val repo = repository()
+        val audio = storage.audioPath("offline-art", "audio/webm")
+        storage.append(audio, "audio".encodeToByteArray())
+        val oldArt = "${storage.root}/art/offline-art.jpg"
+        val oldBytes = "previous-cover".encodeToByteArray()
+        storage.append(oldArt, oldBytes)
+        repo.upsert(DownloadedTrack(
+            trackId = "offline-art",
+            title = "Offline cover",
+            artistName = "Artist",
+            durationSeconds = 200,
+            thumbnailUrl = "https://images.example/offline.jpg",
+            localAudioPath = audio,
+            localArtworkPath = oldArt,
+            fileSizeBytes = 5,
+            mimeType = "audio/webm",
+            downloadState = DownloadState.COMPLETED,
+        ))
+        val attempts = mutableListOf<String>()
+        val offlineDownloader = object : StreamDownloader {
+            override suspend fun download(
+                url: String,
+                userAgent: String?,
+                destinationPath: String,
+                onProgress: (Long, Long?) -> Unit,
+            ): DhunResult<Long> {
+                attempts += url
+                return DhunResult.Failure(DhunError.Network("offline"))
+            }
+        }
+        val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        FileDownloadManager(
+            repo, FakeResolver(DhunResult.Failure(DhunError.Unavailable("must not resolve"))),
+            offlineDownloader, storage, managerScope,
+        )
+        try {
+            withTimeout(15_000) { while (attempts.size < 2) delay(10) }
+            assertEquals(oldArt, repo.get("offline-art")?.localArtworkPath)
+            assertTrue(storage.files[oldArt]!!.contentEquals(oldBytes))
+            assertFalse(storage.exists(storage.artPath("offline-art")))
+            assertEquals(DownloadState.COMPLETED, repo.get("offline-art")?.downloadState)
+        } finally { managerScope.cancel() }
+    }
+
+    @Test
+    fun updateRestartMarksMissingAudioRetryableWithoutDeletingItsMetadata(): Unit = runBlocking {
+        val storage = TestDownloadStorage()
+        val repo = repository()
+        repo.upsert(DownloadedTrack(
+            trackId = "missing",
+            title = "Keep this metadata",
+            artistName = "Artist",
+            albumName = "Album",
+            durationSeconds = 200,
+            thumbnailUrl = "https://images.example/missing.jpg",
+            localAudioPath = storage.audioPath("missing", "audio/webm"),
+            localArtworkPath = null,
+            fileSizeBytes = 123,
+            mimeType = "audio/webm",
+            bitrateKbps = 160,
+            downloadState = DownloadState.COMPLETED,
+            downloadedAtEpochMs = 1,
+        ))
+        val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val manager = FileDownloadManager(
+            repo, FakeResolver(DhunResult.Success(stream("missing"))),
+            FakeStreamDownloader(storage), storage, managerScope,
+        )
+        try {
+            withTimeout(15_000) {
+                while (repo.get("missing")?.downloadState != DownloadState.FAILED) delay(10)
+            }
+            assertEquals("Keep this metadata", repo.get("missing")?.title)
+            manager.resume("missing")
+            assertEquals(DownloadState.COMPLETED, awaitTerminal(repo, "missing"))
+            assertEquals("Keep this metadata", repo.get("missing")?.title)
+            assertTrue(storage.exists(repo.get("missing")!!.localAudioPath))
         } finally { managerScope.cancel() }
     }
 }

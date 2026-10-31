@@ -49,6 +49,7 @@ fun NowPlayingBackdrop(
     val blurPercent = DhunAppearance.backdropBlurPercent
     val brightnessPercent = DhunAppearance.backdropBrightnessPercent
     val canBlur = supportsRealtimeBlur
+    val blurArtwork = GlassMaterialPolicy.shouldBlurArtwork(canBlur, blurPercent)
     val tokens = DhunAppearance.tokens
     val veilStops = NowPlayingBackdropPolicy.veilStops(tokens.isLight, brightnessPercent)
         .map { (offset, alpha) -> offset to DhunVisualTuning.veilAlpha(VisualPart.PAGE_BACKDROP, alpha) }
@@ -57,12 +58,25 @@ fun NowPlayingBackdrop(
     val context = LocalPlatformContext.current
     var phase by remember(artworkUrl) { mutableStateOf(NowPlayingBackdropPhase.Idle) }
     val artworkAlpha by animateFloatAsState(
-        targetValue = if (phase == NowPlayingBackdropPhase.Loaded) 1f else 0f,
+        targetValue = if (phase == NowPlayingBackdropPhase.Loaded) {
+            NowPlayingBackdropPolicy.loadedLayerAlpha(blurArtwork)
+        } else {
+            0f
+        },
         animationSpec = DhunAnimations.slowTween(),
         label = "nowPlayingBackdrop",
     )
 
-    Box(modifier = modifier.fillMaxSize().clipToBounds()) {
+    // Fade the already-composited artwork + veil as ONE layer. Applying the
+    // fallback alpha to each child separately would apply it twice to the
+    // artwork wherever the translucent veil overlaps it, and would also leave
+    // a different amount of theme base visible than the real-blur path.
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .clipToBounds()
+            .graphicsLayer { alpha = artworkAlpha },
+    ) {
         AsyncImage(
             model = ImageRequest.Builder(context)
                 .data(url)
@@ -74,10 +88,9 @@ fun NowPlayingBackdrop(
                 .graphicsLayer {
                     scaleX = NowPlayingBackdropPolicy.OVERSCAN
                     scaleY = NowPlayingBackdropPolicy.OVERSCAN
-                    alpha = artworkAlpha
                 }
                 .then(
-                    if (canBlur && blurPercent > 0) {
+                    if (blurArtwork) {
                         Modifier.blur(
                             DhunSpacing.glassBlur * NowPlayingBackdropPolicy.BLUR_SCALE *
                                 NowPlayingBackdropPolicy.blurMultiplier(blurPercent),
@@ -98,7 +111,6 @@ fun NowPlayingBackdrop(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer { alpha = artworkAlpha }
                 .background(
                     Brush.verticalGradient(
                         colorStops = veilStops.map { (offset, alpha) ->
@@ -125,6 +137,15 @@ object NowPlayingBackdropPolicy {
     const val BLUR_SCALE = 4
 
     const val OVERSCAN = 1.15f
+
+    /**
+     * Without real blur, full-strength bright/dark covers can overpower direct
+     * text even after the tonal veil. Fade the established artwork+veil layer
+     * over the theme base instead of adding another scrim or a CPU blur.
+     */
+    const val NON_BLUR_LAYER_ALPHA = 0.40f
+
+    fun loadedLayerAlpha(blurActive: Boolean): Float = if (blurActive) 1f else NON_BLUR_LAYER_ALPHA
 
     val artworkSizePx: Int get() = ArtworkUrls.LIST_SIZE_PX
 

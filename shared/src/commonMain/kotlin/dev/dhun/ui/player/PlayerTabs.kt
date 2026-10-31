@@ -27,7 +27,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -139,13 +138,13 @@ internal fun QueueTabContent(
                     "${queue.size} tracks"
                 },
                 style = MaterialTheme.typography.labelMedium,
-                color = accent,
+                color = DhunColors.textSecondary,
             )
             Spacer(modifier = Modifier.weight(1f))
             Text(
                 text = "Drag to reorder",
                 style = MaterialTheme.typography.labelSmall,
-                color = DhunColors.textTertiary,
+                color = DhunColors.textSecondary,
             )
         }
         ReorderableList(
@@ -225,7 +224,9 @@ internal fun QueueTabContent(
                     Text(
                         text = track.title,
                         style = MaterialTheme.typography.titleSmall,
-                        color = if (isHighlighted) accent else DhunColors.textPrimary,
+                        // The highlight wash/equalizer already identify the
+                        // current row; keep its small title readable too.
+                        color = DhunColors.textPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.basicMarquee(),
@@ -236,7 +237,7 @@ internal fun QueueTabContent(
                             track.albumName?.let { append(" • $it") }
                         },
                         style = MaterialTheme.typography.labelSmall,
-                        color = DhunColors.textTertiary,
+                        color = DhunColors.textSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -247,7 +248,7 @@ internal fun QueueTabContent(
                     Text(
                         text = duration,
                         style = MaterialTheme.typography.labelSmall,
-                        color = DhunColors.textTertiary,
+                        color = DhunColors.textSecondary,
                         maxLines = 1,
                     )
                 }
@@ -560,16 +561,25 @@ internal fun LyricsProviderPicker(
                     tint = accent,
                 )
             }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                lyricsProviderOptions.forEach { (id, label) ->
-                    DropdownMenuItem(
-                        text = { Text(label) },
-                        modifier = Modifier.semantics { selected = id == selectedProvider },
-                        onClick = {
-                            expanded = false
-                            if (id != selectedProvider) onSelect(id)
-                        },
-                    )
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                shape = DhunShapes.large,
+                containerColor = Color.Transparent,
+                tonalElevation = DhunSpacing.zero,
+                shadowElevation = DhunSpacing.zero,
+            ) {
+                TrackMenuSurface(artworkUrl = null, modifier = Modifier.width(DhunSpacing.menuMinWidth)) {
+                    lyricsProviderOptions.forEach { (id, label) ->
+                        MenuActionRow(
+                            label = label,
+                            modifier = Modifier.semantics { selected = id == selectedProvider },
+                            onClick = {
+                                expanded = false
+                                if (id != selectedProvider) onSelect(id)
+                            },
+                        )
+                    }
                 }
             }
         }

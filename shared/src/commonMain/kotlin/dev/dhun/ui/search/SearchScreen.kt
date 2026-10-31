@@ -22,11 +22,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -38,15 +35,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.input.key.onKeyEvent
 
 import dev.dhun.core.Album
 import dev.dhun.core.Artist
@@ -61,19 +52,17 @@ import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.components.AlbumCard
 import dev.dhun.design.components.ArtistCard
-import dev.dhun.design.components.contentRowFill
-import dev.dhun.design.components.readingSurfaceFill
 import dev.dhun.design.components.DhunAssistChip
 import dev.dhun.design.components.DhunButton
 import dev.dhun.design.components.DhunFilterChip
 import dev.dhun.design.components.DhunHorizontalRail
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.DhunTextButton
+import dev.dhun.design.components.DhunTextField
 import dev.dhun.design.components.EmptyView
 import dev.dhun.design.components.ErrorView
 import dev.dhun.design.components.GlassCard
 import dev.dhun.design.components.LoadingShimmer
-import dev.dhun.design.components.LocalTextInputFocusRegistry
 import dev.dhun.design.components.PlaylistCard
 import dev.dhun.design.components.SectionHeader
 import dev.dhun.design.components.TrackRow
@@ -199,12 +188,6 @@ private fun SearchBarSection(
     onSearchSubmit: () -> Unit,
     onClear: () -> Unit,
 ) {
-    val focusRegistry = LocalTextInputFocusRegistry.current
-    val focusToken = remember { Any() }
-    DisposableEffect(focusRegistry, focusToken) {
-        onDispose { focusRegistry?.setFocused(focusToken, false) }
-    }
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -212,27 +195,24 @@ private fun SearchBarSection(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
     ) {
-        OutlinedTextField(
+        DhunTextField(
             value = query,
             onValueChange = onQueryChange,
-            placeholder = {
-                Text(
-                    "Search songs, artists, albums…",
-                    color = DhunColors.textHint,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            },
-            leadingIcon = {
+            placeholder = "Search songs, artists, albums…",
+            onSubmit = onSearchSubmit,
+            imeAction = ImeAction.Search,
+            shape = DhunShapes.extraLarge,
+            leadingContent = {
                 DhunIconView(
                     icon = DhunIcon.Search,
                     contentDescription = "Search",
                     modifier = Modifier
-                        .padding(start = DhunSpacing.xs)
+                        .padding(start = DhunSpacing.xs, end = DhunSpacing.xs)
                         .size(DhunSpacing.iconSize),
                     tint = DhunColors.textTertiary,
                 )
             },
-            trailingIcon = {
+            trailingContent = {
                 if (query.isNotEmpty()) {
                     DhunIconButton(onClick = onClear, contentDescription = "Clear search") {
                         DhunIconView(
@@ -244,41 +224,17 @@ private fun SearchBarSection(
                     }
                 }
             },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { onSearchSubmit() }),
-            shape = DhunShapes.extraLarge,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = readingSurfaceFill(),
-                unfocusedContainerColor = contentRowFill(),
-                disabledContainerColor = contentRowFill(),
-                focusedTextColor = DhunColors.textPrimary,
-                unfocusedTextColor = DhunColors.textPrimary,
-                cursorColor = DhunColors.accent,
-                focusedBorderColor = DhunColors.glassEdge,
-                unfocusedBorderColor = DhunColors.border,
-                focusedLeadingIconColor = DhunColors.accent,
-                unfocusedLeadingIconColor = DhunColors.textTertiary,
-                focusedTrailingIconColor = DhunColors.textSecondary,
-                unfocusedTrailingIconColor = DhunColors.textTertiary,
-                focusedPlaceholderColor = DhunColors.textHint,
-                unfocusedPlaceholderColor = DhunColors.textHint,
-            ),
-            modifier = Modifier
-                .weight(1f)
-                .onFocusChanged { focusRegistry?.setFocused(focusToken, it.isFocused) }
-                .onKeyEvent { event ->
-                    // Physical Enter (desktop keyboards, and Android hardware
-                    // keyboards) — the IME Search action above is the soft-key
-                    // half. The rule lives in SearchInputPolicy so the shipped
-                    // predicate is the one its regression test exercises.
-                    if (SearchInputPolicy.shouldSubmitOnKeyEvent(event)) {
-                        onSearchSubmit()
-                        true
-                    } else {
-                        false
-                    }
-                },
+            onKeyEvent = { event ->
+                // The IME action handles soft keyboards; this preserves Enter
+                // on desktop and Android hardware keyboards.
+                if (SearchInputPolicy.shouldSubmitOnKeyEvent(event)) {
+                    onSearchSubmit()
+                    true
+                } else {
+                    false
+                }
+            },
+            modifier = Modifier.weight(1f),
         )
         if (query.isNotBlank()) {
             DhunTextButton(onClick = onSearchSubmit) {

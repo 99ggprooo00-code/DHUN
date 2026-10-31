@@ -2,6 +2,7 @@ package dev.dhun.android.download
 
 import android.content.Context
 import dev.dhun.download.DownloadStorage
+import dev.dhun.download.downloadArtworkFileName
 import dev.dhun.download.extensionForMimeType
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -23,7 +24,7 @@ class AndroidDownloadStorage(
         File(File(root, "audio"), "${safeTrackId(trackId)}.${extensionForMimeType(mimeType)}").absolutePath
 
     override fun artPath(trackId: String): String =
-        File(File(root, "art"), "${safeTrackId(trackId)}.jpg").absolutePath
+        File(File(root, "art"), downloadArtworkFileName(trackId)).absolutePath
 
     override suspend fun size(path: String): Long = withContext(Dispatchers.IO) {
         val f = File(path)
@@ -36,6 +37,16 @@ class AndroidDownloadStorage(
         val f = File(path)
         f.parentFile?.mkdirs()
         f.appendBytes(bytes)
+    }
+
+    override suspend fun readText(path: String): String? = withContext(Dispatchers.IO) {
+        File(path).takeIf { it.isFile }?.readText(Charsets.UTF_8)
+    }
+
+    override suspend fun writeText(path: String, text: String): Unit = withContext(Dispatchers.IO) {
+        val f = File(path)
+        f.parentFile?.mkdirs()
+        f.writeText(text, Charsets.UTF_8)
     }
 
     override suspend fun commit(part: String, final: String): Unit = withContext(Dispatchers.IO) {

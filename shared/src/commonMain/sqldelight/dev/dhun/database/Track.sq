@@ -20,9 +20,11 @@ INSERT OR IGNORE INTO Track(id, title, artistName, artistId, albumName, albumId,
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 update:
-UPDATE Track SET title = ?, artistName = ?, artistId = ?, albumName = ?, albumId = ?,
-    durationSeconds = ?, thumbnailUrl = ?, explicit = ?, updatedAt = ?
-WHERE id = ?;
+UPDATE Track SET title = :title, artistName = :artistName,
+    artistId = COALESCE(:artistId, artistId), albumName = COALESCE(:albumName, albumName),
+    albumId = COALESCE(:albumId, albumId), durationSeconds = COALESCE(:durationSeconds, durationSeconds),
+    thumbnailUrl = COALESCE(:thumbnailUrl, thumbnailUrl), explicit = :explicit, updatedAt = :updatedAt
+WHERE id = :id;
 
 selectById:
 SELECT * FROM Track WHERE id = ?;

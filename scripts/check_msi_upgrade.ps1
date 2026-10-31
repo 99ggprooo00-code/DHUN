@@ -51,6 +51,149 @@ function Invoke-MsiCheck {
     throw "msiexec $Operation failed with exit $code; log: $Log"
 }
 
+function Save-DhunAppWindow {
+    param(
+        [Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process,
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+    $Process.Refresh()
+    $handle = $Process.MainWindowHandle
+    if ($handle -eq [IntPtr]::Zero) { throw 'Cannot capture DHUN without a real main-window handle' }
+    Add-Type -AssemblyName System.Drawing
+    Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class DhunWindowNative {
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
+    [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int command);
+}
+'@
+    [void][DhunWindowNative]::ShowWindow($handle, 9) # SW_RESTORE; minimized windows have no useful frame.
+    [void][DhunWindowNative]::SetForegroundWindow($handle)
+    Start-Sleep -Seconds 2
+    $rect = New-Object DhunWindowNative+RECT
+    if (-not [DhunWindowNative]::GetWindowRect($handle, [ref]$rect)) {
+        throw 'GetWindowRect failed for the launched DHUN window'
+    }
+    $width = $rect.Right - $rect.Left
+    $height = $rect.Bottom - $rect.Top
+    if ($width -lt 200 -or $height -lt 150) {
+        throw "Implausible DHUN window bounds ${width}x${height}; refusing to label this an app screenshot"
+    }
+    $bitmap = $null
+    $graphics = $null
+    try {
+        $bitmap = New-Object System.Drawing.Bitmap -ArgumentList $width, $height
+        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+        $graphics.CopyFromScreen($rect.Left, $rect.Top, 0, 0, $bitmap.Size)
+        $bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
+    } finally {
+        if ($null -ne $graphics) { $graphics.Dispose() }
+        if ($null -ne $bitmap) { $bitmap.Dispose() }
+    }
+    if (-not (Test-Path -LiteralPath $Path) -or (Get-Item -LiteralPath $Path).Length -lt 1000) {
+        throw 'The DHUN window capture was not written or is implausibly small'
+    }
+}
+
+function Find-DhunMainWindow {
+    param([int[]]$ExcludedProcessIds = @())
+    # jpackage's native launcher can remain alive while a child DHUN.exe owns
+    # the Compose window. Watch the normal application window, not whichever
+    # PID Start-Process returned. A startup-error window is never acceptance.
+    $candidates = @(Get-Process -Name 'DHUN' -ErrorAction SilentlyContinue |
+        Where-Object { $_.Id -notin $ExcludedProcessIds })
+    foreach ($process in $candidates) {
+        try {
+            $process.Refresh()
+            if (-not $process.HasExited -and
+                $process.MainWindowHandle -ne [IntPtr]::Zero -and
+                $process.MainWindowTitle -eq 'DHUN' -and
+                $process.Responding) {
+                return $process
+            }
+        } catch { continue }
+    }
+    return $null
+}
+
+function Stop-DhunLaunchedProcess {
+    param([System.Diagnostics.Process]$Process)
+    if ($null -eq $Process) { return }
+    try {
+        $Process.Refresh()
+        if (-not $Process.HasExited) {
+            [void]$Process.CloseMainWindow()
+            if (-not $Process.WaitForExit(15000)) {
+                $Process.Kill()
+                $Process.WaitForExit()
+            }
+        }
+    } finally {
+        $Process.Dispose()
+    }
+}
+
+function Write-DhunSafeLaunchDiagnostics {
+    param(
+        [System.Diagnostics.Process]$Launcher,
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string[]]$StartupLogCandidates
+    )
+    $processes = @()
+    foreach ($process in Get-Process) {
+        try {
+            $title = $process.MainWindowTitle
+            if ($process.ProcessName -notmatch '^(DHUN|java|javaw)$' -and $title -notlike 'DHUN*') { continue }
+            $processes += [PSCustomObject]@{
+                name = $process.ProcessName
+                id = $process.Id
+                mainWindowHandle = $process.MainWindowHandle.ToInt64()
+                mainWindowTitle = ([string]$title -replace '[\r\n;=]', ' ')
+                responding = $process.Responding
+            }
+        } catch { continue }
+    }
+    $startup = @()
+    foreach ($candidate in $StartupLogCandidates) {
+        if (-not (Test-Path -LiteralPath $candidate)) { continue }
+        $text = [IO.File]::ReadAllText($candidate)
+        $classes = @([regex]::Matches($text, 'FAILURE:\s+([A-Za-z0-9_.$]+)') | ForEach-Object { $_.Groups[1].Value })
+        $startup += [PSCustomObject]@{
+            location = if ($candidate.StartsWith($userdata, [StringComparison]::OrdinalIgnoreCase)) { 'userdata' } else { 'temp' }
+            bytes = (Get-Item -LiteralPath $candidate).Length
+            lastWriteUtc = (Get-Item -LiteralPath $candidate).LastWriteTimeUtc.ToString('o')
+            mainStarted = $text.Contains('DHUN main starting')
+            jdbcProbeAvailable = $text.Contains('DHUN probe: java.sql.Driver available')
+            failureClasses = $classes
+        }
+    }
+    $launcherInfo = $null
+    if ($null -ne $Launcher) {
+        $Launcher.Refresh()
+        $launcherInfo = [PSCustomObject]@{
+            id = $Launcher.Id
+            exited = $Launcher.HasExited
+            mainWindowHandle = $Launcher.MainWindowHandle.ToInt64()
+            mainWindowTitle = ([string]$Launcher.MainWindowTitle -replace '[\r\n;=]', ' ')
+        }
+    }
+    $lines = @('note=Metadata only: no command lines, paths, log messages, URLs or stack traces.')
+    if ($null -ne $launcherInfo) {
+        $lines += "launcher=id=$($launcherInfo.id);exited=$($launcherInfo.exited);handle=$($launcherInfo.mainWindowHandle);title=$($launcherInfo.mainWindowTitle)"
+    }
+    foreach ($process in $processes) {
+        $lines += "process=name=$($process.name);id=$($process.id);handle=$($process.mainWindowHandle);responding=$($process.responding);title=$($process.mainWindowTitle)"
+    }
+    foreach ($entry in $startup) {
+        $lines += "startup=location=$($entry.location);bytes=$($entry.bytes);lastWriteUtc=$($entry.lastWriteUtc);mainStarted=$($entry.mainStarted);jdbcProbeAvailable=$($entry.jdbcProbeAvailable);failureClasses=$($entry.failureClasses -join ',')"
+    }
+    $lines | Set-Content -LiteralPath $Path -Encoding utf8
+}
+
 # Prefer the newest published fixed public release. Until v1.00.002 exists,
 # the published v1.00.001 release (whose actual asset is `dhun.msi`) is used.
 # Accept its older versioned filename too if the asset is renamed back. A
@@ -133,6 +276,8 @@ $installDirectory = Join-Path $env:LOCALAPPDATA 'DHUN'
 $userdata = Join-Path $installDirectory 'userdata'
 $sentinel = Join-Path $userdata 'upgrade-sentinel.txt'
 $cacheSentinel = Join-Path $userdata 'cache/audio/upgrade-sentinel.txt'
+$appLaunchResult = 'not tested'
+$audioVisualResult = 'not tested'
 try {
     [void](Invoke-MsiCheck '/i' $baseline (Join-Path $logs 'baseline-install.log'))
     if (-not (Test-Path -LiteralPath (Join-Path $installDirectory 'DHUN.exe'))) {
@@ -150,7 +295,68 @@ try {
     if (-not (Test-Path -LiteralPath $cacheSentinel) -or [IO.File]::ReadAllText($cacheSentinel) -ne 'preserve-cache') {
         throw 'In-place MSI upgrade removed/changed existing cache data'
     }
-    Write-Host "::notice title=MSI upgrade smoke PASS::Hosted Windows: $($baselineReleaseTag) $($old['ProductVersion']) -> $($new['ProductVersion']); per-user install and userdata/cache sentinels preserved. Baseline SHA256=$baselineHash. App playback/visuals not tested."
+    Write-Host "::notice title=MSI upgrade smoke PASS::Hosted Windows: $($baselineReleaseTag) $($old['ProductVersion']) -> $($new['ProductVersion']); per-user install and userdata/cache sentinels preserved. Baseline SHA256=$baselineHash. Installed-app launch is checked separately."
+
+    # Launch the actual upgraded per-user package, not a Compose preview. A live
+    # native window and PNG establish startup only; audible playback and visual
+    # acceptance still require their own evidence.
+    $app = $null
+    $windowProcess = $null
+    try {
+        $executable = Join-Path $installDirectory 'DHUN.exe'
+        $preLaunchProcessIds = @(Get-Process -Name 'DHUN' -ErrorAction SilentlyContinue |
+            ForEach-Object { $_.Id })
+        $app = Start-Process -FilePath $executable -WorkingDirectory $installDirectory -PassThru
+        $windowDeadline = [DateTime]::UtcNow.AddSeconds(90)
+        do {
+            Start-Sleep -Seconds 2
+            $windowProcess = Find-DhunMainWindow -ExcludedProcessIds $preLaunchProcessIds
+        } while ($null -eq $windowProcess -and [DateTime]::UtcNow -lt $windowDeadline)
+        if ($null -eq $windowProcess) {
+            throw 'Installed DHUN.exe did not expose a normal main window within 90 seconds'
+        }
+        Start-Sleep -Seconds 15
+        $appShot = Join-Path $logs 'app-launch.png'
+        Save-DhunAppWindow -Process $windowProcess -Path $appShot
+        $appLaunchResult = 'passed: installed DHUN.exe opened a native main window'
+        $audioVisualResult = 'window PNG captured; visual review and audible playback not tested'
+        Write-Host "::notice title=MSI installed-app launch PASS::Native DHUN.exe window opened after upgrade; captured app-launch.png. Audible playback and visual review are not claimed."
+    } catch {
+        $appLaunchResult = 'failed'
+        $audioVisualResult = 'not tested'
+        try {
+            Write-DhunSafeLaunchDiagnostics `
+                -Launcher $app `
+                -Path (Join-Path $logs 'app-diagnostics.txt') `
+                -StartupLogCandidates @((Join-Path $userdata 'dhun-startup.log'), (Join-Path $env:TEMP 'dhun-startup.log'))
+        } catch {
+            Write-Host '::warning title=MSI launch diagnostics::Safe metadata could not be written; preserving the original launch failure.'
+        }
+        Write-DhunInstallResult ([ordered]@{
+            status = 'failed'
+            requiredForThisBuild = [string][bool]$RequireInstallOver
+            sourceSha = $env:GITHUB_SHA
+            baselineTag = $baselineReleaseTag
+            baselineVersion = $old['ProductVersion']
+            baselineSha256 = $baselineHash
+            candidateVersion = $new['ProductVersion']
+            perUserInstall = 'passed'
+            installOver = 'passed'
+            userdataSentinel = 'preserved'
+            cacheSentinel = 'preserved'
+            futureUpgradeRemoval = 'not tested'
+            uninstallCleanup = 'not tested'
+            appLaunch = $appLaunchResult
+            audioAndVisuals = $audioVisualResult
+        })
+        throw
+    } finally {
+        $windowProcessId = if ($null -ne $windowProcess) { $windowProcess.Id } else { -1 }
+        Stop-DhunLaunchedProcess -Process $windowProcess
+        if ($null -eq $app -or $app.Id -ne $windowProcessId) {
+            Stop-DhunLaunchedProcess -Process $app
+        }
+    }
 
     # Exercise the installed candidate's future-upgrade removal path too.
     # This is the same public flag RemoveExistingProducts gives the old MSI;
@@ -166,7 +372,7 @@ try {
     [void](Invoke-MsiCheck '/i' $candidatePath (Join-Path $logs 'candidate-reinstall.log'))
     [void](Invoke-MsiCheck '/x' $new['ProductCode'] (Join-Path $logs 'candidate-uninstall.log'))
     if (Test-Path -LiteralPath $userdata) { throw 'MSI uninstall left the test userdata directory behind' }
-    Write-Host '::notice title=MSI uninstall smoke PASS::Hosted Windows uninstall removed test userdata. No app launch, audio or visual acceptance claimed.'
+    Write-Host '::notice title=MSI uninstall smoke PASS::Hosted Windows uninstall removed test userdata. Installed-app startup was checked separately; audible playback and visual acceptance are not claimed.'
     Write-DhunInstallResult ([ordered]@{
         status = 'passed'
         requiredForThisBuild = [string][bool]$RequireInstallOver
@@ -181,8 +387,8 @@ try {
         cacheSentinel = 'preserved'
         futureUpgradeRemoval = 'preserved both sentinels'
         uninstallCleanup = 'passed'
-        appLaunch = 'not tested'
-        audioAndVisuals = 'not tested'
+        appLaunch = $appLaunchResult
+        audioAndVisuals = $audioVisualResult
     })
 } finally {
     # Product GUIDs were read from these two verified DHUN packages. Do not

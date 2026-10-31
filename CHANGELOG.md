@@ -22,6 +22,29 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Selective native restoration and DHUN glass (2026-10-31, session `arena/8a70a040-dhun`)
+
+- Glass foundations, shared controls, Home/Search/browse/Library surfaces,
+  player/queue/lyrics controls, Settings/dialogs, and DHUN navigation were
+  implemented in separately reviewable stages. Stock visual calls are banned by
+  a source guardrail across shared native UI, Android, and desktop; toolkit
+  primitives remain only inside DHUN wrappers or as allowed text/layout/anchor
+  mechanics.
+- The authoritative `docs/design/glass-system.md` now describes the components
+  and fallback behavior in this tree, with independent light/dark rules,
+  accessibility requirements, and correct/incorrect examples. Active agent and
+  product guidance defers to it; dated reports remain historical evidence.
+- **Background preferences are deliberately simple:** Background blur and
+  Background brightness (defaults 100% and 55%). Zero blur keeps sharp, dimmed
+  artwork; unsupported platforms hide only the blur slider. The five-palette,
+  four-surface custom-colour, and HSL entries below describe their original
+  branches and are not the current product model or a restoration target.
+- Transport, seeking, queue mutation/reordering, lyrics state machines,
+  Settings persistence/rollback, and playlist/download transactions were not
+  rewritten for the visual stages. Local source/Python checks are not Kotlin
+  compilation or visual QA; exact-head CI and real Android/desktop acceptance
+  remain separate gates. Persistent-update phone recovery remains open.
+
 ### Native loading, artwork and continuation recovery (2026-10-31, PR #217)
 
 - The phone-tested `c8d5dc1` and later `2a6038d` packages are **not accepted as
