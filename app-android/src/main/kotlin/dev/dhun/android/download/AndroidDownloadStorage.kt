@@ -71,4 +71,6 @@ class AndroidDownloadStorage(
         File(path).parentFile?.mkdirs()
     }
 
+    private fun safeTrackId(id: String): String =
+        id.filter { it.isLetterOrDigit() || it == '-' || it == '_' }.take(80)
 }
