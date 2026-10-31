@@ -107,7 +107,7 @@ jobs:
               fields = {"query": "Oasis"}
               if value is not None:
                   fields["params"] = value
-              output = "probe/search-current.json" if name == "current-songs" else None
+              output = f"probe/search-{name}.json" if name in ("all", "old-songs", "current-songs") else None
               status, text = post("search", fields, output)
               detail = ""
               if status != 200:
@@ -117,6 +117,18 @@ jobs:
                   except Exception:
                       pass
               emit(f"search {name} http={status} bytes={len(text)}{detail}")
+
+          # The phone reports NP locale. Exercise the exact built-in Focus query
+          # through the same anonymous body before changing any filter constant.
+          client["gl"] = "NP"
+          for name, value in (("all", None), ("old-songs", params["old-songs"]),
+                              ("current-songs", params["current-songs"])):
+              fields = {"query": "focus instrumental music"}
+              if value is not None:
+                  fields["params"] = value
+              status, text = post("search", fields, f"probe/search-np-{name}.json")
+              emit(f"search NP focus {name} http={status} bytes={len(text)}")
+          client["gl"] = "US"
 
           def count_key(value, key):
               if isinstance(value, dict):
@@ -154,6 +166,17 @@ jobs:
                       emit(f"next {name} errorStatus={error.get('status')}")
                   except Exception:
                       pass
+          client["gl"] = "NP"
+          status, text = post("next", basic, "probe/next-np-basic.json")
+          emit(f"next NP basic http={status} bytes={len(text)}")
+          if status == 200:
+              raw = json.loads(text)
+              counts = {key: count_key(raw, key) for key in (
+                  "musicQueueRenderer", "playlistPanelRenderer", "playlistPanelVideoRenderer",
+                  "playlistPanelVideoWrapperRenderer", "automixPlaylistVideoRenderer",
+                  "messageRenderer", "alertRenderer", "nextRadioContinuationData",
+              )}
+              emit(f"next NP basic rootKeys={sorted(raw.keys())} counts={counts}")
           PY
 
       - name: Parse captured responses with DHUN parsers
@@ -163,30 +186,83 @@ jobs:
           cat > shared/src/jvmTest/kotlin/dev/dhun/innertube/LiveRecoveryShapeProbeTest.kt <<'KT'
           package dev.dhun.innertube
 
+          import dev.dhun.core.DhunError
+          import dev.dhun.core.DhunResult
           import java.io.File
+          import kotlinx.coroutines.runBlocking
           import kotlinx.serialization.json.Json
           import kotlinx.serialization.json.JsonObject
           import kotlin.test.Test
 
           class LiveRecoveryShapeProbeTest {
+              private val output = File("probe/parser-result.txt")
+
+              private fun emit(line: String) {
+                  println(line)
+                  output.appendText(line + "\n")
+              }
+
+              private fun capture(label: String, block: () -> String) {
+                  val line = try {
+                      label + block()
+                  } catch (error: Throwable) {
+                      val at = error.stackTrace.firstOrNull { it.className.startsWith("dev.dhun") }
+                      "$label exception=${error::class.simpleName} at=$at"
+                  }
+                  emit(line)
+              }
+
               @Test
               fun summarizeLiveShapes() {
-                  val out = StringBuilder()
-                  val search = File("probe/search-current.json")
-                  if (search.isFile) {
-                      val root = Json.parseToJsonElement(search.readText()) as JsonObject
-                      val page = parseSearchResults("Oasis", root, SearchFilter.SONGS)
-                      out.appendLine("search parser songs=${page.songs.size} videos=${page.videos.size} token=${page.continuationToken != null}")
-                  } else out.appendLine("search parser SKIP no successful current-songs response")
-                  for (name in listOf("basic", "persistent")) {
-                      val file = File("probe/next-$name.json")
-                      if (!file.isFile) { out.appendLine("next $name parser SKIP no response"); continue }
-                      val root = Json.parseToJsonElement(file.readText()) as JsonObject
-                      val page = parseRadioQueuePage(root)
-                      out.appendLine("next $name parser tracks=${page.tracks.size} token=${page.continuationToken != null}")
+                  output.writeText("")
+                  for ((name, filter) in listOf("all" to SearchFilter.ALL, "old-songs" to SearchFilter.SONGS,
+                      "current-songs" to SearchFilter.SONGS, "np-all" to SearchFilter.ALL,
+                      "np-old-songs" to SearchFilter.SONGS, "np-current-songs" to SearchFilter.SONGS)) {
+                      val file = File("probe/search-$name.json")
+                      if (!file.isFile) { emit("search $name parser SKIP no response"); continue }
+                      capture("search $name parser ") {
+                          val root = Json.parseToJsonElement(file.readText()) as JsonObject
+                          val page = parseSearchResults("Oasis", root, filter)
+                          "songs=${page.songs.size} videos=${page.videos.size} token=${page.continuationToken != null}"
+                      }
                   }
-                  println(out)
-                  File("probe/parser-result.txt").writeText(out.toString())
+                  for (name in listOf("basic", "persistent", "np-basic")) {
+                      val file = File("probe/next-$name.json")
+                      if (!file.isFile) { emit("next $name parser SKIP no response"); continue }
+                      capture("next $name parser ") {
+                          val root = Json.parseToJsonElement(file.readText()) as JsonObject
+                          val page = parseRadioQueuePage(root)
+                          "tracks=${page.tracks.size} token=${page.continuationToken != null}"
+                      }
+                  }
+
+                  // Exact DHUN CIO/request/context path, not the Python model.
+                  val http = InnerTubeClient.defaultHttpClient()
+                  try {
+                      val client = InnerTubeClient(http, country = "NP")
+                      runBlocking {
+                          for (filter in listOf(SearchFilter.ALL, SearchFilter.SONGS)) {
+                              try {
+                                  when (val result = client.search("focus instrumental music", filter)) {
+                                      is DhunResult.Success -> emit("live-client NP $filter songs=${result.value.songs.size} videos=${result.value.videos.size}")
+                                      is DhunResult.Failure -> emit("live-client NP $filter error=${result.error::class.simpleName} detail=${(result.error as? DhunError.Parse)?.detail}")
+                                  }
+                              } catch (error: Throwable) {
+                                  emit("live-client NP $filter exception=${error::class.simpleName}")
+                              }
+                          }
+                          try {
+                              when (val result = client.radioQueuePage("utwMHfDZ6SA")) {
+                                  is DhunResult.Success -> emit("live-client NP next tracks=${result.value.tracks.size} token=${result.value.continuationToken != null}")
+                                  is DhunResult.Failure -> emit("live-client NP next error=${result.error::class.simpleName} detail=${(result.error as? DhunError.Parse)?.detail}")
+                              }
+                          } catch (error: Throwable) {
+                              emit("live-client NP next exception=${error::class.simpleName}")
+                          }
+                      }
+                  } finally {
+                      http.close()
+                  }
               }
           }
           KT
