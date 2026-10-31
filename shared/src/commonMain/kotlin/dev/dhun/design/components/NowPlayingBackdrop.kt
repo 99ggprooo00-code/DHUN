@@ -67,7 +67,16 @@ fun NowPlayingBackdrop(
         label = "nowPlayingBackdrop",
     )
 
-    Box(modifier = modifier.fillMaxSize().clipToBounds()) {
+    // Fade the already-composited artwork + veil as ONE layer. Applying the
+    // fallback alpha to each child separately would apply it twice to the
+    // artwork wherever the translucent veil overlaps it, and would also leave
+    // a different amount of theme base visible than the real-blur path.
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .clipToBounds()
+            .graphicsLayer { alpha = artworkAlpha },
+    ) {
         AsyncImage(
             model = ImageRequest.Builder(context)
                 .data(url)
@@ -79,7 +88,6 @@ fun NowPlayingBackdrop(
                 .graphicsLayer {
                     scaleX = NowPlayingBackdropPolicy.OVERSCAN
                     scaleY = NowPlayingBackdropPolicy.OVERSCAN
-                    alpha = artworkAlpha
                 }
                 .then(
                     if (blurArtwork) {
@@ -103,7 +111,6 @@ fun NowPlayingBackdrop(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer { alpha = artworkAlpha }
                 .background(
                     Brush.verticalGradient(
                         colorStops = veilStops.map { (offset, alpha) ->
