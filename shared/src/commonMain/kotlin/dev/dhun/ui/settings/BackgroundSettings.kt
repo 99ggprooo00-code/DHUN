@@ -294,10 +294,10 @@ private fun BackgroundComponentDialog(
     // effect: while Dynamic colours is on, the surface is showing artwork
     // colours, and pretending a swatch is selected would be a lie.
     val picked = prefs.color
-    val defaultColour = BackgroundPalettePolicy
-        .defaultPalette(component, tokens)
-        .mainGlow
-        .copy(alpha = 1f)
+    val defaultPreview = BackgroundPalettePolicy.defaultPalette(component, tokens).mainGlow
+    // The editor stores an opaque RGB colour; the quick Default swatch keeps
+    // the palette's own alpha so its preview remains unchanged.
+    val defaultColour = defaultPreview.copy(alpha = 1f)
     var customColour by remember { mutableStateOf(false) }
 
     GlassDialog(onDismissRequest = onDismiss) {
@@ -354,9 +354,9 @@ private fun BackgroundComponentDialog(
             // Fixed rows rather than a wrapping flow: seven picks fit two rows
             // on a phone, and a stable grid is easier to scan than a reflowing
             // one (and needs no experimental layout API).
-            val picks = remember(component, tokens.isLight, defaultColour) {
+            val picks = remember(component, tokens.isLight, defaultPreview) {
                 buildList {
-                    add(SwatchPick("Default", null, defaultColour))
+                    add(SwatchPick("Default", null, defaultPreview))
                     for (accent in DhunAccent.entries) {
                         add(
                             SwatchPick(
