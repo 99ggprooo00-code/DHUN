@@ -617,22 +617,12 @@ private fun PlaylistRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
         ) {
-            // Placeholder cover: translucent glass with the same hairline edge
-            // as the row it sits in, not an opaque grey tile.
-            Box(
-                modifier = Modifier.size(DhunSpacing.artworkThumb)
-                    .clip(DhunShapes.medium)
-                    .background(DhunColors.glassStrong)
-                    .border(DhunSpacing.border, DhunColors.glassEdge, DhunShapes.medium),
-                contentAlignment = Alignment.Center,
-            ) {
-                DhunIconView(
-                    icon = DhunIcon.LibraryMusic,
-                    contentDescription = "Playlist",
-                    modifier = Modifier.size(DhunSpacing.iconSizeLg),
-                    tint = DhunColors.textTertiary,
-                )
-            }
+            ArtworkImage(
+                imageUrl = playlist.thumbnailUrl,
+                contentDescription = playlist.name,
+                modifier = Modifier.size(DhunSpacing.artworkThumb),
+                shape = DhunShapes.medium,
+            )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = playlist.name,

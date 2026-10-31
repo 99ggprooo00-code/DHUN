@@ -18,11 +18,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -86,6 +88,8 @@ fun PlaylistScreen(
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsState()
+    val isLoadingMore by viewModel.isLoadingMore.collectAsState()
+    val loadMoreError by viewModel.loadMoreError.collectAsState()
     val deleted by viewModel.deleted.collectAsState()
     val deletion by viewModel.deletion.collectAsState()
     val mutation by viewModel.mutation.collectAsState()
@@ -105,7 +109,8 @@ fun PlaylistScreen(
     // colour stays the fallback.
     val backdropArtwork = when (val s = state) {
         is PlaylistUiState.Remote -> s.detail.thumbnailUrl
-        is PlaylistUiState.Local -> s.tracks.firstOrNull()?.thumbnailUrl
+        is PlaylistUiState.Local -> s.tracks.firstOrNull { !it.thumbnailUrl.isNullOrBlank() }?.thumbnailUrl
+            ?: ArtworkUrls.videoThumbnail(s.tracks.firstOrNull()?.id)
         is PlaylistUiState.Loading, is PlaylistUiState.Error -> null
     }
 
@@ -124,6 +129,10 @@ fun PlaylistScreen(
             )
             is PlaylistUiState.Remote -> RemotePlaylistContent(
                 detail = s.detail,
+                isLoadingMore = isLoadingMore,
+                loadMoreError = loadMoreError,
+                onLoadMore = viewModel::loadMore,
+                onRetryMore = viewModel::retryLoadMore,
                 onPlayAll = { viewModel.play(0) },
                 onShuffle = { viewModel.playShuffled() },
                 onTrackPlay = onTrackPlay,
@@ -212,12 +221,28 @@ fun PlaylistScreen(
 @Composable
 private fun RemotePlaylistContent(
     detail: PlaylistDetail,
+    isLoadingMore: Boolean,
+    loadMoreError: String?,
+    onLoadMore: () -> Unit,
+    onRetryMore: () -> Unit,
     onPlayAll: () -> Unit,
     onShuffle: () -> Unit,
     onTrackPlay: (Track, List<Track>, Int) -> Unit,
     onTrackOverflow: (Track) -> Unit,
 ) {
+    val listState = rememberLazyListState()
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val total = listState.layoutInfo.totalItemsCount
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            total > 0 && lastVisible >= total - 3
+        }
+    }
+    LaunchedEffect(shouldLoadMore, isLoadingMore, loadMoreError, detail.continuationToken) {
+        if (shouldLoadMore && !isLoadingMore && loadMoreError == null) onLoadMore()
+    }
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = DhunSpacing.contentBottomInset),
     ) {
@@ -245,6 +270,27 @@ private fun RemotePlaylistContent(
                     onClick = { onTrackPlay(track, detail.tracks, index) },
                     onOverflow = { onTrackOverflow(track) },
                 )
+            }
+        }
+        if (isLoadingMore || loadMoreError != null || detail.continuationToken != null) {
+            item(key = "pagination_status") {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(DhunSpacing.md),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
+                ) {
+                    when {
+                        isLoadingMore -> {
+                            LoadingShimmer(modifier = Modifier.width(DhunSpacing.skeletonMetaWidth).height(DhunSpacing.xl))
+                            Text("Loading more tracks…", color = DhunColors.textSecondary)
+                        }
+                        loadMoreError != null -> {
+                            Text(loadMoreError, color = DhunColors.textSecondary)
+                            DhunTextButton(onClick = onRetryMore) { Text("Retry loading more") }
+                        }
+                        else -> DhunTextButton(onClick = onLoadMore) { Text("Load more tracks") }
+                    }
+                }
             }
         }
     }
@@ -327,7 +373,8 @@ private fun LocalPlaylistContent(
             subtitle = "Local playlist",
             meta = "${tracks.size} track${if (tracks.size == 1) "" else "s"}",
             description = description,
-            thumbnailUrl = tracks.firstOrNull()?.thumbnailUrl,
+            thumbnailUrl = tracks.firstOrNull { !it.thumbnailUrl.isNullOrBlank() }?.thumbnailUrl
+                ?: ArtworkUrls.videoThumbnail(tracks.firstOrNull()?.id),
             onPlayAll = onPlayAll,
             onShuffle = onShuffle,
             trackCount = tracks.size,

@@ -6,6 +6,7 @@ import dev.dhun.core.ArtistPage
 import dev.dhun.core.AlbumDetail
 import dev.dhun.core.Playlist
 import dev.dhun.core.PlaylistDetail
+import dev.dhun.core.PlaylistTracksPage
 import dev.dhun.core.Track
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -390,6 +391,7 @@ internal fun parseAlbumPage(root: JsonObject, browseId: String): AlbumDetail {
 internal fun parsePlaylistPage(root: JsonObject, browseId: String): PlaylistDetail {
     val header = pageHeader(root)
     val title = header?.firstRunText("title", "runs") ?: "Playlist"
+    val coverUrl = thumbnailsLastUrl(header)
 
     val subtitleText = header?.allRunsText("subtitle", "runs")
     val parts = subtitleText?.split("•")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
@@ -406,22 +408,64 @@ internal fun parsePlaylistPage(root: JsonObject, browseId: String): PlaylistDeta
             descShelves.firstNotNullOfOrNull { it.allRunsText("description", "runs") }
         }
 
-    // musicPlaylistShelfRenderer contents carry the ordered track list.
-    val shelfRows = mutableListOf<JsonObject>()
-    root.collectObjects("musicPlaylistShelfRenderer", shelfRows)
-    val tracks = shelfRows.flatMap { shelf ->
-        shelf.arr("contents").orEmpty()
-            .mapNotNull { (it as? JsonObject)?.obj("musicResponsiveListItemRenderer") }
-            .mapNotNull { parseBrowseSongRow(it) }
-    }.distinctBy { it.id }
-
+    val page = parsePlaylistTracksPage(root, fallbackArtist = author, fallbackThumbnail = coverUrl)
     return PlaylistDetail(
         id = browseId,
         title = title,
         authorName = author,
         trackCountText = countText,
         description = description,
-        thumbnailUrl = thumbnailsLastUrl(header),
-        tracks = tracks,
+        thumbnailUrl = coverUrl,
+        tracks = page.tracks,
+        continuationToken = page.continuationToken,
     )
+}
+
+/** Initial or continuation playlist rows plus only their own list cursor. */
+internal fun parsePlaylistTracksPage(
+    root: JsonObject,
+    fallbackArtist: String? = null,
+    fallbackThumbnail: String? = null,
+): PlaylistTracksPage {
+    val playlistShelves = mutableListOf<JsonObject>()
+    root.collectObjects("musicPlaylistShelfRenderer", playlistShelves)
+    if (playlistShelves.isEmpty()) root.collectObjects("musicShelfRenderer", playlistShelves)
+    val continuation = root.obj("continuationContents")
+    val continuationShelves = listOfNotNull(
+        continuation.obj("musicPlaylistShelfContinuation"),
+        continuation.obj("musicShelfContinuation"),
+    )
+    val containers = playlistShelves + continuationShelves
+
+    // Some browse continuations use one append action instead of a named
+    // continuation wrapper. Accept a single unambiguous action only.
+    val appendActions = listOf("onResponseReceivedActions", "onResponseReceivedEndpoints")
+        .flatMap { root.arr(it).orEmpty() }
+        .mapNotNull { (it as? JsonObject)?.obj("appendContinuationItemsAction") }
+    val actionItems = appendActions.singleOrNull()?.arr("continuationItems").orEmpty()
+    val rows = if (containers.isEmpty()) actionItems else containers.flatMap { it.arr("contents").orEmpty() }
+    val tracks = rows.mapNotNull { (it as? JsonObject)?.obj("musicResponsiveListItemRenderer") }
+        .mapNotNull { parseBrowseSongRow(it, fallbackArtist, fallbackThumbnail) }
+        .distinctBy { it.id }
+    val token = containers.firstNotNullOfOrNull(::playlistShelfContinuation)
+        ?: playlistItemsContinuation(rows)
+    return PlaylistTracksPage(tracks, token)
+}
+
+private fun playlistShelfContinuation(shelf: JsonObject): String? {
+    shelf.arr("continuations").orEmpty().forEach { entry ->
+        (entry as? JsonObject).obj("nextContinuationData").str("continuation")
+            ?.takeIf { it.isNotBlank() }?.let { return it }
+    }
+    return playlistItemsContinuation(shelf.arr("contents").orEmpty())
+}
+
+private fun playlistItemsContinuation(items: List<JsonElement>): String? {
+    for (entry in items) {
+        val renderer = (entry as? JsonObject).obj("continuationItemRenderer") ?: continue
+        val command = renderer.obj("continuationEndpoint").obj("continuationCommand")
+        val token = command.str("token") ?: command.str("continuation")
+        if (!token.isNullOrBlank()) return token
+    }
+    return null
 }

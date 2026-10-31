@@ -33,12 +33,32 @@ delete:
 DELETE FROM Playlist WHERE id = ?;
 
 selectAll:
-SELECT Playlist.*, (SELECT COUNT(*) FROM PlaylistTrack WHERE PlaylistTrack.playlistId = Playlist.id) AS trackCount
+SELECT Playlist.id, Playlist.name, Playlist.description,
+    COALESCE(
+        (SELECT Track.thumbnailUrl FROM PlaylistTrack
+         JOIN Track ON Track.id = PlaylistTrack.trackId
+         WHERE PlaylistTrack.playlistId = Playlist.id
+           AND Track.thumbnailUrl IS NOT NULL AND TRIM(Track.thumbnailUrl) <> ''
+         ORDER BY PlaylistTrack.position ASC LIMIT 1),
+        Playlist.thumbnailUrl
+    ) AS thumbnailUrl,
+    Playlist.isLocal, Playlist.youtubePlaylistId, Playlist.createdAt, Playlist.updatedAt,
+    (SELECT COUNT(*) FROM PlaylistTrack WHERE PlaylistTrack.playlistId = Playlist.id) AS trackCount
 FROM Playlist ORDER BY updatedAt DESC;
 
 selectById:
-SELECT Playlist.*, (SELECT COUNT(*) FROM PlaylistTrack WHERE PlaylistTrack.playlistId = Playlist.id) AS trackCount
-FROM Playlist WHERE id = ?;
+SELECT Playlist.id, Playlist.name, Playlist.description,
+    COALESCE(
+        (SELECT Track.thumbnailUrl FROM PlaylistTrack
+         JOIN Track ON Track.id = PlaylistTrack.trackId
+         WHERE PlaylistTrack.playlistId = Playlist.id
+           AND Track.thumbnailUrl IS NOT NULL AND TRIM(Track.thumbnailUrl) <> ''
+         ORDER BY PlaylistTrack.position ASC LIMIT 1),
+        Playlist.thumbnailUrl
+    ) AS thumbnailUrl,
+    Playlist.isLocal, Playlist.youtubePlaylistId, Playlist.createdAt, Playlist.updatedAt,
+    (SELECT COUNT(*) FROM PlaylistTrack WHERE PlaylistTrack.playlistId = Playlist.id) AS trackCount
+FROM Playlist WHERE Playlist.id = ?;
 
 -- Playlist tracks -----------------------------------------------------------
 

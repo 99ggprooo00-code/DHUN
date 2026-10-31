@@ -1,5 +1,6 @@
 package dev.dhun.presentation.browse
 
+import dev.dhun.core.DhunError
 import dev.dhun.core.DhunResult
 import dev.dhun.core.PlaylistDetail
 import dev.dhun.core.Track
@@ -15,12 +16,18 @@ import dev.dhun.provider.MusicProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 
 sealed interface PlaylistUiState {
@@ -54,8 +61,24 @@ class PlaylistViewModel(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    private val _state = MutableStateFlow<PlaylistUiState>(PlaylistUiState.Loading)
-    val state: StateFlow<PlaylistUiState> = _state.asStateFlow()
+    private data class ViewState(
+        val ui: PlaylistUiState = PlaylistUiState.Loading,
+        val generation: Long = 0,
+        val loadingMore: Boolean = false,
+        val pageError: String? = null,
+        val completedTokens: Set<String> = emptySet(),
+        val emptyPageCount: Int = 0,
+    )
+
+    private val viewState = MutableStateFlow(ViewState())
+    val state: StateFlow<PlaylistUiState> = viewState.map { it.ui }
+        .stateIn(scope, SharingStarted.Eagerly, PlaylistUiState.Loading)
+    val isLoadingMore: StateFlow<Boolean> = viewState.map { it.loadingMore }
+        .stateIn(scope, SharingStarted.Eagerly, false)
+    val loadMoreError: StateFlow<String?> = viewState.map { it.pageError }
+        .stateIn(scope, SharingStarted.Eagerly, null)
+    private var loadJob: Job? = null
+    private var pageJob: Job? = null
 
     /** True once a local playlist under view has been deleted (UI pops). */
     private val _deleted = MutableStateFlow(false)
@@ -80,7 +103,7 @@ class PlaylistViewModel(
                     playlists.observePlaylist(playlistId),
                     playlists.observeTracks(playlistId),
                 ) { playlist, tracks -> PlaylistUiState.Local(playlist, tracks) }
-                    .collect { _state.value = it }
+                    .collect { local -> viewState.update { current -> current.copy(ui = local) } }
             }
         } else {
             load()
@@ -89,11 +112,90 @@ class PlaylistViewModel(
 
     fun load() {
         if (isLocal) return
-        scope.launch {
-            _state.value = PlaylistUiState.Loading
-            _state.value = when (val r = provider.playlistPage(playlistId)) {
-                is DhunResult.Success -> PlaylistUiState.Remote(r.value)
-                is DhunResult.Failure -> PlaylistUiState.Error(r.error.toUserMessage())
+        val request = viewState.updateAndGet {
+            ViewState(ui = PlaylistUiState.Loading, generation = it.generation + 1)
+        }
+        loadJob?.cancel()
+        pageJob?.cancel()
+        loadJob = scope.launch {
+            try {
+                val next = when (val result = provider.playlistPage(playlistId)) {
+                    is DhunResult.Success -> PlaylistUiState.Remote(result.value)
+                    is DhunResult.Failure -> PlaylistUiState.Error(result.error.toUserMessage())
+                }
+                viewState.update { current ->
+                    if (current.generation != request.generation) current else current.copy(ui = next)
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                val failure = PlaylistUiState.Error(
+                    DhunError.Unknown("${error::class.simpleName ?: "Exception"}: ${error.message.orEmpty()}")
+                        .toUserMessage(),
+                )
+                viewState.update { current ->
+                    if (current.generation != request.generation) current else current.copy(ui = failure)
+                }
+            }
+        }
+    }
+
+    fun loadMore() = requestMore(retry = false)
+    fun retryLoadMore() = requestMore(retry = true)
+
+    private fun requestMore(retry: Boolean) {
+        if (isLocal) return
+        val before = viewState.value
+        val detail = (before.ui as? PlaylistUiState.Remote)?.detail ?: return
+        val token = detail.continuationToken ?: return
+        if (before.loadingMore || token in before.completedTokens || (!retry && before.pageError != null)) return
+        val request = before.copy(
+            loadingMore = true,
+            pageError = null,
+            emptyPageCount = if (retry) 0 else before.emptyPageCount,
+        )
+        if (!viewState.compareAndSet(before, request)) return
+        pageJob = scope.launch {
+            try {
+                val result = provider.playlistContinuation(token)
+                viewState.update { latest ->
+                    if (latest.generation != request.generation) return@update latest
+                    val current = (latest.ui as? PlaylistUiState.Remote)?.detail ?: return@update latest
+                    when (result) {
+                        is DhunResult.Success -> {
+                            val seen = current.tracks.mapTo(HashSet()) { it.id }
+                            val tracks = current.tracks + result.value.tracks.filter { seen.add(it.id) }
+                            val used = latest.completedTokens + token
+                            val nextToken = result.value.continuationToken
+                                ?.takeIf { it.isNotBlank() && it !in used }
+                            val emptyPages = if (tracks.size == current.tracks.size) latest.emptyPageCount + 1 else 0
+                            latest.copy(
+                                ui = PlaylistUiState.Remote(current.copy(
+                                    tracks = tracks,
+                                    continuationToken = nextToken,
+                                )),
+                                completedTokens = used,
+                                emptyPageCount = emptyPages,
+                                pageError = if (nextToken != null && emptyPages >= MAX_EMPTY_PAGES) {
+                                    "No new tracks arrived. Retry or reload the playlist."
+                                } else null,
+                            )
+                        }
+                        is DhunResult.Failure -> latest.copy(pageError = result.error.toUserMessage())
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                val failure = DhunError.Unknown("${error::class.simpleName ?: "Exception"}: ${error.message.orEmpty()}")
+                viewState.update { latest ->
+                    if (latest.generation != request.generation) latest
+                    else latest.copy(pageError = failure.toUserMessage())
+                }
+            } finally {
+                viewState.update { latest ->
+                    if (latest.generation != request.generation) latest else latest.copy(loadingMore = false)
+                }
             }
         }
     }
@@ -119,7 +221,7 @@ class PlaylistViewModel(
         }
     }
 
-    private fun currentTracks(): List<Track>? = when (val s = _state.value) {
+    private fun currentTracks(): List<Track>? = when (val s = viewState.value.ui) {
         is PlaylistUiState.Remote -> s.detail.tracks
         is PlaylistUiState.Local -> s.tracks
         else -> null
@@ -135,7 +237,7 @@ class PlaylistViewModel(
     suspend fun rename(newName: String) {
         if (!isLocal) return
         val trimmed = newName.trim()
-        if (trimmed.isBlank() || trimmed == _state.value.let { (it as? PlaylistUiState.Local)?.playlist?.name }) return
+        if (trimmed.isBlank() || trimmed == viewState.value.ui.let { (it as? PlaylistUiState.Local)?.playlist?.name }) return
         playlists.rename(playlistId, trimmed)
     }
 
@@ -191,4 +293,8 @@ class PlaylistViewModel(
     }
 
     fun close() = scope.cancel()
+
+    private companion object {
+        const val MAX_EMPTY_PAGES = 2
+    }
 }

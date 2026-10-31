@@ -7,6 +7,7 @@ import dev.dhun.core.diagnosticText
 import dev.dhun.core.HomeFeedPage
 import dev.dhun.core.HomeSection
 import dev.dhun.core.Lyrics
+import dev.dhun.core.PlaylistTracksPage
 import dev.dhun.core.RateLimitGate
 import dev.dhun.core.map
 import dev.dhun.core.SearchResults
@@ -266,6 +267,13 @@ class InnerTubeClient(
                 put("browseId", browseId)
             }
             parsePlaylistPage(postJson("browse", body), browseId)
+        }
+
+    /** Next ordered playlist track page; the opaque cursor stays in the query. */
+    suspend fun playlistContinuation(continuationToken: String): DhunResult<PlaylistTracksPage> =
+        resultify {
+            val body = buildJsonObject { put("context", context()) }
+            parsePlaylistTracksPage(postJson("browse", body, continuationToken))
         }
 
     /** Radio queue for a track (RDAMVM playlist = "start radio from this"). */

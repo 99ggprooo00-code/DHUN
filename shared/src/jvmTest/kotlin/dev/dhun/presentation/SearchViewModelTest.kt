@@ -248,6 +248,7 @@ class SearchViewModelTest {
                     DhunResult.Failure(DhunError.Network("HTTP 400 from /search"))
                 } else {
                     DhunResult.Success(SearchResults(
+                        query = "",
                         songs = listOf(sampleTrack("s1"), sampleTrack("s2"), sampleTrack("s2")),
                         continuationToken = "token_123",
                     ))
@@ -294,7 +295,7 @@ class SearchViewModelTest {
                     // Deliberately emulate a provider that answers after its
                     // caller was cancelled; the ViewModel must still drop it.
                 }
-                DhunResult.Success(SearchResults(songs = listOf(sampleTrack("stale"))))
+                DhunResult.Success(SearchResults(query = "", songs = listOf(sampleTrack("stale"))))
             }
             val vm = SearchViewModel(provider, data.search, data.library, data.playlists, testScope)
             vm.performSearch("old")

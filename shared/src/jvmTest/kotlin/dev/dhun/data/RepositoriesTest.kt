@@ -128,6 +128,29 @@ class RepositoriesTest {
     }
 
     @Test
+    fun playlistCoverFollowsOrderedTrackArtworkWithoutAMigration(): Unit = runBlocking {
+        val db = newDb()
+        val clock = FakeClock()
+        val repo = SqlDelightPlaylistRepository(db, clock, Dispatchers.Unconfined, idGenerator = { "cover" })
+        val tracks = SqlDelightTrackRepository(db, clock, Dispatchers.Unconfined)
+        repo.create("Covers")
+        val sparse = track("a").copy(thumbnailUrl = null)
+        repo.addTrack("cover", sparse)
+        repo.addTrack("cover", track("b"))
+        assertEquals("https://i/b.jpg", repo.observePlaylist("cover").first()?.thumbnailUrl)
+
+        tracks.save(track("a"))
+        assertEquals("https://i/a.jpg", repo.observePlaylist("cover").first()?.thumbnailUrl)
+        repo.move("cover", 0, 1)
+        assertEquals(listOf("b", "a"), repo.observeTracks("cover").first().map { it.id })
+        assertEquals("https://i/b.jpg", repo.observePlaylist("cover").first()?.thumbnailUrl)
+        repo.removeTrack("cover", "b")
+        assertEquals("https://i/a.jpg", repo.observePlaylist("cover").first()?.thumbnailUrl)
+        repo.removeTrack("cover", "a")
+        assertNull(repo.observePlaylist("cover").first()?.thumbnailUrl)
+    }
+
+    @Test
     fun deletingPlaylistPreservesRelatedDataAcrossDatabaseReopen(): Unit = runBlocking {
         val dir = Files.createTempDirectory("dhun-playlist-delete").toFile()
         val dbFile = dir.resolve("library.db")

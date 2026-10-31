@@ -151,6 +151,13 @@ data class PlaylistDetail(
     val description: String? = null,
     val thumbnailUrl: String? = null,
     val tracks: List<Track> = emptyList(),
+    val continuationToken: String? = null,
+)
+
+/** One continuation page of a remote playlist's ordered tracks. */
+data class PlaylistTracksPage(
+    val tracks: List<Track> = emptyList(),
+    val continuationToken: String? = null,
 )
 
 /** Resolved playback information for one track. */

@@ -8,6 +8,7 @@ import dev.dhun.core.HomeItem
 import dev.dhun.data.SettingsRepository
 import dev.dhun.data.SettingsKeys
 import dev.dhun.core.Lyrics
+import dev.dhun.core.PlaylistTracksPage
 import dev.dhun.core.RadioQueuePage
 import dev.dhun.core.SearchResults
 import dev.dhun.core.StreamInfo
@@ -62,6 +63,10 @@ interface MusicProvider {
     suspend fun artistPage(browseId: String): DhunResult<dev.dhun.core.ArtistPage>
     suspend fun albumPage(browseId: String): DhunResult<dev.dhun.core.AlbumDetail>
     suspend fun playlistPage(browseId: String): DhunResult<dev.dhun.core.PlaylistDetail>
+
+    /** Next ordered track page; unsupported keeps older provider fakes/source ports source-compatible. */
+    suspend fun playlistContinuation(continuationToken: String): DhunResult<PlaylistTracksPage> =
+        DhunResult.Failure(DhunError.Unavailable("playlist continuation unsupported"))
 }
 
 /**
@@ -145,6 +150,11 @@ class YouTubeMusicProvider(
 
     override suspend fun playlistPage(browseId: String): DhunResult<dev.dhun.core.PlaylistDetail> =
         client.playlistPage(browseId).map { page ->
+            if (allowExplicit()) page else page.copy(tracks = page.tracks.filterNot { it.explicit })
+        }
+
+    override suspend fun playlistContinuation(continuationToken: String): DhunResult<PlaylistTracksPage> =
+        client.playlistContinuation(continuationToken).map { page ->
             if (allowExplicit()) page else page.copy(tracks = page.tracks.filterNot { it.explicit })
         }
 

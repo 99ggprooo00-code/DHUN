@@ -9,6 +9,7 @@ import dev.dhun.core.HomeSection
 import dev.dhun.core.Lyrics
 import dev.dhun.core.PlaybackState
 import dev.dhun.core.PlaylistDetail
+import dev.dhun.core.PlaylistTracksPage
 import dev.dhun.core.RepeatMode
 import dev.dhun.core.SearchResults
 import dev.dhun.core.StreamInfo
@@ -88,6 +89,10 @@ class BrowseViewModelTest {
         var radio: List<Track> = emptyList(),
         var radioToken: String? = null,
     ) : MusicProvider {
+        val playlistTokens = mutableListOf<String>()
+        var playlistMore: suspend (String) -> DhunResult<PlaylistTracksPage> = {
+            DhunResult.Failure(DhunError.Unavailable())
+        }
         override suspend fun search(query: String, filter: SearchFilter) = DhunResult.Success(SearchResults(query))
         override suspend fun searchContinuation(continuationToken: String) = DhunResult.Success(SearchResults(""))
         override suspend fun searchSuggestions(query: String) = DhunResult.Success(emptyList<String>())
@@ -104,6 +109,10 @@ class BrowseViewModelTest {
         override suspend fun artistPage(browseId: String) = artist
         override suspend fun albumPage(browseId: String) = album
         override suspend fun playlistPage(browseId: String) = playlist
+        override suspend fun playlistContinuation(continuationToken: String): DhunResult<PlaylistTracksPage> {
+            playlistTokens += continuationToken
+            return playlistMore(continuationToken)
+        }
     }
 
     private suspend fun eventually(timeoutMs: Long = 15_000, check: suspend () -> Boolean) {
@@ -227,6 +236,51 @@ class BrowseViewModelTest {
             eventually { vm.state.value is PlaylistUiState.Remote }
             vm.play(0)
             eventually { player.queue.value.size == 2 }
+        } finally {
+            vm.close()
+        }
+    }
+
+    @Test
+    fun remotePlaylistContinuationRetriesAndDeduplicates(): Unit = runBlocking {
+        val player = FakePlayer()
+        val provider = FakeBrowseProvider(
+            playlist = DhunResult.Success(PlaylistDetail(
+                id = "VLx",
+                title = "Hits",
+                tracks = listOf(track("p1")),
+                continuationToken = "next",
+            )),
+        )
+        provider.playlistMore = {
+            if (provider.playlistTokens.size == 1) {
+                DhunResult.Failure(DhunError.Network("HTTP 400 from /browse"))
+            } else {
+                DhunResult.Success(PlaylistTracksPage(
+                    tracks = listOf(track("p1"), track("p2"), track("p2")),
+                    continuationToken = "next",
+                ))
+            }
+        }
+        val data = DataLayer(DatabaseFactory.create(DatabaseDriverFactory.inMemory().createDriver()))
+        val vm = PlaylistViewModel(provider, data.playlists, player, "VLx", isLocal = false)
+        try {
+            eventually { vm.state.value is PlaylistUiState.Remote }
+            vm.loadMore()
+            eventually { vm.loadMoreError.value != null }
+            assertEquals(1, (vm.state.value as PlaylistUiState.Remote).detail.tracks.size)
+            vm.loadMore()
+            delay(100)
+            assertEquals(1, provider.playlistTokens.size)
+
+            vm.retryLoadMore()
+            eventually {
+                (vm.state.value as? PlaylistUiState.Remote)?.detail?.tracks?.size == 2
+            }
+            val detail = (vm.state.value as PlaylistUiState.Remote).detail
+            assertEquals(listOf("p1", "p2"), detail.tracks.map { it.id })
+            assertNull(detail.continuationToken)
+            assertEquals(2, provider.playlistTokens.size)
         } finally {
             vm.close()
         }
