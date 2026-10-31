@@ -16,7 +16,9 @@ import androidx.compose.ui.input.pointer.PointerButtons
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodes
+import androidx.compose.ui.test.onNode
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runSkikoComposeUiTest
@@ -189,6 +191,10 @@ class VisualAppEvidenceTest {
                     SceneDriver(composeScene).capture("app-track-menu-${mode.id}.png", settleFrames = 24)
                 }
                 runSkikoComposeUiTest(size = Size(412f, 915f)) {
+                    // Artwork/loading indicators intentionally animate forever.
+                    // Skiko auto-advance idling has no timeout; manual frames
+                    // keep semantic queries bounded and captures deterministic.
+                    mainClock.autoAdvance = false
                     setContent {
                         DhunTheme(mode = mode) {
                             Box(Modifier.fillMaxSize().background(DhunColors.background))
@@ -204,14 +210,23 @@ class VisualAppEvidenceTest {
                     // A repository precondition alone is not UI evidence: wait
                     // for the real flow emission instead of accepting the
                     // initial empty list or assuming a fixed number of frames
-                    // is sufficient. The bounded condition still fails if the
-                    // popup never delivers its row.
-                    waitUntil(timeoutMillis = 5_000) {
-                        onAllNodesWithText("Visual QA").fetchSemanticsNodes().isNotEmpty() &&
-                            onAllNodesWithText("4 tracks").fetchSemanticsNodes().isNotEmpty()
+                    // is sufficient. Manual frames are needed because the
+                    // clock no longer auto-advances; the deadline still fails
+                    // if the popup never delivers its row. The row is clickable,
+                    // so inspect its unmerged name/count text children.
+                    val deadline = System.nanoTime() + 5_000_000_000L
+                    var populated = false
+                    while (!populated && System.nanoTime() < deadline) {
+                        mainClock.advanceTimeBy(50)
+                        populated = onAllNodes(hasText("Visual QA"), useUnmergedTree = true)
+                            .fetchSemanticsNodes().isNotEmpty() &&
+                            onAllNodes(hasText("4 tracks"), useUnmergedTree = true)
+                            .fetchSemanticsNodes().isNotEmpty()
+                        if (!populated) Thread.sleep(20)
                     }
-                    onNodeWithText("Visual QA").assertIsDisplayed()
-                    onNodeWithText("4 tracks").assertIsDisplayed()
+                    assertTrue(populated, "The playlist dialog did not expose its populated row")
+                    onNode(hasText("Visual QA"), useUnmergedTree = true).assertIsDisplayed()
+                    onNode(hasText("4 tracks"), useUnmergedTree = true).assertIsDisplayed()
                     mainClock.advanceTimeBy(500)
                     captureUiImage("app-add-playlist-${mode.id}.png", captureToImage())
                 }
@@ -224,6 +239,10 @@ class VisualAppEvidenceTest {
         withFixture(DhunThemeMode.DARK) { fixture ->
             val nav = AppNavState()
             runSkikoComposeUiTest(size = Size(1200f, 780f)) {
+                // Album/artwork loading can otherwise keep waitForIdle() in
+                // its unbounded auto-advance loop. Advance only the frames we
+                // intend to inspect; assertions still use the real semantics.
+                mainClock.autoAdvance = false
                 setContent {
                     Shell(fixture, nav, DhunThemeMode.DARK, isDesktop = true)
                 }
