@@ -251,7 +251,12 @@ fun AcrylicSurface(
     ) {
         LyricsArtworkLayer(artworkUrl = artworkUrl, modifier = Modifier.matchParentSize())
         Box(modifier = Modifier.matchParentSize().acrylicGlass())
-        Box(modifier = Modifier.fillMaxSize(), content = content)
+        // This surface wraps the standalone MiniPlayer. Filling the incoming
+        // max height here made the unweighted dock consume the whole Column on
+        // rail layouts, leaving Home/Search/Library with zero height. Artwork
+        // and veil already use matchParentSize; only the content determines
+        // the surface's height.
+        Box(modifier = Modifier.fillMaxWidth(), content = content)
     }
 }
 

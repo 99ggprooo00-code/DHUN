@@ -8,9 +8,17 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asSkiaBitmap
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerButtons
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.runSkikoComposeUiTest
 import androidx.compose.ui.use
 import androidx.compose.ui.unit.Density
 import dev.dhun.core.Album
@@ -65,6 +73,7 @@ import dev.dhun.ui.shell.AppTab
 import dev.dhun.ui.shell.DetailRoute
 import dev.dhun.ui.shell.DhunAppShell
 import java.io.File
+import org.jetbrains.skia.Image
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -85,7 +94,7 @@ import kotlin.test.fail
  * the database and player are deterministic test doubles. No shipped screen,
  * navigation route, callback or test-only product flag is changed.
  */
-@OptIn(ExperimentalComposeUiApi::class)
+@OptIn(ExperimentalComposeUiApi::class, ExperimentalTestApi::class)
 class VisualAppEvidenceTest {
     private val output = File("build/outputs/visual-evidence").apply { mkdirs() }
 
@@ -189,19 +198,34 @@ class VisualAppEvidenceTest {
     fun `render wide desktop shell and detail navigation`() {
         withFixture(DhunThemeMode.DARK) { fixture ->
             val nav = AppNavState()
-            scene(width = 1200, height = 780) {
-                Shell(fixture, nav, DhunThemeMode.DARK, isDesktop = true)
-            }.use { composeScene ->
-                val driver = SceneDriver(composeScene)
-                driver.capture("desktop-home-dark.png", settleFrames = 40)
-                nav.selectTab(AppTab.SEARCH, keepDetailOnTabChange = true)
-                driver.capture("desktop-search-dark.png")
-                nav.selectTab(AppTab.LIBRARY, keepDetailOnTabChange = true)
-                driver.capture("desktop-library-dark.png")
-                nav.push(DetailRoute.AlbumPage(ALBUM_ID))
-                driver.capture("desktop-album-dark.png", settleFrames = 30)
-                nav.playerExpanded = true
-                driver.capture("desktop-player-dark.png", settleFrames = 30)
+            runSkikoComposeUiTest(size = Size(1200f, 780f)) {
+                setContent {
+                    Shell(fixture, nav, DhunThemeMode.DARK, isDesktop = true)
+                }
+                fun capture(name: String) {
+                    mainClock.advanceTimeBy(500)
+                    waitForIdle()
+                    captureUiImage(name, captureToImage())
+                }
+
+                capture("desktop-home-dark.png")
+                // Regression for the full-height standalone MiniPlayer: Home
+                // was squeezed to zero height even though its data was loaded.
+                onNodeWithText("Quick picks").assertIsDisplayed()
+                val pauseTop = onNodeWithContentDescription("Pause")
+                    .fetchSemanticsNode().boundsInRoot.top
+                assertTrue(
+                    pauseTop > 650f,
+                    "MiniPlayer must dock at the bottom, not cover the page (Pause top=$pauseTop)",
+                )
+                runOnIdle { nav.selectTab(AppTab.SEARCH, keepDetailOnTabChange = true) }
+                capture("desktop-search-dark.png")
+                runOnIdle { nav.selectTab(AppTab.LIBRARY, keepDetailOnTabChange = true) }
+                capture("desktop-library-dark.png")
+                runOnIdle { nav.push(DetailRoute.AlbumPage(ALBUM_ID)) }
+                capture("desktop-album-dark.png")
+                runOnIdle { nav.playerExpanded = true }
+                capture("desktop-player-dark.png")
                 assertEquals(RECORDED_TRACKS.first(), fixture.player.currentTrack.value)
                 assertIs<PlaybackState.Playing>(fixture.player.state.value)
             }
@@ -326,6 +350,17 @@ class VisualAppEvidenceTest {
         density = Density(1f, fontScale),
         content = content,
     )
+
+    private fun captureUiImage(name: String, image: ImageBitmap): ByteArray =
+        Image.makeFromBitmap(image.asSkiaBitmap()).use { skiaImage ->
+            skiaImage.encodeToData()!!.use { encoded ->
+                val bytes = encoded.bytes
+                val target = File(output, name)
+                target.writeBytes(bytes)
+                assertTrue(target.length() > 1_000, "$name was empty or implausibly small")
+                bytes
+            }
+        }
 
     private inner class SceneDriver(private val scene: ImageComposeScene) {
         private var timeNanos = 0L
