@@ -10,6 +10,7 @@ import dev.dhun.player.DhunPlayer
 import dev.dhun.player.resetModesForNewQueue
 import dev.dhun.data.SettingsRepository
 import dev.dhun.provider.MusicProvider
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,6 +32,12 @@ sealed interface PlaylistUiState {
     data class Local(val playlist: LocalPlaylist?, val tracks: List<Track>) : PlaylistUiState
 }
 
+/** Observable operation state; independent from the repository's row observer. */
+data class PlaylistDeletionState(
+    val isDeleting: Boolean = false,
+    val errorMessage: String? = null,
+)
+
 /**
  * Playlist page screen model (Phase 09) — handles a YTM playlist (browse)
  * or a local playlist (SQLDelight, editable: rename/delete/remove/reorder).
@@ -49,9 +56,11 @@ class PlaylistViewModel(
     private val _state = MutableStateFlow<PlaylistUiState>(PlaylistUiState.Loading)
     val state: StateFlow<PlaylistUiState> = _state.asStateFlow()
 
-    /** True once a local playlist under view has been deleted (UI pops). */
+    /** True only after the repository's delete transaction returned normally. */
     private val _deleted = MutableStateFlow(false)
     val deleted: StateFlow<Boolean> = _deleted.asStateFlow()
+    private val _deletion = MutableStateFlow(PlaylistDeletionState())
+    val deletion: StateFlow<PlaylistDeletionState> = _deletion.asStateFlow()
 
     init {
         if (isLocal) {
@@ -114,9 +123,38 @@ class PlaylistViewModel(
 
     fun delete() {
         if (!isLocal) return
+        // Claim the operation before launching. A second tap in the same UI
+        // frame must not enqueue another transaction or success callback.
+        while (true) {
+            val current = _deletion.value
+            if (current.isDeleting || _deleted.value) return
+            if (_deletion.compareAndSet(current, PlaylistDeletionState(isDeleting = true))) break
+        }
         scope.launch {
-            playlists.delete(playlistId)
-            _deleted.value = true
+            try {
+                playlists.delete(playlistId)
+                _deleted.value = true
+                _deletion.value = PlaylistDeletionState()
+            } catch (cancelled: CancellationException) {
+                _deletion.value = PlaylistDeletionState(
+                    errorMessage = "Deletion was interrupted. Check the playlist and try again.",
+                )
+                throw cancelled
+            } catch (_: Exception) {
+                // A failure after commit has an uncertain outcome. Do not turn
+                // either kind of exception into a successful navigation event.
+                _deletion.value = PlaylistDeletionState(
+                    errorMessage = "Could not confirm deletion. Check the playlist and try again.",
+                )
+            }
+        }
+    }
+
+    fun clearDeletionError() {
+        while (true) {
+            val current = _deletion.value
+            if (current.isDeleting) return
+            if (_deletion.compareAndSet(current, PlaylistDeletionState())) return
         }
     }
 

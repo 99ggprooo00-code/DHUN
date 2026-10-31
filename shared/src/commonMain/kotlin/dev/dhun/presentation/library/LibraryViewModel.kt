@@ -446,9 +446,9 @@ class LibraryViewModel(
         scope.launch { runCatching { playlists.rename(id, newName) } }
     }
 
-    fun deletePlaylist(id: String) {
-        scope.launch { runCatching { playlists.delete(id) } }
-    }
+    // No current UI caller. Keep failures and cancellation observable to the
+    // Library management stage rather than silently discarding them here.
+    suspend fun deletePlaylist(id: String) = playlists.delete(id)
 
     // ---- Favorite actions ----
     fun removeFavorite(trackId: String) {
