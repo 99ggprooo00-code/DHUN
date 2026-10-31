@@ -53,9 +53,10 @@ def verify_signature(apksigner_output: str) -> None:
         )
     ]
     if digests != [EXPECTED_CERT_SHA256]:
+        output = " ".join(apksigner_output.split())[:900]
         raise ValueError(
             "APK does not have exactly the expected DHUN test-build signer; "
-            f"found {digests or '<none>'}"
+            f"found {digests or '<none>'}; apksigner output: {output or '<empty>'}"
         )
 
 

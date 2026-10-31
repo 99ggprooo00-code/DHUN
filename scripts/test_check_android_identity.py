@@ -51,6 +51,10 @@ class AndroidIdentityTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 select_apks(directory)
 
+    def test_signature_failure_retains_public_apksigner_diagnostic(self):
+        with self.assertRaisesRegex(ValueError, "apksigner output: unexpected format"):
+            verify_signature("unexpected format")
+
     def test_expected_test_certificate_is_required(self):
         output = (
             "Signer #1 certificate DN: CN=DHUN Test Build, O=DHUN\n"
