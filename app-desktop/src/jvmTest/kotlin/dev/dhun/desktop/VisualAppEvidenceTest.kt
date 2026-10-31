@@ -379,7 +379,15 @@ class VisualAppEvidenceTest {
         destination: (AppNavState) -> Unit = {},
     ) {
         withFixture(mode, provider, online) { fixture ->
-            if (artworkUrl != null) fixture.player.useArtwork(artworkUrl)
+            if (artworkUrl != null) {
+                fixture.player.useArtwork(artworkUrl)
+                assertEquals(artworkUrl, fixture.playerVm.currentTrack.value?.thumbnailUrl)
+                assertTrue(
+                    fixture.playerVm.queue.value.isNotEmpty() &&
+                        fixture.playerVm.queue.value.all { it.thumbnailUrl == artworkUrl },
+                    "Controlled artwork must reach the shell-facing queue as well as the current track",
+                )
+            }
             if (blurPercent != null) DhunAppearance.setBackdropPrefs(blurPercent = blurPercent)
             if (brightnessPercent != null) DhunAppearance.setBackdropPrefs(brightnessPercent = brightnessPercent)
             val nav = AppNavState().apply(destination)
