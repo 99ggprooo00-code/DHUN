@@ -7,6 +7,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerButton
+import androidx.compose.ui.input.pointer.PointerButtons
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.use
 import androidx.compose.ui.unit.Density
 import dev.dhun.core.Album
@@ -33,6 +37,7 @@ import dev.dhun.data.DataLayer
 import dev.dhun.data.DatabaseDriverFactory
 import dev.dhun.data.DatabaseFactory
 import dev.dhun.data.PlayContext
+import dev.dhun.data.SettingsKeys
 import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunTheme
@@ -54,6 +59,7 @@ import dev.dhun.presentation.settings.SettingsCategory
 import dev.dhun.provider.MusicProvider
 import dev.dhun.ui.components.AddToPlaylistDialog
 import dev.dhun.ui.components.TrackOverflowDialog
+import dev.dhun.ui.home.HomeScreen
 import dev.dhun.ui.shell.AppNavState
 import dev.dhun.ui.shell.AppTab
 import dev.dhun.ui.shell.DetailRoute
@@ -181,6 +187,15 @@ class VisualAppEvidenceTest {
                 assertEquals(RECORDED_TRACKS.first(), fixture.player.currentTrack.value)
                 assertIs<PlaybackState.Playing>(fixture.player.state.value)
             }
+            scene(width = 1200, height = 780) {
+                DhunTheme(mode = DhunThemeMode.DARK) {
+                    Box(Modifier.fillMaxSize().background(DhunColors.background)) {
+                        HomeScreen(viewModel = fixture.home, onTrackClick = { _, _, _ -> })
+                    }
+                }
+            }.use { composeScene ->
+                SceneDriver(composeScene).capture("desktop-home-direct-dark.png", settleFrames = 24)
+            }
         }
     }
 
@@ -261,6 +276,7 @@ class VisualAppEvidenceTest {
         DhunAppearance.setAppearance(nextMode = mode)
         val fixture = AppFixture(provider, online)
         try {
+            runBlocking { fixture.data.settings.putString(SettingsKeys.THEME, mode.id) }
             block(fixture)
         } finally {
             fixture.close()
@@ -291,15 +307,40 @@ class VisualAppEvidenceTest {
             }
         }
 
-        fun capture(name: String, settleFrames: Int = 12) {
+        fun capture(name: String, settleFrames: Int = 12): ByteArray {
             settle(settleFrames)
-            scene.render(timeNanos).use { image ->
+            return scene.render(timeNanos).use { image ->
                 image.encodeToData()!!.use { encoded ->
+                    val bytes = encoded.bytes
                     val target = File(output, name)
-                    target.writeBytes(encoded.bytes)
+                    target.writeBytes(bytes)
                     assertTrue(target.length() > 1_000, "$name was empty or implausibly small")
+                    bytes
                 }
             }
+        }
+
+        fun tap(x: Float, y: Float) {
+            val position = Offset(x, y)
+            val startMillis = timeNanos / 1_000_000L
+            scene.sendPointerEvent(PointerEventType.Enter, position, timeMillis = startMillis)
+            scene.sendPointerEvent(PointerEventType.Move, position, timeMillis = startMillis + 1)
+            scene.sendPointerEvent(
+                PointerEventType.Press,
+                position,
+                timeMillis = startMillis + 2,
+                buttons = PointerButtons(isPrimaryPressed = true),
+                button = PointerButton.Primary,
+            )
+            settle(1)
+            scene.sendPointerEvent(
+                PointerEventType.Release,
+                position,
+                timeMillis = timeNanos / 1_000_000L,
+                buttons = PointerButtons(),
+                button = PointerButton.Primary,
+            )
+            settle(24)
         }
     }
 
