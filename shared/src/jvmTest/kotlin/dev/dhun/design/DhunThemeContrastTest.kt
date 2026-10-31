@@ -1,6 +1,7 @@
 package dev.dhun.design
 
 import androidx.compose.ui.graphics.Color
+import dev.dhun.design.components.GlassMaterialPolicy
 import dev.dhun.design.components.contentRowFill
 import dev.dhun.design.components.readingSurfaceFill
 import dev.dhun.design.components.NowPlayingBackdropPolicy
@@ -244,6 +245,21 @@ class DhunThemeContrastTest {
                 assertAtLeast(contrast(tokens.textPrimary.compositedOver(reading), reading), 4.5f, "$mode primary on legal reader over $artwork")
                 assertAtLeast(contrast(tokens.textSecondary.compositedOver(reading), reading), 4.5f, "$mode secondary on legal reader over $artwork")
                 assertAtLeast(contrast(tokens.textTertiary.compositedOver(reading), reading), 3f, "$mode tertiary on legal reader over $artwork")
+
+                val dialog = GlassMaterialPolicy.dialogBody(tokens.isLight, tokens.surfaceVariant)
+                    .compositedOver(page)
+                assertAtLeast(contrast(tokens.textPrimary.compositedOver(dialog), dialog), 4.5f, "$mode primary on dialog over $artwork")
+                assertAtLeast(contrast(tokens.textSecondary.compositedOver(dialog), dialog), 4.5f, "$mode secondary on dialog over $artwork")
+                assertAtLeast(contrast(tokens.textTertiary.compositedOver(dialog), dialog), 3f, "$mode tertiary on dialog over $artwork")
+
+                assertGlassStopContrast(
+                    mode, tokens, GlassMaterialPolicy.contentBody(readingSurfaceFill()), page,
+                    content = true, label = "content card over $artwork",
+                )
+                assertGlassStopContrast(
+                    mode, tokens, GlassMaterialPolicy.dialogBody(tokens.isLight, tokens.surfaceVariant), page,
+                    content = false, label = "dialog over $artwork",
+                )
             }
         }
     }
@@ -312,6 +328,32 @@ class DhunThemeContrastTest {
 
     private fun assertAtLeast(actual: Float, minimum: Float, what: String) {
         assertTrue(actual >= minimum, "$what = ${"%.2f".format(actual)}:1, need $minimum:1")
+    }
+
+    /** Measures the actual lifted/sheened top and deepened bottom, not only the middle fill. */
+    private fun assertGlassStopContrast(
+        mode: DhunThemeMode,
+        tokens: DhunTokens,
+        base: Color,
+        page: Color,
+        content: Boolean,
+        label: String,
+    ) {
+        val body = GlassMaterialPolicy.bodyStops(base, tokens.isLight)
+        val sheen = if (content) {
+            GlassMaterialPolicy.contentSheenStops(tokens.isLight)
+        } else {
+            GlassMaterialPolicy.sheenStops(tokens.isLight)
+        }
+        listOf(body.first(), body.last()).forEach { (offset, color) ->
+            val bodyOverPage = color.compositedOver(page)
+            val sheenAlpha = if (offset == 0f) sheen.first().second else 0f
+            val surface = Color.White.copy(alpha = sheenAlpha).compositedOver(bodyOverPage)
+            val where = "$mode $label at stop $offset"
+            assertAtLeast(contrast(tokens.textPrimary.compositedOver(surface), surface), 4.5f, "$where primary")
+            assertAtLeast(contrast(tokens.textSecondary.compositedOver(surface), surface), 4.5f, "$where secondary")
+            assertAtLeast(contrast(tokens.textTertiary.compositedOver(surface), surface), 3f, "$where tertiary")
+        }
     }
 
     /** WCAG 2.1 relative luminance. */

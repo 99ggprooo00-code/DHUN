@@ -77,7 +77,7 @@ fun NowPlayingBackdrop(
                     alpha = artworkAlpha
                 }
                 .then(
-                    if (canBlur && blurPercent > 0) {
+                    if (GlassMaterialPolicy.shouldBlurArtwork(canBlur, blurPercent)) {
                         Modifier.blur(
                             DhunSpacing.glassBlur * NowPlayingBackdropPolicy.BLUR_SCALE *
                                 NowPlayingBackdropPolicy.blurMultiplier(blurPercent),

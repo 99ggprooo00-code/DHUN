@@ -40,8 +40,8 @@ import dev.dhun.design.supportsRealtimeBlur
  * The lyrics-card material, as numbers — so the lyrics card, the Related
  * list, the nav band under the mini-player, and small chrome cannot drift.
  *
- * This is still the ADR-002 recipe (blur **once** per track, translucent M3
- * veil, sharp content). It is not Liquid Glass and not a platform Acrylic API.
+ * This is still the ADR-002 recipe (blur **once** per track, a translucent
+ * DHUN veil and sharp content). It is not a platform Acrylic API.
  * "Acrylic" below is the lighter milky cut of the same recipe used by the
  * mini-player: more of the blur shows through than the old `glassStrong`
  * slab (~72% near-black), which read as a translucent black disc/bar.
@@ -295,7 +295,7 @@ internal fun LyricsArtworkLayer(
                         scaleY = NowPlayingBackdropPolicy.OVERSCAN
                     }
                     .then(
-                        if (canBlur && DhunAppearance.backdropBlurPercent > 0) {
+                        if (GlassMaterialPolicy.shouldBlurArtwork(canBlur, DhunAppearance.backdropBlurPercent)) {
                             Modifier.blur(
                                 DhunSpacing.glassBlur * LyricsMaterialPolicy.BLUR_SCALE *
                                     NowPlayingBackdropPolicy.blurMultiplier(
