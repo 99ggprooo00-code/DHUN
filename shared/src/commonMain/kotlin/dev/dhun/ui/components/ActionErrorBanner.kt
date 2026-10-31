@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -16,6 +15,7 @@ import androidx.compose.ui.semantics.semantics
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.DhunTextButton
+import dev.dhun.design.components.GlassCard
 
 /**
  * Screen-level failure notice for a mutation that has no dialog of its own —
@@ -35,7 +35,11 @@ fun ActionErrorBanner(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(color = DhunColors.errorContainer, modifier = modifier.fillMaxWidth()) {
+    GlassCard(
+        modifier = modifier.fillMaxWidth(),
+        tint = DhunColors.errorContainer,
+        elevated = false,
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()

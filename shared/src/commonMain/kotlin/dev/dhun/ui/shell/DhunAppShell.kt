@@ -11,26 +11,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
-import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -70,7 +60,6 @@ import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
-import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTypographyTokens
@@ -78,13 +67,17 @@ import dev.dhun.design.DhunVisualTuning
 import dev.dhun.design.VisualPart
 import dev.dhun.design.catalog.ComponentCatalogScreen
 import dev.dhun.legal.DhunAppInfo
+import dev.dhun.design.components.DhunNavigationBar
+import dev.dhun.design.components.DhunNavigationBarItem
+import dev.dhun.design.components.DhunNavigationRail
+import dev.dhun.design.components.DhunNavigationRailItem
+import dev.dhun.design.components.GlassCard
 import dev.dhun.design.components.GlassDock
 import dev.dhun.design.components.LocalTextInputFocusRegistry
 import dev.dhun.design.components.NowPlayingBackdrop
 import dev.dhun.design.components.TextInputFocusRegistry
 import dev.dhun.design.components.acrylicGlass
 import dev.dhun.design.components.lyricsVeil
-import dev.dhun.design.components.readingSurfaceFill
 import dev.dhun.player.DhunPlayer
 import dev.dhun.player.equalizer.EqualizerSession
 import dev.dhun.presentation.browse.AlbumViewModel
@@ -721,7 +714,11 @@ fun DhunAppShell(
 
 @Composable
 private fun OfflineStatusBanner(modifier: Modifier = Modifier) {
-    Surface(color = DhunColors.errorContainer, modifier = modifier.fillMaxWidth()) {
+    GlassCard(
+        modifier = modifier.fillMaxWidth(),
+        tint = DhunColors.errorContainer,
+        elevated = false,
+    ) {
         Text(
             "You're offline. Search and streaming are unavailable; downloaded tracks remain available.",
             fontSize = DhunTypographyTokens.labelSmall.fontSize,
@@ -766,15 +763,11 @@ private fun BottomNavigationBar(
             )
         }
         Box(modifier = Modifier.fillMaxWidth().lyricsVeil(part = VisualPart.NAVIGATION)) {
-            NavigationBar(
-                containerColor = Color.Transparent,
-                contentColor = DhunColors.textPrimary,
-                tonalElevation = DhunSpacing.zero,
-                modifier = Modifier.fillMaxWidth().height(DhunSpacing.navigationBarContent),
-            ) {
+            DhunNavigationBar(modifier = Modifier.fillMaxWidth()) {
                 AppTab.userTabs.forEach { tab ->
-                    AppBottomNavigationItem(
-                        tab = tab,
+                    DhunNavigationBarItem(
+                        icon = tab.icon,
+                        label = tab.title,
                         selected = DhunShellPolicy.isTabSelected(
                             layout = layout,
                             selectedTab = nav.selectedTab,
@@ -797,14 +790,11 @@ private fun AppNavigationRail(
     nav: AppNavState,
     layout: DhunShellLayout,
 ) {
-    NavigationRail(
-        containerColor = readingSurfaceFill(VisualPart.NAVIGATION),
-        contentColor = DhunColors.textPrimary,
-        modifier = Modifier.fillMaxHeight(),
-    ) {
+    DhunNavigationRail {
         AppTab.userTabs.forEach { tab ->
-            AppRailNavigationItem(
-                tab = tab,
+            DhunNavigationRailItem(
+                icon = tab.icon,
+                label = tab.title,
                 selected = DhunShellPolicy.isTabSelected(
                     layout = layout,
                     selectedTab = nav.selectedTab,
@@ -1130,59 +1120,6 @@ private fun SettingsThemeCatalogue(
             viewModel.setAccentId(accent.id)
             DhunAppearance.setAppearance(nextAccent = accent)
         },
-    )
-}
-
-@Composable
-private fun AppNavigationIcon(tab: AppTab, selected: Boolean) {
-    DhunIconView(
-        icon = tab.icon,
-        contentDescription = "${tab.title} tab",
-        modifier = Modifier.size(DhunSpacing.iconSize),
-        tint = if (selected) DhunColors.accent else DhunColors.textTertiary,
-    )
-}
-
-@Composable
-private fun ColumnScope.AppRailNavigationItem(
-    tab: AppTab,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    NavigationRailItem(
-        selected = selected,
-        onClick = onClick,
-        icon = { AppNavigationIcon(tab, selected) },
-        label = { Text(text = tab.title, style = MaterialTheme.typography.labelSmall) },
-        alwaysShowLabel = true,
-        colors = NavigationRailItemDefaults.colors(
-            selectedIconColor = DhunColors.accent,
-            selectedTextColor = DhunColors.accent,
-            unselectedIconColor = DhunColors.textTertiary,
-            unselectedTextColor = DhunColors.textTertiary,
-            indicatorColor = DhunColors.accentContainer,
-        ),
-    )
-}
-
-@Composable
-private fun RowScope.AppBottomNavigationItem(
-    tab: AppTab,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    NavigationBarItem(
-        selected = selected,
-        onClick = onClick,
-        icon = { AppNavigationIcon(tab, selected) },
-        label = { Text(text = tab.title, style = MaterialTheme.typography.labelSmall) },
-        colors = NavigationBarItemDefaults.colors(
-            selectedIconColor = DhunColors.onAccentContainer,
-            selectedTextColor = DhunColors.accent,
-            unselectedIconColor = DhunColors.textTertiary,
-            unselectedTextColor = DhunColors.textTertiary,
-            indicatorColor = DhunColors.accentContainer,
-        ),
     )
 }
 

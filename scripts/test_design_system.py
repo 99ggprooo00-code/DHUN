@@ -1,9 +1,8 @@
 """Source guardrails for DHUN's native visual system.
 
-These tests deliberately cover only the screen surfaces already migrated.
-Settings and remaining shell controls join the banned-call scope in their own
-stages; an untested global ban today would only encode an allowlist of known
-defects. No assertion here claims a rendered screenshot or Kotlin execution.
+The raw-control ban covers every Kotlin source in the native UI roots; design
+wrappers are deliberately outside that scope. No assertion here claims a
+rendered screenshot or Kotlin execution.
 """
 
 from pathlib import Path
@@ -13,23 +12,10 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 SHARED = ROOT / "shared/src/commonMain/kotlin/dev/dhun"
-SCREEN_SURFACES = (
-    "ui/home/HomeScreen.kt",
-    "ui/search/SearchScreen.kt",
-    "ui/browse/ArtistScreen.kt",
-    "ui/browse/AlbumScreen.kt",
-    "ui/browse/PlaylistScreen.kt",
-    "ui/library/LibraryScreen.kt",
-    "ui/player/FullPlayer.kt",
-    "ui/player/MiniPlayer.kt",
-    "ui/player/PlayerSeekBar.kt",
-    "ui/player/PlayerTabs.kt",
-    "ui/player/SyncedLyrics.kt",
-    "ui/player/TransportControls.kt",
-    "ui/player/LyricsControlsDialog.kt",
-    "ui/player/LyricsMatchPicker.kt",
-    "ui/player/LyricsRomanizationControls.kt",
-    "ui/player/PlaybackErrorDialog.kt",
+UI_SOURCE_ROOTS = (
+    SHARED / "ui",
+    ROOT / "app-android",
+    ROOT / "app-desktop",
 )
 RAW_STOCK_CALLS = (
     "AlertDialog",
@@ -58,8 +44,13 @@ def source(relative: str) -> str:
     return (SHARED / relative).read_text(encoding="utf-8")
 
 
+def native_ui_sources():
+    for root in UI_SOURCE_ROOTS:
+        yield from sorted(root.rglob("*.kt"))
+
+
 class DesignSystemSourceTest(unittest.TestCase):
-    def test_migrated_screens_do_not_call_raw_stock_visuals(self):
+    def test_native_ui_does_not_call_raw_stock_visuals(self):
         # The negative lookbehind is important: DhunTextButton is a DHUN wrapper,
         # not a raw TextButton call.
         patterns = {
@@ -67,8 +58,9 @@ class DesignSystemSourceTest(unittest.TestCase):
             for name in RAW_STOCK_CALLS
         }
         violations = []
-        for relative in SCREEN_SURFACES:
-            text = source(relative)
+        for path in native_ui_sources():
+            relative = path.relative_to(ROOT)
+            text = path.read_text(encoding="utf-8")
             for name, pattern in patterns.items():
                 for match in pattern.finditer(text):
                     line = text.count("\n", 0, match.start()) + 1
@@ -125,6 +117,29 @@ class DesignSystemSourceTest(unittest.TestCase):
         self.assertIn("GlassDialog(onDismissRequest = onDismiss)", error)
         self.assertIn("diagnosticText(it, 4_000)", error)
         self.assertIn("onDismiss(); onRetry()", error)
+
+    def test_settings_shell_and_battery_actions_keep_callbacks(self):
+        settings = source("ui/settings/SettingsScreen.kt")
+        self.assertIn("viewModel.setBackdropBlurPercent(percent)", settings)
+        self.assertIn("DhunAppearance.setBackdropPrefs(blurPercent = percent)", settings)
+        self.assertIn("viewModel.setBackdropBrightnessPercent(percent)", settings)
+        self.assertIn("DhunAppearance.setBackdropPrefs(brightnessPercent = percent)", settings)
+        self.assertIn("onCheckedChange = session::setEnabled", settings)
+        self.assertIn("onChange = session::setPreamp", settings)
+        self.assertIn("session.setBandGain(band.index, it)", settings)
+        self.assertIn("viewModel.setCountryCode(region.code)", settings)
+
+        shell = source("ui/shell/DhunAppShell.kt")
+        self.assertIn("DhunNavigationBarItem(", shell)
+        self.assertIn("DhunNavigationRailItem(", shell)
+        self.assertIn("nav.selectTab(tab, keepDetailOnTabChange = false)", shell)
+        self.assertIn("nav.selectTab(tab, keepDetailOnTabChange = layout.showsDetailPane)", shell)
+
+        activity = (ROOT / "app-android/src/main/kotlin/dev/dhun/android/MainActivity.kt").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("GlassDialog(onDismissRequest", activity)
+        self.assertIn("openBatteryOptimizationSettings()", activity)
 
     def test_product_identity_is_not_assigned_to_the_toolkit(self):
         home = source("ui/home/HomeScreen.kt")
