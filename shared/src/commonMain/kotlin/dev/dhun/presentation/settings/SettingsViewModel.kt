@@ -493,6 +493,9 @@ class SettingsViewModel(
     /** Preview continuously, but write once on slider release (not per drag frame). */
     fun previewVisualTuning(part: VisualPart, percent: Int) {
         if (part !in DhunVisualTuning.adjustableParts) return
+        // A drag is a newer visible request even before slider release. An
+        // older save completion must not snap the finger's newer preview back.
+        nextWriteGeneration(part.key)
         _visualTuning.value = _visualTuning.value + (part to percent.coerceIn(0, 100))
     }
 

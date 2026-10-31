@@ -653,6 +653,47 @@ class SettingsPersistenceTest {
     }
 
     @Test
+    fun anOlderVisualSaveCannotSnapBackANewerPreview(): Unit = runBlocking {
+        val d = data()
+        val h = Harness()
+        val part = VisualPart.LIST_ROWS
+        d.settings.putInt(part.key, 70)
+        val saveStarted = CompletableDeferred<Unit>()
+        val releaseSave = CompletableDeferred<Unit>()
+        var saveAttempts = 0
+        val blockingSettings = object : SettingsRepository by d.settings {
+            override suspend fun putInt(key: String, value: Int) {
+                if (key == part.key) {
+                    saveAttempts++
+                    if (saveAttempts == 1) {
+                        saveStarted.complete(Unit)
+                        releaseSave.await()
+                    }
+                }
+                d.settings.putInt(key, value)
+            }
+        }
+        val vm = SettingsViewModel(GetSettingUseCase(blockingSettings), UpdateSettingUseCase(blockingSettings), h.scope)
+        try {
+            eventually { vm.loaded.value }
+            vm.previewVisualTuning(part, 50)
+            vm.saveVisualTuning(part)
+            saveStarted.await()
+            vm.previewVisualTuning(part, 95)
+            releaseSave.complete(Unit)
+            eventually { saveAttempts == 1 && d.settings.getInt(part.key, -1) == 50 }
+
+            assertEquals(95, vm.visualTuning.value[part], "the newer drag is still previews-only and must not be snapped back")
+            vm.saveVisualTuning(part)
+            eventually { saveAttempts == 2 && d.settings.getInt(part.key, -1) == 95 }
+            assertEquals(95, vm.visualTuning.value[part])
+            assertTrue(h.uncaught.isEmpty(), "the ordered slider writes must not escape: ${h.uncaught}")
+        } finally {
+            h.close()
+        }
+    }
+
+    @Test
     fun aFailedVisualTuningSavePutsBackTheStoredExperiment(): Unit = runBlocking {
         val d = data()
         val h = Harness()
