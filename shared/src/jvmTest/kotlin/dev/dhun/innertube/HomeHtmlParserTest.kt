@@ -23,6 +23,16 @@ class HomeHtmlParserTest {
     }
 
     @Test
+    fun decodesHexEscapedScriptDataWithoutExecutingScript() {
+        val payload = """{"contents":{"sectionListRenderer":{"contents":[],"title":"it's real"}}}"""
+        val encoded = payload.map { char ->
+            "\\x" + char.code.toString(16).padStart(2, '0')
+        }.joinToString("")
+        val html = "<script>data: 'not-json'; other(); data: '$encoded';</script>"
+        assertEquals(json(payload), parseHomeInitialData(html))
+    }
+
+    @Test
     fun rejectsUnrelatedMalformedOrIncompleteJson() {
         assertNull(parseHomeInitialData("""<script>var ytInitialData = {"contents":{"other":{}}};</script>"""))
         assertNull(parseHomeInitialData("""<script>var ytInitialData = {not-json};</script>"""))

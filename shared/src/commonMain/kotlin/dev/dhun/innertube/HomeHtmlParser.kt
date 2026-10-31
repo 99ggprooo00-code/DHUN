@@ -8,8 +8,10 @@ import kotlinx.serialization.json.JsonObject
  *
  * This is a protocol fallback for a rejected `/browse` request, not fabricated
  * content. Only a JSON object with a recognized Home `contents` envelope is
- * returned. The balanced scan respects JSON strings and escapes; a regex that
- * stops at the first `}` cannot safely parse nested shelves.
+ * returned. YouTube has shipped both a direct `ytInitialData` object and a
+ * single-quoted, hex-escaped `data: '…'` script value; accept either without
+ * evaluating JavaScript. The scans respect strings and escapes, so nested
+ * shelves and a `}` inside a title cannot truncate the response.
  */
 internal fun parseHomeInitialData(html: String): JsonObject? {
     if (html.isEmpty()) return null
@@ -22,17 +24,30 @@ internal fun parseHomeInitialData(html: String): JsonObject? {
             val start = match.range.last + 1
             if (start >= html.length || html[start] != '{') continue
             val end = jsonObjectEnd(html, start) ?: continue
-            val candidate = runCatching {
-                Json.parseToJsonElement(html.substring(start, end + 1)) as? JsonObject
-            }.getOrNull() ?: continue
-            val contents = candidate.obj("contents")
-            if (contents?.obj("singleColumnBrowseResultsRenderer") != null ||
-                contents?.obj("twoColumnBrowseResultsRenderer") != null ||
-                contents?.obj("sectionListRenderer") != null
-            ) return candidate
+            homeCandidate(html.substring(start, end + 1))?.let { return it }
         }
     }
+
+    val dataMarker = Regex("""\bdata\s*:\s*'""")
+    for (match in dataMarker.findAll(html)) {
+        val start = match.range.last + 1
+        val end = jsSingleQuotedStringEnd(html, start) ?: continue
+        val decoded = decodeJavaScriptString(html.substring(start, end))
+        homeCandidate(decoded)?.let { return it }
+    }
     return null
+}
+
+private fun homeCandidate(source: String): JsonObject? {
+    val candidate = runCatching {
+        Json.parseToJsonElement(source) as? JsonObject
+    }.getOrNull() ?: return null
+    val contents = candidate.obj("contents")
+    return candidate.takeIf {
+        contents?.obj("singleColumnBrowseResultsRenderer") != null ||
+            contents?.obj("twoColumnBrowseResultsRenderer") != null ||
+            contents?.obj("sectionListRenderer") != null
+    }
 }
 
 /** End offset of the JSON object starting at [start], or null for an incomplete value. */
@@ -61,4 +76,63 @@ private fun jsonObjectEnd(source: String, start: Int): Int? {
         }
     }
     return null
+}
+
+/** Closing quote for a JavaScript single-quoted string, respecting backslash parity. */
+private fun jsSingleQuotedStringEnd(source: String, start: Int): Int? {
+    var escaped = false
+    for (index in start until source.length) {
+        val char = source[index]
+        if (escaped) {
+            escaped = false
+        } else if (char == '\\') {
+            escaped = true
+        } else if (char == '\'') {
+            return index
+        }
+    }
+    return null
+}
+
+/** Decode only string escapes; this parser never executes page script. */
+private fun decodeJavaScriptString(source: String): String = buildString(source.length) {
+    var index = 0
+    while (index < source.length) {
+        val char = source[index]
+        if (char != '\\' || index + 1 >= source.length) {
+            append(char)
+            index++
+            continue
+        }
+        when (val escape = source[index + 1]) {
+            'x' if index + 3 < source.length -> {
+                val value = source.substring(index + 2, index + 4).toIntOrNull(16)
+                if (value == null) {
+                    append("\\x")
+                } else {
+                    append(value.toChar())
+                }
+                index += 4
+            }
+            'u' if index + 4 < source.length -> {
+                val value = source.substring(index + 2, index + 6).toIntOrNull(16)
+                if (value == null) {
+                    append("\\u")
+                } else {
+                    append(value.toChar())
+                }
+                index += 6
+            }
+            '\\' -> append('\\').also { index += 2 }
+            '/' -> append('/').also { index += 2 }
+            '\'' -> append('\'').also { index += 2 }
+            '"' -> append('"').also { index += 2 }
+            else -> {
+                // Preserve JSON escapes such as \n instead of inserting a raw
+                // control character into the JSON document.
+                append('\\').append(escape)
+                index += 2
+            }
+        }
+    }
 }
