@@ -31,6 +31,8 @@ The browser build and the site that publishes it have their own architecture, st
 
 ## Binding references
 
+- [Current owner-directed pre-PR #196 native rollback](verification/39-pre-pr196-native-rollback.md)
+- [Historical native recovery and device-acceptance ledger](verification/38-native-application-recovery.md)
 - [Current master prompt](../.ai/MASTER_PROMPT.md)
 - [Current roadmap and active task](../.ai/ROADMAP.md)
 - [Debug log / known incidents](../.ai/DEBUG_LOG.md)

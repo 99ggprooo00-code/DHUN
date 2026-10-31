@@ -41,6 +41,22 @@ make DHUN a single-source product by intent.
 | Browser (`app-web/`, `/app/`) | JioSaavn via three unofficial community wrapper instances; HTML audio | Partial integration: code/unit tests exist, live catalogue and audible playback from the deployed origin remain unverified. No YouTube or Spotify playback, audio downloads, equaliser or lyrics. Offline support is the shell and local library display, not offline music. |
 | Spotify (all clients) | No adapter, SDK, OAuth or provider traffic | Planned; execution deferred by ADR-010 D3/D4 and feasibility gates. No platform implementation is promised. |
 
+### Native recovery acceptance contract (2026-10-31)
+
+The current recovery work is not feature expansion. Home's For You, Focus, Chill,
+Workout and Party feeds; all supported Search result types; album/artist/playlist
+navigation; local and remote continuation; artwork; playback/queue; Library,
+persistence, downloads, lyrics, settings and responsive player behaviour must work
+as coherent pipelines. A category failure must not silently show For You or sample
+content. A continuation failure must preserve prior results and offer real Retry.
+Artwork must come from the selected item's real metadata/video identity, never a
+random or fabricated image. Existing KMP architecture, user data and DHUN's visual
+identity are preserved. The green `c8d5dc1` build and later `2a6038d` build were
+both rejected by phone evidence; the latter retained Search HTTP 400, new-download
+backdrop, custom-colour brightness and empty-Related failures. Compilation and
+packaging do not close these requirements.
+See [verification §38](verification/38-native-application-recovery.md).
+
 See [the capability/evidence matrix](research/05-source-capability-matrix.md) for
 the current ledger, [provider research](research/README.md) for permissions and
 unresolved questions, and [ADR-010](decisions/ADR-010-multi-source-provider-direction.md)

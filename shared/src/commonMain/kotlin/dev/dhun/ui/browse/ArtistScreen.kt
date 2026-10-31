@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -51,8 +52,6 @@ import dev.dhun.design.components.ArtistCard
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunHorizontalRail
 import dev.dhun.design.components.DhunIconButton
-import dev.dhun.design.components.dhunGlassBody
-import dev.dhun.design.components.DhunSpinner
 import dev.dhun.design.components.DhunTonalButton
 import dev.dhun.design.components.ErrorView
 import dev.dhun.design.components.GlassCard
@@ -140,14 +139,9 @@ fun ArtistScreen(
                 .height(DhunSpacing.huge),
         ) {
             if (toolbarCollapsed) {
-                // The collapsed bar is glass, not a flat strip: the page keeps
-                // showing through it while it is lifted by the body gradient and
-                // the specular sheen (docs/design/glass-system.md §1).
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .dhunGlassBody(readingSurfaceFill(VisualPart.NAVIGATION)),
-                )
+                // Match the page's warm/tonal reading material instead of a
+                // near-black bar in dark or an opaque white bar in light.
+                Box(modifier = Modifier.fillMaxSize().background(readingSurfaceFill(VisualPart.NAVIGATION)))
             }
             Row(
                 modifier = Modifier
@@ -281,7 +275,7 @@ private fun ArtistContent(
                 }
                 DhunTonalButton(onClick = onRadio, enabled = !radioLoading && page.topSongs.isNotEmpty()) {
                     if (radioLoading) {
-                        DhunSpinner()
+                        CircularProgressIndicator(modifier = Modifier.size(DhunSpacing.iconSizeSm), strokeWidth = DhunSpacing.iconStroke)
                     } else {
                         DhunIconView(
                             icon = DhunIcon.Play,

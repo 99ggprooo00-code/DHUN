@@ -8,11 +8,8 @@ import dev.dhun.data.LocalPlaylist
 import dev.dhun.data.PlaylistRepository
 import dev.dhun.player.DhunPlayer
 import dev.dhun.player.resetModesForNewQueue
-import dev.dhun.presentation.MutationState
-import dev.dhun.presentation.MutationTracker
 import dev.dhun.data.SettingsRepository
 import dev.dhun.provider.MusicProvider
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -33,11 +30,6 @@ sealed interface PlaylistUiState {
     /** Local (SQLDelight) playlist — full CRUD. Null playlist = deleted. */
     data class Local(val playlist: LocalPlaylist?, val tracks: List<Track>) : PlaylistUiState
 }
-
-data class PlaylistDeletionState(
-    val isDeleting: Boolean = false,
-    val errorMessage: String? = null,
-)
 
 /**
  * Playlist page screen model (Phase 09) — handles a YTM playlist (browse)
@@ -60,18 +52,6 @@ class PlaylistViewModel(
     /** True once a local playlist under view has been deleted (UI pops). */
     private val _deleted = MutableStateFlow(false)
     val deleted: StateFlow<Boolean> = _deleted.asStateFlow()
-    private val _deletion = MutableStateFlow(PlaylistDeletionState())
-    val deletion: StateFlow<PlaylistDeletionState> = _deletion.asStateFlow()
-
-    /**
-     * Pending/failure state for the row edits on a local playlist (remove,
-     * reorder). Both used to be `scope.launch { playlists.… }` with no
-     * handling, so a failed swipe silently left the row in place and a failed
-     * drag snapped the list back with no explanation.
-     */
-    private val mutations = MutationTracker(scope)
-    val mutation: StateFlow<MutationState> = mutations.state
-    fun dismissMutationError() = mutations.dismissError()
 
     init {
         if (isLocal) {
@@ -127,67 +107,27 @@ class PlaylistViewModel(
 
     /* ---------------- local CRUD ---------------- */
 
-    /**
-     * Renames the local playlist. Suspends and propagates failure so the dialog
-     * can keep itself open with a retry — closing it on the tap made a failed
-     * rename look identical to a successful one.
-     */
-    suspend fun rename(newName: String) {
-        if (!isLocal) return
-        val trimmed = newName.trim()
-        if (trimmed.isBlank() || trimmed == _state.value.let { (it as? PlaylistUiState.Local)?.playlist?.name }) return
-        playlists.rename(playlistId, trimmed)
+    fun rename(newName: String) {
+        if (!isLocal || newName.isBlank()) return
+        scope.launch { playlists.rename(playlistId, newName.trim()) }
     }
 
     fun delete() {
         if (!isLocal) return
-        // Set the gate synchronously, before launch/Compose can process a second tap.
-        while (true) {
-            val current = _deletion.value
-            if (current.isDeleting || _deleted.value) return
-            if (_deletion.compareAndSet(current, PlaylistDeletionState(isDeleting = true))) break
-        }
         scope.launch {
-            try {
-                playlists.delete(playlistId)
-                _deleted.value = true // only after the repository transaction returns
-                _deletion.value = PlaylistDeletionState()
-            } catch (cancelled: CancellationException) {
-                _deletion.value = PlaylistDeletionState(
-                    errorMessage = "Deletion was interrupted. Reopen the library to check whether the playlist remains.",
-                )
-                throw cancelled
-            } catch (_: Exception) {
-                // The outcome may be uncertain if the failure happened after a commit.
-                _deletion.value = PlaylistDeletionState(
-                    errorMessage = "Could not confirm deletion. Check the playlist and try again.",
-                )
-            }
-        }
-    }
-
-    fun clearDeletionError() {
-        while (true) {
-            val current = _deletion.value
-            if (current.isDeleting) return
-            if (_deletion.compareAndSet(current, PlaylistDeletionState())) return
+            playlists.delete(playlistId)
+            _deleted.value = true
         }
     }
 
     fun removeTrack(track: Track) {
         if (!isLocal) return
-        mutations.run(
-            key = "playlist-remove:${track.id}",
-            failureMessage = "Could not remove \"${track.title}\" from this playlist. Try again.",
-        ) { playlists.removeTrack(playlistId, track.id) }
+        scope.launch { playlists.removeTrack(playlistId, track.id) }
     }
 
     fun moveTrack(from: Int, to: Int) {
         if (!isLocal) return
-        mutations.run(
-            key = "playlist-move",
-            failureMessage = "Could not save the new order. The list was put back; try again.",
-        ) { playlists.move(playlistId, from, to) }
+        scope.launch { playlists.move(playlistId, from, to) }
     }
 
     fun close() = scope.cancel()

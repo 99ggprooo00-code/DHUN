@@ -19,9 +19,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -62,7 +65,6 @@ import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.dhunContentRowSurface
 import dev.dhun.design.components.DhunAssistChip
 import dev.dhun.design.components.DhunFilterChip
-import dev.dhun.design.components.DhunSpinner
 import dev.dhun.design.components.DhunHorizontalRail
 import dev.dhun.design.components.EmptyView
 import dev.dhun.design.components.ErrorView
@@ -71,8 +73,6 @@ import dev.dhun.design.components.PlaylistCard
 import dev.dhun.design.components.SectionHeader
 import dev.dhun.design.components.SectionShimmer
 import dev.dhun.design.components.TrackCard
-import dev.dhun.design.components.DhunTextButton
-import dev.dhun.design.components.DhunPullToRefresh
 import dev.dhun.domain.HomeMood
 import dev.dhun.domain.GetHomeFeedUseCase
 import dev.dhun.domain.HomeShelfKind
@@ -167,7 +167,7 @@ fun HomeScreen(
                 )
             }
         }
-        DhunPullToRefresh(
+        PullToRefreshBox(
             isRefreshing = isRefreshing,
             onRefresh = viewModel::refresh,
             modifier = Modifier.fillMaxWidth().weight(1f),
@@ -484,21 +484,24 @@ private fun HomeFeedContent(
             ) {
                 when {
                     isLoadingMore -> {
-                        // DHUN spinner: thin accent arc in a glass track.
-                        DhunSpinner()
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                            strokeWidth = DhunSpacing.iconStroke,
+                            color = DhunColors.accent,
+                        )
                         Text("Loading more music…", color = DhunColors.textSecondary)
                     }
                     loadMoreError != null -> {
                         Text(loadMoreError, color = DhunColors.textSecondary)
-                        DhunTextButton(onClick = onRetryMore, enabled = !isRefreshing) { Text("Retry loading more") }
+                        TextButton(onClick = onRetryMore, enabled = !isRefreshing) { Text("Retry loading more") }
                     }
-                    canLoadMore -> DhunTextButton(onClick = onLoadMore, enabled = !isRefreshing) { Text("Load more music") }
+                    canLoadMore -> TextButton(onClick = onLoadMore, enabled = !isRefreshing) { Text("Load more music") }
                     else -> {
                         Text("You're all caught up", color = DhunColors.textTertiary)
                     }
                 }
                 // Mouse/keyboard/accessibility fallback; no header refresh icon.
-                DhunTextButton(onClick = onRefresh, enabled = !isRefreshing) { Text("Refresh music") }
+                TextButton(onClick = onRefresh, enabled = !isRefreshing) { Text("Refresh music") }
             }
         }
     }

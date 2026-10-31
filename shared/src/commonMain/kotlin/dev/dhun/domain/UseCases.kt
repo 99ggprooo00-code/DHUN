@@ -316,9 +316,6 @@ class GetSettingUseCase(private val settings: SettingsRepository) {
     suspend fun string(key: String, default: String): String = settings.getString(key) ?: default
     suspend fun boolean(key: String, default: Boolean): Boolean = settings.getBoolean(key, default)
     suspend fun int(key: String, default: Int): Int = settings.getInt(key, default)
-
-    /** Whether a row exists at all — used by one-off settings migrations. */
-    suspend fun has(key: String): Boolean = settings.getString(key) != null
     fun observe(key: String): Flow<String?> = settings.observeString(key)
 
     suspend fun audioQuality(): String = string(SettingsKeys.AUDIO_QUALITY, SettingsKeys.AUDIO_QUALITY_DEFAULT)
@@ -327,24 +324,20 @@ class GetSettingUseCase(private val settings: SettingsRepository) {
 }
 
 class UpdateSettingUseCase(private val settings: SettingsRepository) {
-    /** Static keys, plus the per-section background keys, which are built from a section id. */
-    private fun known(key: String): Boolean =
-        key in SettingsKeys.all || SettingsKeys.isBackgroundSectionKey(key)
-
     suspend fun remove(key: String) {
-        require(known(key)) { "Unknown setting key: $key" }
+        require(key in SettingsKeys.all)
         settings.remove(key)
     }
     suspend fun string(key: String, value: String) {
-        require(known(key)) { "Unknown setting key: $key" }
+        require(key in SettingsKeys.all) { "Unknown setting key: $key" }
         settings.putString(key, value)
     }
     suspend fun boolean(key: String, value: Boolean) {
-        require(known(key)) { "Unknown setting key: $key" }
+        require(key in SettingsKeys.all) { "Unknown setting key: $key" }
         settings.putBoolean(key, value)
     }
     suspend fun int(key: String, value: Int) {
-        require(known(key)) { "Unknown setting key: $key" }
+        require(key in SettingsKeys.all) { "Unknown setting key: $key" }
         settings.putInt(key, value)
     }
 }

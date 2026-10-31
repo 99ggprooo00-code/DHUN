@@ -13,8 +13,6 @@ import dev.dhun.data.SearchRepository
 import dev.dhun.domain.AddToPlaylistUseCase
 import dev.dhun.domain.RecentSearchesUseCase
 import dev.dhun.domain.ToggleFavoriteUseCase
-import dev.dhun.presentation.MutationState
-import dev.dhun.presentation.MutationTracker
 import dev.dhun.innertube.SearchFilter
 import dev.dhun.provider.MusicProvider
 import kotlinx.coroutines.CoroutineScope
@@ -47,15 +45,6 @@ class SearchViewModel(
 ) {
     private val recentSearchesUseCase = RecentSearchesUseCase(searchRepository)
     private val toggleFavoriteUseCase = ToggleFavoriteUseCase(libraryRepository)
-
-    /**
-     * Same contract as [dev.dhun.presentation.home.HomeViewModel]: a Like that
-     * cannot be saved reports itself instead of disappearing (or crashing the
-     * app through an unguarded coroutine).
-     */
-    private val mutations = MutationTracker(scope)
-    val mutation: StateFlow<MutationState> = mutations.state
-    fun dismissMutationError() = mutations.dismissError()
     private val addToPlaylistUseCase = AddToPlaylistUseCase(playlistRepository)
 
     private val _query = MutableStateFlow("")
@@ -212,7 +201,7 @@ class SearchViewModel(
     }
 
     fun toggleFavorite(track: Track) {
-        mutations.run("like:${track.id}", "Could not update Liked Songs. Try again.") {
+        scope.launch {
             toggleFavoriteUseCase(track)
         }
     }

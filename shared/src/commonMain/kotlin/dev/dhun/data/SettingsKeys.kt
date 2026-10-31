@@ -63,51 +63,6 @@ object SettingsKeys {
     const val BACKDROP_BRIGHTNESS = "backdrop_brightness"
     const val BACKDROP_BRIGHTNESS_DEFAULT = 55
 
-    /**
-     * Background blur, as three switches (see `dev.dhun.design.background`):
-     * the master [BACKGROUND_BLUR_ENABLED], the *kind* of blur
-     * [BACKGROUND_DYNAMIC_BLUR], and the independent colour switch
-     * [BACKGROUND_DYNAMIC_COLORS]. They default to the behaviour the app had
-     * before the switches existed: blurred, artwork-responsive, artwork-coloured.
-     */
-    const val BACKGROUND_BLUR_ENABLED = "background_blur_enabled"
-    const val BACKGROUND_BLUR_ENABLED_DEFAULT = true
-    const val BACKGROUND_DYNAMIC_BLUR = "background_dynamic_blur"
-    const val BACKGROUND_DYNAMIC_BLUR_DEFAULT = true
-    const val BACKGROUND_DYNAMIC_COLORS = "background_dynamic_colors"
-    const val BACKGROUND_DYNAMIC_COLORS_DEFAULT = true
-
-    /**
-     * One-off migration marker for the background settings. Version 0 (absent)
-     * means the build predates the switches, so the legacy `BACKDROP_BLUR = 0`
-     * row means "no blur" and is imported once. Bumping this constant is how a
-     * future default change is applied without overwriting a user's choice.
-     */
-    const val BACKGROUND_PROFILE_VERSION = "background_profile_version"
-    const val BACKGROUND_PROFILE_VERSION_CURRENT = 1
-
-    /** Per-section background keys: `background_<section>_<field>`. */
-    fun backgroundKey(sectionId: String, field: String): String = "background_${sectionId}_$field"
-
-    const val BACKGROUND_FIELD_BLUR = "blur"
-    const val BACKGROUND_FIELD_DYNAMIC_BLUR = "dynamic_blur"
-    const val BACKGROUND_FIELD_DYNAMIC_COLORS = "dynamic_colors"
-    const val BACKGROUND_FIELD_PRIMARY = "primary"
-    const val BACKGROUND_FIELD_SECONDARY = "secondary"
-    const val BACKGROUND_FIELD_TERTIARY = "tertiary"
-
-    private val BACKGROUND_SECTION_KEY = Regex(
-        "^background_(home|search|library|mini|player)_(blur|dynamic_blur|dynamic_colors|primary|secondary|tertiary)$",
-    )
-
-    /**
-     * Per-section background keys are built from a section id, so they cannot
-     * live in [all]. [UpdateSettingUseCase] still has to refuse typos, so it
-     * asks this instead: the shape is validated, and an id that is not one of
-     * the five sections is rejected exactly like an unknown key.
-     */
-    fun isBackgroundSectionKey(key: String): Boolean = BACKGROUND_SECTION_KEY.matches(key)
-
     // Internal test-build visual tuning. The public build ignores persisted values.
     const val TUNE_PAGE_BACKDROP = "tune_page_backdrop"
     const val TUNE_LIST_ROWS = "tune_list_rows"
@@ -163,8 +118,6 @@ object SettingsKeys {
         AUDIO_QUALITY, THEME, ACCENT, ACCENT_MODE, LYRICS_ENABLED, CACHE_SIZE_MB, COUNTRY_CODE,
         RECORD_LISTENING_HISTORY, EXPLICIT_CONTENT, CLOSE_TO_TRAY, RESUME_ON_LAUNCH, WINDOW_GEOMETRY,
         BACKDROP_BLUR, BACKDROP_BRIGHTNESS, SEEK_STEP_SECONDS, AUTOPLAY_RADIO_ENABLED,
-        BACKGROUND_BLUR_ENABLED, BACKGROUND_DYNAMIC_BLUR, BACKGROUND_DYNAMIC_COLORS,
-        BACKGROUND_PROFILE_VERSION,
         TUNE_PAGE_BACKDROP, TUNE_LIST_ROWS, TUNE_READING, TUNE_CHIPS, TUNE_INPUTS,
         TUNE_PLAYER, TUNE_LYRICS, TUNE_MINI_PLAYER, TUNE_NAVIGATION, TUNE_QUEUE_SHEET, TUNE_QUEUE_ROWS, TUNE_TONAL_SURFACES, TUNE_PROFILE_VERSION,
         LYRICS_ROMANIZATION_ENABLED, LYRICS_ROMANIZATION_MODE,

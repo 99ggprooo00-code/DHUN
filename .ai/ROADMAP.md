@@ -331,7 +331,7 @@ overflow was escaped markup, not layout.
 
 1. **Destructive download/history actions (P0):** clear-all used to hide failures and dismiss early; batch deletion and clear history had the same issue. This branch makes all three result-driven: pending disables duplicate submits, failures stay visible with retry, and confirmation/selection resets only after success. The manager serializes download mutations with clear-all and joins workers before deleting final/partial files. JVM tests cover clear-all failure/retry and successful file/row cleanup. Still needs CI confirmation and Android/desktop interaction verification.
 2. **GitHub Pages internal links (P1):** templates emitted root URLs such as `/`, `/features/` and `/ui/` although the canonical project site is hosted beneath `/DHUN/`. A `sitePath` filter preserves root-hosted local tests and prefixes internal paths for a separate Pages artifact build. The Pages workflow now builds and smoke-checks that artifact separately from the root-built artifact used by browser tests.
-3. **Design-system drift:** the current visual direction is **translucent frosted glass**, artwork-led, with cached/lightweight blur, tint/scrim and accessible fallback. Material libraries may be implementation primitives; “Material 3 only” is stale and must not direct new work.
+3. **Design-system drift:** the current visual direction is **translucent frosted glass**, artwork-led, with cached/lightweight blur, tint/scrim and accessible fallback. Material libraries may be implementation primitives; “Material 3 only” is stale and must not direct new work. **2026-10-30:** background customisation is two orthogonal switches (background blur, dynamic colours) over four surfaces (pages, navigation bar, miniplayer, full player), each with one picked colour — see `docs/design/glass-system.md` §3a. The earlier five-section `primary`/`secondary`/`tertiary` model is superseded; do not restore it.
 4. **AI operating-file drift:** update this file, MASTER_PROMPT, KNOWN_LIMITATIONS, DEBUG_LOG, WEBSITE_PLAN, HANDOFF and README together. Preserve old session notes as history; never present their old branch/commit/status or “do not touch FullPlayer” restrictions as current instructions.
 5. **Product specs:** reconcile PRD, TRD, app flow, UI/UX, data schema and implementation plan with current source and this accepted contract. Separate native app, static marketing site and experimental `app-web/`; no production browser player or new backend is implied.
 
@@ -2783,3 +2783,37 @@ follow-ups. None are designed, stubbed, or promised.
 > died) · `CHANGELOG.md` (per-change history) · `git log --merges`
 > (merge evidence) · `git log -p -- .ai/ROADMAP.md` (this file's
 > superseded snapshots).
+
+---
+
+## 2026-10-31 — Native application recovery on PR #217 (current gate)
+
+**Status: 🔴 phone recovery open; do not merge without permission.**
+The phone rejected `c8d5dc1` for Home/mood/Search loading and continuation, then
+rejected the later green `2a6038d` package for Search HTTP 400, new-download blur,
+custom-colour Brightness and empty Related. Artifacts `13028524117` and
+`13031609048` are not recovery acceptance points.
+
+| Recovery lane | Source result | Acceptance still required |
+| --- | --- | --- |
+| Anonymous request context / bounded 400 retry | `1158b33`; request regressions | Affected Android phone and real service; sole HTTP 400 trigger not proven |
+| Independent Home categories + Search paging | `dbc3e20`; generation, retry, dedupe and cursor tests | Every category/filter, scroll return, offline Retry on phone |
+| Shared real artwork candidates | `10400ca`; parser/loader regressions | Home/Search/History/queue/Mini/Full Player visible artwork |
+| Local covers + remote playlist continuation | `9be284c`; SQL/parser/ViewModel regressions | Existing-data upgrade, long playlist and playback on device |
+| Videos result typing + guarded recent-search deletion | `30f4a1a`; parser/filter regressions | Videos first/later pages and database-fault UI |
+| Same-type Search 400 compatibility | `30fb887`; bounded old/current params request tests | Affected phone; live US/NP probes did not reproduce the rejection |
+| New-download artwork + solid-colour Brightness | `1abbc47`; download fallback and shared policy tests | New versus old download blur, custom colours at 0/55/100, contrast |
+| Related persistent audio panel | `30fb887`; request fields + real radio fixture | Real Related rows, tap/Play radio, queue and continuation on phone |
+
+Local gates: **518 Python tests + 159 subtests**, **40 JSON fixtures**, clean diff
+check. Earlier recovery CI failures are retained in
+[`docs/verification/38-native-application-recovery.md`](../docs/verification/38-native-application-recovery.md):
+`dbc3e20` had two missing test-fixture arguments; `9be284c` ran 855 shared tests
+with one incorrect fixture expectation. Current-head runs must be recorded only
+after they finish. No local JDK, Android SDK/ADB/emulator, interactive Windows or
+audible output exists in the sandbox.
+
+Next gate: read final-head CI/Build/test-release, supply only a successful exact-head
+Actions APK artifact, then complete the Android and Windows checklists in §38.
+Playback/queue/persistence tests remain intact, but no new audible playback or
+visual claim is made. No release/tag/publication or protected-asset change.

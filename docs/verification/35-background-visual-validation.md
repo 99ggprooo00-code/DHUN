@@ -1,78 +1,97 @@
-# 35 — Background blur, dynamic blur and dynamic colours: on-device validation
+# 35 — Background blur, dynamic colours and surface colours: on-device validation
 
-> **Status: OPEN.** No Android device, emulator or interactive Windows session
-> was available to the agent that wrote this feature, so **none of the six
-> visual checks below has been performed**. CI proves the code compiles and its
-> unit tests pass; it says nothing about how the app looks. This page is the
-> procedure for the person who *can* look — it is written so it can be followed
-> without reading any code.
+> **Status: OPEN.** No Android device, emulator or interactive Windows session has
+> been available to the agent that wrote this feature, so **none of the checks
+> below has been performed**. CI proves the code compiles and its unit tests pass;
+> it says nothing about how the app looks. This page is the procedure for the
+> person who *can* look — it is written so it can be followed without reading any
+> code.
+>
+> The model under test (2026-10-30): **two independent switches** —
+> *Background blur* and *Dynamic colours* — plus **one colour per interface
+> surface**. See `docs/design/glass-system.md` §3a.
 
 ## 0. What is proven, and what is not
 
 | Question | Answer | Evidence |
 | --- | --- | --- |
 | Does it compile for Android and Windows? | Yes | CI `build`, `apk`, `msi` jobs |
-| Do the preference, precedence, migration and persistence rules hold? | Yes | `BackgroundSettingsTest` (JVM, 500+ tests in the suite) |
-| Does every frosted surface ask its own section for the radius? | Yes, by static gate | `scripts/test_design_system.py` |
+| Do "blur off removes the artwork", the two-switch matrix and per-surface colours hold in code? | Yes | `BackgroundSettingsTest` (JVM) |
+| Does every artwork layer gate on the blur switch? | Yes, by static gate | `scripts/test_design_system.py` |
+| Does "blur off" really remove every thumbnail on a screen? | **Unknown** | needs a screen |
 | Do the blooms look natural behind real covers? | **Unknown** | needs a screen |
-| Are the settings readable over a bright cover? | **Unknown** | needs a screen |
-| Do the five sections actually differ on screen? | **Unknown** | needs a screen |
-| Are track-to-track palette changes smooth? | **Unknown** | needs a screen |
+| Is the navigation bar's own colour readable next to the dock? | **Unknown** | needs a screen |
+| Are settings readable over a bright cover? | **Unknown** | needs a screen |
+| Are track-to-track colour changes smooth? | **Unknown** | needs a screen |
 | Does Android 8–11 behave sensibly with no real blur? | **Unknown** | needs a screen |
-| Are the layers in the right order? | Reasoned from the code, **not seen** | needs a screen |
 
-Do not mark anything below PASS without having seen it. A screenshot of a
-failure is worth more than a paragraph of description.
+Do not mark anything below PASS without having seen it. A screenshot of a failure
+is worth more than a paragraph of description.
 
 ## 1. Getting a build onto the device
 
 ### Android
 
-1. Open the pull request (or the branch) on GitHub and go to the **Checks** tab.
-2. Open the **`apk`** job that ran on the commit you want to test, scroll to
-   **Artifacts**, and download **`apk`** (a `.zip` containing `dhun-test.apk`).
-   The separate **Build APK** workflow publishes the same thing as
-   **`debug-apk`**. You must be signed in to GitHub; artifacts expire after 14
-   days, so use a recent run.
-3. Unzip it, then install in one of two ways:
-   - with a USB cable: `adb install -r dhun-test.apk`
-   - without a cable: copy the `.apk` to the phone, tap it, and allow your file
-     manager to install unknown apps.
-4. Write down the file name and its checksum (`sha256sum dhun-test.apk`) in the
-   environment table in §3 — a PASS without a build identity is not evidence.
+> Beginner version with the exact artifact, the download links, the
+> version-code caveat and the ADB commands step by step:
+> [`36-pr217-device-install.md`](36-pr217-device-install.md).
 
-The debug build installs next to a release build only if the application id
-differs; if installation is refused with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`,
-uninstall the old DHUN first (that also erases saved settings, so note that you
-did it).
+1. Open the pull request (or the branch) on GitHub and go to **Checks**.
+2. Open the **`apk`** job for the commit you want to test, scroll to
+   **Artifacts**, and download **`apk`** (a zip containing `dhun-test.apk`). The
+   separate **Build APK** workflow publishes the same thing as **`debug-apk`**.
+   Artifacts expire after 14 days, so use a recent run.
+3. Unzip, then install either with a cable (`adb install -r dhun-test.apk`) or by
+   copying the `.apk` to the phone and tapping it.
+4. Record the file name and `sha256sum dhun-test.apk` in §3 — a PASS without a
+   build identity is not evidence.
+
+If installation is refused with `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, uninstall the
+old DHUN first (that also erases saved settings — note that you did it).
 
 ### Windows
 
-1. In the same Checks list, open the **`msi`** job and download the **`msi`**
-   artifact (`dhun-test.msi`).
-2. Run it. Windows may warn about an unknown publisher; the package is signed
-   with the project's test certificate, not a commercial one.
-3. Record the MSI `ProductVersion` (shown in the installer and in the app's
-   About panel).
+1. In the same Checks list, open the **`msi`** job and download **`msi`**.
+2. Run it (Windows warns about an unknown publisher; the package uses the project's
+   test certificate).
+3. Record the MSI `ProductVersion` (installer, and the app's About panel).
 
 ## 2. Where the controls are
 
 **Library → Settings (top right) → Appearance → Backgrounds.**
 
-You will see, in order:
+In order:
 
-- **Background blur** — the master switch.
-- **Dynamic blur** — greyed out while the master is off, with the caption
-  "Paused while Background blur is off. Your choice is remembered."
-- **Dynamic colors** — independent of both blur switches.
-- **Section backgrounds** — one row each for Home, Search, Library, Miniplayer
-  and Full player. Tapping a row opens that section's dialog: a preview strip,
-  "Showing: …" (why it looks like that), blur / dynamic blur / artwork-colours
-  switches, three colour layers you can pick, and restore-defaults.
-- **Blur strength** lives in the **Backdrop detail** group below.
+- **Background blur** — global switch, first.
+  - On: "The playing track's artwork is used as a blurred background, tinted with
+    each surface's colour."
+  - Off: "No artwork behind the app at all. Every surface uses its own solid
+    colour."
+- **Dynamic colours** — global switch, directly under it. "Surface colours come
+  from the playing track's artwork. Works with or without background blur."
+- **Surface colours** — one row each for **Main pages**, **Navigation bar**,
+  **Miniplayer**, **Full player**. Each row shows a colour preview and a line like
+  "From the current artwork · artwork behind it", "Your colour · solid colour" or
+  "DHUN default · blur paused".
+- Tapping a row opens that surface's dialog, in this order: preview strip,
+  "Showing: …", **Quick colours** (**Default** plus Violet, Azure, Jade, Amber,
+  Rose, Cyan) and **More colours**, then **Overrides for this surface** — a
+  **Background blur here** switch and a **Take colour from artwork** switch — then
+  **Restore defaults**. **More colours** opens **Custom colour** with a large
+  preview, Hue / Saturation / Lightness gradient sliders, Cancel and **Use colour**.
+- **Backdrop detail** (below) holds **Adaptive blur** (disabled while Background
+  blur is off: "Paused while Background blur is off. Your choice is remembered.")
+  and **Blur strength**.
 
-Playing something first makes all of this easier to judge: with no track, there
-is no artwork colour to see.
+The two switches at the top are the whole global model; the two switches inside a
+surface only affect that surface. If *that* reads ambiguously to you on a real
+screen, it is a finding — say so in §4 rather than editing the copy yourself.
+
+Play something first: with no track there is no artwork colour to judge. For the
+checks below you need **three covers**: a bright/busy one, a very dark one, and a
+highly saturated one. Put them next to each other in the queue (the album of a
+colourful record is usually enough), because every check below is about what
+changes when the cover does.
 
 ## 3. Environment record — fill this in
 
@@ -83,156 +102,216 @@ is no artwork colour to see.
 | Build installed (file name) | | |
 | Build commit (from About) | | |
 | Date + local time | | |
-| Does this device support real blur? (Android 12 / API 31 or newer) | | |
+| Supports real blur? (Android 12 / API 31+) | | |
 
-## 4. The six checks
+## 4. The checks
 
-For each check: do it, then write **PASS / FAIL** plus one sentence and (on
-FAIL) a screenshot name. If you cannot judge something, write "not judged" —
-that is a useful answer, a guess is not.
+For each: do it, then write **PASS / FAIL / not judged** plus one sentence and, on
+FAIL, a screenshot name. "Not judged" is a useful answer; a guess is not.
 
-### Check 1 — Artwork bloom quality
+### Check 1 — Blur OFF genuinely removes the thumbnail
 
-Pick three tracks with very different covers: one **dark**, one **near-white or
-pale**, one **strongly saturated** (deep red, green or blue).
+This is the check that decides whether the switch means anything.
 
-1. Play the track, go to **Home**.
-2. Look at the colour behind the shelves. There should be a soft glow, strongest
-   near the top-left corner, with the page's own background colour still
-   visible through it.
-3. Repeat for all three covers.
+1. Play a track with a recognisable cover. Note the page backdrop.
+2. Turn **Background blur** off.
+3. Look at **Home**, **Search**, **Library**, the **Miniplayer**, the **Full
+   player**, the track **overflow menu** (long-press/⋮ on a track) and a
+   **dialog** (Settings itself).
+4. Repeat with the device in the light theme.
 
-Passes if: the glow reads as *light in the room*, not a painted wall; the three
-covers look different from each other; no grey rectangle, banding or visible
-blur edge appears where the blurred cover ends.
-Fails if: colours are harsh, the screen looks flat-tinted, there is a seam, or
-text on top becomes harder to read than with no track playing.
+Passes if: no cover, no cropped or dimmed fragment of a cover, and no grey slab
+of it is visible anywhere; surfaces are flat coloured glass.
+Fails if: any surface still shows the artwork — sharp, dimmed, washed or as a
+blurred remnant — or the screen turns plain black/white with no colour at all.
 
-### Check 2 — Settings readability
+### Check 2 — The four combinations
 
-1. With a **bright, busy** cover playing, open **Settings → Appearance**.
-2. Read: every group title, every switch subtitle, the "Showing: …" line in the
-   per-section dialog, the colour-layer labels, and the confirm dialog text.
-3. Repeat with a **very dark** cover.
-4. Repeat in the **light theme** (Appearance → theme).
+Set a distinctive colour on **Main pages** first (for example Jade), then visit
+each combination and confirm what you see:
 
-Passes if: all of the above stays comfortably readable, disabled rows still look
-deliberately disabled rather than invisible, and the theme and accent pickers
-remain distinguishable.
-Fails if: any label washes into the background, a selected/unselected state
-becomes ambiguous, or the palette dialog's preview strip makes its own text
-unreadable.
+| Background blur | Dynamic colours | Expect on the pages |
+| --- | --- | --- |
+| off | off | solid Jade-tinted surface, **no artwork at all** |
+| off | on | surface coloured from the cover, **still no artwork** |
+| on | off | blurred cover, tinted Jade |
+| on | on | blurred cover, coloured from the cover |
 
-### Check 3 — Section-specific blur
+Passes if all four are visibly different and match the table.
+Fails if "off + on" looks identical to "off + off", or "on + off" ignores the
+picked colour.
 
-1. Play a track. In **Section backgrounds → Home**, turn **Blur on this
-   surface** off and close the dialog.
-2. Go to **Home**: it should now be sharp (the cover visible, still dimmed by the
-   veil). Go to **Search** and **Library**: both should still be frosted.
-3. From **Library**, open a playlist, then an album. Those pages paint their own
-   cover backdrop; they must match **Library's** setting (frosted), not Home's.
-4. Turn **Library's** blur off too and re-open the album: it should now be sharp.
-5. Turn the master **Background blur** off: everything becomes sharp, and the
-   per-section rows show as held by the global switch. Turn the master back on:
-   Home and Library return to sharp (their own choice), Search to frosted.
-6. Repeat for **Miniplayer** (the dock above the tabs) and **Full player** (tap
-   the dock to expand).
+### Check 3 — One colour per surface, independently
 
-Passes if: exactly the surface you changed changes; the others do not; re-enabling
-the master restores each section's own choice.
-Fails if: changing one section changes another, a detail page follows a
-different section than the tab it was opened from, or a section's choice is lost
-across a master toggle.
+1. Give the four surfaces four different colours: Main pages **Jade**,
+   Navigation bar **Violet**, Miniplayer **Amber**, Full player **Rose**.
+2. Turn **Dynamic colours** off so the picks are what you see.
+3. Visit each surface. Then change only the navigation bar's colour to **Azure**
+   and check again.
+
+Passes if: each surface shows its own colour; the tab bar/rail is visibly its own
+colour rather than inheriting the dock; changing one surface leaves the others
+untouched.
+Fails if: two surfaces always share a colour, changing one changes another, or the
+navigation bar shows no colour of its own.
+
+### Check 3b — The full player's own colour is visible while blur is on
+
+This is the combination that used to fail silently: with the artwork behind the
+player, the scrim was the theme's grey, so a colour picked for the player did
+nothing.
+
+1. Open one surface dialog at a time and give **Full player** a strong colour
+   (Jade, then Rose).
+2. Turn **Dynamic colours** off, leave **Background blur** on.
+3. Open the full player. Then close it and compare Home.
+
+Passes if: the player's blurred artwork is visibly tinted with the chosen colour
+(not grey), and the pages use the *pages'* colour, not the player's.
+Fails if: the player looks neutral/grey, the pages change with the player, or the
+controls' text contrast visibly drops.
+
+### Check 3c — Custom colour sliders and their draft
+
+1. Open **Main pages → More colours**. Drag **Hue**, then **Saturation**, then
+   **Lightness**. The large preview and each gradient track should update.
+2. Tap **Cancel**. The surface must keep its previous colour. Open More colours
+   again, choose a visibly different colour and tap **Use colour**.
+3. Repeat for one other surface, restart the app, and check both custom colours
+   survived. Repeat the editor in the light theme and with TalkBack enabled.
+
+Passes if: the sliders are easy to drag, their labels/values are readable, the
+preview matches the chosen colour, Cancel discards and Use colour applies the
+draft, and only the intended surface changes.
+Fails if: a track is invisible or misleading, dragging stutters, Cancel saves,
+Use colour does nothing, or the colour is lost on restart.
 
 ### Check 4 — Palette transitions
 
-1. Queue two tracks whose covers are very different in hue (for example a warm
-   orange cover next to a cool blue one).
-2. Skip back and forth between them several times while watching the background.
+1. Queue two tracks whose covers are very different in hue (for example warm
+   orange next to cool blue).
+2. Skip back and forth several times, watching the background, with Dynamic
+   colours on.
 
-Passes if: the background fades from one palette to the other over roughly half
-a second, with no flash to grey/black, no jump, and no visible intermediate
-colour that belongs to neither track.
-Fails if: you see a flicker, a snap, a sudden white or black frame, or the
-background briefly falls back to the default palette before the new colour
-arrives.
+Passes if: the colour fades from one to the other in roughly half a second, with
+no flash to grey/black and no jump.
+Fails if: you see a flicker, a snap, or an intermediate colour belonging to
+neither track.
 
-### Check 5 — Android 8–11 (no real blur)
+### Check 5 — Settings readability and live preview
 
-Needs a device or emulator on **API 30 or older** (in Android Studio: Device
-Manager → Create device → system image API 30 → run).
+1. With a **bright, busy** cover playing, open **Settings → Appearance**.
+2. Read: every switch subtitle, each surface row's "Showing: …" line, the swatch
+   labels, and the confirm dialog text. Open one surface dialog and watch its
+   preview strip while the track changes.
+3. Repeat with a **very dark** cover, and in the **light theme**.
 
-1. Play a track and go to Home.
-2. Confirm the cover is dimmed by the veil but **not** frosted.
-3. Open **Settings → Appearance**: the caption "This device cannot render real
-   blur. Your choices are saved, and the cover is dimmed instead of frosted."
-   must be present.
-4. Toggle every blur switch, change sections, and restart the app.
+Passes if: everything stays comfortably readable, disabled rows look deliberately
+disabled, and the preview follows the track.
+Fails if: any label washes into the background, the selected swatch is ambiguous,
+or the preview disagrees with what the surface actually paints.
 
-Passes if: the caption appears, nothing frosts, the switches still save and
-restore, and nothing crashes or shows a blank/black background.
-Fails if: the app renders an unblurred *and* undimmed cover under text, shows no
-explanation, or the settings do not survive a restart.
+### Check 6 — Android 8–11 (no real blur)
 
-### Check 6 — Layer ordering
+Needs an **API 30 or older** device/emulator (Android Studio → Device Manager →
+system image API 30).
 
-With a track playing, blur on and dynamic colours on, inspect each layer from the
-back forwards:
+1. Play a track, go to Home.
+2. Confirm the cover is dimmed by the veil but **not** frosted, and that the
+   Settings page says "This device cannot blur artwork…".
+3. Toggle every switch, change surface colours, restart the app.
 
-1. Page colour wash (the base tint) — behind everything.
-2. Blurred cover.
-3. The veil/scrim that dims it.
-4. Cards, rows and text.
-5. The miniplayer dock above the tab bar.
-6. The full player, which must cover the tab bar and the dock completely.
-7. A floating menu: long-press / overflow a track and open its menu — first from
-   Home, then from inside the full player.
+Passes if: the caption appears, nothing frosts, the switches and colours save and
+restore, and nothing crashes or goes blank.
+Fails if: an unblurred and undimmed cover sits under text, the explanation is
+missing, or settings do not survive a restart.
 
-Passes if: each layer above is visible and none is painted behind something that
-should be under it; the menu is fully above the dock and the content; the menu
-frosts with the switches of the surface it was opened over.
-Fails if: the veil or a tint is drawn on top of text, the dock is clipped by the
-tab bar, a menu appears behind a surface, or a menu opened in the player is
-frosted like a page.
+### Check 7 — Layer ordering
+
+With a track playing, blur on and Dynamic colours on, inspect from the back:
+
+1. Page colour, 2. blurred cover, 3. veil/scrim, 4. cards, rows and text,
+5. the miniplayer dock above the tab bar, 6. the full player (must cover the tab
+bar and the dock completely), 7. a track menu opened first from Home and then from
+inside the full player.
+
+Passes if: each layer is visible and nothing is painted behind something that
+should be under it; the menu is fully above the dock and content; the menu follows
+the surface it was opened over.
+Fails if: a veil/tint is drawn on top of text, the dock is clipped by the tab bar,
+a menu appears behind a surface, or a menu opened in the player is coloured like a
+page.
+
+### Check 8 — Upgrading does not lose your colours
+
+Needs two builds on one device: the **previous `test` draft** (the build that had
+the old palette picker) and the build under test. Installing the second over the
+first keeps app data.
+
+1. On the old build, give **Home** one colour, **Search** a different one, and the
+   **miniplayer** a third; turn *Dynamic colours* off so they are what you see.
+2. Install the new build over it (do **not** clear data). Open Settings →
+   Backgrounds.
+3. Also test the older public pre-release if you have it: those builds predate the
+   switches entirely and only stored a blur strength. Set the strength slider to
+   its minimum there, then upgrade.
+
+Passes if: *Main pages* shows one of the two page colours (Home's, if Home had
+one), the miniplayer keeps its colour, the two global switches keep their values,
+and the app starts without a crash or a reset to defaults.
+Fails if: every surface comes back at "DHUN default", the miniplayer loses its
+colour, or the switches flip back on by themselves.
+
+Expected and documented, not a failure: Home and Search can no longer have
+*different* colours, because they are one surface now. The old rows are left in
+the database rather than deleted.
 
 ### Record your results
 
-| Check | Result (PASS/FAIL/not judged) | Note | Screenshot |
+| Check | Result | Note | Screenshot |
 | --- | --- | --- | --- |
-| 1. Bloom quality | | | |
-| 2. Settings readability | | | |
-| 3. Section-specific blur | | | |
+| 1. Blur off removes the thumbnail | | | |
+| 2. Four combinations | | | |
+| 3. One colour per surface | | | |
+| 3b. Full player colour visible with blur on | | | |
+| 3c. Custom colour sliders and draft | | | |
 | 4. Palette transitions | | | |
-| 5. Pre-Android-12 fallback | | | |
-| 6. Layer ordering | | | |
+| 5. Settings readability + preview | | | |
+| 6. Pre-Android-12 fallback | | | |
+| 7. Layer ordering | | | |
+| 8. Upgrade keeps colours | | | |
 
-## 5. Known limitations you can confirm rather than "find"
+## 5. Known limitations to confirm rather than "find"
 
-These are documented trade-offs, not bugs to report. Each has a symptom you can
-look for, and a condition under which it *would* deserve a code change.
+Documented trade-offs, not bugs. Each has a symptom to look for and a condition
+under which it would deserve code.
 
 | Limitation | What you may notice | Becomes a bug if… |
 | --- | --- | --- |
-| Colours are derived from a hash of the artwork URL, not sampled from the image (one image pipeline by design) | Two different covers can land in a similar colour family, and a cover's glow need not match its dominant colour | The mismatch is obvious on most covers — then bitmap sampling has to be brought into the same pipeline deliberately, not as a second one |
-| The dynamic blur band (70–100 %) was reasoned, not profiled | Bright/busy covers keep the full frost; dark/calm covers are slightly sharper — the difference between two extremes is subtle | On a real screen the difference is invisible (the feature does nothing) or so large that songs look sharp vs. smeared |
-| A failed colour extraction falls back to the default palette instead of retrying | A track with unusable artwork shows the DHUN default colours | The default flashes on tracks that clearly *do* have artwork, i.e. the failure is ours, not the image's |
-| Layer order is reasoned from the composition, never seen | See Check 6 | Any layer is visibly in the wrong place |
-| Readability comes from the scrim and brightness veil, not per-text contrast maths | Very bright or high-frequency artwork can still be busier behind text | A specific label is hard to read in a specific state — pin that state down, then raise the surface opacity rather than the artwork |
+| Colours derive from a hash of the artwork URL, not sampled pixels (one image pipeline by design) | Two different covers can land in a similar colour family; a cover's glow need not match its dominant colour | The mismatch is obvious on most covers |
+| The adaptive band (70–100 %) was reasoned, not profiled | Bright/busy covers keep full frost, dark/calm ones slightly less | The difference is invisible, or songs look sharp vs. smeared |
+| A failed extraction falls back to the surface's colour | A track with unusable artwork shows your colour / the default | The default flashes on tracks that clearly have artwork |
+| Solid surfaces use a stronger tint (0.55 vs 0.30) with the same luminance clamp | Picked colours read as deep coloured surfaces, not bright ones | Colours look like mud, or text contrast visibly degrades |
+| Custom colours use three sliders rather than a hex field | Hue, Saturation and Lightness cover the full range without colour-notation knowledge | A slider is hard to drag, its track does not match the result, or Cancel/Use colour saves the wrong value |
+| Layer order is reasoned from the composition, never seen | See Check 7 | Any layer is visibly in the wrong place |
+| Version-1 installs lose per-tab colours | Home/Search/Library keep one colour after upgrading; the old rows stay in the database | You relied on Home and Search having *different* colours |
+| Version-1 palettes had three layers; version 2 keeps one | The imported colour is the one you picked (the old `secondary`); the derived wash and companion glow are re-derived | A surface looks flatter than it did before upgrading |
 
 ## 6. What was verified without a device (this session)
 
-Static audit plus gates, recorded here so the audit is not repeated:
+- **Unit tests** cover every cell of the blur × colour matrix on all four
+  surfaces, per-surface independence, one surface opting out of artwork colour,
+  colour with the artwork removed, adaptive bounds, the strength floor, the
+  luminance band for solid and blurred palettes in both themes, the colour codec,
+  persistence across a restart, both migrations and an unwritable database.
+- **Design gates** (`scripts/test_design_system.py`): the two features may not
+  read each other's switches; every artwork layer must gate on the blur switch
+  (`paintsArtwork` / `showsArtwork`); `NowPlayingBackdrop` must return *before*
+  building its image request; the four surfaces must each be wired to their own
+  component; the settings screen must not expose palette layers.
+- **Audited, not observed:** one artwork-seed writer in the shell, palette
+  animation that never passes through the default on a track change, per-surface
+  reads in MiniPlayer/FullPlayer/navigation, and the pre-API-31 branch that skips
+  `Modifier.blur` and keeps the veil.
 
-- **Found and fixed:** album, artist and playlist pages painted their backdrop
-  with a hardcoded `BackgroundSection.HOME`, so a page opened from Library kept
-  Home's blur switches. The section is now inherited from
-  `LocalBackgroundSection` on all three, exactly like the dock, the dialogs and
-  the player — see `docs/design/glass-system.md` §3a and the new
-  `test_page_backdrops_follow_the_page_they_are_composed_on` gate.
-- **Re-checked in code:** one artwork seed writer (`DhunAppearance`-style single
-  `LaunchedEffect` in the shell), palette crossfades via `animateColorAsState`
-  with no path back through the default palette on a track change, per-section
-  reads in `MiniPlayer`, `FullPlayer` and the shell, and the pre-API-31 branch
-  (`supportsRealtimeBlur`) that skips blur entirely and keeps the veil.
-
-None of that is a substitute for §4.
+None of that substitutes for §4.

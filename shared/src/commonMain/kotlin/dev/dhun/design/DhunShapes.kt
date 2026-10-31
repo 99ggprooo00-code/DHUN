@@ -5,10 +5,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 
 /**
- * DHUN's corner scale — extra-large on primary media cards, pill chips, one
- * `navIndicator` for the tab pill. Material 3's shape *theme* is never what
- * these are read from: the values live here so every glass panel, chip and
- * button rounds the same way (`docs/design/glass-system.md`).
+ * Material 3 shape scale — extra-large on primary media cards, pill chips.
+ * Keeps the product feeling rounded and premium without Liquid Glass.
  */
 object DhunShapes {
     val extraSmall = RoundedCornerShape(4.dp)
@@ -19,7 +17,7 @@ object DhunShapes {
     val extraExtraLarge = RoundedCornerShape(32.dp)
     val full = CircleShape
 
-    // Semantic aliases — named by what they are used for, not by a Material role.
+    // Semantic aliases (M3 roles)
     val card = large
     val cardLarge = extraLarge
     val chip = full // pill filter / assist chips

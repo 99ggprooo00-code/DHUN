@@ -44,14 +44,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import dev.dhun.core.PlaybackState
 import dev.dhun.design.ArtworkColorExtractor
 import dev.dhun.design.ArtworkColors
-import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunAppearance
+import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
-import dev.dhun.design.background.BackgroundSection
 import dev.dhun.design.components.AcrylicSurface
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunIconButton
@@ -259,12 +258,8 @@ fun MiniPlayer(
         // The dock owns the blurred artwork and veils this row with acrylic.
         Box(modifier = modifier.fillMaxWidth()) { miniContent() }
     } else {
-        // The standalone card is the miniplayer background section: the surface
-        // itself carries that section's palette tint and frost, so a manual
-        // palette or the artwork colours reach the floating card too.
         AcrylicSurface(
             artworkUrl = track.thumbnailUrl,
-            section = BackgroundSection.MINI_PLAYER,
             modifier = modifier.fillMaxWidth(),
             shape = DhunShapes.large,
         ) {

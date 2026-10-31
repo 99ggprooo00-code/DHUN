@@ -12,8 +12,6 @@ import dev.dhun.domain.HomeMood
 import dev.dhun.domain.GetHomeFeedUseCase
 import dev.dhun.domain.GetRecommendationsUseCase
 import dev.dhun.domain.ToggleFavoriteUseCase
-import dev.dhun.presentation.MutationState
-import dev.dhun.presentation.MutationTracker
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.combine
 import dev.dhun.data.SettingsKeys
@@ -47,17 +45,6 @@ class HomeViewModel(
     settings: SettingsRepository? = null,
 ) {
     private val toggleFavoriteUseCase = ToggleFavoriteUseCase(libraryRepository)
-
-    /**
-     * The Like control is on every track row, and it used to be a bare
-     * `scope.launch { toggleFavoriteUseCase(track) }`: a write failure either
-     * vanished or reached the platform's uncaught handler (an app crash on
-     * Android) while the heart simply stayed as it was. Failures are now a
-     * message the shell renders as a banner.
-     */
-    private val mutations = MutationTracker(scope)
-    val mutation: StateFlow<MutationState> = mutations.state
-    fun dismissMutationError() = mutations.dismissError()
 
     // Generation, feed and request flags change atomically. A separate generation
     // check followed by a UI write could still overwrite a concurrent refresh on
@@ -299,11 +286,10 @@ class HomeViewModel(
     }
 
     fun toggleFavorite(track: Track) {
-        mutations.run("like:${track.id}", FAVORITE_FAILED) { toggleFavoriteUseCase(track) }
+        scope.launch { toggleFavoriteUseCase(track) }
     }
 
     private companion object {
-        const val FAVORITE_FAILED = "Could not update Liked Songs. Try again."
         const val MAX_EMPTY_PAGES = 3
         /** Distinct recent plays that form the seed signal for recommendations. */
         const val RECOMMEND_SEED_SIGNAL = 10

@@ -27,6 +27,10 @@ No custom DHUN backend is part of the current architecture. Local persistence is
 - Use existing design tokens/components in `shared/design/`; do not invent ad hoc colors, radii, blur values, spacing, icons or one-off dialog styles.
 - Keep I/O, database access, network access, artwork processing and downloads off the UI thread. Expose progress/results through observable state.
 - Treat provider output, artwork URLs, links and file paths as untrusted. Validate IDs and URLs; never log cookies, tokens, personal data or stream URLs with sensitive query parameters.
+- Continuation belongs to a request generation and a result/category identity. Accept a page only for the current generation, append each item once, retain earlier results on failure, require explicit retry after failure, and stop on a repeated cursor or an empty-page policy rather than looping.
+- Initial and continuation Search requests must carry the same result filter. Parser output must populate the same songs/videos/artists/albums/playlists collections consumed by the UI.
+- Artwork recovery is shared at extraction/loader boundaries: preserve original source URLs, try a bounded real candidate set, use genuine video artwork only for valid IDs, and keep downloaded local artwork ahead of network recovery. Do not add screen-specific fake images.
+- Playlist covers use the ordered first nonblank stored track cover with the playlist's own cover as fallback; this derivation must work for existing sparse rows without resetting or rewriting user data.
 - Do not add authentication, server-side proxying, a web-player framework, new extraction mechanism or platform target without an accepted ADR.
 - Keep `website/` and `app-web/` isolated in code but identical in design. The marketing site does not import app runtime code — it ships none — yet it renders the app's shell and reads the app's tokens at build time; neither surface may promise browser playback the repository cannot keep.
 

@@ -16,13 +16,9 @@ import dev.dhun.core.map
 import dev.dhun.innertube.SearchFilter
 
 /**
- * Existing native metadata/playback seam; currently implemented only by
- * YouTubeMusicProvider. It is NOT source-neutral yet: SearchFilter is imported
- * from InnerTube, arguments/ids are video/browse-shaped, and callers/storage
- * assume that identity. Provider-scoped ids/capabilities and auth/player adapters
- * need a separately reviewed design/migration before adding another source.
- * See docs/PRD.md §1 and ADR-010 D5; Spotify is planned, not implemented.
- * Resolver fallback within YouTube is distinct from adding a music provider.
+ * The provider abstraction — the ONLY music-source API the application and
+ * UI layers are allowed to see. YouTube-specific types never cross this
+ * boundary.
  */
 interface MusicProvider {
     suspend fun search(query: String, filter: SearchFilter = SearchFilter.SONGS): DhunResult<SearchResults>

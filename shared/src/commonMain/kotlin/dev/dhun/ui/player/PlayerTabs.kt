@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -56,7 +57,6 @@ import dev.dhun.core.Track
 import dev.dhun.data.PlayContext
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunColors
-import dev.dhun.design.components.resolveGlassArtwork
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
@@ -560,34 +560,16 @@ internal fun LyricsProviderPicker(
                     tint = accent,
                 )
             }
-            // Anchored Material popup, transparent container, frosted DHUN
-            // surface inside — the same menu material as the track overflow
-            // menu, so the provider list is not the one stock Material popup in
-            // the player (docs/design/glass-system.md §2).
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                shape = DhunShapes.large,
-                containerColor = Color.Transparent,
-                tonalElevation = DhunSpacing.zero,
-                shadowElevation = DhunSpacing.zero,
-            ) {
-                TrackMenuSurface(
-                    artworkUrl = resolveGlassArtwork(null),
-                    modifier = Modifier.width(DhunSpacing.menuMinWidth),
-                    shape = DhunShapes.large,
-                ) {
-                    lyricsProviderOptions.forEach { (id, label) ->
-                        MenuActionRow(
-                            label = label,
-                            icon = if (id == selectedProvider) DhunIcon.Check else null,
-                            modifier = Modifier.semantics { selected = id == selectedProvider },
-                            onClick = {
-                                expanded = false
-                                if (id != selectedProvider) onSelect(id)
-                            },
-                        )
-                    }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                lyricsProviderOptions.forEach { (id, label) ->
+                    DropdownMenuItem(
+                        text = { Text(label) },
+                        modifier = Modifier.semantics { selected = id == selectedProvider },
+                        onClick = {
+                            expanded = false
+                            if (id != selectedProvider) onSelect(id)
+                        },
+                    )
                 }
             }
         }

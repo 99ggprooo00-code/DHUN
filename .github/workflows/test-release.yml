@@ -122,11 +122,13 @@ jobs:
           TEST_VERSION_CODE: ${{ steps.test_version.outputs.version_code }}
         run: |
           aapt=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)
+          apksigner=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
           test -n "$aapt"
+          test -n "$apksigner"
           if [ "$DHUN_RELEASE_CHANNEL" = public ]; then
-            python scripts/check_android_identity.py "$aapt" out '1.00.002' 7
+            python scripts/check_android_identity.py "$aapt" out '1.00.002' 7 --apksigner "$apksigner"
           else
-            python scripts/check_android_identity.py "$aapt" out "$TEST_VERSION_NAME" "$TEST_VERSION_CODE"
+            python scripts/check_android_identity.py "$aapt" out "$TEST_VERSION_NAME" "$TEST_VERSION_CODE" --apksigner "$apksigner"
           fi
 
       - uses: actions/upload-artifact@v6

@@ -22,7 +22,189 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Native loading, artwork and continuation recovery (2026-10-31, PR #217)
+
+- The phone-tested `c8d5dc1` and later `2a6038d` packages are **not accepted as
+  recovery fixes**. The latter still had filtered Search HTTP 400, no new-download
+  blurred artwork outside Full Player, ineffective custom-colour brightness and
+  empty Related. New source work repairs served request context, bounded HTTP 400
+  recovery, independent Home-category paging, generation-scoped continuation and
+  shared real-artwork candidates. Exact phone-side service triggers remain
+  unproven until the affected device accepts a corrected build.
+- Home categories retain their own results, cursors and scroll positions; failed
+  pages stay visible with real Retry and never silently fall back to For You.
+  Search retains successful results on continuation failure, rejects stale pages,
+  deduplicates rows and terminates repeated cursors.
+- Search Videos now populates the actual video result list and preserves its filter
+  across continuation. Removing one recent search reports persistence failure
+  through the existing mutation UI instead of escaping an unguarded coroutine.
+- Filtered Search HTTP 400 now has one same-type current-params compatibility path,
+  never an unfiltered/content fallback. Related requests the current persistent
+  audio panel while preserving its parser, continuation and queue behavior.
+- New downloads persist bounded real artwork candidates including genuine video
+  covers, and the shell backdrop uses the same shared loader as Full Player.
+  Color-only/custom backgrounds now consume Brightness through a neutral-at-55
+  shared overlay, leaving the established default palette unchanged.
+- Local playlist rows use shared artwork rendering; ordered nonblank track covers
+  support existing sparse data without a schema migration. Remote playlists now
+  have scoped `/browse` continuation, retryable paging and bounded termination.
+- Regression coverage includes request contracts, Home/Search/playlist state,
+  alternate artwork shapes, video-filter typing, SQL cover reorder/removal and
+  cancellation/stale-result behaviour. See
+  `docs/verification/38-native-application-recovery.md` for causes, origins, run
+  IDs and remaining Android/Windows acceptance. Green CI is not device recovery.
+
+### Android test-package upgrade and signature gates (2026-10-31, session `arena/09e5238e-dhun`)
+
+- An arm64-v8a phone reported Android's generic "package appears to be invalid"
+  while installing the earlier PR artifact. The exact PackageInstaller failure
+  code was not captured, so this is not yet a proven on-device root cause or fix.
+- The fast Build APK path no longer packages public versionCode `7` over newer
+  test installations. Build APK and test-release now allocate test APK versionCodes
+  from one Unix-time sequence while retaining readable run/attempt versionNames;
+  universal, arm64-v8a and armeabi-v7a variants from one job share that identity.
+  Public `1.00.002` versionCode `7`, existing releases, tags and assets are unchanged.
+- Both APK workflows now check the actual universal and per-ABI packages with
+  `aapt` and require DHUN's expected test certificate through `apksigner`.
+  Regression tests cover cross-workflow version ordering, clock bounds, complete
+  package sets, current `V2 Signer`/legacy signer output and wrong/missing/extra
+  signers. Device installation remains open
+  in `docs/verification/36-pr217-device-install.md`.
+
+### Simpler surface colours with custom HSL sliders (2026-10-31, session `arena/09e5238e-dhun`)
+
+- **Quick colours** keeps the named swatches as a one-tap choice. **More colours**
+  opens a focused custom-colour view with a large preview and Hue, Saturation and
+  Lightness gradient sliders, rather than asking for a hex value or palette layers.
+- The custom editor is a draft: Cancel/back discards it and **Use colour** applies
+  it through the same per-surface setter as a quick swatch. No new preference,
+  palette, background pipeline or global colour control was added.
+- `DhunColourSlider` keeps the accessible Slider primitive inside the design
+  system and paints the meaningful ramp into DHUN's rounded, hairline-edged track.
+  `HslColorTest` covers primary/secondary hues, round trips, achromatic colours,
+  clamping/wrapping, gradient endpoints and opaque codec-compatible output.
+
+The 510 Python repository checks pass, including the default-Material design gate.
+Kotlin/Android CI is required for compilation and JVM tests. Slider touch behavior,
+preview appearance and saved colours on a real device remain **unverified**; Check
+3c in `docs/verification/35-background-visual-validation.md` records the procedure.
+
+### Home loading diagnostics and response compatibility (2026-10-31, session `arena/09e5238e-dhun`)
+
+- Live anonymous Home responses were parsed by DHUN itself in CI for both US and
+  Nepal contexts (run `41150960094`): US 2 sections/30 items, Nepal 2/20, both
+  with a continuation. This does **not** prove the reported phone is fixed; its
+  exact exception was not available before this change.
+- Home no longer throws away the error detail. A bounded, URL-redacted technical
+  detail is available below Retry and in Android's `DHUN` logcat, so a screenshot
+  can distinguish an HTTP rejection, homepage discovery failure or response-shape
+  mismatch. Retry is pinned to issue a fresh request.
+- Browse accepts `musicTabRenderer` as well as `tabRenderer`; client-version
+  discovery accepts JSON whitespace and reports homepage HTTP status on failure;
+  malformed/non-object JSON is a `Parse` error with its endpoint rather than an
+  `Unknown` error retried as though it were transient.
+- New JVM regressions cover normal/empty/malformed responses, optional and unknown
+  fields, unknown and partially broken shelves, HTTP errors, both tab renderers,
+  sanitized details and Retry. A Robolectric test covers the same failure with
+  Android SQLite and Android logging. The strict fixture gate validates 40 JSON
+  files. The temporary live-probe workflow was removed after collecting its annotations.
+
+See `docs/verification/37-home-loading-diagnostics.md` for evidence and the simple
+phone screenshot/log procedure. **No on-device Home verification has happened.**
+
+### Audit of the background controls: the surface colour now reaches every surface (2026-10-30, session `arena/09e5238e-dhun`)
+
+Four defects found reading the shipped feature against the brief, each with a
+regression test or a design gate:
+
+- **The full player ignored its own colour while blur was on.** Its scrim and dim
+  used the theme's neutral rung, and its palette layer sits *underneath* the
+  artwork backdrop, so "blur + my colour" and "blur + artwork colour" looked the
+  same in the player — the one surface made of artwork was the one surface a
+  manual colour could not reach. `BackgroundPalettePolicy.veilTintFor` gives the
+  veil the surface's hue at the theme veil's luminance, pinned exactly, so every
+  contrast number the ladder was built on still holds for any colour; both
+  backdrops use it.
+- **A third switch sat between the two globals.** *Adaptive blur* now lives with
+  *Blur strength* under **Backdrop detail**: it is a detail of an enabled blur,
+  not a third global, and the two-switch block reads as exactly two decisions.
+- **The component dialog led with overrides instead of the colour.** Swatches come
+  first; *Background blur here* and *Take colour from artwork* sit under "Overrides
+  for this surface", disabled while their global is off and naming it in the
+  caption.
+- **Migration could prefer a section with no colour.** *Main pages* takes its
+  flags from the first saved section and its colour from the first section that
+  actually saved one, and a section that only saved a `primary` wash still
+  migrates a colour. Version-1 rows are read once, never rewritten or removed, so
+  nothing is destroyed — only Home/Search/Library's *differences* cannot be shown
+  by one surface, which is documented rather than silently dropped.
+
+Verified: `python3 -m unittest discover -s scripts -p 'test_*.py'` (509 tests, 12
+design gates) and CI `:shared:jvmTest` on Ubuntu and Windows. **Not** visually
+verified: no device, emulator or interactive desktop in this environment; the
+eight manual checks are in
+`docs/verification/35-background-visual-validation.md` (OPEN).
+
+### Background blur and dynamic colours: two switches, four surfaces (2026-10-30, session `arena/09e5238e-dhun`)
+
+The controls from #216 asked the user to assemble a palette (`primary`,
+`secondary`, `tertiary`) and never made "blur off" mean what it says. This
+replaces that model with the two decisions the owner actually described, and
+makes **individual interface areas** customisable.
+
+- **Two independent switches.** *Background blur* puts the playing track's
+  artwork behind the interface; off removes it **entirely** — no sharp copy, no
+  dimmed copy, no decode. *Dynamic colours* takes surface colours from that
+  artwork and is independent of blur, so all four states work: solid + own
+  colours, solid + artwork colours, blurred + own colours, blurred + artwork
+  colours. *Adaptive blur* is a sub-choice of an enabled blur, not a third
+  feature; the strength slider still cannot impersonate the off switch.
+- **Four surfaces replace five sections and three layers.** `BackgroundComponent`
+  is `PAGES` (Home, Search, Library and the pages opened from them),
+  `NAVIGATION` (tab band / rail), `MINI_PLAYER`, `FULL_PLAYER`. Each saves one
+  colour (or "DHUN default") and its own blur switch, plus an opt-out of artwork
+  colour for that surface alone. The navigation bar is now a real surface with
+  its own tint — it previously only ever showed the dock's frost.
+- **The palette is derived from that one colour**: base wash plus two related
+  glows (`BackgroundPalettePolicy.paletteFrom`), so what a swatch shows is what
+  the surface paints. With no artwork behind it the base uses a stronger tint
+  (`SOLID_BASE_TINT_ALPHA`) so the chosen colour is visible rather than a 30% wash
+  over near-black; the luminance clamp still holds the surface inside the
+  measured contrast band (to `CLAMP_TOLERANCE`, 0.002 — a `Color` packs its
+  components, so a colour clamped exactly onto the band edge reads back a
+  fraction off it).
+- **"Blur off" is a paint gate, not a radius of zero.** Every artwork layer
+  (`NowPlayingBackdrop`, `LyricsArtworkLayer`, `GlassCard` frost,
+  `PlayerBackdrop`, the player's `ArtworkBackdrop` and lyrics card) returns
+  before drawing, so nothing thumbnail-derived remains on screen.
+- **Settings** are rebuilt around the two switches and the four surfaces: a
+  colour preview per surface, "Showing: …" naming the effective source, a blur
+  switch and an artwork-colour switch per surface, quick named colour swatches
+  plus the custom HSL editor described above, and restore-defaults per surface
+  and for all of them.
+- **Migration is additive and one-shot.** `background_profile_version` 0 → 1
+  still imports the legacy slider (`backdrop_blur = 0` = blur off, slider reset
+  to the shipped strength); 1 → 2 imports the five per-section palettes into the
+  component model — Home/Search/Library collapse into *Main pages* (first saved
+  section wins), the dock and player map one-to-one, the version-1 `secondary`
+  layer becomes the surface colour, and the navigation bar starts at its default
+  because version 1 had no navigation colour. Version-1 rows are read once and
+  then left alone; "reset everything" clears both shapes.
+- **Tests.** `BackgroundSettingsTest` covers every cell of the two-switch matrix
+  on all four surfaces, per-surface independence, the opt-out of artwork colour,
+  colour with no artwork, adaptivity bounds, the strength floor, luminance-band
+  safety (including solid palettes in both themes), the colour codec,
+  persistence across a restart, both migrations and an unwritable database.
+  `scripts/test_design_system.py` gained `test_blur_off_means_no_artwork_is_painted`
+  and a surface-wiring gate, and now fails if a palette-layer picker returns.
+
 ### Background blur, dynamic blur and dynamic colours are real settings (2026-10-30, session `arena/83a7841b-dhun`)
+
+> **Superseded 2026-10-30** by the entry above. The three global switches and
+> the per-section model described here were correct as far as they went, but
+> they exposed palette *layers* to the user and let "blur off" keep painting the
+> cover. The entry above replaces the five sections with four surfaces, one
+> colour each, and makes blur-off remove the artwork. Kept as history.
 
 The Settings screen had one slider named "background blur" that changed a
 percentage, and nothing else: no way to turn blur off, no way to say whether the

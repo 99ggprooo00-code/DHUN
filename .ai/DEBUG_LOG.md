@@ -4688,3 +4688,80 @@ have passed; the sweep queried for the app's links, and the app had none because
 a different layer had mislabelled its data. Ask what a person sees — the painted
 background, the cards on the shelf — and the failure appears immediately.
 
+
+---
+
+## 2026-10-31 · Native recovery: request state, artwork and result typing (PR #217)
+
+**Symptom / evidence:** the user rejected `c8d5dc1` on an ARM64 phone: Focus and
+Search failed (authentic screenshot includes `/search` HTTP 400), For You could not
+continue, and artwork outside Full Player remained suspect. Earlier green CI and
+APK packaging were not device acceptance.
+
+**Source causes found (not all are proven phone triggers):**
+1. `InnerTubeClient` could replace served request context and had no bounded generic
+   metadata-400 fresh-session retry. Fixed in `1158b33`; served-context and repeated
+   400 tests added. The actual phone rejection trigger remains unproven.
+2. Home category and Search continuation state was not fully generation/category
+   scoped. Fixed in `dbc3e20`: independent feeds, retained results, explicit Retry,
+   stale-page rejection, dedupe and repeated-cursor termination.
+3. Shared thumbnail extraction and ordinary loader candidates were narrower than
+   Full Player's recovery path; original URLs could be lost during resizing. Fixed
+   centrally in `10400ca`, with no fake images or per-screen random artwork.
+4. Library playlist rows ignored their model thumbnail; local detail depended on
+   first-track art, and remote playlists exposed no continuation. Fixed in
+   `9be284c` with ordered SQL cover derivation (no migration), shared artwork,
+   scoped `/browse` continuation and retryable generation-scoped UI.
+5. Search parser allocated `videos` but populated only `songs`; continuation also
+   dropped the selected filter. Fixed in `30f4a1a`. Single recent-search deletion
+   now uses `MutationTracker` instead of an unguarded coroutine.
+
+**Test incidents, recorded rather than hidden:** `dbc3e20` CI failed to compile two
+new Search fixtures missing `query`; corrected. `9be284c` then compiled and ran 855
+shared tests with one failure: a new playlist test expected `Real artist` although
+its row helper emitted `Artist`; corrected without changing production behaviour.
+Local gates after the source work: 518 Python tests + 159 subtests, 40 JSON fixture
+syntax checks and clean `git diff --check`.
+
+**Verification boundary:** no JDK/SDK/ADB/emulator/phone, interactive Windows or
+audible output in the sandbox. See `docs/verification/38-native-application-recovery.md`
+for exact run IDs, remaining checks and the rejected-artifact warning. Do not convert
+a later green head into Android, Windows, artwork or playback recovery.
+
+---
+
+## 2026-10-31 · Second phone rejection: four narrowed recovery paths (PR #217)
+
+**New evidence:** green `2a6038d` / artifact `13031609048` was not accepted. Full
+Player blur works, but a newly downloaded song has no blurred artwork outside it
+while an older download can work. Search-backed screens still report `/search` HTTP
+400, customized solid colours ignore Brightness, and Related is empty while Queue
+works. This is the active acceptance gate, not a reason to claim the previous fixes
+succeeded.
+
+**What the source and sanitized live probes established:**
+1. New downloads initially have no local artwork; the writer tried one remote URL
+   (or none for null), and the shell backdrop also used one direct request. Full
+   Player instead used bounded shared candidates. `1abbc47` now shares that chain
+   in the writer/backdrop, including genuine video-cover persistence and no giant
+   failure glyph. Older local-art priority is unchanged.
+2. Brightness reached only the artwork veil; `AmbientBackdrop`'s solid/custom path
+   did not consume it. `1abbc47` adds a bounded relative overlay, transparent at
+   the default 55 so PR #216 colours do not receive a new permanent scrim.
+3. Old and current Search params both returned HTTP 200 in anonymous CI, including
+   the exact Focus query with `gl=NP`. Therefore stale params are not a proven root
+   cause. `30fb887` adds a bounded old→current compatibility attempt for the same
+   filter only after HTTP 400; it never drops the filter or fabricates results.
+4. Basic and persistent `/next` responses in US/NP contained 19 standard
+   `playlistPanelVideoRenderer` entries and a radio continuation. No renderer
+   rename is supported. `30fb887` adds the current persistent audio-panel request
+   fields while leaving parser, continuation, queue and explicit filtering intact.
+
+**Boundary:** live CI did not reproduce the affected phone. One diagnostic JVM step
+initially used the wrong working directory; corrected run `41179034524` then passed,
+parsed old/current Search and `/next` fixtures, and DHUN's actual NP client returned
+30 Focus songs plus 19 Related tracks and a token. That is CI real-service evidence,
+not device acceptance. New request/download/policy regressions must pass exact-head automation,
+then the phone must check Search types, new-versus-old download blur, Brightness at
+0/55/100 with custom colours, and real Related rows/queue continuation. No merge,
+release, tag, publication or protected-asset change is authorized by this entry.

@@ -24,11 +24,16 @@ These artifacts use a public Android test key; the Windows MSI is unsigned. YouT
 
 ### Increasing versions
 
-Every test-release workflow run assigns Android `1.00.<run>-test.<attempt>` and a
-strictly increasing Android versionCode. Reruns increase the attempt; the next run
-outranks all supported attempts of the previous run. Windows already uses the same
-workflow run/attempt counter for its increasing MSI ProductVersion. The rolling
-`test` tag and asset filenames stay stable; the draft title stays "DHUN beta"
+Every test APK records Android `1.00.<run>-test.<attempt>` as its readable
+versionName. Its integer versionCode is the package job's allocation time in Unix
+seconds. Build APK and test-release have independent run counters, so the shared
+clock—not either run number—orders their packages and prevents a newer PR artifact
+from becoming an accidental downgrade. Later allocations increase the code;
+same-second jobs can share one, which Android accepts as a reinstall. Bad clocks
+and values above Android's 2,100,000,000 limit fail rather than wrap.
+
+Windows keeps its separate workflow run/attempt MSI ProductVersion sequence. The
+rolling `test` tag and asset filenames stay stable; the draft title stays "DHUN beta"
 while the installed binary identity changes. Public `v1.00.002` is a separate fixed release and is not rewritten.
 Android will reject installing a lower-versionCode public build over a newer test build; back up app-private data before uninstalling the test build.
 

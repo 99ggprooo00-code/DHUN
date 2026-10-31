@@ -118,3 +118,72 @@ Constraints below are unchanged and still binding.
    `shared/`.
 5. Design tokens stay in `shared/design/` (MASTER_PROMPT: no raw hex/px
    outside it).
+
+---
+
+## 2026-10-30 — second pass: how the artwork-driven colour *experience* works
+
+Requested because the owner wants DHUN's background customisation to match the
+*experience* of VIVI Music (not ViMusic). Read in place through `api.github.com`;
+no code was copied. Files inspected: `ui/theme/Theme.kt`,
+`ui/theme/PlayerColorExtractor.kt`, `ui/component/AlbumGradient.kt`,
+`ui/player/Player.kt`, `constants/PreferenceKeys.kt`,
+`ui/screens/settings/ThemeSettings.kt`.
+
+**1. How colour is extracted.** `Bitmap.extractThemeColor()` builds an
+`androidx.palette.Palette` (max 8 colours), scores swatches with
+`androidx.palette.graphics.Palette.Score` and takes the first. The player
+gradient (`PlayerColorExtractor`) instead ranks *dominant × vibrant* swatches by
+`population * 2 * vibrancyBonus * (saturation + brightness) / 2`, then boosts
+saturation (1.1–1.3×) and clamps brightness to 0.4–0.85 so the result cannot be
+mud or glare. The bitmap it needs is a 100×100 Coil decode of the same artwork
+URL the UI already loads.
+
+**2. What the colour touches.** Two different things, and this is the part worth
+copying conceptually:
+
+- the **whole app's tonal scheme** comes from a *seed colour the user picked*
+  (`rememberDynamicColorScheme`, materialKolor `TonalSpot`/`Monochrome`), or, on
+  Android 12+ when the seed is the default, from the system wallpaper
+  (`dynamicDarkColorScheme`). It does **not** follow the track;
+- the **player and mini-player backgrounds** follow the artwork, as a vertical
+  gradient painted by `AlbumGradient`: artwork colour at α≈0.5 → a darker
+  variant at α≈0.3 → the theme's `surface` at the bottom.
+
+So in VIVI the artwork colour lives in the *surface wash*, while text, icons and
+controls keep the theme's own on-colours. That is the same separation DHUN's
+glass system already makes (artwork identity in the wash and glows, text on its
+measured ladder).
+
+**3. How the transition works.** Each gradient stop is an
+`animateColorAsState(tween(800))`: switching tracks crossfades the wash over
+0.8 s instead of snapping. There is no flash to black and no intermediate
+default palette, because the *old* colour is the animation's start value.
+
+**4. How the user turns it off.** Two unrelated switches, which is the part DHUN's
+previous pass got wrong in the opposite direction: `DynamicThemeKey` enables
+system/wallpaper colour, and the *player* picks `PlayerBackgroundStyle`
+(`DEFAULT`, `GRADIENT`, `BLUR`, `GLOW_ANIMATED`, `APPLE_MUSIC`, `LIVE_MESH`).
+`GRADIENT` and `BLUR` are **alternatives in one enum** — VIVI cannot show blurred
+artwork *and* its own chosen colour, and it cannot show artwork colours with the
+artwork removed. The owner's brief asks DHUN for exactly the four states that enum
+cannot express, so the enum is not the model to copy.
+
+**5. How it differs from a conventional primary/secondary theme.** There is no
+"accent colour picker" applied to surfaces: the *surfaces themselves* are tinted,
+continuously, from the current track, while the semantic roles (on-background,
+on-surface-variant, outline…) are generated from the tonal scheme so contrast is
+preserved. The user perceives "the app is this song's colour", not "the app has
+this song's accent".
+
+**What DHUN took from this (and what it deliberately did not).**
+
+- Took: artwork colour as a *surface wash* with the palette layered (base, main
+  glow, companion glow), an animated crossfade per track, saturation/brightness
+  discipline on the source colour, and the vocabulary of "dynamic colour" as a
+  switch the user can turn off.
+- Did not take: the single-enum background style (DHUN needs blur × colour as two
+  independent switches — four states), the bitmap decode on the hot path (DHUN
+  keeps one extraction pipeline keyed by seed; see `DhunBackgrounds`), and the
+  materialKolor tonal-scheme generator (DHUN has its own token system and
+  measured contrast gates).

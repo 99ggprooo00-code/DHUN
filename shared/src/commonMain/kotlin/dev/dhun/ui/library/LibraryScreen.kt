@@ -2,7 +2,6 @@ package dev.dhun.ui.library
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -23,7 +22,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,7 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
@@ -55,12 +55,10 @@ import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.dhunContentRowSurface
 import dev.dhun.design.components.DhunButton
-import dev.dhun.design.components.DhunCheckbox
 import dev.dhun.design.components.DhunFilterChip
 import dev.dhun.design.components.DhunTextField
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.DhunOutlinedButton
-import dev.dhun.design.components.DhunProgressBar
 import dev.dhun.design.components.DhunTextButton
 import dev.dhun.design.components.EmptyView
 import dev.dhun.design.components.GlassCard
@@ -72,13 +70,8 @@ import dev.dhun.presentation.library.LibraryTab
 import dev.dhun.presentation.library.LibraryViewModel
 import dev.dhun.presentation.library.currentUtcOffsetMs
 import dev.dhun.presentation.library.toTrack
-import dev.dhun.ui.components.ActionErrorBanner
 import dev.dhun.ui.components.DragHandleGrip
-import dev.dhun.ui.components.MenuActionRow
-import dev.dhun.ui.components.PlaylistDeleteDialog
-import dev.dhun.ui.components.PlaylistRenameDialog
 import dev.dhun.ui.components.ReorderableList
-import dev.dhun.ui.components.TrackMenuSurface
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -108,9 +101,6 @@ fun LibraryScreen(
     val downloadsUi by viewModel.downloadsForUi.collectAsState()
     val storageSummary by viewModel.storageSummary.collectAsState()
     val clearDownloadsState by viewModel.clearDownloadsUiState.collectAsState()
-    val mutation by viewModel.mutation.collectAsState()
-    val renamingPlaylist by viewModel.renamingPlaylist.collectAsState()
-    val deletingPlaylist by viewModel.deletingPlaylist.collectAsState()
 
     // Keep day grouping fresh on zone changes (cheap ticker)
     LaunchedEffect(Unit) {
@@ -154,22 +144,6 @@ fun LibraryScreen(
 
         Spacer(modifier = Modifier.height(DhunSpacing.sm))
 
-        // A single-row mutation (like/unlike, history removal, a download
-        // action) reports failure here instead of failing silently. The row it
-        // was invoked from is still on screen, so tapping it again is the retry.
-        // A playlist rename/delete that failed is reported inside its own
-        // dialog, which stays open with a retry; the banner would say the same
-        // thing twice.
-        mutation.errorMessage
-            ?.takeUnless { viewModel.playlistDialogOwnsError(mutation) }
-            ?.let { message ->
-                ActionErrorBanner(
-                    message = message,
-                    onDismiss = viewModel::dismissMutationError,
-                    modifier = Modifier.padding(bottom = DhunSpacing.xs),
-                )
-            }
-
         when (selectedTab) {
             LibraryTab.PLAYLISTS -> {
                 if (viewingLikedSongs) {
@@ -191,8 +165,6 @@ fun LibraryScreen(
                         onPlaylistClick = onPlaylistClick,
                         onCreatePlaylist = { name -> viewModel.createPlaylist(name) },
                         onPlayPlaylist = viewModel::playPlaylist,
-                        onRenamePlaylist = viewModel::beginRenamePlaylist,
-                        onDeletePlaylist = viewModel::beginDeletePlaylist,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -232,29 +204,6 @@ fun LibraryScreen(
                 modifier = Modifier.weight(1f),
             )
         }
-    }
-
-    // Playlist management from the list itself, through the same two dialogs
-    // the playlist page uses. Both read their pending/error state from the
-    // mutation the ViewModel actually started, so neither can close on a write
-    // that failed, and the row keeps the stored name / stays in the list.
-    renamingPlaylist?.let { playlist ->
-        PlaylistRenameDialog(
-            current = playlist.name,
-            isSaving = mutation.isRunning(viewModel.renameActionKey(playlist.id)),
-            errorMessage = mutation.errorFor(viewModel.renameActionKey(playlist.id)),
-            onDismiss = viewModel::cancelRenamePlaylist,
-            onConfirm = viewModel::confirmRenamePlaylist,
-        )
-    }
-    deletingPlaylist?.let { playlist ->
-        PlaylistDeleteDialog(
-            playlistName = playlist.name,
-            isDeleting = mutation.isRunning(viewModel.deleteActionKey(playlist.id)),
-            errorMessage = mutation.errorFor(viewModel.deleteActionKey(playlist.id)),
-            onDismiss = viewModel::cancelDeletePlaylist,
-            onConfirm = viewModel::confirmDeletePlaylist,
-        )
     }
 }
 
@@ -298,8 +247,6 @@ private fun PlaylistsTab(
     onPlaylistClick: (LocalPlaylist) -> Unit,
     onCreatePlaylist: suspend (String) -> LocalPlaylist,
     onPlayPlaylist: (String, Int) -> Unit,
-    onRenamePlaylist: (LocalPlaylist) -> Unit,
-    onDeletePlaylist: (LocalPlaylist) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var showCreate by remember { mutableStateOf(false) }
@@ -372,8 +319,6 @@ private fun PlaylistsTab(
                         playlist = playlist,
                         onClick = { onPlaylistClick(playlist) },
                         onPlay = { onPlayPlaylist(playlist.id, 0) },
-                        onRename = { onRenamePlaylist(playlist) },
-                        onDelete = { onDeletePlaylist(playlist) },
                     )
                 }
             }
@@ -599,10 +544,7 @@ private fun PlaylistRow(
     playlist: LocalPlaylist,
     onClick: () -> Unit,
     onPlay: () -> Unit,
-    onRename: () -> Unit,
-    onDelete: () -> Unit,
 ) {
-    var menuOpen by remember(playlist.id) { mutableStateOf(false) }
     Box(
         modifier = Modifier.fillMaxWidth()
             .padding(horizontal = DhunSpacing.screenPadding, vertical = DhunSpacing.xs)
@@ -614,13 +556,10 @@ private fun PlaylistRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
         ) {
-            // Placeholder cover: translucent glass with the same hairline edge
-            // as the row it sits in, not an opaque grey tile.
             Box(
                 modifier = Modifier.size(DhunSpacing.artworkThumb)
                     .clip(DhunShapes.medium)
-                    .background(DhunColors.glassStrong)
-                    .border(DhunSpacing.border, DhunColors.glassEdge, DhunShapes.medium),
+                    .background(DhunColors.surfaceElevated),
                 contentAlignment = Alignment.Center,
             ) {
                 DhunIconView(
@@ -659,56 +598,6 @@ private fun PlaylistRow(
                     tint = DhunColors.accent,
                 )
             }
-            // Rename/delete belong to the row, where the playlist is actually
-            // visible. Same anchored ⋮ menu and frosted surface as the queue
-            // row, so the library does not grow a second menu system.
-            Box {
-                DhunIconButton(
-                    onClick = { menuOpen = true },
-                    modifier = Modifier.size(DhunSpacing.touchTarget),
-                    contentDescription = "Manage ${playlist.name}",
-                ) {
-                    DhunIconView(
-                        icon = DhunIcon.MoreVert,
-                        contentDescription = null,
-                        modifier = Modifier.size(DhunSpacing.iconSizeSm),
-                        tint = DhunColors.textSecondary,
-                    )
-                }
-                DropdownMenu(
-                    expanded = menuOpen,
-                    onDismissRequest = { menuOpen = false },
-                    shape = DhunShapes.large,
-                    containerColor = Color.Transparent,
-                    tonalElevation = DhunSpacing.zero,
-                    shadowElevation = DhunSpacing.zero,
-                ) {
-                    // No playlist artwork exists to frost the surface with, so
-                    // this menu uses the same opaque base without one.
-                    TrackMenuSurface(
-                        artworkUrl = null,
-                        modifier = Modifier.width(DhunSpacing.menuMinWidth),
-                        shape = DhunShapes.large,
-                    ) {
-                        MenuActionRow(
-                            label = "Rename",
-                            onClick = {
-                                menuOpen = false
-                                onRename()
-                            },
-                        )
-                        MenuActionRow(
-                            label = "Delete",
-                            icon = DhunIcon.Delete,
-                            destructive = true,
-                            onClick = {
-                                menuOpen = false
-                                onDelete()
-                            },
-                        )
-                    }
-                }
-            }
         }
     }
 }
@@ -721,7 +610,6 @@ private fun CreatePlaylistDialog(
 ) {
     var name by remember { mutableStateOf("") }
     var creating by remember { mutableStateOf(false) }
-    var errorText by remember { mutableStateOf<String?>(null) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     Dialog(onDismissRequest = onDismiss) {
         GlassCard(
@@ -740,48 +628,26 @@ private fun CreatePlaylistDialog(
                 // glass card). See `DhunTextField`.
                 DhunTextField(
                     value = name,
-                    onValueChange = { name = it; errorText = null },
+                    onValueChange = { name = it },
                     placeholder = "My playlist",
-                    isError = errorText != null,
                 )
-                if (errorText != null) {
-                    Spacer(modifier = Modifier.height(DhunSpacing.xs))
-                    Text(
-                        text = errorText.orEmpty(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = DhunColors.error,
-                    )
-                }
                 Spacer(modifier = Modifier.height(DhunSpacing.md))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    DhunTextButton(onClick = onDismiss, enabled = !creating) { Text("Cancel") }
+                    DhunTextButton(onClick = onDismiss) { Text("Cancel") }
                     Spacer(modifier = Modifier.width(DhunSpacing.sm))
                     DhunButton(
                         onClick = {
                             if (name.isNotBlank() && !creating) {
                                 creating = true
-                                errorText = null
                                 scope.launch {
-                                    try {
-                                        onCreate(name.trim())
-                                        // Only a write that returned normally
-                                        // closes the dialog as a created playlist.
-                                        onConfirm(name)
-                                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                                        throw cancelled
-                                    } catch (_: Exception) {
-                                        // Previously swallowed: the dialog closed
-                                        // as if the playlist existed.
-                                        errorText = "Could not create the playlist. Check free space and try again."
-                                    } finally {
-                                        creating = false
-                                    }
+                                    try { onCreate(name.trim()) } catch (_: Exception) {}
+                                    creating = false
+                                    onConfirm(name)
                                 }
                             }
                         },
                         enabled = name.isNotBlank() && !creating,
-                        loading = creating,
-                    ) { Text(if (errorText != null) "Try again" else "Create") }
+                    ) { Text(if (creating) "Creating…" else "Create") }
                 }
             }
         }
@@ -1053,8 +919,7 @@ private fun StorageSummaryCard(
                         .fillMaxWidth()
                         .height(DhunSpacing.progressStroke * 2)
                         .clip(DhunShapes.full)
-                        // Translucent groove: the row's glass reads through it.
-                        .background(DhunColors.glassStrong),
+                        .background(DhunColors.surfaceElevated),
                 ) {
                     Box(
                         modifier = Modifier
@@ -1112,11 +977,11 @@ private fun StorageManageView(
                     val volumeUsed = (storage.device.totalBytes - storage.device.freeBytes).coerceAtLeast(0L)
                     StorageStatRow("Used by apps & system", formatBytes(volumeUsed))
                     Spacer(modifier = Modifier.height(DhunSpacing.sm))
-                    // DHUN bar: accent fill over a translucent glass groove,
-                    // instead of Material's opaque-track indicator.
-                    DhunProgressBar(
-                        progress = storage.deviceUsedFraction ?: 0f,
-                        trackHeight = DhunSpacing.progressStroke * 2,
+                    LinearProgressIndicator(
+                        progress = { storage.deviceUsedFraction ?: 0f },
+                        modifier = Modifier.fillMaxWidth().height(DhunSpacing.progressStroke * 2).clip(DhunShapes.full),
+                        color = DhunColors.accent,
+                        trackColor = DhunColors.surfaceElevated,
                     )
                 } else {
                     Text(
@@ -1179,11 +1044,13 @@ private fun StorageManageView(
                     .padding(vertical = DhunSpacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // DHUN's glass checkbox, not Material's grey outline — the
-                // offline-selection rows are glass too (glass-system.md §2).
-                DhunCheckbox(
+                Checkbox(
                     checked = selected.size == downloads.size && downloads.isNotEmpty(),
                     onCheckedChange = { onSelectAll() },
+                    colors = CheckboxDefaults.colors(
+                        checkedColor = DhunColors.accent,
+                        uncheckedColor = DhunColors.textTertiary,
+                    ),
                 )
                 Text(
                     if (selected.isEmpty()) "Select all" else "Selected ${selected.size}",
@@ -1256,7 +1123,14 @@ private fun ManageableDownloadRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
     ) {
-        DhunCheckbox(checked = selected, onCheckedChange = { onToggle() })
+        Checkbox(
+            checked = selected,
+            onCheckedChange = { onToggle() },
+            colors = CheckboxDefaults.colors(
+                checkedColor = DhunColors.accent,
+                uncheckedColor = DhunColors.textTertiary,
+            ),
+        )
         ArtworkImage(
             imageUrl = download.thumbnailUrl,
             contentDescription = download.title,
@@ -1419,8 +1293,20 @@ private fun DownloadRow(
         if (download.downloadState == DownloadState.DOWNLOADING) {
             val fraction = progress?.fraction
             Spacer(modifier = Modifier.height(DhunSpacing.xs))
-            // null = indeterminate, same glass groove as the storage bar.
-            DhunProgressBar(progress = fraction)
+            if (fraction != null) {
+                LinearProgressIndicator(
+                    progress = { fraction },
+                    modifier = Modifier.fillMaxWidth().height(DhunSpacing.progressStroke).clip(DhunShapes.full),
+                    color = DhunColors.accent,
+                    trackColor = DhunColors.surfaceElevated,
+                )
+            } else {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth().height(DhunSpacing.progressStroke).clip(DhunShapes.full),
+                    color = DhunColors.accent,
+                    trackColor = DhunColors.surfaceElevated,
+                )
+            }
         }
     }
 }
