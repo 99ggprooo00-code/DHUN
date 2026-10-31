@@ -2445,3 +2445,30 @@ gates, not device validation. The procedure for a human is
   2026-10-31). The earlier fixed-swatch-only limit is superseded: arbitrary HSL
   colours are now accepted, still through the existing luminance clamp. Conversion
   and gradient endpoints are JVM-tested; touch behaviour and visual results are not.
+
+---
+
+## 2026-10-31 — Native recovery remains phone/Windows-open
+
+- **The `c8d5dc1` phone package is rejected for this recovery.** Authentic phone
+  screenshots show Focus `/search` HTTP 400, Search failure and For You continuation
+  failure. Artifact `13028524117` must not be called fixed even though its CI passed.
+- Served-context merging and one bounded fresh-session retry in `1158b33` correct a
+  confirmed request-compatibility defect. They do **not** establish the sole cause
+  of the affected phone's 400. Sampled US/Nepal live Home responses passed earlier;
+  Android/region/visitor/server causation remains unproven.
+- Home/Search/playlist generation-scoped paging and shared artwork are implemented
+  with regressions, but no corrected package has been viewed on the phone. Artwork
+  in Full Player does not prove list/card/History/queue/Mini Player/local-playlist
+  artwork, and JVM tests do not prove Coil decoding or network availability.
+- Remote playlist continuation and Videos result typing are source corrections,
+  not current real-service evidence. No fake content or fallback category is an
+  acceptable substitute if YouTube still rejects the affected device.
+- No local JDK/Android SDK, emulator, phone/ADB, interactive Windows or audible
+  output is available. Windows test-release success can cover JVM/MSI checks, not
+  VLC/libVLC sound, tray/SMTC, visible artwork or installer acceptance.
+- PR #216 backgrounds, PR #217 blur/dynamic-colour corrections, four component
+  colours, preferences/database data and release assets are preserved. Light-mode
+  stacking, Settings simplicity, responsiveness, History/playlist playback,
+  downloads/offline artwork, lyrics and all device checks in verification §38 stay
+  open until actually exercised.

@@ -25,6 +25,27 @@ private test draft after merge; that is not a new public app release. Future
 sessions must obey their own explicit permissions, not historical autonomous
 merge prompts. Keep legal drafts DRAFT and report risks.
 
+## Binding native recovery gate — 2026-10-31
+
+PR #217 is open and unmerged. Its current work is application recovery, not new
+feature development. The user rejected the `c8d5dc1` phone build for real loading
+and continuation failures; never describe that artifact (`13028524117`) as fixed.
+Read [verification §38](../docs/verification/38-native-application-recovery.md)
+before changing Home, Search, artwork or playlists.
+
+- Preserve KMP/playback, PR #216 backgrounds and PR #217's corrected independent
+  blur/dynamic-colour behaviour, four component colours, one palette pipeline,
+  seven quick colours/HSL More colours, preferences, downloads and database data.
+- Use independent generation-scoped category/Search/playlist continuation, real
+  bounded retry, stale-response rejection, deduplication and visible sanitized
+  errors. Never silently substitute For You, sample content or endless paging.
+- Fix artwork through shared extraction/loading and persisted metadata, using only
+  real source/video/local covers. Full Player success is not proof for other UI.
+- CI/JVM/MSI/APK success is an automated gate only. Android, Windows, real-service,
+  visible-artwork and audible-playback claims require their own actual evidence.
+- Do not merge, release, tag or publish without the current session's explicit
+  permission. Historical autonomous-merge instructions do not grant it.
+
 > **Document status: CURRENT.** This file describes the project **as it
 > exists today and as it should be completed from here forward**. It
 > supersedes the v2 "Feasibility-Corrected" master prompt below — v2's

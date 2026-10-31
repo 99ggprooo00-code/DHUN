@@ -178,12 +178,28 @@ class SearchViewModelTest {
         try {
             val data = testData()
             val provider = FakeSearchMusicProvider()
+            provider.searchHandler = { query, _ ->
+                DhunResult.Success(SearchResults(
+                    query = query,
+                    videos = listOf(sampleTrack("v1")),
+                    continuationToken = "token_123",
+                ))
+            }
+            provider.continuationHandler = {
+                DhunResult.Success(SearchResults(query = "", videos = listOf(sampleTrack("v2"))))
+            }
             val vm = SearchViewModel(provider, data.search, data.library, data.playlists, testScope)
             vm.performSearch("live", SearchFilter.VIDEOS)
             eventually { vm.resultsState.value is SearchResultsUiState.Success }
             vm.loadMore()
             eventually { provider.continuationFilters.size == 1 }
             assertEquals(SearchFilter.VIDEOS, provider.continuationFilters.single())
+            eventually {
+                (vm.resultsState.value as? SearchResultsUiState.Success)?.results?.videos?.size == 2
+            }
+            val results = (vm.resultsState.value as SearchResultsUiState.Success).results
+            assertEquals(listOf("v1", "v2"), results.videos.map { it.id })
+            assertEquals(0, results.songs.size)
         } finally {
             testScope.cancel()
         }

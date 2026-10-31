@@ -22,6 +22,29 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Native loading, artwork and continuation recovery (2026-10-31, PR #217)
+
+- The phone-tested `c8d5dc1` package is **not accepted as a loading fix**. New
+  source work repairs served request-context merging, bounded HTTP 400 recovery,
+  independent Home-category paging, generation-scoped Search continuation and
+  shared real-artwork candidates. The exact phone-side HTTP 400 trigger remains
+  unproven until the affected device loads the corrected build.
+- Home categories retain their own results, cursors and scroll positions; failed
+  pages stay visible with real Retry and never silently fall back to For You.
+  Search retains successful results on continuation failure, rejects stale pages,
+  deduplicates rows and terminates repeated cursors.
+- Search Videos now populates the actual video result list and preserves its filter
+  across continuation. Removing one recent search reports persistence failure
+  through the existing mutation UI instead of escaping an unguarded coroutine.
+- Local playlist rows use shared artwork rendering; ordered nonblank track covers
+  support existing sparse data without a schema migration. Remote playlists now
+  have scoped `/browse` continuation, retryable paging and bounded termination.
+- Regression coverage includes request contracts, Home/Search/playlist state,
+  alternate artwork shapes, video-filter typing, SQL cover reorder/removal and
+  cancellation/stale-result behaviour. See
+  `docs/verification/38-native-application-recovery.md` for causes, origins, run
+  IDs and remaining Android/Windows acceptance. Green CI is not device recovery.
+
 ### Android test-package upgrade and signature gates (2026-10-31, session `arena/09e5238e-dhun`)
 
 - An arm64-v8a phone reported Android's generic "package appears to be invalid"

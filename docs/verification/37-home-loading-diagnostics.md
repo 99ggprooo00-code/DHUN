@@ -1,5 +1,11 @@
 # 37 — Home loading failure: evidence and phone diagnostics
 
+> **Later phone evidence (2026-10-31):** the subsequently supplied `c8d5dc1` build
+> still failed: authentic screenshots show Focus `/search` HTTP 400, Search failure
+> and For You continuation failure. This page's earlier live-probe pass did not fix
+> or reproduce that phone. See [§38](38-native-application-recovery.md) for the
+> current recovery ledger; artifact `13028524117` is not an accepted fix.
+
 > **Status: OPEN on the reported phone.** The live response and the shared parser
 > have been probed, and concrete compatibility/diagnostic fixes are in the branch,
 > but no Android device was available to the agent. A green build is not evidence

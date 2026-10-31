@@ -6,6 +6,11 @@
 > step below is unverified until you do it, and `docs/verification/35-background-
 > visual-validation.md` stays **OPEN** until then. Nothing in this file is
 > evidence; it is instructions.
+>
+> **Recovery warning (2026-10-31):** do not reuse artifact `13028524117` from the
+> `c8d5dc1` Build APK run as a loading fix; the phone rejected it. Use only the
+> `debug-apk` artifact from a successful Build APK run on the current PR head and
+> complete [verification §38](38-native-application-recovery.md).
 
 ## 0. Which build this is
 
