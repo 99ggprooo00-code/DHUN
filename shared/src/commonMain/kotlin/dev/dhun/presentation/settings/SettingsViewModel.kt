@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -47,6 +48,30 @@ class SettingsViewModel(
     // Reset right after a slider move) must reach the DB in tap order. Start
     // undispatched so each write claims the mutex before returning to the UI.
     private val writeMutex = Mutex()
+
+    /**
+     * Optimistic setters can queue several values for one key. A failed older
+     * write must not roll back over a newer value whose own write is still
+     * queued. StateFlow's atomic update keeps generation assignment safe even
+     * if a host calls setters from more than one thread.
+     */
+    private val writeGenerations = MutableStateFlow<Map<String, Long>>(emptyMap())
+
+    private fun nextWriteGeneration(key: String): Long =
+        writeGenerations.updateAndGet { current ->
+            current + (key to ((current[key] ?: 0L) + 1L))
+        }.getValue(key)
+
+    private fun invalidateWrites(keys: Iterable<String>) {
+        writeGenerations.update { current ->
+            val next = current.toMutableMap()
+            for (key in keys) next[key] = (next[key] ?: 0L) + 1L
+            next
+        }
+    }
+
+    private fun isLatestWrite(key: String, generation: Long): Boolean =
+        writeGenerations.value[key] == generation
 
     /**
      * Runs one preference write under the shared write mutex.
@@ -107,6 +132,7 @@ class SettingsViewModel(
         write: suspend () -> Unit,
     ) {
         val attempted = state.value
+        val generation = nextWriteGeneration(key)
         enqueueWrite({
             write()
             confirmedStrings.update { it + (key to attempted) }
@@ -118,7 +144,7 @@ class SettingsViewModel(
             } catch (_: Exception) {
                 confirmedStrings.value[key] ?: default
             }
-            publish(stored)
+            if (isLatestWrite(key, generation)) publish(stored)
         })
     }
 
@@ -130,6 +156,7 @@ class SettingsViewModel(
         write: suspend () -> Unit,
     ) {
         val attempted = state.value
+        val generation = nextWriteGeneration(key)
         enqueueWrite({
             write()
             confirmedInts.update { it + (key to attempted) }
@@ -141,7 +168,7 @@ class SettingsViewModel(
             } catch (_: Exception) {
                 confirmedInts.value[key] ?: default
             }
-            publish(stored)
+            if (isLatestWrite(key, generation)) publish(stored)
         })
     }
 
@@ -153,6 +180,7 @@ class SettingsViewModel(
         write: suspend () -> Unit,
     ) {
         val attempted = state.value
+        val generation = nextWriteGeneration(key)
         enqueueWrite({
             write()
             confirmedBooleans.update { it + (key to attempted) }
@@ -164,7 +192,7 @@ class SettingsViewModel(
             } catch (_: Exception) {
                 confirmedBooleans.value[key] ?: default
             }
-            publish(stored)
+            if (isLatestWrite(key, generation)) publish(stored)
         })
     }
 
@@ -465,6 +493,7 @@ class SettingsViewModel(
     fun saveVisualTuning(part: VisualPart) {
         if (part !in DhunVisualTuning.adjustableParts) return
         val value = _visualTuning.value[part] ?: tuningBaseline
+        val generation = nextWriteGeneration(part.key)
         enqueueWrite({
             update.int(part.key, value)
             confirmedTuning.update { it + (part to value) }
@@ -479,11 +508,14 @@ class SettingsViewModel(
             } catch (_: Exception) {
                 confirmedTuning.value[part] ?: tuningBaseline
             }
-            publishTuning(_visualTuning.value + (part to stored))
+            if (isLatestWrite(part.key, generation)) {
+                publishTuning(_visualTuning.value + (part to stored))
+            }
         }
     }
 
     fun resetVisualTuning() {
+        invalidateWrites(VisualPart.entries.map { it.key })
         publishTuning(emptyMap())
         enqueueWrite({
             for (part in VisualPart.entries) update.remove(part.key)
@@ -643,10 +675,14 @@ class SettingsViewModel(
     }
     fun setExplicitContent(enabled: Boolean) {
         // Publish the new UI value only after the provider's SQLDelight read
-        // can see it; a Home/Search refresh is keyed to this flow.
+        // can see it; a Home/Search refresh is keyed to this flow. Reset is a
+        // newer snapshot and must not be overwritten by an older queued write.
+        val generation = nextWriteGeneration(SettingsKeys.EXPLICIT_CONTENT)
         enqueueWrite({
             update.boolean(SettingsKeys.EXPLICIT_CONTENT, enabled)
-            _explicitContent.value = enabled
+            if (isLatestWrite(SettingsKeys.EXPLICIT_CONTENT, generation)) {
+                _explicitContent.value = enabled
+            }
         })
     }
     fun setPauseOnMute(enabled: Boolean) {
@@ -701,6 +737,7 @@ class SettingsViewModel(
     }
 
     fun reset() {
+        invalidateWrites(SettingsKeys.all + VisualPart.entries.map { it.key })
         applyDefaults()
         // Same write mutex as every other control, so a slider moved after
         // Reset cannot be erased by it (and vice versa). The tracker adds the

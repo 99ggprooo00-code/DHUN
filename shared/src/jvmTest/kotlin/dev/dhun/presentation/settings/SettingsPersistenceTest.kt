@@ -223,6 +223,89 @@ class SettingsPersistenceTest {
     }
 
     @Test
+    fun anOlderRollbackCannotOverwriteANewerSuccessfulWrite(): Unit = runBlocking {
+        val d = data()
+        val h = Harness()
+        d.settings.putString(SettingsKeys.THEME, "black")
+        val firstStarted = CompletableDeferred<Unit>()
+        val releaseFirst = CompletableDeferred<Unit>()
+        var writeAttempts = 0
+        val flakySettings = object : SettingsRepository by d.settings {
+            override suspend fun putString(key: String, value: String) {
+                if (key == SettingsKeys.THEME) {
+                    writeAttempts++
+                    if (writeAttempts == 1) {
+                        firstStarted.complete(Unit)
+                        releaseFirst.await()
+                        error("first write failed")
+                    }
+                }
+                d.settings.putString(key, value)
+            }
+        }
+        val vm = SettingsViewModel(GetSettingUseCase(flakySettings), UpdateSettingUseCase(flakySettings), h.scope)
+        try {
+            eventually { vm.loaded.value }
+            vm.setThemeId("light")
+            firstStarted.await()
+            vm.setThemeId("dark")
+            releaseFirst.complete(Unit)
+            eventually { writeAttempts == 2 && d.settings.getString(SettingsKeys.THEME) == "dark" }
+
+            assertEquals("dark", vm.themeId.value, "the newer optimistic value is now the stored value")
+            assertEquals("dark", d.settings.getString(SettingsKeys.THEME))
+            assertTrue(h.uncaught.isEmpty(), "the older failure must stay contained: ${h.uncaught}")
+        } finally {
+            h.close()
+        }
+    }
+
+    @Test
+    fun anOlderCountryRollbackCannotOverwriteANewerRequestRegion(): Unit = runBlocking {
+        val d = data()
+        val h = Harness()
+        d.settings.putString(SettingsKeys.COUNTRY_CODE, "US")
+        val firstStarted = CompletableDeferred<Unit>()
+        val releaseFirst = CompletableDeferred<Unit>()
+        var writeAttempts = 0
+        val flakySettings = object : SettingsRepository by d.settings {
+            override suspend fun putString(key: String, value: String) {
+                if (key == SettingsKeys.COUNTRY_CODE) {
+                    writeAttempts++
+                    if (writeAttempts == 1) {
+                        firstStarted.complete(Unit)
+                        releaseFirst.await()
+                        error("first country write failed")
+                    }
+                }
+                d.settings.putString(key, value)
+            }
+        }
+        val countries = mutableListOf<String>()
+        val vm = SettingsViewModel(
+            GetSettingUseCase(flakySettings),
+            UpdateSettingUseCase(flakySettings),
+            h.scope,
+            onCountryCodeChange = { countries += it },
+        )
+        try {
+            eventually { vm.loaded.value }
+            vm.setCountryCode("NP")
+            firstStarted.await()
+            vm.setCountryCode("IN")
+            releaseFirst.complete(Unit)
+            eventually { writeAttempts == 2 && d.settings.getString(SettingsKeys.COUNTRY_CODE) == "IN" }
+
+            assertEquals("IN", vm.countryCode.value)
+            assertEquals("IN", countries.lastOrNull(), "the wire provider must retain the newer region")
+            assertEquals("IN", d.settings.getString(SettingsKeys.COUNTRY_CODE))
+            assertTrue(h.uncaught.isEmpty(), "the older failure must stay contained: ${h.uncaught}")
+        } finally {
+            h.close()
+        }
+    }
+
+    @Test
     fun aFailedWriteWithNothingStoredFallsBackToTheDocumentedDefault(): Unit = runBlocking {
         val d = data()
         val h = Harness()
@@ -312,6 +395,72 @@ class SettingsPersistenceTest {
             assertEquals(SettingsKeys.AUDIO_QUALITY_DEFAULT, vm.audioQuality.value)
             assertEquals(SettingsKeys.LYRICS_PROVIDER_ORDER_DEFAULT, vm.providerOrder.value)
             assertEquals(SettingsKeys.COUNTRY_CODE_DEFAULT, vm.countryCode.value)
+        } finally {
+            h.close()
+        }
+    }
+
+    @Test
+    fun resetIsNotOverwrittenByAnOlderFailedWrite(): Unit = runBlocking {
+        val d = data()
+        val h = Harness()
+        d.settings.putString(SettingsKeys.THEME, "black")
+        val firstStarted = CompletableDeferred<Unit>()
+        val releaseFirst = CompletableDeferred<Unit>()
+        val flakySettings = object : SettingsRepository by d.settings {
+            override suspend fun putString(key: String, value: String) {
+                if (key == SettingsKeys.THEME) {
+                    firstStarted.complete(Unit)
+                    releaseFirst.await()
+                    error("older theme write failed")
+                }
+                d.settings.putString(key, value)
+            }
+        }
+        val vm = SettingsViewModel(GetSettingUseCase(flakySettings), UpdateSettingUseCase(flakySettings), h.scope)
+        try {
+            eventually { vm.loaded.value }
+            vm.setThemeId("light")
+            firstStarted.await()
+            vm.reset()
+            releaseFirst.complete(Unit)
+            eventually { vm.lastCompletedKey.value == SettingsViewModel.KEY_RESET }
+
+            assertEquals(SettingsKeys.THEME_DEFAULT, vm.themeId.value)
+            assertNull(d.settings.getString(SettingsKeys.THEME))
+            assertTrue(h.uncaught.isEmpty(), "the older failure must stay contained: ${h.uncaught}")
+        } finally {
+            h.close()
+        }
+    }
+
+    @Test
+    fun resetIsNotOverwrittenByAnOlderExplicitContentWrite(): Unit = runBlocking {
+        val d = data()
+        val h = Harness()
+        val firstStarted = CompletableDeferred<Unit>()
+        val releaseFirst = CompletableDeferred<Unit>()
+        val blockingSettings = object : SettingsRepository by d.settings {
+            override suspend fun putBoolean(key: String, value: Boolean) {
+                if (key == SettingsKeys.EXPLICIT_CONTENT) {
+                    firstStarted.complete(Unit)
+                    releaseFirst.await()
+                }
+                d.settings.putBoolean(key, value)
+            }
+        }
+        val vm = SettingsViewModel(GetSettingUseCase(blockingSettings), UpdateSettingUseCase(blockingSettings), h.scope)
+        try {
+            eventually { vm.loaded.value }
+            vm.setExplicitContent(true)
+            firstStarted.await()
+            vm.reset()
+            releaseFirst.complete(Unit)
+            eventually { vm.lastCompletedKey.value == SettingsViewModel.KEY_RESET }
+
+            assertEquals(SettingsKeys.EXPLICIT_CONTENT_DEFAULT, vm.explicitContent.value)
+            assertNull(d.settings.getString(SettingsKeys.EXPLICIT_CONTENT))
+            assertTrue(h.uncaught.isEmpty(), "the ordered writes must not escape: ${h.uncaught}")
         } finally {
             h.close()
         }
