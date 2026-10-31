@@ -2,8 +2,9 @@
 
 **Branch/base:** `arena/8a70a040-dhun`; reviewed recovery/documentation base
 `a21b5236ca156a07832b0bea64555af5048ce074`; separate beta migration commit
-`64fa454` is pushed. Its first hosted beta run exposed the stale desktop channel
-allowlist now corrected in this follow-up. The user installed/tested the supplied
+`64fa454` is pushed. Hosted beta runs then exposed the stale desktop channel
+allowlist and a reset-rollback ordering hole; both are corrected in follow-up
+work. The user installed/tested the supplied
 arm64 package and explicitly authorised merging PR #218 and publishing the rolling
 channel publicly as **DHUN beta**. That statement is not a full device, audible,
 accessibility or performance acceptance matrix.
@@ -28,7 +29,7 @@ legal generation and workflow YAML/publish-shell syntax all pass. No local JDK,
 Android SDK, emulator, ADB/phone, interactive desktop or pwsh is available;
 Kotlin/MSI/runtime checks require the hosted workflows.
 
-**Next:** commit/push the desktop-channel follow-up, obtain green checks for the
+**Next:** commit/push the reset-rollback follow-up, obtain green checks for the
 new exact PR head, merge PR #218 with a merge commit, then verify the public beta
 target/title/prerelease/four assets and fixed-release immutability.
 Do not claim merge, publication, replacement or device acceptance before the

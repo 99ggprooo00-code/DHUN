@@ -333,13 +333,21 @@ class SettingsViewModel(
      * defaults in place.
      */
     private suspend fun loadPersistedValues() {
+        // Keep the same lock through both reading and publication. In
+        // particular, a failed Reset must not read an old snapshot, allow a
+        // newer write to finish, and then publish that stale snapshot over it.
+        writeMutex.withLock {
+            loadPersistedValuesLocked()
+        }
+    }
+
+    /** Caller holds [writeMutex] for the complete read-and-publish operation. */
+    private suspend fun loadPersistedValuesLocked() {
         // One-shot beta-profile migration must run before the values are read,
         // so old saved experiments cannot mask the requested 15% baseline.
         if (isBetaRelease && get.int(SettingsKeys.TUNE_PROFILE_VERSION, 0) < 1) {
-            writeMutex.withLock {
-                for (part in VisualPart.entries) update.remove(part.key)
-                update.int(SettingsKeys.TUNE_PROFILE_VERSION, 1)
-            }
+            for (part in VisualPart.entries) update.remove(part.key)
+            update.int(SettingsKeys.TUNE_PROFILE_VERSION, 1)
         }
 
         val themeId = get.string(SettingsKeys.THEME, SettingsKeys.THEME_DEFAULT)

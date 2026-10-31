@@ -491,7 +491,9 @@ class SettingsPersistenceTest {
             resetStarted.await()
             vm.setThemeId("dark")
             releaseReset.complete(Unit)
-            eventually { d.settings.getString(SettingsKeys.THEME) == "dark" }
+            eventually {
+                vm.themeId.value == "dark" && d.settings.getString(SettingsKeys.THEME) == "dark"
+            }
 
             assertEquals("dark", vm.themeId.value, "the reset rollback must not erase the newer request")
             assertEquals("dark", d.settings.getString(SettingsKeys.THEME))
@@ -527,7 +529,9 @@ class SettingsPersistenceTest {
             vm.previewVisualTuning(part, 95)
             vm.saveVisualTuning(part)
             releaseReset.complete(Unit)
-            eventually { d.settings.getInt(part.key, -1) == 95 }
+            eventually {
+                vm.visualTuning.value[part] == 95 && d.settings.getInt(part.key, -1) == 95
+            }
 
             assertEquals(95, vm.visualTuning.value[part], "the newer slider value is now stored")
             assertEquals(95, d.settings.getInt(part.key, -1))
