@@ -12,7 +12,7 @@ class TestDownloadStorage(override val root: String = "/test") : DownloadStorage
     override fun audioPath(trackId: String, mimeType: String): String =
         "${root}/audio/${safeTrackId(trackId)}.${extensionForMimeType(mimeType)}"
 
-    override fun artPath(trackId: String): String = "${root}/art/${safeTrackId(trackId)}.jpg"
+    override fun artPath(trackId: String): String = "${root}/art/${downloadArtworkFileName(trackId)}"
 
     override suspend fun size(path: String): Long = files[path]?.size?.toLong() ?: 0L
 

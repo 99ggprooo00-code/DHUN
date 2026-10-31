@@ -116,7 +116,9 @@ class FileDownloadManager(
 
     override suspend fun cancel(trackId: String): Unit = mutationLock.withLock {
         stopJob(trackId)
-        repository.get(trackId)?.let { deleteTemporaryFiles(it.trackId, it.mimeType) }
+        repository.get(trackId)?.let {
+            deleteTemporaryFiles(it.trackId, it.mimeType, it.localArtworkPath)
+        }
         repository.delete(trackId)
         _progress.value = _progress.value - trackId
     }
@@ -126,7 +128,7 @@ class FileDownloadManager(
         repository.get(trackId)?.let {
             storage.delete(it.localAudioPath)
             it.localArtworkPath?.let { art -> storage.delete(art) }
-            deleteTemporaryFiles(it.trackId, it.mimeType)
+            deleteTemporaryFiles(it.trackId, it.mimeType, it.localArtworkPath)
         }
         repository.delete(trackId)
         _progress.value = _progress.value - trackId
@@ -148,7 +150,7 @@ class FileDownloadManager(
             row.localArtworkPath?.let { art -> storage.delete(art) }
             // Also remove deterministic temporary paths. A row may point at the
             // final file after a retry while a stale .part file still exists.
-            deleteTemporaryFiles(row.trackId, row.mimeType)
+            deleteTemporaryFiles(row.trackId, row.mimeType, row.localArtworkPath)
         }
         repository.clearAll()
         _progress.value = emptyMap()
@@ -162,13 +164,19 @@ class FileDownloadManager(
         job?.join()
     }
 
-    private suspend fun deleteTemporaryFiles(trackId: String, mimeType: String) {
+    private suspend fun deleteTemporaryFiles(
+        trackId: String,
+        mimeType: String,
+        previousArtworkPath: String? = null,
+    ) {
         val audioPart = storage.audioPath(trackId, mimeType) + ".part"
-        val artPart = storage.artPath(trackId) + ".part"
         storage.delete(audioPart)
         storage.delete(sourceMetadataPath(audioPart))
-        storage.delete(artPart)
-        storage.delete(sourceMetadataPath(artPart))
+        listOfNotNull(storage.artPath(trackId), previousArtworkPath).distinct().forEach { art ->
+            val artPart = "$art.part"
+            storage.delete(artPart)
+            storage.delete(sourceMetadataPath(artPart))
+        }
     }
 
     private fun placeholder(track: Track) = DownloadedTrack(
@@ -324,15 +332,17 @@ class FileDownloadManager(
                     if (audioHealthy == null) return@forEach // retry on the next launch
 
                     var repaired = row
+                    val needsVersionedRefresh = row.localArtworkPath != null &&
+                        row.localArtworkPath != storage.artPath(row.trackId)
                     row.localArtworkPath?.let { art ->
                         val artHealthy = runCatching { storage.exists(art) && storage.size(art) > 0L }.getOrNull()
                         if (artHealthy == false) {
                             repaired = row.copy(localArtworkPath = null)
                             repository.upsert(repaired)
                         }
-                        if (artHealthy == null) return@forEach
+                        if (artHealthy == null && !needsVersionedRefresh) return@forEach
                     }
-                    if (repaired.localArtworkPath == null) repairs += repaired
+                    if (repaired.localArtworkPath == null || needsVersionedRefresh) repairs += repaired
                 }
                 DownloadState.PAUSED, DownloadState.FAILED -> Unit
             }
@@ -363,10 +373,25 @@ class FileDownloadManager(
     private suspend fun repairArtwork(row: DownloadedTrack) {
         val art = fetchArtwork(row.thumbnailUrl, row.trackId) ?: return
         val current = repository.get(row.trackId) ?: return
-        // The user may have removed or restarted the row while the request was
-        // in flight. Never resurrect that stale completed row.
-        if (!current.isCompleted || current.localAudioPath != row.localAudioPath) return
-        repository.upsert(current.copy(localArtworkPath = current.localArtworkPath ?: art))
+        // The user may have removed, restarted or independently repaired the
+        // row while the request was in flight. Never overwrite that newer state.
+        if (!current.isCompleted || current.localAudioPath != row.localAudioPath ||
+            current.localArtworkPath != row.localArtworkPath
+        ) return
+        repository.upsert(current.copy(localArtworkPath = art))
+        val previousArt = row.localArtworkPath
+        if (previousArt != null && previousArt != art && isInsideDownloadRoot(previousArt)) {
+            // The new version is durably referenced before the old file is
+            // removed. A failed refresh never reaches this cleanup.
+            storage.delete(previousArt)
+            storage.delete("$previousArt.part")
+            storage.delete(sourceMetadataPath("$previousArt.part"))
+        }
+    }
+
+    private fun isInsideDownloadRoot(path: String): Boolean {
+        val root = storage.root.trimEnd('/', '\\')
+        return path.startsWith("$root/") || path.startsWith("$root\\")
     }
 
     /**

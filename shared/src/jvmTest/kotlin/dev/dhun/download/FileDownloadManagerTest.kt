@@ -272,6 +272,91 @@ class FileDownloadManagerTest {
     }
 
     @Test
+    fun legacyArtworkMovesToTheVersionedFileOnlyAfterSuccessfulRefresh(): Unit = runBlocking {
+        val storage = TestDownloadStorage()
+        val repo = repository()
+        val audio = storage.audioPath("legacy-art", "audio/webm")
+        storage.append(audio, "audio".encodeToByteArray())
+        val oldArt = "${storage.root}/art/legacy-art.jpg"
+        storage.append(oldArt, "old-possibly-damaged-cover".encodeToByteArray())
+        val versionedArt = storage.artPath("legacy-art")
+        assertTrue(oldArt != versionedArt)
+        repo.upsert(DownloadedTrack(
+            trackId = "legacy-art",
+            title = "Legacy cover",
+            artistName = "Artist",
+            durationSeconds = 200,
+            thumbnailUrl = "https://images.example/legacy.jpg",
+            localAudioPath = audio,
+            localArtworkPath = oldArt,
+            fileSizeBytes = 5,
+            mimeType = "audio/webm",
+            downloadState = DownloadState.COMPLETED,
+        ))
+        val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        FileDownloadManager(
+            repo, FakeResolver(DhunResult.Failure(DhunError.Unavailable("must not resolve"))),
+            FakeStreamDownloader(storage), storage, managerScope,
+        )
+        try {
+            withTimeout(15_000) {
+                while (repo.get("legacy-art")?.localArtworkPath != versionedArt) delay(10)
+            }
+            assertTrue(storage.exists(versionedArt))
+            assertTrue(storage.files[versionedArt]!!.contentEquals("audio-bytes".encodeToByteArray()))
+            assertFalse(storage.exists(oldArt), "old file is removed only after the new path is persisted")
+            assertEquals(DownloadState.COMPLETED, repo.get("legacy-art")?.downloadState)
+        } finally { managerScope.cancel() }
+    }
+
+    @Test
+    fun failedLegacyArtworkRefreshKeepsThePreviousRowAndFile(): Unit = runBlocking {
+        val storage = TestDownloadStorage()
+        val repo = repository()
+        val audio = storage.audioPath("offline-art", "audio/webm")
+        storage.append(audio, "audio".encodeToByteArray())
+        val oldArt = "${storage.root}/art/offline-art.jpg"
+        val oldBytes = "previous-cover".encodeToByteArray()
+        storage.append(oldArt, oldBytes)
+        repo.upsert(DownloadedTrack(
+            trackId = "offline-art",
+            title = "Offline cover",
+            artistName = "Artist",
+            durationSeconds = 200,
+            thumbnailUrl = "https://images.example/offline.jpg",
+            localAudioPath = audio,
+            localArtworkPath = oldArt,
+            fileSizeBytes = 5,
+            mimeType = "audio/webm",
+            downloadState = DownloadState.COMPLETED,
+        ))
+        val attempts = mutableListOf<String>()
+        val offlineDownloader = object : StreamDownloader {
+            override suspend fun download(
+                url: String,
+                userAgent: String?,
+                destinationPath: String,
+                onProgress: (Long, Long?) -> Unit,
+            ): DhunResult<Long> {
+                attempts += url
+                return DhunResult.Failure(DhunError.Network("offline"))
+            }
+        }
+        val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        FileDownloadManager(
+            repo, FakeResolver(DhunResult.Failure(DhunError.Unavailable("must not resolve"))),
+            offlineDownloader, storage, managerScope,
+        )
+        try {
+            withTimeout(15_000) { while (attempts.size < 2) delay(10) }
+            assertEquals(oldArt, repo.get("offline-art")?.localArtworkPath)
+            assertTrue(storage.files[oldArt]!!.contentEquals(oldBytes))
+            assertFalse(storage.exists(storage.artPath("offline-art")))
+            assertEquals(DownloadState.COMPLETED, repo.get("offline-art")?.downloadState)
+        } finally { managerScope.cancel() }
+    }
+
+    @Test
     fun updateRestartMarksMissingAudioRetryableWithoutDeletingItsMetadata(): Unit = runBlocking {
         val storage = TestDownloadStorage()
         val repo = repository()

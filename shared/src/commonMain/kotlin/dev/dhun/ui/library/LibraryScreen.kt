@@ -69,6 +69,7 @@ import dev.dhun.presentation.library.DownloadsListUi
 import dev.dhun.presentation.library.LibraryTab
 import dev.dhun.presentation.library.LibraryViewModel
 import dev.dhun.presentation.library.currentUtcOffsetMs
+import dev.dhun.presentation.library.preferredArtworkUrl
 import dev.dhun.presentation.library.toTrack
 import dev.dhun.ui.components.DragHandleGrip
 import dev.dhun.ui.components.ReorderableList
@@ -1132,7 +1133,7 @@ private fun ManageableDownloadRow(
             ),
         )
         ArtworkImage(
-            imageUrl = download.thumbnailUrl,
+            imageUrl = download.preferredArtworkUrl,
             contentDescription = download.title,
             modifier = Modifier.size(DhunSpacing.touchTarget),
         )
@@ -1181,7 +1182,7 @@ private fun DownloadRow(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md)) {
             ArtworkImage(
-                imageUrl = download.thumbnailUrl,
+                imageUrl = download.preferredArtworkUrl,
                 contentDescription = download.title,
                 modifier = Modifier.size(DhunSpacing.touchTarget),
             )

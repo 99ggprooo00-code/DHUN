@@ -32,6 +32,12 @@ interface DownloadStorage {
     suspend fun ensureDirExists(path: String)
 }
 
+/**
+ * Versioned artwork filename. Version 2 makes old, potentially damaged covers
+ * refresh to a new URI after an update instead of reusing a cached failure.
+ */
+fun downloadArtworkFileName(trackId: String): String = "${safeTrackId(trackId)}.v2.jpg"
+
 /** Map a stream MIME type to the audio file extension (no dot on return). */
 fun extensionForMimeType(mimeType: String): String = when {
     mimeType.contains("webm", ignoreCase = true) -> "webm"

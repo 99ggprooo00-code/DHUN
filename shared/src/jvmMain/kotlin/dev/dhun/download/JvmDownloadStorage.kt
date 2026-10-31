@@ -16,7 +16,7 @@ class JvmDownloadStorage(override val root: String) : DownloadStorage {
         File(File(root, "audio"), "${safeTrackId(trackId)}.${extensionForMimeType(mimeType)}").absolutePath
 
     override fun artPath(trackId: String): String =
-        File(File(root, "art"), "${safeTrackId(trackId)}.jpg").absolutePath
+        File(File(root, "art"), downloadArtworkFileName(trackId)).absolutePath
 
     override suspend fun size(path: String): Long = withContext(Dispatchers.IO) {
         val f = File(path)
