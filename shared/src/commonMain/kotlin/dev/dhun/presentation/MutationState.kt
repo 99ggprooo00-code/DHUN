@@ -79,12 +79,19 @@ class MutationTracker(private val scope: CoroutineScope) {
      *
      * @param failureMessage shown verbatim when [block] throws.
      * @param onSuccess runs only after [block] completed normally.
+     * @param onFailure optional rollback, run before [failureMessage] is
+     *   published. Screens that show the result of a mutation before it is
+     *   stored (a settings reset flips every control immediately) use it to put
+     *   back what is actually stored, so a failure cannot leave the UI claiming
+     *   a state the database never reached. Its own failure is swallowed: the
+     *   action's message still stands and the caller's data is unchanged.
      * @return true when the mutation was started, false when it was a duplicate.
      */
     fun run(
         key: String,
         failureMessage: String,
         onSuccess: (() -> Unit)? = null,
+        onFailure: (suspend () -> Unit)? = null,
         block: suspend () -> Unit,
     ): Boolean {
         // Atomic claim: a second tap before recomposition must not queue a
@@ -108,6 +115,17 @@ class MutationTracker(private val scope: CoroutineScope) {
                 finish(key)
                 throw cancelled
             } catch (_: Exception) {
+                if (onFailure != null) {
+                    try {
+                        onFailure()
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        // The rollback reads the same store that just failed.
+                        // Keep the message; the next screen read shows the
+                        // stored state regardless.
+                    }
+                }
                 // Keep the mutation's failure in the model instead of the
                 // thread's uncaught-exception handler.
                 _state.update {

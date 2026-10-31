@@ -214,6 +214,13 @@ fun DhunAppShell(
     // S4: settings model lives at shell scope (one instance, shared by both
     // panes) so a change made in the detail pane is visible if the window is
     // resized down to the single-pane path, and vice versa.
+    // Reset settings also restores the live EQ engine: its rows are ordinary
+    // settings, but its state lives in a platform session that would keep the
+    // old preset and write it back on the next change. The session is stable
+    // for the app's lifetime (Koin singleton / player equalizer).
+    val resetEqualizer: (suspend () -> Unit)? = equalizerSession?.let { session ->
+        { session.restore(EqualizerState()) }
+    }
     val settingsVm = remember(dataLayer, scope) {
         SettingsViewModel(
             GetSettingUseCase(dataLayer.settings),
@@ -224,6 +231,7 @@ fun DhunAppShell(
             clearSearchHistoryAction = { dataLayer.search.clearRecentSearches() },
             clearPlayHistoryAction = { dataLayer.history.clear() },
             clearAudioCacheAction = clearAudioCache,
+            resetEqualizerAction = resetEqualizer,
             onCountryCodeChange = onCountryCodeChange,
         )
     }

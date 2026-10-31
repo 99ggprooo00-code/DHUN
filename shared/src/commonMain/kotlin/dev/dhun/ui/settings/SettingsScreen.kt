@@ -305,7 +305,9 @@ fun SettingsScreen(
                 }
                 SettingsViewModel.KEY_RESET -> {
                     confirmReset = false
-                    equalizerSession?.restore(dev.dhun.player.equalizer.EqualizerState())
+                    // The ViewModel has already reset the live equalizer as
+                    // part of the same tracked operation. Only the process-
+                    // wide appearance palette remains a UI-side success effect.
                     DhunAppearance.reset()
                     viewModel.consumeCompletedAction()
                 }
@@ -358,8 +360,8 @@ fun SettingsScreen(
             errorMessage = maintenance.errorFor(SettingsViewModel.KEY_RESET),
             confirmLabel = "Reset",
             pendingLabel = "Resetting…",
-            // Live appearance/EQ state is reset in the LaunchedEffect above,
-            // only after the persisted reset reports success.
+            // Stored settings and live EQ are reset by the ViewModel; the
+            // appearance palette is applied above only after overall success.
             onConfirm = { viewModel.reset() },
         )
     }

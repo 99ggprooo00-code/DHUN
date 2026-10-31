@@ -183,6 +183,79 @@ class MutationTrackerTest {
     }
 
     @Test
+    fun aFailedActionRollsBackBeforeTheFailureIsPublished() {
+        val h = Harness()
+        try {
+            var rolledBack = false
+            var messageWhileRollingBack: String? = "unset"
+            h.tracker.run(
+                "reset-settings",
+                "reset failed",
+                onFailure = {
+                    rolledBack = true
+                    // The screen must be put back to the stored state *before*
+                    // it announces the failure, so the user reads the message
+                    // next to values that are actually true.
+                    messageWhileRollingBack = h.tracker.state.value.errorMessage
+                },
+            ) { error("boom") }
+
+            assertTrue(rolledBack, "the rollback runs for a failed action")
+            assertNull(messageWhileRollingBack, "the rollback runs before the message is published")
+            assertEquals("reset failed", h.tracker.state.value.errorFor("reset-settings"))
+            assertFalse(h.tracker.state.value.isRunning("reset-settings"), "the key is released for a retry")
+        } finally {
+            h.close()
+        }
+    }
+
+    @Test
+    fun aFailingRollbackStillPublishesTheRealFailure() {
+        val h = Harness()
+        try {
+            // The rollback reads the same store that just failed; if that read
+            // throws too the user must still be told what happened.
+            h.tracker.run("reset-settings", "reset failed", onFailure = { error("read back failed") }) {
+                error("boom")
+            }
+            assertEquals("reset failed", h.tracker.state.value.errorFor("reset-settings"))
+            assertFalse(h.tracker.state.value.isRunning("reset-settings"))
+            assertTrue(h.escaped.isEmpty(), "neither failure may escape the coroutine: ${h.escaped}")
+        } finally {
+            h.close()
+        }
+    }
+
+    @Test
+    fun aSuccessfulActionNeverRollsBack() {
+        val h = Harness()
+        try {
+            var rolledBack = false
+            h.tracker.run("reset-settings", "reset failed", onFailure = { rolledBack = true }) { }
+            runBlocking { await { !h.tracker.state.value.isBusy } }
+            assertFalse(rolledBack, "success must not undo the stored change")
+            assertNull(h.tracker.state.value.errorMessage)
+        } finally {
+            h.close()
+        }
+    }
+
+    @Test
+    fun aCancelledActionDoesNotRollBack() {
+        val h = Harness()
+        try {
+            var rolledBack = false
+            val gate = CompletableDeferred<Unit>()
+            h.tracker.run("k", "failed", onFailure = { rolledBack = true }) { gate.await() }
+            gate.completeExceptionally(CancellationException("screen closed"))
+            runBlocking { await { !h.tracker.state.value.isBusy } }
+            assertFalse(rolledBack, "cancellation is not a failed write")
+        } finally {
+            h.close()
+        }
+    }
+
+    @Test
     fun independentKeysRunConcurrently() {
         val h = Harness()
         try {
