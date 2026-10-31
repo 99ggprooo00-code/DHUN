@@ -1,6 +1,8 @@
 name: diag-persistence-live
 on:
   workflow_dispatch:
+  push:
+    branches: [arena/8a70a040-dhun]
 permissions:
   contents: read
 jobs:
