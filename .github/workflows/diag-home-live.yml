@@ -1,0 +1,155 @@
+name: diag-home-live
+
+# TEMPORARY diagnostic (session arena/09e5238e-dhun, Home-loading failure).
+# Deleted before this branch is proposed for merge. It answers three questions
+# the sandbox cannot: does the InnerTube client-version scrape still match
+# today's music.youtube.com HTML, what envelope does an anonymous WEB_REMIX
+# FEmusic_home browse return now, and does adding visitorData to the request
+# context change that envelope. Results are printed as check-run annotations
+# because artifact and job-log downloads are unreachable from the agent.
+
+on:
+  push:
+    branches: [arena/09e5238e-dhun]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Probe anonymous Home browse
+        shell: bash
+        run: |
+          set +e
+          python3 - <<'PY'
+          import json, re, sys, urllib.request, urllib.error
+
+          UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
+
+          def emit(level, text):
+              text = text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              print(f"::{level} title=home-probe::{text}", flush=True)
+
+          def get(url):
+              req = urllib.request.Request(url, headers={"User-Agent": UA,
+                  "Accept-Language": "en-US,en;q=0.9"})
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  return r.status, r.read().decode("utf-8", "replace")
+
+          def post(url, body, headers):
+              data = json.dumps(body).encode()
+              req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as r:
+                      return r.status, r.read().decode("utf-8", "replace")
+              except urllib.error.HTTPError as e:
+                  return e.code, e.read().decode("utf-8", "replace")
+              except Exception as e:
+                  return -1, f"{type(e).__name__}: {e}"
+
+          # --- 1. the client-version scrape DHUN performs ---------------------
+          version = None
+          visitor = None
+          try:
+              status, html = get("https://music.youtube.com/")
+              m = re.search(r'"INNERTUBE_CLIENT_VERSION":"([0-9.]+)"', html)
+              version = m.group(1) if m else None
+              v = (re.search(r'"visitorData"\s*:\s*"([^"]+)"', html)
+                   or re.search(r'"VISITOR_DATA"\s*:\s*"([^"]+)"', html))
+              visitor = v.group(1) if v else None
+              emit("warning", f"homepage http={status} htmlBytes={len(html)} "
+                              f"dhunClientVersionRegex={'match' if version else 'NO MATCH'} "
+                              f"dhunVisitorRegex={'match' if visitor else 'NO MATCH'}")
+          except Exception as e:
+              emit("warning", f"homepage fetch failed: {type(e).__name__}: {str(e)[:160]}")
+
+          # --- 2. shape summary (key names only, never values) ---------------
+          def keys(o):
+              return ",".join(sorted(o.keys())) if isinstance(o, dict) and o else "-"
+
+          def summarize(raw):
+              contents = raw.get("contents") or {}
+              browse = (contents.get("singleColumnBrowseResultsRenderer")
+                        or contents.get("twoColumnBrowseResultsRenderer") or {})
+              tabs = browse.get("tabs") or []
+              renderers = []
+              for tab in tabs:
+                  if isinstance(tab, dict):
+                      r = tab.get("tabRenderer") or tab.get("musicTabRenderer")
+                      if isinstance(r, dict):
+                          renderers.append(r)
+              tab_contents = [r.get("content") for r in renderers if isinstance(r.get("content"), dict)]
+              sections = [c.get("sectionListRenderer") for c in tab_contents
+                          if isinstance(c.get("sectionListRenderer"), dict)]
+              cont = raw.get("continuationContents") or {}
+              actions = [k for k in ("onResponseReceivedActions", "onResponseReceivedEndpoints",
+                                     "onResponseReceivedCommands") if k in raw]
+              return (f"root[{keys(raw)}] contents[{keys(contents)}] browse[{keys(browse)}] "
+                      f"tabs={len(tabs)} tabRenderers[{','.join(sorted({k for r in renderers for k in r})) or '-'}] "
+                      f"tabSections={len(sections)} continuation[{keys(cont)}] actions[{','.join(actions) or '-'}]")
+
+          def sections_of(raw):
+              contents = raw.get("contents") or {}
+              browse = (contents.get("singleColumnBrowseResultsRenderer")
+                        or contents.get("twoColumnBrowseResultsRenderer") or {})
+              for tab in browse.get("tabs") or []:
+                  r = tab.get("tabRenderer") or tab.get("musicTabRenderer") or {}
+                  slr = (r.get("content") or {}).get("sectionListRenderer") or {}
+                  if slr.get("contents"):
+                      return len(slr["contents"]), ",".join(sorted(
+                          k for item in slr["contents"] if isinstance(item, dict) for k in item))
+              return 0, "-"
+
+          base = {"context": {"client": {"clientName": "WEB_REMIX", "hl": "en", "gl": "US"}},
+                  "browseId": "FEmusic_home"}
+
+          # --- 3. anonymous browse, exactly like DHUN sends it ---------------
+          live_version = version or "1.20250310.01.00"
+          plain = json.loads(json.dumps(base))
+          plain["context"]["client"]["clientVersion"] = live_version
+          headers = {"Content-Type": "application/json", "User-Agent": UA,
+                     "Accept-Language": "en-US,en;q=0.9",
+                     "X-YouTube-Client-Name": "67",
+                     "X-YouTube-Client-Version": live_version,
+                     "Origin": "https://music.youtube.com",
+                     "Referer": "https://music.youtube.com/"}
+          if visitor:
+              headers["X-Goog-Visitor-Id"] = visitor
+          status, text = post("https://music.youtube.com/youtubei/v1/browse?alt=json", plain, headers)
+          emit("warning", f"browse(no context visitorData) http={status} bytes={len(text)}")
+          if status == 200:
+              raw = json.loads(text)
+              emit("warning", "browse(no context visitorData) " + summarize(raw))
+              n, names = sections_of(raw)
+              emit("warning", f"browse(no context visitorData) rawSections={n} itemKinds[{names}]")
+
+          # --- 4. same request with visitorData inside the context ----------
+          if visitor:
+              ctx = json.loads(json.dumps(base))
+              ctx["context"]["client"]["clientVersion"] = live_version
+              ctx["context"]["client"]["visitorData"] = visitor
+              status2, text2 = post("https://music.youtube.com/youtubei/v1/browse?alt=json", ctx, headers)
+              emit("warning", f"browse(with context visitorData) http={status2} bytes={len(text2)}")
+              if status2 == 200:
+                  raw2 = json.loads(text2)
+                  emit("warning", "browse(with context visitorData) " + summarize(raw2))
+                  n2, names2 = sections_of(raw2)
+                  emit("warning", f"browse(with context visitorData) rawSections={n2} itemKinds[{names2}]")
+              if status2 != 200:
+                  emit("warning", f"browse(with context visitorData) errorBody=" + text2[:300].replace("\n", " "))
+          else:
+              emit("warning", "no visitorData scraped; context variant skipped")
+
+          # --- 5. an error-style request, to see how statuses are reported ---
+          bad = json.loads(json.dumps(base))
+          bad["browseId"] = "FEmusic_home"
+          bad["context"]["client"]["clientVersion"] = "0"
+          status3, text3 = post("https://music.youtube.com/youtubei/v1/browse?alt=json", bad, headers)
+          emit("warning", f"browse(bad clientVersion) http={status3} bodyHead="
+                          + text3[:200].replace("\n", " "))
+          PY
