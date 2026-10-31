@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -125,6 +126,7 @@ fun HomeScreen(
     val recentlyPlayed by viewModel.recentlyPlayed.collectAsState()
     val recommendedSongs by viewModel.recommendedSongs.collectAsState()
     val isLoadingRecommended by viewModel.isLoadingRecommended.collectAsState()
+    val feedListStates = remember { mutableMapOf<HomeMood, LazyListState>() }
 
     // Persistent controls remain usable while a category is loading/empty/error.
     Column(modifier = modifier.fillMaxSize().onPreviewKeyEvent { event ->
@@ -231,6 +233,7 @@ fun HomeScreen(
                     key(selectedMood) {
                         HomeFeedContent(
                             feed = state.feed,
+                            listState = feedListStates.getOrPut(selectedMood) { LazyListState() },
                             recentlyPlayed = if (selectedMood == HomeMood.FOR_YOU) recentlyPlayed else emptyList(),
                             recommendedSongs = if (selectedMood == HomeMood.FOR_YOU) recommendedSongs else emptyList(),
                             isLoadingRecommended = selectedMood == HomeMood.FOR_YOU && isLoadingRecommended,
@@ -261,6 +264,7 @@ fun HomeScreen(
 @Composable
 private fun HomeFeedContent(
     feed: HomeFeed,
+    listState: LazyListState = rememberLazyListState(),
     recentlyPlayed: List<Track>,
     recommendedSongs: List<Track>,
     isLoadingRecommended: Boolean,
@@ -291,8 +295,6 @@ private fun HomeFeedContent(
     val otherSections = remember(feed.sections, feed.quickPicks) {
         remainingHomeSections(feed)
     }
-
-    val listState = rememberLazyListState()
 
     // Endless scroll: ask for the next page of shelves once the user gets
     // near the end of what we already have. `feed.continuationToken == null`

@@ -97,6 +97,7 @@ fun SearchScreen(
     val suggestions by viewModel.suggestions.collectAsState()
     val resultsState by viewModel.resultsState.collectAsState()
     val isLoadingMore by viewModel.isLoadingMore.collectAsState()
+    val loadMoreError by viewModel.loadMoreError.collectAsState()
     val recentSearches by viewModel.recentSearches.collectAsState()
     val listState = rememberLazyListState()
 
@@ -109,8 +110,8 @@ fun SearchScreen(
         }
     }
 
-    LaunchedEffect(shouldLoadMore) {
-        if (shouldLoadMore && !isLoadingMore) {
+    LaunchedEffect(shouldLoadMore, isLoadingMore, loadMoreError, resultsState) {
+        if (shouldLoadMore && !isLoadingMore && loadMoreError == null) {
             viewModel.loadMore()
         }
     }
@@ -158,6 +159,7 @@ fun SearchScreen(
                         ErrorView(
                             message = state.message,
                             title = "Search failed",
+                            details = state.detail,
                             onRetry = { viewModel.onSearchSubmitted() },
                             modifier = Modifier.fillMaxSize(),
                         )
@@ -174,6 +176,9 @@ fun SearchScreen(
                             results = state.results,
                             filter = selectedFilter,
                             isLoadingMore = isLoadingMore,
+                            loadMoreError = loadMoreError,
+                            onLoadMore = viewModel::loadMore,
+                            onRetryMore = viewModel::retryLoadMore,
                             listState = listState,
                             onTrackClick = onTrackClick,
                             onAlbumClick = onAlbumClick,
@@ -468,6 +473,9 @@ private fun SearchResultsList(
     results: SearchResults,
     filter: SearchFilter,
     isLoadingMore: Boolean,
+    loadMoreError: String?,
+    onLoadMore: () -> Unit,
+    onRetryMore: () -> Unit,
     listState: LazyListState,
     onTrackClick: (track: Track, contextQueue: List<Track>, index: Int) -> Unit,
     onAlbumClick: (Album) -> Unit,
@@ -563,16 +571,28 @@ private fun SearchResultsList(
             }
         }
 
-        // Pagination Loader Indicator
-        if (isLoadingMore) {
-            item(key = "loading_more") {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(DhunSpacing.md),
-                    contentAlignment = Alignment.Center,
+        // Pagination status: failures keep the existing results visible and
+        // wait for an explicit retry instead of looping on recomposition.
+        if (isLoadingMore || loadMoreError != null || results.continuationToken != null) {
+            item(key = "pagination_status") {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(DhunSpacing.md),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
                 ) {
-                    LoadingShimmer(modifier = Modifier.width(DhunSpacing.skeletonMetaWidth).height(DhunSpacing.xl))
+                    when {
+                        isLoadingMore -> {
+                            LoadingShimmer(
+                                modifier = Modifier.width(DhunSpacing.skeletonMetaWidth).height(DhunSpacing.xl),
+                            )
+                            Text("Loading more results…", color = DhunColors.textSecondary)
+                        }
+                        loadMoreError != null -> {
+                            Text(loadMoreError, color = DhunColors.textSecondary)
+                            DhunTextButton(onClick = onRetryMore) { Text("Retry loading more") }
+                        }
+                        else -> DhunTextButton(onClick = onLoadMore) { Text("Load more results") }
+                    }
                 }
             }
         }

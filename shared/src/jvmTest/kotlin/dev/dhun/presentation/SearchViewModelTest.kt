@@ -20,6 +20,8 @@ import dev.dhun.innertube.SearchFilter
 import dev.dhun.presentation.search.SearchResultsUiState
 import dev.dhun.presentation.search.SearchViewModel
 import dev.dhun.provider.MusicProvider
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -30,6 +32,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SearchViewModelTest {
@@ -42,10 +45,14 @@ class SearchViewModelTest {
     private class FakeSearchMusicProvider : MusicProvider {
         @Volatile var lastFilter: SearchFilter? = null
         @Volatile var lastQuery: String? = null
+        @Volatile var searchHandler: (suspend (String, SearchFilter) -> DhunResult<SearchResults>)? = null
+        @Volatile var continuationHandler: (suspend (String) -> DhunResult<SearchResults>)? = null
+        val continuationCalls = java.util.concurrent.ConcurrentLinkedQueue<String>()
 
         override suspend fun search(query: String, filter: SearchFilter): DhunResult<SearchResults> {
             lastQuery = query
             lastFilter = filter
+            searchHandler?.let { return it(query, filter) }
             return DhunResult.Success(
                 SearchResults(
                     query = query,
@@ -59,6 +66,8 @@ class SearchViewModelTest {
         }
 
         override suspend fun searchContinuation(continuationToken: String): DhunResult<SearchResults> {
+            continuationCalls += continuationToken
+            continuationHandler?.let { return it(continuationToken) }
             return DhunResult.Success(
                 SearchResults(
                     query = "",
@@ -223,6 +232,108 @@ class SearchViewModelTest {
             eventually { !vm.recentSearches.value.contains("query1") }
             vm.clearAllRecentSearches()
             eventually { vm.recentSearches.value.isEmpty() }
+        } finally {
+            testScope.cancel()
+        }
+    }
+
+    @Test
+    fun continuationFailureIsRetryableAndAppendsAreDistinct(): Unit = runBlocking {
+        val testScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val data = testData()
+            val provider = FakeSearchMusicProvider()
+            provider.continuationHandler = {
+                if (provider.continuationCalls.size == 1) {
+                    DhunResult.Failure(DhunError.Network("HTTP 400 from /search"))
+                } else {
+                    DhunResult.Success(SearchResults(
+                        songs = listOf(sampleTrack("s1"), sampleTrack("s2"), sampleTrack("s2")),
+                        continuationToken = "token_123",
+                    ))
+                }
+            }
+            val vm = SearchViewModel(provider, data.search, data.library, data.playlists, testScope)
+            vm.performSearch("queen")
+            eventually { vm.resultsState.value is SearchResultsUiState.Success }
+
+            vm.loadMore()
+            eventually { vm.loadMoreError.value != null }
+            assertEquals(1, (vm.resultsState.value as SearchResultsUiState.Success).results.songs.size)
+            vm.loadMore()
+            delay(100)
+            assertEquals(1, provider.continuationCalls.size, "a failure must not auto-retry")
+
+            vm.retryLoadMore()
+            eventually {
+                (vm.resultsState.value as? SearchResultsUiState.Success)?.results?.songs?.size == 2
+            }
+            val results = (vm.resultsState.value as SearchResultsUiState.Success).results
+            assertEquals(listOf("s1", "s2"), results.songs.map { it.id })
+            assertNull(results.continuationToken, "a completed cursor must not be requested again")
+            assertEquals(2, provider.continuationCalls.size)
+            vm.loadMore()
+            delay(100)
+            assertEquals(2, provider.continuationCalls.size)
+        } finally {
+            testScope.cancel()
+        }
+    }
+
+    @Test
+    fun staleContinuationCannotOverwriteANewerSearch(): Unit = runBlocking {
+        val testScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val data = testData()
+            val provider = FakeSearchMusicProvider()
+            val release = CompletableDeferred<Unit>()
+            provider.continuationHandler = {
+                try {
+                    release.await()
+                } catch (_: CancellationException) {
+                    // Deliberately emulate a provider that answers after its
+                    // caller was cancelled; the ViewModel must still drop it.
+                }
+                DhunResult.Success(SearchResults(songs = listOf(sampleTrack("stale"))))
+            }
+            val vm = SearchViewModel(provider, data.search, data.library, data.playlists, testScope)
+            vm.performSearch("old")
+            eventually { vm.resultsState.value is SearchResultsUiState.Success }
+            vm.loadMore()
+            eventually { provider.continuationCalls.size == 1 }
+
+            provider.searchHandler = { query, _ ->
+                DhunResult.Success(SearchResults(query = query, songs = listOf(sampleTrack("new"))))
+            }
+            vm.performSearch("new")
+            eventually {
+                (vm.resultsState.value as? SearchResultsUiState.Success)?.results?.songs?.singleOrNull()?.id == "new"
+            }
+            release.complete(Unit)
+            delay(100)
+            val results = (vm.resultsState.value as SearchResultsUiState.Success).results
+            assertEquals("new", results.query)
+            assertEquals(listOf("new"), results.songs.map { it.id })
+            assertNull(vm.loadMoreError.value)
+        } finally {
+            testScope.cancel()
+        }
+    }
+
+    @Test
+    fun searchFailureKeepsSanitizedEndpointDetail(): Unit = runBlocking {
+        val testScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val data = testData()
+            val provider = FakeSearchMusicProvider()
+            provider.searchHandler = { _, _ ->
+                DhunResult.Failure(DhunError.Parse("HTTP 400 from /search; status=INVALID_ARGUMENT"))
+            }
+            val vm = SearchViewModel(provider, data.search, data.library, data.playlists, testScope)
+            vm.performSearch("focus")
+            eventually { vm.resultsState.value is SearchResultsUiState.Error }
+            val error = vm.resultsState.value as SearchResultsUiState.Error
+            assertTrue(error.detail?.contains("HTTP 400 from /search") == true)
         } finally {
             testScope.cancel()
         }

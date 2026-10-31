@@ -194,6 +194,7 @@ val appModule = module {
             libraryRepository = get<DataLayer>().library,
             playlistRepository = get<DataLayer>().playlists,
             scope = get(),
+            errorLogger = { android.util.Log.e("DHUN", it) },
         )
     }
 
