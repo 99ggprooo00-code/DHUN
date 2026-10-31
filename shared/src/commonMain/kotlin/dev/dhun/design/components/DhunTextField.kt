@@ -50,6 +50,9 @@ fun DhunTextField(
     trailingContent: (@Composable () -> Unit)? = null,
     /** Optional physical-key handling; return true to consume the event. */
     onKeyEvent: ((KeyEvent) -> Boolean)? = null,
+    singleLine: Boolean = true,
+    minLines: Int = 1,
+    maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
 ) {
     val focusRegistry = LocalTextInputFocusRegistry.current
     val focusToken = remember { Any() }
@@ -62,7 +65,9 @@ fun DhunTextField(
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
-        singleLine = true,
+        singleLine = singleLine,
+        minLines = minLines,
+        maxLines = maxLines,
         textStyle = MaterialTheme.typography.bodyMedium.copy(color = DhunColors.textPrimary),
         cursorBrush = SolidColor(DhunColors.accent),
         keyboardOptions = KeyboardOptions(
@@ -100,14 +105,17 @@ fun DhunTextField(
                         horizontal = DhunSpacing.md,
                         vertical = if (trailingContent != null) DhunSpacing.xs else DhunSpacing.smPlus,
                     ),
-                contentAlignment = Alignment.CenterStart,
+                contentAlignment = if (singleLine) Alignment.CenterStart else Alignment.TopStart,
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalAlignment = if (singleLine) Alignment.CenterVertically else Alignment.Top,
                 ) {
                     leadingContent?.invoke()
-                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                    Box(
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = if (singleLine) Alignment.CenterStart else Alignment.TopStart,
+                    ) {
                         if (value.isEmpty() && placeholder != null) {
                             Text(
                                 text = placeholder,

@@ -15,7 +15,7 @@ class DhunControlPolicyTest {
     @AfterTest fun resetAfter() = DhunAppearance.reset()
 
     @Test
-    fun checkboxAndProgressUseTheActiveDhunTokens() {
+    fun smallControlsUseTheActiveDhunTokens() {
         for (mode in DhunThemeMode.entries) {
             DhunAppearance.setAppearance(mode, DhunAccent.BRAND)
             assertEquals(DhunAppearance.tokens.glassStrong, DhunControlPolicy.checkboxFillOff())
@@ -25,6 +25,17 @@ class DhunControlPolicyTest {
             assertEquals(DhunAppearance.tokens.onAccent, DhunControlPolicy.checkboxGlyphOn())
             assertEquals(DhunAppearance.tokens.accent, DhunControlPolicy.progressFill())
             assertEquals(DhunAppearance.tokens.glassStrong, DhunControlPolicy.progressTrack())
+            assertEquals(DhunAppearance.tokens.onAccent, DhunControlPolicy.switchThumbOn())
+            assertEquals(DhunAppearance.tokens.accent, DhunControlPolicy.switchTrackOn())
+            assertEquals(DhunAppearance.tokens.textSecondary, DhunControlPolicy.switchThumbOff())
+            assertEquals(DhunAppearance.tokens.glassStrong, DhunControlPolicy.switchTrackOff())
+            assertEquals(DhunAppearance.tokens.glassEdge, DhunControlPolicy.switchBorderOff())
+            assertEquals(DhunAppearance.tokens.glassStrong, DhunControlPolicy.sliderInactiveTrack())
+            assertEquals(
+                DhunAppearance.tokens.accent.alpha * 0.85f,
+                DhunControlPolicy.sliderActiveTrack(DhunAppearance.tokens.accent).alpha,
+                0.001f,
+            )
             assertTrue(DhunControlPolicy.checkboxFillOff().alpha < 1f)
             assertTrue(DhunControlPolicy.progressTrack().alpha < 1f)
         }

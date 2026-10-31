@@ -1,6 +1,6 @@
 """Source guardrails for DHUN's native visual system.
 
-These tests deliberately cover only the screen surfaces already migrated. Player,
+These tests deliberately cover only the screen surfaces already migrated.
 Settings and remaining shell controls join the banned-call scope in their own
 stages; an untested global ban today would only encode an allowlist of known
 defects. No assertion here claims a rendered screenshot or Kotlin execution.
@@ -20,6 +20,16 @@ SCREEN_SURFACES = (
     "ui/browse/AlbumScreen.kt",
     "ui/browse/PlaylistScreen.kt",
     "ui/library/LibraryScreen.kt",
+    "ui/player/FullPlayer.kt",
+    "ui/player/MiniPlayer.kt",
+    "ui/player/PlayerSeekBar.kt",
+    "ui/player/PlayerTabs.kt",
+    "ui/player/SyncedLyrics.kt",
+    "ui/player/TransportControls.kt",
+    "ui/player/LyricsControlsDialog.kt",
+    "ui/player/LyricsMatchPicker.kt",
+    "ui/player/LyricsRomanizationControls.kt",
+    "ui/player/PlaybackErrorDialog.kt",
 )
 RAW_STOCK_CALLS = (
     "AlertDialog",
@@ -28,10 +38,18 @@ RAW_STOCK_CALLS = (
     "Card",
     "Checkbox",
     "CircularProgressIndicator",
+    "DropdownMenuItem",
+    "IconButton",
     "LinearProgressIndicator",
+    "NavigationBar",
+    "NavigationBarItem",
+    "NavigationRail",
+    "NavigationRailItem",
     "OutlinedTextField",
     "PullToRefreshBox",
+    "Slider",
     "Surface",
+    "Switch",
     "TextButton",
 )
 
@@ -80,6 +98,33 @@ class DesignSystemSourceTest(unittest.TestCase):
         self.assertIn("progress = fraction", screen)
         self.assertIn("val value = DhunControlPolicy.progressValue(progress)", controls)
         self.assertIn("if (value == null)", controls)
+
+    def test_player_visual_adoption_preserves_operation_hooks(self):
+        player = source("ui/player/FullPlayer.kt")
+        self.assertIn("DhunSlider(", player)
+        self.assertIn("onValueChange = viewModel::setVolume", player)
+        self.assertIn("valueRange = 0f..1f", player)
+
+        romanization = source("ui/player/LyricsRomanizationControls.kt")
+        self.assertIn("onCheckedChange = controller::setEnabled", romanization)
+        self.assertIn("controller.setMode(value)", romanization)
+
+        tabs = source("ui/player/PlayerTabs.kt")
+        self.assertIn("if (id != selectedProvider) onSelect(id)", tabs)
+        self.assertIn("MenuActionRow(", tabs)
+
+        picker = source("ui/player/LyricsMatchPicker.kt")
+        self.assertIn("singleLine = false", picker)
+        self.assertIn("minLines = 3", picker)
+        self.assertIn("maxLines = 5", picker)
+        self.assertIn("TtmlParser.MAX_INPUT_CHARS + 1", picker)
+        self.assertIn("controller.previewTtml(track.id, ttml)", picker)
+        self.assertIn("controller.choose(track.id, match)", picker)
+
+        error = source("ui/player/PlaybackErrorDialog.kt")
+        self.assertIn("GlassDialog(onDismissRequest = onDismiss)", error)
+        self.assertIn("diagnosticText(it, 4_000)", error)
+        self.assertIn("onDismiss(); onRetry()", error)
 
     def test_product_identity_is_not_assigned_to_the_toolkit(self):
         home = source("ui/home/HomeScreen.kt")

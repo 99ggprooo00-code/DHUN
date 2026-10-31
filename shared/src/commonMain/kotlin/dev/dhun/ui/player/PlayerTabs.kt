@@ -27,7 +27,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -560,16 +559,25 @@ internal fun LyricsProviderPicker(
                     tint = accent,
                 )
             }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                lyricsProviderOptions.forEach { (id, label) ->
-                    DropdownMenuItem(
-                        text = { Text(label) },
-                        modifier = Modifier.semantics { selected = id == selectedProvider },
-                        onClick = {
-                            expanded = false
-                            if (id != selectedProvider) onSelect(id)
-                        },
-                    )
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                shape = DhunShapes.large,
+                containerColor = Color.Transparent,
+                tonalElevation = DhunSpacing.zero,
+                shadowElevation = DhunSpacing.zero,
+            ) {
+                TrackMenuSurface(artworkUrl = null, modifier = Modifier.width(DhunSpacing.menuMinWidth)) {
+                    lyricsProviderOptions.forEach { (id, label) ->
+                        MenuActionRow(
+                            text = label,
+                            modifier = Modifier.semantics { selected = id == selectedProvider },
+                            onClick = {
+                                expanded = false
+                                if (id != selectedProvider) onSelect(id)
+                            },
+                        )
+                    }
                 }
             }
         }

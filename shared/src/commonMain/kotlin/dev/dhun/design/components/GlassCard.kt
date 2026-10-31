@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -19,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.window.Dialog
 import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunShapes
@@ -86,6 +88,27 @@ fun GlassCard(
             Box(modifier = Modifier.padding(contentPadding), content = content)
         } else {
             Box(content = content)
+        }
+    }
+}
+
+/** One high-opacity DHUN dialog container; callers retain their own actions. */
+@Composable
+fun GlassDialog(
+    onDismissRequest: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Dialog(onDismissRequest = onDismissRequest) {
+        GlassCard(
+            modifier = modifier.widthIn(
+                min = DhunSpacing.dialogMinWidth,
+                max = DhunSpacing.dialogMaxWidth,
+            ),
+            shape = DhunShapes.large,
+            opaqueBase = true,
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(DhunSpacing.lg), content = content)
         }
     }
 }

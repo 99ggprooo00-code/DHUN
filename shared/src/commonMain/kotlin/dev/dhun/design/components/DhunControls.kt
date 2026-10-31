@@ -8,6 +8,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,12 +38,89 @@ object DhunControlPolicy {
 
     fun progressFill(): Color = DhunColors.accent
     fun progressTrack(): Color = DhunColors.glassStrong
+
+    fun switchThumbOn(): Color = DhunColors.onAccent
+    fun switchTrackOn(): Color = DhunColors.accent
+    fun switchThumbOff(): Color = DhunColors.textSecondary
+    fun switchTrackOff(): Color = DhunColors.glassStrong
+    fun switchBorderOff(): Color = DhunColors.glassEdge
+
+    fun sliderInactiveTrack(): Color = DhunColors.glassStrong
+    fun sliderActiveTrack(accent: Color): Color = accent.copy(alpha = accent.alpha * 0.85f)
+
     fun progressValue(progress: Float?): Float? = progress?.let {
         if (it.isNaN()) 0f else it.coerceIn(0f, 1f)
     }
 
     fun disabled(color: Color): Color = color.copy(alpha = color.alpha * DISABLED_ALPHA)
     fun disableIf(enabled: Boolean, color: Color): Color = if (enabled) color else disabled(color)
+}
+
+/** DHUN switch colors with the same enabled/disabled contract as other controls. */
+@Composable
+fun DhunSwitch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    Switch(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        modifier = modifier,
+        enabled = enabled,
+        colors = SwitchDefaults.colors(
+            checkedThumbColor = DhunControlPolicy.switchThumbOn(),
+            checkedTrackColor = DhunControlPolicy.switchTrackOn(),
+            checkedBorderColor = DhunControlPolicy.switchTrackOn(),
+            checkedIconColor = DhunControlPolicy.switchThumbOn(),
+            uncheckedThumbColor = DhunControlPolicy.switchThumbOff(),
+            uncheckedTrackColor = DhunControlPolicy.switchTrackOff(),
+            uncheckedBorderColor = DhunControlPolicy.switchBorderOff(),
+            uncheckedIconColor = DhunControlPolicy.switchThumbOff(),
+            disabledCheckedThumbColor = DhunControlPolicy.disabled(DhunControlPolicy.switchThumbOn()),
+            disabledCheckedTrackColor = DhunControlPolicy.disabled(DhunControlPolicy.switchTrackOn()),
+            disabledCheckedBorderColor = DhunControlPolicy.disabled(DhunControlPolicy.switchTrackOn()),
+            disabledCheckedIconColor = DhunControlPolicy.disabled(DhunControlPolicy.switchThumbOn()),
+            disabledUncheckedThumbColor = DhunControlPolicy.disabled(DhunControlPolicy.switchThumbOff()),
+            disabledUncheckedTrackColor = DhunControlPolicy.disabled(DhunControlPolicy.switchTrackOff()),
+            disabledUncheckedBorderColor = DhunControlPolicy.disabled(DhunControlPolicy.switchBorderOff()),
+            disabledUncheckedIconColor = DhunControlPolicy.disabled(DhunControlPolicy.switchThumbOff()),
+        ),
+    )
+}
+
+/** Shared slider mechanics with caller-preservable accent/track colors. */
+@Composable
+fun DhunSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+    valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
+    enabled: Boolean = true,
+    onValueChangeFinished: (() -> Unit)? = null,
+    accent: Color = DhunColors.accent,
+    inactiveTrackColor: Color = DhunControlPolicy.sliderInactiveTrack(),
+) {
+    val activeTrackColor = DhunControlPolicy.sliderActiveTrack(accent)
+    Slider(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier,
+        enabled = enabled,
+        valueRange = valueRange,
+        onValueChangeFinished = onValueChangeFinished,
+        colors = SliderDefaults.colors(
+            thumbColor = accent,
+            activeTrackColor = activeTrackColor,
+            inactiveTrackColor = inactiveTrackColor,
+            activeTickColor = Color.Transparent,
+            inactiveTickColor = Color.Transparent,
+            disabledThumbColor = DhunControlPolicy.disabled(accent),
+            disabledActiveTrackColor = DhunControlPolicy.disabled(activeTrackColor),
+            disabledInactiveTrackColor = DhunControlPolicy.disabled(inactiveTrackColor),
+        ),
+    )
 }
 
 /** A 48dp checkbox target with a compact glass/accent glyph, not a stock box. */
