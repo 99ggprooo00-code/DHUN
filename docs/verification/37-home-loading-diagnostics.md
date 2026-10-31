@@ -53,7 +53,9 @@ phone's proven root cause.
 - Regression coverage includes a normal response, missing optional fields,
   unknown keys/section types, a valid empty section list, an empty/unrecognised
   envelope, malformed/non-object JSON, a broken shelf beside a valid shelf,
-  HTTP errors, and `musicTabRenderer`.
+  HTTP errors, and `musicTabRenderer`. A Robolectric regression also runs the
+  failure path with real Android SQLite and Android `Log`, checking the same
+  sanitized detail in `HomeUiState` and logcat.
 
 No sample music is inserted, no error is permanently hidden, and a failed Retry
 is not presented as success.

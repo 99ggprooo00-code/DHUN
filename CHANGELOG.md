@@ -56,8 +56,9 @@ preview appearance and saved colours on a real device remain **unverified**; Che
   `Unknown` error retried as though it were transient.
 - New JVM regressions cover normal/empty/malformed responses, optional and unknown
   fields, unknown and partially broken shelves, HTTP errors, both tab renderers,
-  sanitized details and Retry. The strict fixture gate validates 40 JSON files.
-  The temporary live-probe workflow was removed after collecting its annotations.
+  sanitized details and Retry. A Robolectric test covers the same failure with
+  Android SQLite and Android logging. The strict fixture gate validates 40 JSON
+  files. The temporary live-probe workflow was removed after collecting its annotations.
 
 See `docs/verification/37-home-loading-diagnostics.md` for evidence and the simple
 phone screenshot/log procedure. **No on-device Home verification has happened.**
