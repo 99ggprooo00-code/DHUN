@@ -29,13 +29,26 @@ class LyricsMaterialPolicyTest {
     @Test
     fun lyricsVeilIsTheLyricsCardContract() {
         // FullPlayer's lyrics card paints exactly these alphas over the
-        // blurred artwork. Related, tab cards and small chrome share them.
+        // blurred artwork. Non-queue tab cards and small chrome share them.
         assertEquals(
             listOf(0f to 0.42f, 1f to 0.62f),
             LyricsMaterialPolicy.lyricsVeilStops(),
         )
         assertEquals(LyricsMaterialPolicy.LYRICS_VEIL_TOP, LyricsMaterialPolicy.lyricsVeilStops().first().second)
         assertEquals(LyricsMaterialPolicy.LYRICS_VEIL_BOTTOM, LyricsMaterialPolicy.lyricsVeilStops().last().second)
+    }
+
+    @Test
+    fun queueVeilIsStrongerButStillRetainsArtwork() {
+        assertEquals(
+            listOf(0f to 0.80f, 1f to 0.88f),
+            LyricsMaterialPolicy.queueVeilStops(),
+        )
+        LyricsMaterialPolicy.queueVeilStops().zip(LyricsMaterialPolicy.lyricsVeilStops())
+            .forEach { (queue, lyrics) ->
+                assertTrue(queue.second > lyrics.second, "queue text needs more protection than the lyrics card")
+                assertTrue(queue.second < 0.94f, "queue veil must retain an artwork contribution")
+            }
     }
 
     @Test

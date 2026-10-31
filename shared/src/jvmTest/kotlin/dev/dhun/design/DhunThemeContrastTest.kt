@@ -2,6 +2,7 @@ package dev.dhun.design
 
 import androidx.compose.ui.graphics.Color
 import dev.dhun.design.components.GlassMaterialPolicy
+import dev.dhun.design.components.LyricsMaterialPolicy
 import dev.dhun.design.components.contentRowFill
 import dev.dhun.design.components.readingSurfaceFill
 import dev.dhun.design.components.NowPlayingBackdropPolicy
@@ -281,6 +282,41 @@ class DhunThemeContrastTest {
                     }
                 }
             }
+        }
+    }
+
+    @Test
+    fun queueSheetProtectsTextOverExtremeArtworkInBothReleaseModes() {
+        // The queue has small labels directly on its artwork material, unlike
+        // rows with their own fill. Test the actual public/test-channel veil
+        // interpolation; the nominal constants alone would miss the beta.
+        try {
+            listOf(false, true).forEach { testChannel ->
+                DhunVisualTuning.restore(emptyMap(), enabled = testChannel)
+                eachMode { mode, tokens ->
+                    listOf(Color.Black, Color.White).forEach { artwork ->
+                        LyricsMaterialPolicy.queueVeilStops().forEach { (stop, baseAlpha) ->
+                            val alpha = DhunVisualTuning.veilAlpha(VisualPart.QUEUE_SHEET, baseAlpha)
+                            val page = tokens.background.copy(alpha = alpha).compositedOver(artwork)
+                            val where = "$mode/testChannel=$testChannel/artwork=$artwork/stop=$stop"
+                            assertAtLeast(
+                                contrast(tokens.textPrimary.compositedOver(page), page), 7f,
+                                "$where primary",
+                            )
+                            assertAtLeast(
+                                contrast(tokens.textSecondary.compositedOver(page), page), 4.5f,
+                                "$where secondary",
+                            )
+                            assertAtLeast(
+                                contrast(tokens.textTertiary.compositedOver(page), page), 3f,
+                                "$where tertiary",
+                            )
+                        }
+                    }
+                }
+            }
+        } finally {
+            DhunVisualTuning.restore(emptyMap(), enabled = false)
         }
     }
 

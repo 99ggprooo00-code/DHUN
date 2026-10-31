@@ -138,13 +138,13 @@ internal fun QueueTabContent(
                     "${queue.size} tracks"
                 },
                 style = MaterialTheme.typography.labelMedium,
-                color = accent,
+                color = DhunColors.textSecondary,
             )
             Spacer(modifier = Modifier.weight(1f))
             Text(
                 text = "Drag to reorder",
                 style = MaterialTheme.typography.labelSmall,
-                color = DhunColors.textTertiary,
+                color = DhunColors.textSecondary,
             )
         }
         ReorderableList(
@@ -224,7 +224,9 @@ internal fun QueueTabContent(
                     Text(
                         text = track.title,
                         style = MaterialTheme.typography.titleSmall,
-                        color = if (isHighlighted) accent else DhunColors.textPrimary,
+                        // The highlight wash/equalizer already identify the
+                        // current row; keep its small title readable too.
+                        color = DhunColors.textPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.basicMarquee(),
@@ -235,7 +237,7 @@ internal fun QueueTabContent(
                             track.albumName?.let { append(" • $it") }
                         },
                         style = MaterialTheme.typography.labelSmall,
-                        color = DhunColors.textTertiary,
+                        color = DhunColors.textSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -246,7 +248,7 @@ internal fun QueueTabContent(
                     Text(
                         text = duration,
                         style = MaterialTheme.typography.labelSmall,
-                        color = DhunColors.textTertiary,
+                        color = DhunColors.textSecondary,
                         maxLines = 1,
                     )
                 }

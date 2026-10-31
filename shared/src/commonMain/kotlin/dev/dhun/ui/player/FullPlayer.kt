@@ -2165,7 +2165,9 @@ private fun PanelTabRow(
         listOf(1 to "Queue", 2 to "Related").forEach { (index, title) ->
             val selected = index == selectedTab
             val color by animateColorAsState(
-                targetValue = if (selected) accent else DhunColors.textTertiary,
+                // Accent stays in the pill/underline. Small text uses the
+                // readable theme roles over the artwork-veiled sheet.
+                targetValue = if (selected) DhunColors.textPrimary else DhunColors.textSecondary,
                 animationSpec = DhunAnimations.fastTween(),
                 label = "panelTabColor$index",
             )
