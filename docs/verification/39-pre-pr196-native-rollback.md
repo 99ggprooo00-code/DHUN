@@ -44,8 +44,10 @@ app screens or recovery behaviour:
 - `shared/src/commonMain/kotlin/dev/dhun/legal/LegalContent.kt` — generated from
   the current canonical legal documents and checked for parity with the web
   fixture.
-- `shared/src/commonMain/kotlin/dev/dhun/ui/legal/AboutLegalScreen.kt` — retains
-  the current legal status wording required by that current corpus.
+- `shared/src/commonMain/kotlin/dev/dhun/ui/legal/AboutLegalScreen.kt` — keeps the
+  pre-#196 screen and its existing divider, with only the current legal status
+  wording required by that corpus. The newer `DhunDivider` dependency is not
+  retained; exact-head CI run `41184568603` identified that incompatibility.
 
 The current Android/Desktop Gradle files and Actions workflows also remain.
 They are packaging/identity infrastructure, not a restoration of post-#196 app
