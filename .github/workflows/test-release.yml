@@ -331,11 +331,14 @@ jobs:
           gh release delete test --yes --cleanup-tag || true
           git push origin :refs/tags/test || true
 
+          # Checksums and revision provenance stay in the internal build
+          # artifacts for verification/promotion. The rolling beta itself is
+          # deliberately just the four installers.
           gh release create test \
-            dist/dhun-test.apk dist/dhun-test.apk.sha256 dist/dhun-test.apk.provenance.txt \
-            dist/dhun-test-arm64-v8a.apk dist/dhun-test-arm64-v8a.apk.sha256 dist/dhun-test-arm64-v8a.apk.provenance.txt \
-            dist/dhun-test-armeabi-v7a.apk dist/dhun-test-armeabi-v7a.apk.sha256 dist/dhun-test-armeabi-v7a.apk.provenance.txt \
-            dist/dhun-test.msi dist/dhun-test.msi.sha256 dist/dhun-test.msi.provenance.txt \
+            dist/dhun-test.apk \
+            dist/dhun-test-arm64-v8a.apk \
+            dist/dhun-test-armeabi-v7a.apk \
+            dist/dhun-test.msi \
             --target "$GITHUB_SHA" \
             --title "DHUN beta" \
             --notes-file docs/releases/rolling-test.md \
@@ -352,6 +355,18 @@ jobs:
           fi
           if [ "$(gh release view test --json targetCommitish --jq '.targetCommitish')" != "$GITHUB_SHA" ]; then
             echo "::error::The rolling test release does not target this build commit"
+            exit 1
+          fi
+          expected_test_assets=$(printf '%s\n' \
+            "dhun-test.apk" \
+            "dhun-test-arm64-v8a.apk" \
+            "dhun-test-armeabi-v7a.apk" \
+            "dhun-test.msi" | jq -R . | jq -sc 'sort')
+          actual_test_assets=$(gh release view test --json assets --jq '[.assets[] | select(.size > 0) | .name] | sort' | jq -c .)
+          if [ "$actual_test_assets" != "$expected_test_assets" ]; then
+            echo "::error::The rolling test release must contain only the four installers"
+            echo "Expected: $expected_test_assets"
+            echo "Actual:   $actual_test_assets"
             exit 1
           fi
 

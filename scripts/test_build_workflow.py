@@ -210,7 +210,14 @@ class BuildWorkflowTest(unittest.TestCase):
         for name in ("dhun-test.apk", "dhun-test-arm64-v8a.apk", "dhun-test-armeabi-v7a.apk"):
             self.assertIn(f"python scripts/stage_artifact.py out/{name}", apk)
             self.assertIn(name, create)
-            self.assertIn(f"{name}.sha256", create)
+        self.assertIn("dist/dhun-test.msi", create)
+        # Internal checksums/provenance still protect build promotion, but the
+        # rolling beta exposes exactly its four installers and no text sidecars.
+        self.assertNotIn(".sha256", create)
+        self.assertNotIn(".provenance.txt", create)
+        self.assertIn("expected_test_assets=", self.publish_test)
+        self.assertIn("actual_test_assets=", self.publish_test)
+        self.assertIn("The rolling test release must contain only the four installers", self.publish_test)
 
     def test_msi_uses_the_existing_packaging_workflow_counter(self):
         self.assertIn("python scripts/installer_version.py $env:GITHUB_RUN_NUMBER $env:GITHUB_RUN_ATTEMPT", self.text)
@@ -223,7 +230,8 @@ class BuildWorkflowTest(unittest.TestCase):
         # (The published v1.00.001 .build-info.json files are historical and untouched.)
         self.assertNotIn(".json", self.publish)
         self.assertIn("dist/$version/dhun-v1.00.002.msi.provenance.txt", self.publish)
-        self.assertIn("dist/dhun-test.msi.provenance.txt", self.publish_test)
+        create_test = self.publish_test.split("gh release create test", 1)[1].split("--target", 1)[0]
+        self.assertNotIn(".provenance.txt", create_test)
         for line in self.text.splitlines():
             if "upload" in line or "gh release create" in line:
                 self.assertNotIn(".json", line)
