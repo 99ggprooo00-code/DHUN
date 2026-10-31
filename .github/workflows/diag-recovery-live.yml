@@ -195,7 +195,10 @@ jobs:
           import kotlin.test.Test
 
           class LiveRecoveryShapeProbeTest {
-              private val output = File("probe/parser-result.txt")
+              private val probeDir = listOf(File("probe"), File("../probe"))
+                  .firstOrNull { it.isDirectory } ?: File("probe")
+              private val output = File(probeDir, "parser-result.txt")
+              private fun probeFile(name: String) = File(probeDir, name)
 
               private fun emit(line: String) {
                   println(line)
@@ -218,7 +221,7 @@ jobs:
                   for ((name, filter) in listOf("all" to SearchFilter.ALL, "old-songs" to SearchFilter.SONGS,
                       "current-songs" to SearchFilter.SONGS, "np-all" to SearchFilter.ALL,
                       "np-old-songs" to SearchFilter.SONGS, "np-current-songs" to SearchFilter.SONGS)) {
-                      val file = File("probe/search-$name.json")
+                      val file = probeFile("search-$name.json")
                       if (!file.isFile) { emit("search $name parser SKIP no response"); continue }
                       capture("search $name parser ") {
                           val root = Json.parseToJsonElement(file.readText()) as JsonObject
@@ -227,7 +230,7 @@ jobs:
                       }
                   }
                   for (name in listOf("basic", "persistent", "np-basic")) {
-                      val file = File("probe/next-$name.json")
+                      val file = probeFile("next-$name.json")
                       if (!file.isFile) { emit("next $name parser SKIP no response"); continue }
                       capture("next $name parser ") {
                           val root = Json.parseToJsonElement(file.readText()) as JsonObject
