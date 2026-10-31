@@ -138,8 +138,11 @@ class StreamDownloaderTest {
         val engine = MockEngine { _ ->
             respond(
                 content = content.copyOfRange(0, 8),
-                status = HttpStatusCode.OK,
-                headers = headersOf(HttpHeaders.ContentLength, content.size.toString()),
+                status = HttpStatusCode.PartialContent,
+                // Declare the complete object/range, then provide a short
+                // channel. The downloader must retain the bytes it could read
+                // and reject the response instead of reporting a full download.
+                headers = headersOf("Content-Range", "bytes 0-15/16"),
             )
         }
         val downloader = KtorStreamDownloader(client(engine), storage)
