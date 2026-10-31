@@ -176,19 +176,26 @@ class VisualAppEvidenceTest {
                 }.use { composeScene ->
                     SceneDriver(composeScene).capture("app-track-menu-${mode.id}.png", settleFrames = 24)
                 }
-                scene(width = 412, height = 915) {
-                    DhunTheme(mode = mode) {
-                        Box(Modifier.fillMaxSize().background(DhunColors.background))
-                        AddToPlaylistDialog(
-                            track = RECORDED_TRACKS.first(),
-                            playlistRepository = fixture.data.playlists,
-                            onDismiss = {},
-                            onAdded = {},
-                            onOpenPlaylist = {},
-                        )
+                runSkikoComposeUiTest(size = Size(412f, 915f)) {
+                    setContent {
+                        DhunTheme(mode = mode) {
+                            Box(Modifier.fillMaxSize().background(DhunColors.background))
+                            AddToPlaylistDialog(
+                                track = RECORDED_TRACKS.first(),
+                                playlistRepository = fixture.data.playlists,
+                                onDismiss = {},
+                                onAdded = {},
+                                onOpenPlaylist = {},
+                            )
+                        }
                     }
-                }.use { composeScene ->
-                    SceneDriver(composeScene).capture("app-add-playlist-${mode.id}.png", settleFrames = 60)
+                    // A repository precondition alone is not UI evidence: the
+                    // popup's collectAsState must deliver the row to semantics
+                    // and to the pixels before this capture can pass.
+                    onNodeWithText("Visual QA").assertIsDisplayed()
+                    onNodeWithText("4 tracks").assertIsDisplayed()
+                    mainClock.advanceTimeBy(500)
+                    captureUiImage("app-add-playlist-${mode.id}.png", captureToImage())
                 }
             }
         }
