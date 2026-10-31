@@ -71,6 +71,7 @@ import dev.dhun.presentation.library.LibraryViewModel
 import dev.dhun.presentation.library.currentUtcOffsetMs
 import dev.dhun.presentation.library.preferredArtworkUrl
 import dev.dhun.presentation.library.toTrack
+import dev.dhun.ui.components.ActionErrorBanner
 import dev.dhun.ui.components.DragHandleGrip
 import dev.dhun.ui.components.ReorderableList
 import kotlinx.coroutines.delay
@@ -102,6 +103,7 @@ fun LibraryScreen(
     val downloadsUi by viewModel.downloadsForUi.collectAsState()
     val storageSummary by viewModel.storageSummary.collectAsState()
     val clearDownloadsState by viewModel.clearDownloadsUiState.collectAsState()
+    val mutation by viewModel.mutation.collectAsState()
 
     // Keep day grouping fresh on zone changes (cheap ticker)
     LaunchedEffect(Unit) {
@@ -144,6 +146,17 @@ fun LibraryScreen(
         )
 
         Spacer(modifier = Modifier.height(DhunSpacing.sm))
+
+        // A single-row mutation (like/unlike, history removal, a download
+        // action) reports failure here instead of failing silently. The row it
+        // was invoked from is still on screen, so tapping it again is the retry.
+        mutation.errorMessage?.let { message ->
+            ActionErrorBanner(
+                message = message,
+                onDismiss = viewModel::dismissMutationError,
+                modifier = Modifier.padding(bottom = DhunSpacing.xs),
+            )
+        }
 
         when (selectedTab) {
             LibraryTab.PLAYLISTS -> {
@@ -611,8 +624,9 @@ private fun CreatePlaylistDialog(
 ) {
     var name by remember { mutableStateOf("") }
     var creating by remember { mutableStateOf(false) }
+    var errorText by remember { mutableStateOf<String?>(null) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(onDismissRequest = { if (!creating) onDismiss() }) {
         GlassCard(
             modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
             shape = DhunShapes.large,
@@ -629,26 +643,48 @@ private fun CreatePlaylistDialog(
                 // glass card). See `DhunTextField`.
                 DhunTextField(
                     value = name,
-                    onValueChange = { name = it },
+                    onValueChange = { name = it; errorText = null },
                     placeholder = "My playlist",
+                    isError = errorText != null,
                 )
+                if (errorText != null) {
+                    Spacer(modifier = Modifier.height(DhunSpacing.xs))
+                    Text(
+                        text = errorText.orEmpty(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DhunColors.error,
+                    )
+                }
                 Spacer(modifier = Modifier.height(DhunSpacing.md))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    DhunTextButton(onClick = onDismiss) { Text("Cancel") }
+                    DhunTextButton(onClick = onDismiss, enabled = !creating) { Text("Cancel") }
                     Spacer(modifier = Modifier.width(DhunSpacing.sm))
                     DhunButton(
                         onClick = {
                             if (name.isNotBlank() && !creating) {
                                 creating = true
+                                errorText = null
                                 scope.launch {
-                                    try { onCreate(name.trim()) } catch (_: Exception) {}
-                                    creating = false
-                                    onConfirm(name)
+                                    try {
+                                        onCreate(name.trim())
+                                        // Only a write that returned normally
+                                        // closes the dialog as a created playlist.
+                                        onConfirm(name)
+                                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                        throw cancelled
+                                    } catch (_: Exception) {
+                                        // Previously swallowed: the dialog closed
+                                        // as if the playlist existed.
+                                        errorText = "Could not create the playlist. Check free space and try again."
+                                    } finally {
+                                        creating = false
+                                    }
                                 }
                             }
                         },
                         enabled = name.isNotBlank() && !creating,
-                    ) { Text(if (creating) "Creating…" else "Create") }
+                        loading = creating,
+                    ) { Text(if (errorText != null) "Try again" else "Create") }
                 }
             }
         }
