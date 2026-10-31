@@ -230,7 +230,10 @@ per-surface background pipeline.
 - Gate real blur with `GlassMaterialPolicy.shouldBlurArtwork`. Unsupported
   platforms and a zero blur preference must skip the blur modifier.
 - The non-blur fallback is **sharp, dimmed artwork plus the theme veil**, not a
-  CPU blur implementation and not an unmodulated cover under text.
+  CPU blur implementation and not an unmodulated cover under text. Its loaded
+  artwork+veil layer uses **0.40 opacity over the theme base** (the real-blur
+  path remains 1.0), protecting direct text as well as card-row text over
+  extreme black/white artwork and the full brightness range.
 - No artwork or a failed image leaves the theme base and readable surfaces;
   never substitute fake artwork or a placeholder cover as atmosphere.
 - Animate opacity/position on established materials rather than animating blur

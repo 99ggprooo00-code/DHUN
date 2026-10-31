@@ -264,6 +264,26 @@ class DhunThemeContrastTest {
         }
     }
 
+    @Test
+    fun nonBlurBackdropProtectsDirectTextOverExtremeArtwork() {
+        eachMode { mode, tokens ->
+            val layerAlpha = NowPlayingBackdropPolicy.loadedLayerAlpha(blurActive = false)
+            listOf(Color.Black, Color.White).forEach { artwork ->
+                listOf(0, 55, 100).forEach { brightness ->
+                    val veilTint = NowPlayingBackdropPolicy.veilTint(tokens)
+                    NowPlayingBackdropPolicy.veilStops(tokens.isLight, brightness).forEach { (stop, veilAlpha) ->
+                        val veiledArtwork = veilTint.copy(alpha = veilAlpha).compositedOver(artwork)
+                        val page = veiledArtwork.copy(alpha = layerAlpha).compositedOver(tokens.background)
+                        val where = "$mode direct text over $artwork, brightness=$brightness, stop=$stop"
+                        assertAtLeast(contrast(tokens.textPrimary.compositedOver(page), page), 4.5f, "$where primary")
+                        assertAtLeast(contrast(tokens.textSecondary.compositedOver(page), page), 4.5f, "$where secondary")
+                        assertAtLeast(contrast(tokens.textTertiary.compositedOver(page), page), 3f, "$where tertiary")
+                    }
+                }
+            }
+        }
+    }
+
     // -- glass & overlays --------------------------------------------------
 
     @Test

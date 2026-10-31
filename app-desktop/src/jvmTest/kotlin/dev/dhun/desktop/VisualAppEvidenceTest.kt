@@ -216,6 +216,19 @@ class VisualAppEvidenceTest {
         ) { it.selectTab(AppTab.SEARCH) }
         captureSingleState("app-home-offline-dark.png", DhunThemeMode.DARK, online = false)
         captureSingleState("app-home-no-blur-dark.png", DhunThemeMode.DARK, blurPercent = 0)
+        captureSingleState("app-home-no-blur-light.png", DhunThemeMode.LIGHT, blurPercent = 0)
+        captureSingleState(
+            "app-home-no-blur-bright-dark.png",
+            DhunThemeMode.DARK,
+            blurPercent = 0,
+            brightnessPercent = 100,
+        )
+        captureSingleState(
+            "app-home-no-blur-bright-light.png",
+            DhunThemeMode.LIGHT,
+            blurPercent = 0,
+            brightnessPercent = 100,
+        )
         captureSingleState("app-home-brightness-zero-light.png", DhunThemeMode.LIGHT, brightnessPercent = 0)
         captureSingleState("app-home-brightness-full-light.png", DhunThemeMode.LIGHT, brightnessPercent = 100)
         captureSingleState("app-home-oled.png", DhunThemeMode.BLACK)

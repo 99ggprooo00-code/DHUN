@@ -49,6 +49,7 @@ fun NowPlayingBackdrop(
     val blurPercent = DhunAppearance.backdropBlurPercent
     val brightnessPercent = DhunAppearance.backdropBrightnessPercent
     val canBlur = supportsRealtimeBlur
+    val blurArtwork = GlassMaterialPolicy.shouldBlurArtwork(canBlur, blurPercent)
     val tokens = DhunAppearance.tokens
     val veilStops = NowPlayingBackdropPolicy.veilStops(tokens.isLight, brightnessPercent)
         .map { (offset, alpha) -> offset to DhunVisualTuning.veilAlpha(VisualPart.PAGE_BACKDROP, alpha) }
@@ -57,7 +58,11 @@ fun NowPlayingBackdrop(
     val context = LocalPlatformContext.current
     var phase by remember(artworkUrl) { mutableStateOf(NowPlayingBackdropPhase.Idle) }
     val artworkAlpha by animateFloatAsState(
-        targetValue = if (phase == NowPlayingBackdropPhase.Loaded) 1f else 0f,
+        targetValue = if (phase == NowPlayingBackdropPhase.Loaded) {
+            NowPlayingBackdropPolicy.loadedLayerAlpha(blurArtwork)
+        } else {
+            0f
+        },
         animationSpec = DhunAnimations.slowTween(),
         label = "nowPlayingBackdrop",
     )
@@ -77,7 +82,7 @@ fun NowPlayingBackdrop(
                     alpha = artworkAlpha
                 }
                 .then(
-                    if (GlassMaterialPolicy.shouldBlurArtwork(canBlur, blurPercent)) {
+                    if (blurArtwork) {
                         Modifier.blur(
                             DhunSpacing.glassBlur * NowPlayingBackdropPolicy.BLUR_SCALE *
                                 NowPlayingBackdropPolicy.blurMultiplier(blurPercent),
@@ -125,6 +130,15 @@ object NowPlayingBackdropPolicy {
     const val BLUR_SCALE = 4
 
     const val OVERSCAN = 1.15f
+
+    /**
+     * Without real blur, full-strength bright/dark covers can overpower direct
+     * text even after the tonal veil. Fade the established artwork+veil layer
+     * over the theme base instead of adding another scrim or a CPU blur.
+     */
+    const val NON_BLUR_LAYER_ALPHA = 0.40f
+
+    fun loadedLayerAlpha(blurActive: Boolean): Float = if (blurActive) 1f else NON_BLUR_LAYER_ALPHA
 
     val artworkSizePx: Int get() = ArtworkUrls.LIST_SIZE_PX
 
