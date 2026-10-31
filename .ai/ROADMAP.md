@@ -1,28 +1,31 @@
-# CURRENT ACTIVE TASK — 2026-10-29: native mutation feedback
+# CURRENT ACTIVE TASK — 2026-10-31: persistent-update recovery + selective native/glass restoration
 
-**Branch/base:** `arena/8b985cde-dhun` / `main` `1ec8c06` (merge of PR #211).
-Starting tree clean. Owner authorises scoped native implementation, tests,
-commit/push/PR and merge after every applicable gate; no public app release and
-no provider change.
+**Branch/base:** `arena/8a70a040-dhun` / `main` `1e2f7cb` (PR #217 baseline).
+The rollback baseline remains `12498ca`. No public release, provider expansion,
+website work, data wipe, or wholesale historical restoration is authorised.
 
-**Why this task:** the playlist-deletion cycle (PR #210 closed as superseded,
-PR #211 merged) fixed one instance of "the UI confirms before the write does".
-The native audit found the same class across Settings, Library, the playlist page
-and the Like control — including two crash paths, because those call sites had no
-error handling at all. Evidence table:
-[verification 31](../docs/verification/31-native-mutation-feedback.md).
+**Two acceptance bars remain linked:** establish persistent-update causes and
+real fresh/update functionality while preserving user data; and restore the
+authorised mutation/settings/Library behaviors with the new DHUN glass design.
+Clearing/reinstalling, green CI, source tests, packaging, or a screenshot alone
+is not full recovery or device acceptance. Read verification §40–§42.
 
-**Work:** shared `MutationTracker`/`MutationState`; result-driven Settings
-dialogs (pending, failure, retry, success-gated close); banner feedback for
-row-level mutations; create-playlist and rename dialogs that stay open on
-failure; add-to-playlist sheet with in-sheet failures. New `MutationTrackerTest`
-and `SettingsMaintenanceActionsTest` plus regressions in the Library, downloads,
-Home and playlist suites.
+**Implementation status:** restoration stages 1–4 and glass stages 5–8 are
+separate commits on this branch. Stage 9 aligns the authoritative specification
+and active guidance with the actual tree. Background preferences intentionally
+remain simple: Background blur + Background brightness, not the historical
+five-palette or four-surface custom-colour models. Exact-head CI must be checked
+for the commit under review; do not infer it from an earlier commit.
 
-**Verification limits:** this sandbox has no JDK, Gradle distribution, Android
-SDK/emulator, ADB or interactive Windows session, so compilation, unit tests and
-lint are CI-only here and no device interaction is claimed. Local: the Python
-repository-hygiene suite.
+**Verification limits:** no local JDK/Android SDK, emulator, ADB/phone, or
+interactive desktop is available. Kotlin compilation/tests are CI-only here;
+visual, artwork, navigation, IME, update, queue, download, and audible-playback
+acceptance on real targets remains open unless separately evidenced.
+
+**Next:** finish the documentation/guardrail diff, run available tests, inspect
+only the CI results needed for failures/final verification, and keep separately
+reviewable stage scopes. Do not merge recovery work until its cause, regression
+coverage, and actual fresh/update functionality are established.
 
 ---
 
@@ -331,7 +334,7 @@ overflow was escaped markup, not layout.
 
 1. **Destructive download/history actions (P0):** clear-all used to hide failures and dismiss early; batch deletion and clear history had the same issue. This branch makes all three result-driven: pending disables duplicate submits, failures stay visible with retry, and confirmation/selection resets only after success. The manager serializes download mutations with clear-all and joins workers before deleting final/partial files. JVM tests cover clear-all failure/retry and successful file/row cleanup. Still needs CI confirmation and Android/desktop interaction verification.
 2. **GitHub Pages internal links (P1):** templates emitted root URLs such as `/`, `/features/` and `/ui/` although the canonical project site is hosted beneath `/DHUN/`. A `sitePath` filter preserves root-hosted local tests and prefixes internal paths for a separate Pages artifact build. The Pages workflow now builds and smoke-checks that artifact separately from the root-built artifact used by browser tests.
-3. **Design-system drift:** the current visual direction is **translucent frosted glass**, artwork-led, with cached/lightweight blur, tint/scrim and accessible fallback. Material libraries may be implementation primitives; “Material 3 only” is stale and must not direct new work. **2026-10-30:** background customisation is two orthogonal switches (background blur, dynamic colours) over four surfaces (pages, navigation bar, miniplayer, full player), each with one picked colour — see `docs/design/glass-system.md` §3a. The earlier five-section `primary`/`secondary`/`tertiary` model is superseded; do not restore it.
+3. **Design-system drift:** the current visual direction is **translucent frosted glass**, artwork-led, with cached/lightweight blur, tint/scrim and accessible fallback. Material libraries may be implementation primitives; “Material 3 only” is stale and must not direct new work. **2026-10-30 historical experiment:** background customisation briefly used two switches and four per-surface colours on another branch. **Superseded 2026-10-31:** that model is not in the current tree; the authoritative glass specification keeps Background blur + Background brightness and rejects both that editor and the earlier five-palette model.
 4. **AI operating-file drift:** update this file, MASTER_PROMPT, KNOWN_LIMITATIONS, DEBUG_LOG, WEBSITE_PLAN, HANDOFF and README together. Preserve old session notes as history; never present their old branch/commit/status or “do not touch FullPlayer” restrictions as current instructions.
 5. **Product specs:** reconcile PRD, TRD, app flow, UI/UX, data schema and implementation plan with current source and this accepted contract. Separate native app, static marketing site and experimental `app-web/`; no production browser player or new backend is implied.
 

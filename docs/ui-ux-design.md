@@ -1,12 +1,12 @@
 # DHUN — UI/UX Design Specification
 
-**Status:** Design contract for review, aligned to the user's updated direction (2026-10-09). The updated ADR-002 is included in this branch; the former “Material 3 only” wording is superseded.
+**Status:** Supporting product and interaction contract (updated 2026-10-31). Native materials, component choices, background preferences, accessibility values, and fallback rules defer to the authoritative [DHUN glass system](design/glass-system.md).
 
 ## 1. Design identity
 
 DHUN's visual identity is **translucent frosted glass**, dark-first, artwork-led, calm and immersive. It is inspired by the clarity of Apple Music's player hierarchy and the immersive feel of ViMusic/Vivi Music, but must remain recognizably DHUN and must not copy proprietary assets or imply affiliation.
 
-Material 3 is **not the visual target**. Compose Material components can remain implementation primitives, but their default surface, elevation, shape, typography and color treatment must not define the final look. The design target is layered glass, soft blur, artwork-derived color, controlled gradients and clear typography. “Frosted glass” does not require a heavyweight 3D/liquid renderer, platform-private glass APIs or continuous full-resolution blur.
+Compose toolkit components can remain implementation primitives, but their default surface, elevation, shape, typography and color treatment must not define the final look. The design target is layered glass, soft blur, artwork-derived color, controlled gradients and clear typography. “Frosted glass” does not require a heavyweight 3D/liquid renderer, platform-private glass APIs or continuous full-resolution blur.
 
 ## 2. Visual principles
 
@@ -14,20 +14,20 @@ Material 3 is **not the visual target**. Compose Material components can remain 
 2. **Blur is atmosphere, not content.** Sharp artwork is shown separately and must not be cropped to fill the screen; blurred artwork can extend behind the screen.
 3. **Consistent material.** One shared family of frosted surfaces, edge highlights, soft borders, controlled tint and depth; no random “glass” treatment on every card.
 4. **Content first.** Home/Search/Library remain scannable; reserve stronger glass and immersive transitions for player, navigation chrome, dialogs, sheets and floating controls.
-5. **Low-cost rendering.** Prepare/downscale/cache artwork blur per track/artwork generation; never run full-resolution blur every animation frame.
+5. **Low-cost rendering.** Use list-tier artwork, stable keys and the existing artwork cache where provided; never add full-resolution or per-row blur work to animation frames.
 6. **Graceful fallback.** Older Android, low-memory devices, reduced-motion preferences and browsers without reliable backdrop filters use a legible translucent/opaque surface with gradients.
 7. **Accessible by design.** Glass cannot reduce contrast, hide focus, make controls hard to hit or create motion that causes discomfort.
 
 ## 3. Source of truth
 
 Use the existing shared design tokens and components, not ad hoc styling:
-- `shared/design/DhunAppearance.kt`
-- `DhunTypography.kt`, `DhunShapes.kt`, `DhunSpacing.kt`, `DhunAnimations.kt`, `DhunIcons.kt`
-- Existing glass component and material policies, including dialog opacity policy and lyrics material policy.
+- `shared/src/commonMain/kotlin/dev/dhun/design/DhunAppearance.kt`
+- `DhunTypography.kt`, `DhunShapes.kt`, `DhunSpacing.kt`, `DhunAnimations.kt`, `DhunIcons.kt` in that directory
+- The component map and material policies in [docs/design/glass-system.md](design/glass-system.md), including dialog opacity, quiet content surfaces, navigation, and lyrics material.
 - `app-web/src/css/tokens.css` and generated `app-web/src/js/icons.js` must mirror native values; icons are generated from native source, not manually duplicated.
 - `website/css/tokens.css` is **generated** from `app-web/src/css/tokens.css` by `website/tools/sync-tokens.mjs` (name the `--dhun-*` source in every declaration, carry both schemes in one `light-dark()` pair). Never hand-edit it; `npm run build` regenerates it and `scripts/website_quality.py` re-derives the comparison without Node.
 
-When tokens conflict with an old prose document, the accepted updated design contract and current token source must be reconciled in a deliberate commit. Do not quietly reintroduce Material 3 default styling — `scripts/test_design_system.py` and `glass-system.md` §2 exist so this is caught mechanically rather than in review.
+When tokens conflict with an old prose document, reconcile the document with the authoritative glass page and current token source in a deliberate commit. Do not quietly reintroduce stock toolkit styling — `scripts/test_design_system.py` scans every native UI source so this is caught mechanically rather than only in review.
 
 ## 4. Color, typography, geometry
 
@@ -43,47 +43,27 @@ When tokens conflict with an old prose document, the accepted updated design con
 ## 5. Glass material rules
 
 ### Player backdrop
-Artwork changes → load/downscale artwork → blur off the UI thread once → derive a restrained accent/tint → compose **one** theme-aware translucent veil over the screen artwork → cache by stable artwork/track key and generation. Do not stack a black dim, a light/dark scrim and an ambient wash on top of one another. The veil must fade with the image on load/failure, leaving the base color untouched. Invalidate the cache when the artwork URL changes; guard against late async results painting the previous track's image.
+Artwork changes → resolve the list-tier URL → load with a stable artwork/track key → apply the shared blur gate behind sharp content → derive a restrained accent/tint → compose **one** theme-aware translucent veil over the screen artwork. Reuse `BlurredArtworkCache` where the component already provides it; do not claim one caching strategy for every layer. Do not stack a black dim, a light/dark scrim and an ambient wash on top of one another. The veil must fade with the image on load/failure, leaving the base color untouched. Invalidate keyed work when the artwork URL changes and guard against late async results painting the previous track's image.
 
 ### Surfaces
 Use glass for player chrome, lyrics, navigation band/rail where designed, queue sheets, dialogs and floating actions. Avoid turning every content list/card into a translucent slab. Use opaque base under dialogs and sheets when content behind would compromise reading or text fields.
 
-**"Sufficiently opaque" is an opacity floor, not a flat surface** (`GlassMaterialPolicy.DIALOG_BODY_ALPHA_DARK/LIGHT`). Dialogs and sheets still carry the full material: frosted artwork behind, body gradient, specular sheen and gradient hairline edge — implemented once as `GlassCard(opaqueBase = true)` / `GlassDialog`. The component map, the numbers and the list of superseded instructions live in [docs/design/glass-system.md](design/glass-system.md); that page is normative for appearance.
+**"Sufficiently opaque" is an opacity floor, not a flat surface** (`GlassMaterialPolicy.DIALOG_BODY_ALPHA_DARK/LIGHT`). Dialogs use `GlassDialog` for a high-opacity body gradient, sheen and directional edge; artwork-bearing sheets use `LyricsArtworkSheet` with their own readable base. Not every dialog loads or frosts artwork. The component map and numbers live in [docs/design/glass-system.md](design/glass-system.md); that page is normative for appearance.
 
 ### Background preferences
-Blur and colour are two independent decisions, not one setting
-(`docs/design/glass-system.md` §3a):
+The accepted preference model is deliberately small: **Background blur** and
+**Background brightness**, with the existing stored defaults of 100% and 55%.
+Blur is shown only where real blur is supported; brightness remains available
+for the dimmed non-blur fallback. Zero blur means sharp, dimmed artwork rather
+than no artwork. Dynamic artwork accents affect controls, not a per-surface
+background palette.
 
-- *Background blur* — is the playing track's artwork behind the interface? Turning it
-  off removes the artwork **entirely**; it does not swap it for a sharper or dimmed
-  copy, and it never turns colour customisation off.
-- *Dynamic colours* — do the surfaces take their colour from that artwork? This works
-  with the artwork removed, so "artwork colours, no thumbnail" is a real state.
-- These two are the **whole** global model, and neither changes the other. *Adaptive
-  blur* is a detail of an enabled blur (bright, busy covers keep the full frost; dark,
-  calm covers are blurred slightly less) and lives with the strength slider under
-  *Backdrop detail*, not between the two switches.
-
-Four surfaces carry their own colour: **Main pages** (Home, Search, Library and the
-pages opened from them), **Navigation bar** (tab band or side rail), **Miniplayer**
-and **Full player**. A surface's colour is used on its own when the artwork is
-removed and as the tint over the blurred artwork when it is present — including the
-full player's scrim, which previously stayed theme-grey and made a picked player
-colour invisible.
-
-Inside a surface, two *overrides* sit below the colour picker: *Background blur here*
-and *Take colour from artwork*. They affect that surface alone, are disabled while
-their global is off, and say so; they are for "keep the dock solid while the pages
-show the cover", not a second copy of the global switches. Settings shows the four
-surfaces, the colour in effect and why ("From the current artwork", "Your colour",
-"DHUN default"), and never asks the user to assemble palette layers. **Quick
-colours** covers the common one-tap choice; **More colours** offers Hue,
-Saturation and Lightness sliders with a preview and an explicit **Use colour**
-action. Custom and quick picks share one saved colour and one resolution policy;
-one blur policy serves all four surfaces — never a per-screen rule.
+Do not restore the historical five-palette editor or the later four-surface
+custom-colour experiment. The authoritative glass page owns the exact fallback,
+persistence, and correct/incorrect rules.
 
 ### Fallbacks
-- Android versions where real blur is unavailable: gradient/tint/opaque material fallback.
+- Android versions where real blur is unavailable: sharp, dimmed artwork plus the theme veil and readable content surfaces; no CPU blur fallback.
 - Browser: feature-detect backdrop-filter; never make text contrast depend on blur being supported.
 - Reduced motion: remove nonessential spring/parallax transitions while preserving state feedback.
 - High contrast/forced colors: preserve control borders, focus rings, selected state and error/success distinction.
@@ -116,8 +96,8 @@ A control's design is incomplete without its behavior:
 - After success, show the actual resulting state; after failure, preserve state and show retry/recovery. Do not close a dialog and swallow an exception.
 - Empty states include a useful next action; loading states use stable skeleton/progress; errors explain what happened and how to recover.
 
-### Known urgent example: Clear all downloads
-The current code calls the clear callback and dismisses the dialog immediately, while the ViewModel launches the operation and swallows errors. The design requirement is pending → observable result → success/error, not instant dismissal. This is a behavior defect as well as a visual UX defect.
+### Required example: Clear all downloads
+The confirmation must remain pending until persistence/filesystem work returns, prevent duplicate submission, close or clear selection only after success, and keep a visible failure with retry available. This pending → observable result → success/error contract is behavior, not optional visual polish.
 
 ## 8. Navigation and website design
 

@@ -72,12 +72,12 @@ Use the same navigation contract, components and source-derived design tokens/ic
 
 ## 6. Design-system technical requirements
 
-The intended visual identity is **translucent frosted glass** with artwork-led color, not a Material 3 visual theme. Compose Material components may be used as implementation primitives, but their default appearance must not override the agreed visual contract. Source of truth: [`docs/design/glass-system.md`](design/glass-system.md) (the normative appearance contract) and `shared/src/commonMain/kotlin/dev/dhun/design/` — `DhunAppearance.kt`, `DhunTypography.kt`, `DhunShapes.kt`, `DhunSpacing.kt`, `DhunAnimations.kt`, `DhunIcons.kt`, and the glass component policies.
+The intended visual identity is **translucent frosted glass** with artwork-led color. Compose toolkit components may be used as implementation primitives, but their default appearance must not override the agreed visual contract. Source of truth: [`docs/design/glass-system.md`](design/glass-system.md) (the normative appearance contract) and `shared/src/commonMain/kotlin/dev/dhun/design/` — `DhunAppearance.kt`, `DhunTypography.kt`, `DhunShapes.kt`, `DhunSpacing.kt`, `DhunAnimations.kt`, `DhunIcons.kt`, and the glass component policies.
 
-- Blur artwork once per artwork/track generation, cache the result, and avoid per-frame full-resolution blur.
-- Layer blur + controlled tint + gradient scrim + translucent surfaces; ensure text and controls remain readable on bright and dark art.
-- Dialogs and sheets require an opaque or sufficiently opaque base beneath frosted material; do not let underlying content bleed through form fields or destructive confirmations.
-- Provide non-blurred opaque fallbacks for unsupported/expensive blur; respect reduced motion and high contrast.
+- Use downsampled artwork, stable keys and the existing artwork cache where provided; avoid per-frame full-resolution blur and per-row atmospheric layers.
+- Layer artwork + controlled tint + theme veil + translucent surfaces; ensure text and controls remain readable on bright and dark art.
+- Dialogs and sheets require the high-opacity base defined by their shared component; do not let underlying content bleed through form fields or destructive confirmations.
+- Where real blur is unsupported or set to zero, use the existing sharp, dimmed artwork and theme veil without CPU blur; respect reduced motion and high contrast.
 - Sharp cover art must fit its intended card without cropping faces; ambient blur may bleed full-screen behind it.
 - Use consistent design tokens and shared components for all forms/dialogs; no raw one-off style values without a documented reason.
 

@@ -77,8 +77,8 @@ Audit all dialogs and overflow sheets, not just Clear downloads:
 
 ## P4 — Frosted-glass design consistency and accessibility
 
-1. Apply the updated design contract: translucent frosted glass, artwork-led accent, blur + tint + scrim; Material 3 components are implementation primitives, not the target visual identity.
-2. Remove conflicting “Material 3 only” language from the design ADR and cross-reference the UI/UX spec.
+1. Apply the authoritative [DHUN glass specification](design/glass-system.md): translucent frosted glass, artwork-led accent, controlled veil and readable shared surfaces; toolkit components are implementation primitives, not the product identity.
+2. Keep active guidance aligned with that one specification. Dated documents may retain old visual facts only when clearly labelled historical.
 3. Verify sharp artwork is fit-to-card, cached blur stays behind it, and bottom controls remain anchored.
 4. Ensure dialogs/sheets have enough opaque base; no transparent text fields, unreadable error text or invisible edges.
 5. Verify fallback below Android API 31, no-backdrop-filter browsers, reduced motion and high contrast.

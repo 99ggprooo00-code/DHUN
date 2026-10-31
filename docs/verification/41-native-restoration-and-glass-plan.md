@@ -39,13 +39,13 @@ Thirty-seven files under `ui` and `design` currently import Compose `material3`.
 That count is an audit signal, not a request to remove the dependency: technical
 primitives may remain, but stock Material appearance must not define the product.
 
-The design docs are not yet consistent. Active or historical files containing
-Material-3 identity language include `docs/TRD.md`, `docs/ui-ux-design.md`,
+At the Phase 0 inventory, active guidance was inconsistent and some files
+contained toolkit-as-identity language or unimplemented background models.
+Stage 9 makes `docs/design/glass-system.md` the single authoritative DHUN glass
+specification and aligns `docs/TRD.md`, `docs/ui-ux-design.md`,
 `docs/implementation-plan.md`, `.ai/MASTER_PROMPT.md`, `.ai/ROADMAP.md`,
-`.ai/README.md`, `.ai/KNOWN_LIMITATIONS.md`, `.ai/HANDOFF_NEXT_SESSION.md`,
-`CHANGELOG.md`, and `docs/design/glass-system.md`. Later documentation work
-must make current guidance agree with one DHUN glass specification and label
-old material facts as historical where history is useful.
+`.ai/README.md`, `.ai/KNOWN_LIMITATIONS.md`, `.ai/HANDOFF_NEXT_SESSION.md`, and
+`CHANGELOG.md`. Dated reports keep old facts only as labelled history.
 
 ## Delivery stages and gates
 

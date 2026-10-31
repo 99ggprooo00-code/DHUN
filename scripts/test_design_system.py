@@ -20,23 +20,33 @@ UI_SOURCE_ROOTS = (
 RAW_STOCK_CALLS = (
     "AlertDialog",
     "BasicAlertDialog",
+    "BasicTextField",
     "Button",
     "Card",
+    "CenterAlignedTopAppBar",
     "Checkbox",
     "CircularProgressIndicator",
     "DropdownMenuItem",
+    "ExposedDropdownMenuBox",
+    "FilledTonalButton",
     "IconButton",
     "LinearProgressIndicator",
+    "ListItem",
+    "ModalBottomSheet",
     "NavigationBar",
     "NavigationBarItem",
     "NavigationRail",
     "NavigationRailItem",
+    "OutlinedButton",
     "OutlinedTextField",
     "PullToRefreshBox",
+    "RadioButton",
     "Slider",
+    "Snackbar",
     "Surface",
     "Switch",
     "TextButton",
+    "TopAppBar",
 )
 
 
@@ -66,6 +76,27 @@ class DesignSystemSourceTest(unittest.TestCase):
                     line = text.count("\n", 0, match.start()) + 1
                     violations.append(f"{relative}:{line}: raw {name}()")
         self.assertEqual([], violations, "use the DHUN component wrappers")
+
+    def test_menu_anchors_leave_all_visible_paint_to_dhun(self):
+        pattern = re.compile(r"(?<![A-Za-z0-9_])DropdownMenu\s*\((.*?)\)\s*\{", re.DOTALL)
+        violations = []
+        menu_count = 0
+        for path in native_ui_sources():
+            relative = path.relative_to(ROOT)
+            text = path.read_text(encoding="utf-8")
+            for match in pattern.finditer(text):
+                menu_count += 1
+                arguments = match.group(1)
+                line = text.count("\n", 0, match.start()) + 1
+                for required in (
+                    "containerColor = Color.Transparent",
+                    "tonalElevation = DhunSpacing.zero",
+                    "shadowElevation = DhunSpacing.zero",
+                ):
+                    if required not in arguments:
+                        violations.append(f"{relative}:{line}: missing {required}")
+        self.assertGreater(menu_count, 0)
+        self.assertEqual([], violations)
 
     def test_search_keeps_ime_and_physical_enter_submission(self):
         screen = source("ui/search/SearchScreen.kt")
@@ -100,9 +131,11 @@ class DesignSystemSourceTest(unittest.TestCase):
         romanization = source("ui/player/LyricsRomanizationControls.kt")
         self.assertIn("onCheckedChange = controller::setEnabled", romanization)
         self.assertIn("controller.setMode(value)", romanization)
+        self.assertIn("label = value.label", romanization)
 
         tabs = source("ui/player/PlayerTabs.kt")
         self.assertIn("if (id != selectedProvider) onSelect(id)", tabs)
+        self.assertIn("label = label", tabs)
         self.assertIn("MenuActionRow(", tabs)
 
         picker = source("ui/player/LyricsMatchPicker.kt")
@@ -140,6 +173,40 @@ class DesignSystemSourceTest(unittest.TestCase):
         )
         self.assertIn("GlassDialog(onDismissRequest", activity)
         self.assertIn("openBatteryOptimizationSettings()", activity)
+
+    def test_active_guidance_matches_the_simple_background_model(self):
+        active_documents = (
+            ROOT / "docs/design/glass-system.md",
+            ROOT / "docs/ui-ux-design.md",
+            ROOT / ".ai/MASTER_PROMPT.md",
+        )
+        rejected_or_unimplemented = (
+            "DhunColourSlider",
+            "AmbientBackdrop",
+            "BackgroundComponent",
+            "two independent switches",
+            "Dynamic colours",
+        )
+        for path in active_documents:
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("Background blur", text, path)
+            self.assertIn("Background brightness", text, path)
+            for phrase in rejected_or_unimplemented:
+                self.assertNotIn(phrase, text, f"{path}: stale background guidance: {phrase}")
+
+        spec = active_documents[0].read_text(encoding="utf-8")
+        self.assertIn("sharp, dimmed artwork", spec)
+        self.assertIn("DhunNavigationBar", spec)
+        self.assertIn("GlassMaterialPolicy", spec)
+        self.assertNotIn("Material 3", spec)
+        self.assertNotIn("Material-3", spec)
+        self.assertNotIn("Material3", spec)
+
+        roadmap_head = (ROOT / ".ai/ROADMAP.md").read_text(encoding="utf-8").split("\n---\n", 1)[0]
+        self.assertIn("arena/8a70a040-dhun", roadmap_head)
+        self.assertIn("Background blur + Background brightness", roadmap_head)
+        self.assertNotIn("two orthogonal switches", roadmap_head)
+        self.assertNotIn("DhunColourSlider", roadmap_head)
 
     def test_product_identity_is_not_assigned_to_the_toolkit(self):
         home = source("ui/home/HomeScreen.kt")
