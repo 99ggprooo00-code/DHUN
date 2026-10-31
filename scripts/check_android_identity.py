@@ -2,6 +2,7 @@
 import argparse
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 EXPECTED_CERT_SHA256 = "d8e57ec69f40956d34adff137872db9fec3b817e149e2d0c33af5924142468c3"
@@ -37,10 +38,10 @@ def verify_identity(badging: str, expected_name: str, expected_code: int) -> Non
     values = dict(fields)
     if len(fields) != len(values):
         raise ValueError("duplicate Android identity fields")
-    if (values.get("name"), values.get("versionName"), values.get("versionCode")) != (
-        "dev.dhun.android", expected_name, str(expected_code)
-    ):
-        raise ValueError("packaged Android identity does not match the expected release channel")
+    actual = (values.get("name"), values.get("versionName"), values.get("versionCode"))
+    expected = ("dev.dhun.android", expected_name, str(expected_code))
+    if actual != expected:
+        raise ValueError(f"packaged Android identity {actual!r} != expected {expected!r}")
 
 
 def verify_signature(apksigner_output: str) -> None:
@@ -52,30 +53,53 @@ def verify_signature(apksigner_output: str) -> None:
         )
     ]
     if digests != [EXPECTED_CERT_SHA256]:
-        raise ValueError("APK does not have exactly the expected DHUN test-build signer")
+        raise ValueError(
+            "APK does not have exactly the expected DHUN test-build signer; "
+            f"found {digests or '<none>'}"
+        )
 
 
-if __name__ == "__main__":
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("aapt")
     parser.add_argument("directory", type=Path)
     parser.add_argument("name")
     parser.add_argument("code", type=int)
     parser.add_argument("--apksigner", help="also verify the stable test certificate on every APK")
-    args = parser.parse_args()
-    for apk in select_apks(args.directory):
-        badging = subprocess.check_output([args.aapt, "dump", "badging", str(apk)], text=True)
-        verify_identity(badging, args.name, args.code)
-        signer = ""
-        if args.apksigner:
-            signature = subprocess.check_output(
-                [args.apksigner, "verify", "--print-certs", str(apk)],
-                text=True,
-                stderr=subprocess.STDOUT,
+    args = parser.parse_args(argv)
+    try:
+        apks = select_apks(args.directory)
+        print(f"::notice title=Android package set::{', '.join(apk.name for apk in apks)}")
+        for apk in apks:
+            badging = subprocess.check_output([args.aapt, "dump", "badging", str(apk)], text=True)
+            verify_identity(badging, args.name, args.code)
+            signer = ""
+            if args.apksigner:
+                signature = subprocess.check_output(
+                    [args.apksigner, "verify", "--print-certs", str(apk)],
+                    text=True,
+                    stderr=subprocess.STDOUT,
+                )
+                verify_signature(signature)
+                signer = f" signer={EXPECTED_CERT_SHA256}"
+            message = (
+                f"Verified {apk.name}: versionName={args.name} "
+                f"versionCode={args.code}{signer}"
             )
-            verify_signature(signature)
-            signer = f" signer={EXPECTED_CERT_SHA256}"
-        print(
-            f"Verified {apk.name}: versionName={args.name} "
-            f"versionCode={args.code}{signer}"
-        )
+            print(message)
+            print(f"::notice title=Android package verified::{message}")
+    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        detail = " ".join(str(error).split())
+        output = getattr(error, "output", None)
+        if output:
+            detail += " | output: " + " ".join(output.split())
+        # Workflow-command message escaping; keep the annotation bounded and one-line.
+        detail = detail[:1800].replace("%", "%25")
+        print(f"::error title=Android package verification::{detail}", file=sys.stderr)
+        print(detail, file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
