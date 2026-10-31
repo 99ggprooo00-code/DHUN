@@ -279,13 +279,13 @@ class InnerTubeRequestTest {
         val detail = innerTubeHttpErrorDetail(
             400,
             "browse",
-            """{"error":{"status":"INVALID_ARGUMENT","message":"Request contains an invalid argument.","reason":"badRequest","debugInfo":"secret-debug","context":{"visitorData":"secret-visitor"}},"request":{"visitorData":"also-secret"}}""",
+            """{"error":{"status":"INVALID_ARGUMENT","message":"Request contains an invalid argument.","errors":[{"reason":"badRequest","debugInfo":"cause-secret"}],"debugInfo":"secret-debug","context":{"visitorData":"secret-visitor"}},"request":{"visitorData":"also-secret"}}""",
         )!!
         assertTrue(detail.contains("HTTP 400 from /browse"))
         assertTrue(detail.contains("status=INVALID_ARGUMENT"))
         assertTrue(detail.contains("reason=badRequest"))
         assertTrue(detail.contains("Request contains an invalid argument"))
-        for (secret in listOf("debugInfo", "secret-debug", "visitorData", "secret-visitor", "also-secret", "request")) {
+        for (secret in listOf("debugInfo", "secret-debug", "cause-secret", "visitorData", "secret-visitor", "also-secret", "request")) {
             assertTrue(!detail.contains(secret), "HTTP detail leaked $secret: $detail")
         }
         assertEquals("HTTP 400 from /browse", innerTubeHttpErrorDetail(400, "browse", "not-json"))
