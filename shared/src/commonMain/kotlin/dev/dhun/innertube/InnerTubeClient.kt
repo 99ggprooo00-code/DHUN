@@ -43,13 +43,32 @@ import kotlinx.serialization.json.putJsonObject
  * Search-result filter params. These are YTM's filter protos, base64-encoded.
  * Values verified live against every filter in Phase 02 (see verification doc).
  */
-enum class SearchFilter(internal val params: String?) {
+enum class SearchFilter(
+    internal val params: String?,
+    /** Current upstream equivalent, tried only if the first params are rejected. */
+    internal val compatibilityParams: String? = null,
+) {
     ALL(null),
-    SONGS("EgWKAQIIAWoKEAkQBRAKEAMQBA%3D%3D"),
-    VIDEOS("EgWKAQIQAWoKEAkQChAFEAMQBA%3D%3D"),
-    ARTISTS("EgWKAQIgAWoKEAkQChAFEAMQBA%3D%3D"),
-    ALBUMS("EgWKAQIYAWoKEAkQChAFEAMQBA%3D%3D"),
-    PLAYLISTS("EgWKAQIOAWoKEAkQChAFEAMQBA%3D%3D"),
+    SONGS(
+        "EgWKAQIIAWoKEAkQBRAKEAMQBA%3D%3D",
+        "EgWKAQIIAWoMEA4QChADEAQQCRAF",
+    ),
+    VIDEOS(
+        "EgWKAQIQAWoKEAkQChAFEAMQBA%3D%3D",
+        "EgWKAQIQAWoMEA4QChADEAQQCRAF",
+    ),
+    ARTISTS(
+        "EgWKAQIgAWoKEAkQChAFEAMQBA%3D%3D",
+        "EgWKAQIgAWoMEA4QChADEAQQCRAF",
+    ),
+    ALBUMS(
+        "EgWKAQIYAWoKEAkQChAFEAMQBA%3D%3D",
+        "EgWKAQIYAWoMEA4QChADEAQQCRAF",
+    ),
+    PLAYLISTS(
+        "EgWKAQIOAWoKEAkQChAFEAMQBA%3D%3D",
+        "Eg-KAQwIABAAGAAgACgBMABqChAEEAMQCRAFEAo%3D",
+    ),
 }
 
 internal const val INNERTUBE_USER_AGENT =
@@ -150,12 +169,34 @@ class InnerTubeClient(
 
     suspend fun search(query: String, filter: SearchFilter = SearchFilter.SONGS): DhunResult<SearchResults> =
         resultify {
-            val body = buildJsonObject {
+            fun bodyWithParams(params: String?) = buildJsonObject {
                 put("context", context())
                 put("query", query)
-                filter.params?.let { put("params", it) }
+                params?.let { put("params", it) }
             }
-            parseSearchResults(query, postJson("search", body), filter)
+
+            val response = try {
+                postJson(
+                    endpoint = "search",
+                    body = bodyWithParams(filter.params),
+                    // A rejected filtered request has a more useful bounded
+                    // recovery below: the current params for the SAME filter.
+                    refreshSessionOnBadRequest = filter.compatibilityParams == null,
+                )
+            } catch (rejected: DhunException) {
+                val compatibilityParams = filter.compatibilityParams
+                val badRequest = (rejected.error as? DhunError.Parse)?.detail
+                    ?.startsWith("HTTP 400 from /search") == true
+                if (!badRequest || compatibilityParams == null) throw rejected
+
+                // Both params versions are accepted by the live service in some
+                // sessions, but the phone report proves that is not universal.
+                // Never drop the filter or invent results: only a real HTTP 200
+                // for the requested type can recover the page. The alternate
+                // request retains the one bounded fresh-session retry.
+                postJson("search", bodyWithParams(compatibilityParams))
+            }
+            parseSearchResults(query, response, filter)
         }
 
     suspend fun searchContinuation(
@@ -294,6 +335,20 @@ class InnerTubeClient(
                 put("context", context())
                 put("videoId", videoId)
                 put("playlistId", "RDAMVM$videoId")
+                // Current WEB_REMIX watch contract: ask for the persistent
+                // audio queue explicitly instead of relying on the legacy
+                // implicit panel. The response still uses the same
+                // playlistPanelVideoRenderer / nextRadioContinuationData
+                // parser and keeps the existing queue continuation chain.
+                put("enablePersistentPlaylistPanel", true)
+                put("isAudioOnly", true)
+                put("tunerSettingValue", "AUTOMIX_SETTING_NORMAL")
+                putJsonObject("watchEndpointMusicSupportedConfigs") {
+                    putJsonObject("watchEndpointMusicConfig") {
+                        put("hasPersistentPlaylistPanel", true)
+                        put("musicVideoType", "MUSIC_VIDEO_TYPE_ATV")
+                    }
+                }
             }
             parseRadioQueuePage(postJson("next", body))
         }

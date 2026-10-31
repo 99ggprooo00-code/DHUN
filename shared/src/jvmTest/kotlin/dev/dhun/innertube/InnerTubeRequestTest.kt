@@ -28,6 +28,14 @@ class InnerTubeRequestTest {
         .getResourceAsStream("fixtures/home-pagination/initial-feed-and-shelf-token.json")!!
         .bufferedReader().use { it.readText() }
 
+    private fun searchFixture(): String = javaClass.classLoader
+        .getResourceAsStream("fixtures/search-songs-bohemian-rhapsody.json")!!
+        .bufferedReader().use { it.readText() }
+
+    private fun radioFixture(): String = javaClass.classLoader
+        .getResourceAsStream("fixtures/next-radio-utwMHfDZ6SA.json")!!
+        .bufferedReader().use { it.readText() }
+
     private fun homepageWithContext(visitor: String): String =
         """{"INNERTUBE_CLIENT_VERSION":"1.20261027.10.00","INNERTUBE_CONTEXT":{"client":{"clientName":"WEB_REMIX","clientVersion":"1.20261027.10.00","visitorData":"$visitor","hl":"en","gl":"US"},"request":{"useSsl":true},"user":{"lockedSafetyMode":false}}}"""
 
@@ -136,7 +144,7 @@ class InnerTubeRequestTest {
     }
 
     @Test
-    fun searchUsesServedSessionAndRefreshesItOnceAfterBadRequest() = runBlocking {
+    fun unfilteredSearchUsesServedSessionAndRefreshesItOnceAfterBadRequest() = runBlocking {
         var homepageRequests = 0
         var searchRequests = 0
         val engine = MockEngine { request ->
@@ -166,7 +174,10 @@ class InnerTubeRequestTest {
         }
         val http = HttpClient(engine) { install(HttpTimeout) }
         try {
-            val result = InnerTubeClient(http).search("focus instrumental music") as DhunResult.Success
+            val result = InnerTubeClient(http).search(
+                "focus instrumental music",
+                SearchFilter.ALL,
+            ) as DhunResult.Success
             assertEquals("focus instrumental music", result.value.query)
             assertEquals(2, homepageRequests)
             assertEquals(2, searchRequests, "only the fresh-session retry is allowed")
@@ -176,7 +187,7 @@ class InnerTubeRequestTest {
     }
 
     @Test
-    fun repeatedBadRequestStopsAfterOneSessionRefresh() = runBlocking {
+    fun repeatedUnfilteredBadRequestStopsAfterOneSessionRefresh() = runBlocking {
         var homepageRequests = 0
         var searchRequests = 0
         val engine = MockEngine { request ->
@@ -194,10 +205,130 @@ class InnerTubeRequestTest {
         }
         val http = HttpClient(engine) { install(HttpTimeout) }
         try {
-            val result = InnerTubeClient(http).search("chill music") as DhunResult.Failure
+            val result = InnerTubeClient(http).search("chill music", SearchFilter.ALL) as DhunResult.Failure
             assertTrue(result.error is DhunError.Parse)
             assertEquals(2, homepageRequests)
             assertEquals(2, searchRequests)
+        } finally {
+            http.close()
+        }
+    }
+
+    @Test
+    fun rejectedFilterUsesCurrentParamsForTheSameTypeWithoutDroppingTheFilter() = runBlocking {
+        var homepageRequests = 0
+        val seenParams = mutableListOf<String?>()
+        val engine = MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/" -> {
+                    homepageRequests++
+                    respond(homepageWithContext("visitor-fixture"))
+                }
+                "/youtubei/v1/search" -> {
+                    val body = obj((request.body as TextContent).text)
+                    seenParams += body.str("params")
+                    if (seenParams.size == 1) {
+                        respond(
+                            """{"error":{"status":"INVALID_ARGUMENT","message":"bad request"}}""",
+                            status = HttpStatusCode.BadRequest,
+                        )
+                    } else {
+                        respond(searchFixture())
+                    }
+                }
+                else -> error("Unexpected request: ${request.url.encodedPath}")
+            }
+        }
+        val http = HttpClient(engine) { install(HttpTimeout) }
+        try {
+            val result = InnerTubeClient(http).search(
+                "focus instrumental music",
+                SearchFilter.SONGS,
+            ) as DhunResult.Success
+            assertTrue(result.value.songs.isNotEmpty(), "the real filtered fixture must be parsed")
+            assertEquals(
+                listOf(SearchFilter.SONGS.params, SearchFilter.SONGS.compatibilityParams),
+                seenParams,
+            )
+            assertTrue(seenParams.all { it != null }, "a filtered failure must never become unfiltered")
+            assertEquals(1, homepageRequests, "the successful params fallback needs no session refresh")
+        } finally {
+            http.close()
+        }
+    }
+
+    @Test
+    fun rejectedFilterAndCompatibilityParamsRemainBounded() = runBlocking {
+        var homepageRequests = 0
+        val seenParams = mutableListOf<String?>()
+        val engine = MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/" -> {
+                    homepageRequests++
+                    respond(homepageWithContext("visitor-$homepageRequests"))
+                }
+                "/youtubei/v1/search" -> {
+                    seenParams += obj((request.body as TextContent).text).str("params")
+                    respond("{}", status = HttpStatusCode.BadRequest)
+                }
+                else -> error("Unexpected request: ${request.url.encodedPath}")
+            }
+        }
+        val http = HttpClient(engine) { install(HttpTimeout) }
+        try {
+            val result = InnerTubeClient(http).search("chill music") as DhunResult.Failure
+            assertTrue(result.error is DhunError.Parse)
+            assertEquals(
+                listOf(
+                    SearchFilter.SONGS.params,
+                    SearchFilter.SONGS.compatibilityParams,
+                    SearchFilter.SONGS.compatibilityParams,
+                ),
+                seenParams,
+                "old params, current params, then one fresh-session current retry only",
+            )
+            assertEquals(2, homepageRequests)
+        } finally {
+            http.close()
+        }
+    }
+
+    @Test
+    fun everyFilteredSearchHasADistinctCurrentCompatibilityValue() {
+        for (filter in SearchFilter.entries.filter { it != SearchFilter.ALL }) {
+            assertTrue(!filter.compatibilityParams.isNullOrBlank(), filter.name)
+            assertTrue(filter.compatibilityParams != filter.params, filter.name)
+        }
+        assertNull(SearchFilter.ALL.compatibilityParams)
+    }
+
+    @Test
+    fun radioQueueRequestsThePersistentAudioPanelAndKeepsItsContinuation() = runBlocking {
+        var capturedBody: JsonObject? = null
+        val engine = MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/" -> respond("""{"INNERTUBE_CLIENT_VERSION":"1.20261027.10.00"}""")
+                "/youtubei/v1/next" -> {
+                    capturedBody = obj((request.body as TextContent).text)
+                    respond(radioFixture())
+                }
+                else -> error("Unexpected request: ${request.url.encodedPath}")
+            }
+        }
+        val http = HttpClient(engine) { install(HttpTimeout) }
+        try {
+            val result = InnerTubeClient(http).radioQueuePage("utwMHfDZ6SA") as DhunResult.Success
+            assertTrue(result.value.tracks.size > 1)
+            assertTrue(!result.value.continuationToken.isNullOrBlank())
+            val body = capturedBody ?: error("no /next request")
+            assertEquals("utwMHfDZ6SA", body.str("videoId"))
+            assertEquals("RDAMVMutwMHfDZ6SA", body.str("playlistId"))
+            assertEquals("true", body.str("enablePersistentPlaylistPanel"))
+            assertEquals("true", body.str("isAudioOnly"))
+            assertEquals("AUTOMIX_SETTING_NORMAL", body.str("tunerSettingValue"))
+            val config = body.obj("watchEndpointMusicSupportedConfigs").obj("watchEndpointMusicConfig")
+            assertEquals("true", config.str("hasPersistentPlaylistPanel"))
+            assertEquals("MUSIC_VIDEO_TYPE_ATV", config.str("musicVideoType"))
         } finally {
             http.close()
         }
