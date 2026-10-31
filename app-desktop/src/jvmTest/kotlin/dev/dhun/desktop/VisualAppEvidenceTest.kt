@@ -16,6 +16,7 @@ import androidx.compose.ui.input.pointer.PointerButtons
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.runSkikoComposeUiTest
@@ -189,9 +190,15 @@ class VisualAppEvidenceTest {
                             )
                         }
                     }
-                    // A repository precondition alone is not UI evidence: the
-                    // popup's collectAsState must deliver the row to semantics
-                    // and to the pixels before this capture can pass.
+                    // A repository precondition alone is not UI evidence: wait
+                    // for the real flow emission instead of accepting the
+                    // initial empty list or assuming a fixed number of frames
+                    // is sufficient. The bounded condition still fails if the
+                    // popup never delivers its row.
+                    waitUntil(timeoutMillis = 5_000) {
+                        onAllNodesWithText("Visual QA").fetchSemanticsNodes().isNotEmpty() &&
+                            onAllNodesWithText("4 tracks").fetchSemanticsNodes().isNotEmpty()
+                    }
                     onNodeWithText("Visual QA").assertIsDisplayed()
                     onNodeWithText("4 tracks").assertIsDisplayed()
                     mainClock.advanceTimeBy(500)
