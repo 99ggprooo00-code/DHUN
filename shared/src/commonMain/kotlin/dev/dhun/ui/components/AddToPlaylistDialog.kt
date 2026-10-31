@@ -77,7 +77,10 @@ fun AddToPlaylistDialog(
     // recompositions; otherwise each recomposition can restart collection at
     // the empty initial value and the picker never shows existing playlists.
     val playlistFlow = remember(playlistRepository) { playlistRepository.observePlaylists() }
-    val playlists by playlistFlow.collectAsState(initial = emptyList())
+    // Read in this parent composition, not only inside Dialog's separate
+    // popup composition. An emission then recomposes the parent and passes a
+    // fresh snapshot to the popup instead of leaving its initial empty list.
+    val playlists = playlistFlow.collectAsState(initial = emptyList()).value
     val scope = rememberCoroutineScope()
     // Result-driven, like every other mutation in the app: `onAdded` and
     // `onDismiss` run only after the write returned normally, a failure is
