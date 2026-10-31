@@ -28,10 +28,12 @@ merge prompts. Keep legal drafts DRAFT and report risks.
 ## Binding native recovery gate — 2026-10-31
 
 PR #217 is open and unmerged. Its current work is application recovery, not new
-feature development. The user rejected the `c8d5dc1` phone build for real loading
-and continuation failures; never describe that artifact (`13028524117`) as fixed.
-Read [verification §38](../docs/verification/38-native-application-recovery.md)
-before changing Home, Search, artwork or playlists.
+feature development. The user rejected `c8d5dc1` (`13028524117`) and then `2a6038d`
+(`13031609048`): the latter still had filtered Search HTTP 400, no new-download
+blur outside Full Player, ineffective customized-colour Brightness and empty
+Related. Never describe either artifact as fixed. Read
+[verification §38](../docs/verification/38-native-application-recovery.md),
+including R9–R12, before changing Home, Search, artwork, backgrounds or Related.
 
 - Preserve KMP/playback, PR #216 backgrounds and PR #217's corrected independent
   blur/dynamic-colour behaviour, four component colours, one palette pipeline,
@@ -41,6 +43,10 @@ before changing Home, Search, artwork or playlists.
   errors. Never silently substitute For You, sample content or endless paging.
 - Fix artwork through shared extraction/loading and persisted metadata, using only
   real source/video/local covers. Full Player success is not proof for other UI.
+- Search compatibility retries must keep the requested type and bounded sanitized
+  failure; never substitute unfiltered results. Related must retain its real queue,
+  continuation and explicit filtering. Live CI old/new params passing does not
+  prove the affected phone is fixed or that one params version caused its 400.
 - CI/JVM/MSI/APK success is an automated gate only. Android, Windows, real-service,
   visible-artwork and audible-playback claims require their own actual evidence.
 - Do not merge, release, tag or publish without the current session's explicit

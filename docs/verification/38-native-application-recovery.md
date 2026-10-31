@@ -2,8 +2,9 @@
 
 **Date:** 2026-10-31  
 **PR:** #217 (open; not merged)  
-**Recovery commits:** `1158b33`, `10400ca`, `dbc3e20`, `9be284c`, `30f4a1a`  
-**Overall:** 🟡 **source recovery implemented; Android acceptance remains open**
+**Recovery commits:** `1158b33`, `10400ca`, `dbc3e20`, `9be284c`, `30f4a1a`, `1abbc47`, `30fb887`
+
+**Overall:** 🔴 **new compatibility fixes await exact-head gates and Android acceptance**
 
 This record supersedes any implication that the `c8d5dc1` package fixed the
 phone's loading problem. Green compilation, packaging or JVM tests are not phone,
@@ -25,6 +26,21 @@ Windows, artwork or audible-playback acceptance.
 - Earlier Home live probes passed for sampled US and Nepal responses. Those probes
   did not reproduce the phone and cannot establish that Android, Nepal, a visitor
   ID or YouTube alone caused its rejection.
+- New sanitized CI probes (`41178495022`, `41178809006`) compared anonymous Search
+  requests without cookies or credentials. US requests for All, old Songs and
+  current Songs params all returned HTTP 200; the exact Focus query with `gl=NP`
+  also returned HTTP 200 for all three. Basic and persistent `/next` requests in
+  US and NP returned 19 `playlistPanelVideoRenderer` entries and one radio
+  continuation. This disproves “old params always fail” and “the panel renderer
+  was renamed”; it does **not** reproduce or negate the affected phone's failures.
+  The second probe's JVM summary did not run because its relative output path was
+  wrong, so no parser/client conclusion is taken from that run.
+- Corrected probe `41179034524` then passed its JVM step. Captured old/current
+  Search responses parsed 20 songs in US and 30 in NP; basic/persistent/NP `/next`
+  responses parsed 19 tracks and a continuation. DHUN's actual `InnerTubeClient`
+  with `country=NP` returned 30 Focus songs and 19 Related tracks plus a token.
+  This is real-service evidence for the corrected code on CI, not affected-phone
+  acceptance or proof that the phone's original trigger has been identified.
 - Exact first-introducing commits are not asserted without evidence. “Baseline
   defect” below means present at `942d2df`, not “introduced by #215/#216/#217.”
 
@@ -167,6 +183,86 @@ Windows, artwork or audible-playback acceptance.
 - **Tests:** the tracker has failure/cancellation/retry coverage. No Android
   database-fault injection was performed for this specific row.
 
+### R9 — Filtered Search still reported HTTP 400 on the accepted-test phone
+
+**Severity:** Critical. **Status:** 🟡 bounded compatibility implemented; phone-open.
+
+- **Behaviour / expectation:** For You can load while Focus/Chill/Workout/Party and
+  Search report `HTTP 400 from /search; INVALID_ARGUMENT; badRequest`. Every real
+  Search type must retain its own results, details, history and continuation.
+- **Cause and limits:** `1158b33`'s fresh-session retry did not recover the phone.
+  DHUN's filtered params and current upstream params differ, but sanitized live CI
+  accepted both in US and NP, so stale params are a compatibility candidate, not a
+  proven device root cause. No region, visitor or server-only conclusion is made.
+- **Fix:** `30fb887` keeps the existing params first. Only a filtered `/search`
+  HTTP 400 tries the current upstream params for the **same** filter, retaining one
+  bounded fresh-session retry. It never drops the filter, substitutes unfiltered
+  content, fabricates rows or hides a final failure.
+- **Tests:** `InnerTubeRequestTest` pins old→current same-type recovery, real
+  filtered fixture parsing, distinct values for every filter, no unfiltered
+  fallback, and termination after old/current/fresh-current attempts.
+
+### R10 — A newly downloaded song lacked blurred artwork outside Full Player
+
+**Severity:** High. **Status:** 🟡 shared artwork path corrected; device-open.
+
+- **Behaviour / expectation:** Full Player artwork already works. Outside it, an
+  older downloaded song with valid local art can work while a newly downloaded
+  song has no blurred cover. Both must use real artwork without regressing local
+  files or the established ambient fallback.
+- **Confirmed implementation causes:** `FileDownloadManager.fetchArtwork` returned
+  immediately for a missing remote URL and otherwise tried only that one URL, so a
+  new row could remain `localArtworkPath=null`. Separately, `NowPlayingBackdrop`
+  made one direct `AsyncImage` request while Full Player used shared bounded
+  candidates and a genuine video-cover fallback.
+- **Fix:** `1abbc47` uses `ArtworkUrls.loadingCandidates` in both the download
+  writer and shell backdrop. Downloads persist the first real candidate, including
+  `i.ytimg.com` video art; the backdrop reuses `ArtworkImage` with terminal load
+  callbacks. Final failure still reveals the ambient surface, not a giant glyph.
+- **Tests:** `FileDownloadManagerTest` covers failed remote candidates and a null
+  remote URL, both persist the genuine video cover. `NowPlayingBackdropPolicyTest`
+  covers a sparse track with only a valid video fallback. Existing local-art
+  priority tests remain unchanged. Coil decoding and visible blur need Android.
+
+### R11 — Background Brightness did not affect customized solid surfaces
+
+**Severity:** High. **Status:** 🟡 shared policy corrected; visual phone-open.
+
+- **Behaviour / expectation:** changing Background Brightness must visibly adjust
+  the background even when a custom surface colour is used without artwork, while
+  preserving the selected colour, independent blur/dynamic switches and contrast.
+- **Confirmed cause:** brightness reached `NowPlayingBackdropPolicy.veilStops`, but
+  only the artwork veil consumed it. `AmbientBackdrop`'s colour-only/custom palette
+  path had no brightness input.
+- **Fix:** `1abbc47` adds a shared bounded relative overlay to `AmbientBackdrop`.
+  The neutral value 55 is transparent (preserving PR #216's established palette);
+  lower values darken and higher values lighten without rewriting the chosen base
+  or bloom hues. The existing artwork veil remains independent.
+- **Tests:** `GlassSystemTest` verifies a transparent neutral setting, clamped
+  bounded overlays, and decreasing/increasing channels over a customized colour.
+  Exact visual contrast and slider response still require device inspection.
+
+### R12 — Related was empty for every song while the queue worked
+
+**Severity:** Critical. **Status:** 🟡 current watch contract implemented; phone-open.
+
+- **Behaviour / expectation:** Related must show real applicable recommendations;
+  tapping them and seamless radio must retain queue, continuation and explicit
+  filtering behaviour.
+- **Cause and limits:** the ViewModel/provider path returns Empty only after a
+  successful page has no tracks other than the current one; failures use Error.
+  DHUN still sent the legacy implicit `/next` panel request, omitting current
+  persistent-panel/audio/tuner fields. Live responses still use
+  `playlistPanelVideoRenderer`, so a renderer rename is not a supported cause.
+  The precise reason the affected phone receives/parses an empty page is unproven.
+- **Fix:** `30fb887` adds the current persistent audio-panel fields to the shared
+  radio request. It deliberately leaves the working parser, continuation endpoint,
+  ViewModel queue operations and explicit-content filters unchanged.
+- **Tests:** `InnerTubeRequestTest` asserts every new request field and parses the
+  real radio fixture with multiple tracks and a continuation. Existing queue/radio
+  refill and explicit-filter tests remain in the shared suite. Android acceptance
+  must confirm actual rows and seamless playback rather than infer them from CI.
+
 ## 3. Playback, queue, persistence and visual audit
 
 No new playback-engine root cause was established in this pass, so the playback
@@ -203,6 +299,7 @@ phone acceptance; source changes are not recorded as visual success.
 | `dbc3e20` | 🔴 CI `41173236235` / `41173232254`, test-release `41173236366`; Build `41173236267` passed | Two new Search test fixtures omitted `query`; packaging did not run the failing tests |
 | `9be284c` | 🔴 CI `41173612519` / `41173616208`: 855 shared tests, 1 failed; test-release `41173616216` failed its Windows JVM step; Build `41173616245` passed | Playlist fixture expected a different artist string than its own helper supplied; production and other regressions ran |
 | `30f4a1a` | ✅ CI `41173851125` / `41173854396`, Build `41173854404`, test-release `41173854389` | Shared/Android/Desktop tests, Android builds/lint, Windows JVM and MSI/install-over checks passed; publication skipped; no device claim |
+| `2a6038d` | ✅ CI `41174466874` / `41174578447`, Build `41174578491`, test-release `41174578467`; 🔴 phone acceptance | Automation was green, but Search 400, new-download backdrop, custom-colour brightness and empty Related remained; artifact `13031609048` is not accepted |
 
 The fixture and compilation failures above are recorded rather than hidden. A
 later green run applies only to its exact head.
@@ -210,9 +307,12 @@ later green run applies only to its exact head.
 ### Android
 
 🔴 The `c8d5dc1` Build artifact `13028524117` failed phone acceptance for loading
-and continuation and must not be presented as the fixed build. No later package
-has been installed or viewed by the agent. A new APK should be supplied only from
-a successful Build APK run on the final reviewed head.
+and continuation. The later `2a6038d` artifact `13031609048` was also rejected:
+Search still returned HTTP 400, a new download lacked blurred artwork outside Full
+Player, customized-colour brightness did not respond, and Related was empty. Neither
+artifact may be presented as the fixed build. No package containing R9–R12 has been
+installed or viewed by the agent. A new APK should be supplied only from a
+successful Build APK run on the final reviewed head.
 
 Simplest phone acceptance after installing that artifact's ARM64 APK:
 
@@ -221,31 +321,39 @@ Simplest phone acceptance after installing that artifact's ARM64 APK:
 2. Search Songs and Videos, open album/artist/playlist results, load more, and try
    aeroplane mode/Retry without losing existing results.
 3. Check artwork on Home, Search, History, local and remote playlists, queue, Mini
-   Player and Full Player. Report any screen that still shows a placeholder.
-4. Play from History and a playlist; exercise next/previous, seek, queue move/remove,
+   Player and Full Player. Download a **new** song, play it outside Full Player,
+   and compare its blurred backdrop with an older download and Full Player.
+4. Open Related for several songs: confirm real rows, tap one, use Play radio, and
+   check that the queue continues without repeating the current song.
+5. Play from History and a playlist; exercise next/previous, seek, queue move/remove,
    repeat/shuffle and a downloaded track with networking off.
-5. Background/foreground and reopen the app; check queue, settings and downloads.
-6. Check lyrics, light/dark themes, four surface colours, independent blur/dynamic
-   colours, Settings and narrow/wide layouts.
+6. Background/foreground and reopen the app; check queue, settings and downloads.
+7. With a customized Main pages/Full Player colour, move Background Brightness to
+   0, 55 and 100 with Background blur both off and on. Check visible response,
+   selected-colour retention and readable text; then check lyrics, themes,
+   independent blur/dynamic colours, Settings and narrow/wide layouts.
 
 ### Windows and real service
 
 ⚠️ No interactive Windows, VLC/libVLC audible playback, tray/SMTC or installer
 session was available. A green test-release can establish JVM tests/package checks
-only. No current real-service phone run has established that R1–R7 are fixed against
-YouTube from the affected device.
+only. Sanitized CI did reach the real anonymous metadata service, but it did not
+reproduce the phone's Search rejection and is not Android evidence. No real-service
+run from the affected phone has established that R1–R12 are fixed.
 
 ## 5. Remaining status
 
-- ✅ Root-caused source corrections are organized in reviewable commits on PR #217.
-- ✅ Local repository/fixture gates pass; existing playback/queue/persistence tests
+- ✅ Confirmed implementation corrections are organized in reviewable commits on
+  PR #217; local repository/fixture gates pass and playback/queue/persistence tests
   were not weakened.
-- ✅ Code head `30f4a1a` passed all four automated runs; publication jobs were
-  skipped. The exact later documentation/test head must also be green on PR #217
-  before its artifact is offered.
-- 🔴 The previously supplied phone package is rejected for this recovery.
-- ⚠️ Android, Windows, real-service, visible artwork and audible playback acceptance
-  remain explicit user/environment gates.
+- 🔴 Both previously supplied phone packages are rejected for this recovery. Search
+  and Related remain critical until the affected phone accepts a new package.
+- 🟡 R9–R12 compatibility/source fixes must pass CI, Build APK and test-release on
+  their exact final head before another artifact is offered; green automation will
+  still not be phone acceptance.
+- ⚠️ Android, interactive Windows, visible artwork/brightness/Related and audible
+  playback acceptance remain explicit user/environment gates. Live CI evidence is
+  useful but did not reproduce the phone's failures.
 
 PR #217 remains open and unmerged. No release, tag, publication or protected asset
 was changed.

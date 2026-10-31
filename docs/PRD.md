@@ -51,8 +51,10 @@ as coherent pipelines. A category failure must not silently show For You or samp
 content. A continuation failure must preserve prior results and offer real Retry.
 Artwork must come from the selected item's real metadata/video identity, never a
 random or fabricated image. Existing KMP architecture, user data and DHUN's visual
-identity are preserved. The accepted `c8d5dc1` green build was subsequently rejected
-by phone evidence; compilation and packaging do not close these requirements.
+identity are preserved. The green `c8d5dc1` build and later `2a6038d` build were
+both rejected by phone evidence; the latter retained Search HTTP 400, new-download
+backdrop, custom-colour brightness and empty-Related failures. Compilation and
+packaging do not close these requirements.
 See [verification §38](verification/38-native-application-recovery.md).
 
 See [the capability/evidence matrix](research/05-source-capability-matrix.md) for

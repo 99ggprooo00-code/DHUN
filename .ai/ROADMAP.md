@@ -2788,9 +2788,11 @@ follow-ups. None are designed, stubbed, or promised.
 
 ## 2026-10-31 — Native application recovery on PR #217 (current gate)
 
-**Status: 🟡 source recovery; not device-accepted; do not merge without permission.**
-The phone rejected `c8d5dc1` for Home/mood/Search loading and continuation. That
-build and artifact `13028524117` are not a recovery acceptance point.
+**Status: 🔴 phone recovery open; do not merge without permission.**
+The phone rejected `c8d5dc1` for Home/mood/Search loading and continuation, then
+rejected the later green `2a6038d` package for Search HTTP 400, new-download blur,
+custom-colour Brightness and empty Related. Artifacts `13028524117` and
+`13031609048` are not recovery acceptance points.
 
 | Recovery lane | Source result | Acceptance still required |
 | --- | --- | --- |
@@ -2799,6 +2801,9 @@ build and artifact `13028524117` are not a recovery acceptance point.
 | Shared real artwork candidates | `10400ca`; parser/loader regressions | Home/Search/History/queue/Mini/Full Player visible artwork |
 | Local covers + remote playlist continuation | `9be284c`; SQL/parser/ViewModel regressions | Existing-data upgrade, long playlist and playback on device |
 | Videos result typing + guarded recent-search deletion | `30f4a1a`; parser/filter regressions | Videos first/later pages and database-fault UI |
+| Same-type Search 400 compatibility | `30fb887`; bounded old/current params request tests | Affected phone; live US/NP probes did not reproduce the rejection |
+| New-download artwork + solid-colour Brightness | `1abbc47`; download fallback and shared policy tests | New versus old download blur, custom colours at 0/55/100, contrast |
+| Related persistent audio panel | `30fb887`; request fields + real radio fixture | Real Related rows, tap/Play radio, queue and continuation on phone |
 
 Local gates: **518 Python tests + 159 subtests**, **40 JSON fixtures**, clean diff
 check. Earlier recovery CI failures are retained in

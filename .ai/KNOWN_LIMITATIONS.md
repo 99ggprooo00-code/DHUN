@@ -2450,17 +2450,27 @@ gates, not device validation. The procedure for a human is
 
 ## 2026-10-31 — Native recovery remains phone/Windows-open
 
-- **The `c8d5dc1` phone package is rejected for this recovery.** Authentic phone
-  screenshots show Focus `/search` HTTP 400, Search failure and For You continuation
-  failure. Artifact `13028524117` must not be called fixed even though its CI passed.
+- **The `c8d5dc1` and `2a6038d` phone packages are rejected for this recovery.**
+  Authentic evidence includes Focus `/search` HTTP 400 and continuation failure;
+  the later package also retained new-download blur, customized-colour Brightness
+  and empty-Related failures. Artifacts `13028524117` and `13031609048` must not be
+  called fixed even though their automation passed.
 - Served-context merging and one bounded fresh-session retry in `1158b33` correct a
   confirmed request-compatibility defect. They do **not** establish the sole cause
-  of the affected phone's 400. Sampled US/Nepal live Home responses passed earlier;
-  Android/region/visitor/server causation remains unproven.
+  of the affected phone's 400. New sanitized live CI accepted old/current Search
+  params and the exact Focus query in US and NP; `/next` returned 19 standard panel
+  video renderers. Corrected probe `41179034524` also ran DHUN's real NP client
+  successfully (30 Focus songs; 19 Related tracks plus a token). This is not the
+  affected phone: Android/region/visitor/server causation remains unproven, and a
+  renderer rename or universally stale Search params is not supported.
 - Home/Search/playlist generation-scoped paging and shared artwork are implemented
   with regressions, but no corrected package has been viewed on the phone. Artwork
   in Full Player does not prove list/card/History/queue/Mini Player/local-playlist
   artwork, and JVM tests do not prove Coil decoding or network availability.
+- Same-type Search params fallback, persistent Related request fields, shared
+  new-download artwork candidates and the neutral-at-55 solid-background
+  Brightness overlay are new source corrections, not phone acceptance. Their exact
+  final-head CI/Build/test-release and affected-device checks remain mandatory.
 - Remote playlist continuation and Videos result typing are source corrections,
   not current real-service evidence. No fake content or fallback category is an
   acceptable substitute if YouTube still rejects the affected device.

@@ -24,11 +24,13 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ### Native loading, artwork and continuation recovery (2026-10-31, PR #217)
 
-- The phone-tested `c8d5dc1` package is **not accepted as a loading fix**. New
-  source work repairs served request-context merging, bounded HTTP 400 recovery,
-  independent Home-category paging, generation-scoped Search continuation and
-  shared real-artwork candidates. The exact phone-side HTTP 400 trigger remains
-  unproven until the affected device loads the corrected build.
+- The phone-tested `c8d5dc1` and later `2a6038d` packages are **not accepted as
+  recovery fixes**. The latter still had filtered Search HTTP 400, no new-download
+  blurred artwork outside Full Player, ineffective custom-colour brightness and
+  empty Related. New source work repairs served request context, bounded HTTP 400
+  recovery, independent Home-category paging, generation-scoped continuation and
+  shared real-artwork candidates. Exact phone-side service triggers remain
+  unproven until the affected device accepts a corrected build.
 - Home categories retain their own results, cursors and scroll positions; failed
   pages stay visible with real Retry and never silently fall back to For You.
   Search retains successful results on continuation failure, rejects stale pages,
@@ -36,6 +38,13 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 - Search Videos now populates the actual video result list and preserves its filter
   across continuation. Removing one recent search reports persistence failure
   through the existing mutation UI instead of escaping an unguarded coroutine.
+- Filtered Search HTTP 400 now has one same-type current-params compatibility path,
+  never an unfiltered/content fallback. Related requests the current persistent
+  audio panel while preserving its parser, continuation and queue behavior.
+- New downloads persist bounded real artwork candidates including genuine video
+  covers, and the shell backdrop uses the same shared loader as Full Player.
+  Color-only/custom backgrounds now consume Brightness through a neutral-at-55
+  shared overlay, leaving the established default palette unchanged.
 - Local playlist rows use shared artwork rendering; ordered nonblank track covers
   support existing sparse data without a schema migration. Remote playlists now
   have scoped `/browse` continuation, retryable paging and bounded termination.
