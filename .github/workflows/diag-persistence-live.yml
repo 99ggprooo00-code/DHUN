@@ -13,7 +13,7 @@ jobs:
       - name: Compare anonymous persisted-country request scenarios
         shell: bash
         run: |
-          python3 - <<'PY'
+          python3 - <<'PY' 2>&1 | tee persistence-probe.log
           import json
           import re
           import urllib.error
@@ -133,3 +133,8 @@ jobs:
               except Exception as error:
                   print(f"PROBE|{label}|exception|type={type(error).__name__}", flush=True)
           PY
+          while IFS= read -r line; do
+            case "$line" in
+              PROBE\|*) printf '::notice title=Persistence probe::%s\n' "$line" ;;
+            esac
+          done < persistence-probe.log
