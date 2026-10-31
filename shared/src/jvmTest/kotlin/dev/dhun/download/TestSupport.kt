@@ -42,15 +42,20 @@ class FakeStreamDownloader(
     private val payload: ByteArray = "audio-bytes".encodeToByteArray(),
     private val fail: Boolean = false,
     private val throwable: Throwable? = null,
+    private val failUrls: Set<String> = emptySet(),
 ) : StreamDownloader {
+    val requestedUrls = mutableListOf<String>()
     override suspend fun download(
         url: String,
         userAgent: String?,
         destinationPath: String,
         onProgress: (Long, Long?) -> Unit,
     ): DhunResult<Long> {
+        requestedUrls += url
         throwable?.let { throw it }
-        if (fail) return DhunResult.Failure(dev.dhun.core.DhunError.Network("simulated"))
+        if (fail || url in failUrls) {
+            return DhunResult.Failure(dev.dhun.core.DhunError.Network("simulated"))
+        }
         storage.ensureDirExists(destinationPath)
         val existing = storage.size(destinationPath)
         storage.append(destinationPath, payload)

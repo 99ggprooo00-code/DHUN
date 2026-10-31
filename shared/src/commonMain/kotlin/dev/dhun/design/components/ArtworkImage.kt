@@ -61,7 +61,7 @@ fun ArtworkImage(
      * shows the same artwork: the letterbox bands then reveal that backdrop
      * (FullPlayer's blurred bleed) instead of a flat grey bar, and nothing is
      * ever cropped to avoid the bands. Null/blank/failed URLs still get the
-     * glyph placeholder either way.
+     * glyph placeholder unless [showFailurePlaceholder] is disabled.
      */
     placeholderBase: Boolean = true,
     /**
@@ -70,6 +70,15 @@ fun ArtworkImage(
      * fallback instead of turning the hero into a placeholder.
      */
     fallbackImageUrl: String? = null,
+    /**
+     * Full-screen atmospheric backdrops reveal the ambient surface on final
+     * failure rather than painting a giant placeholder glyph. Ordinary artwork
+     * keeps the default glyph.
+     */
+    showFailurePlaceholder: Boolean = true,
+    /** Terminal load notifications; intermediate candidate failures are hidden. */
+    onArtworkLoaded: (() -> Unit)? = null,
+    onArtworkFailed: (() -> Unit)? = null,
 ) {
     val resolvedShape: Shape = if (cornerRadius != null) RoundedCornerShape(cornerRadius) else shape
     val candidates = remember(imageUrl, fallbackImageUrl) {
@@ -77,7 +86,9 @@ fun ArtworkImage(
     }
 
     if (candidates.isEmpty()) {
-        ArtworkPlaceholder(modifier = modifier, shape = resolvedShape)
+        if (showFailurePlaceholder) {
+            ArtworkPlaceholder(modifier = modifier, shape = resolvedShape)
+        }
         return
     }
 
@@ -128,7 +139,7 @@ fun ArtworkImage(
                 ),
             )
         }
-        if (phase == LoadPhase.Failed) {
+        if (phase == LoadPhase.Failed && showFailurePlaceholder) {
             // A failed load used to leave a flat grey rectangle — the device
             // screenshots are full of them. Show the same glyph placeholder
             // the null-URL path uses so the grid reads as artwork-shaped.
@@ -142,13 +153,17 @@ fun ArtworkImage(
                 contentScale = contentScale,
                 // Coil handles crossfade; we keep the placeholder underneath.
                 onLoading = { phase = LoadPhase.Loading },
-                onSuccess = { phase = LoadPhase.Loaded },
+                onSuccess = {
+                    phase = LoadPhase.Loaded
+                    onArtworkLoaded?.invoke()
+                },
                 onError = {
                     if (candidateIndex < candidates.lastIndex) {
                         candidateIndex++
                         phase = LoadPhase.Loading
                     } else {
                         phase = LoadPhase.Failed
+                        onArtworkFailed?.invoke()
                     }
                 },
             )

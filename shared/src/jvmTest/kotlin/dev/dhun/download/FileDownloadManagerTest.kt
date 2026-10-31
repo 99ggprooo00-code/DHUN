@@ -8,6 +8,7 @@ import dev.dhun.core.Track
 import dev.dhun.data.DatabaseDriverFactory
 import dev.dhun.data.DatabaseFactory
 import dev.dhun.data.SqlDelightDownloadRepository
+import dev.dhun.design.ArtworkUrls
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -77,6 +78,64 @@ class FileDownloadManagerTest {
             val row = repo.get("v1") ?: error("no row")
             assertTrue(row.localAudioPath.endsWith("v1.webm"), "path ${row.localAudioPath}")
             assertTrue(storage.exists(row.localAudioPath))
+        } finally { managerScope.cancel() }
+    }
+
+    @Test
+    fun newDownloadPersistsVideoCoverWhenRemoteArtworkCandidatesFail(): Unit = runBlocking {
+        val storage = TestDownloadStorage()
+        val repo = repository()
+        val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val id = "utwMHfDZ6SA"
+        val remote = "https://lh3.googleusercontent.com/cover=w60-h60-l90-rj"
+        val videoCover = ArtworkUrls.videoThumbnail(id) ?: error("valid video id")
+        val downloader = FakeStreamDownloader(
+            storage = storage,
+            failUrls = ArtworkUrls.loadingCandidates(remote).toSet(),
+        )
+        val manager = FileDownloadManager(
+            repo, FakeResolver(DhunResult.Success(stream(id))), downloader, storage, managerScope,
+        )
+        try {
+            manager.enqueue(track(id, remote))
+            assertEquals(DownloadState.COMPLETED, awaitTerminal(repo, id))
+            val row = withTimeout(5_000) {
+                var value = repo.get(id)
+                while (value?.localArtworkPath == null) {
+                    delay(10)
+                    value = repo.get(id)
+                }
+                value ?: error("row vanished for $id")
+            }
+            val localArtwork = row.localArtworkPath ?: error("artwork was not persisted")
+            assertTrue(storage.exists(localArtwork))
+            assertEquals(videoCover, downloader.requestedUrls.last())
+        } finally { managerScope.cancel() }
+    }
+
+    @Test
+    fun newDownloadWithoutRemoteThumbnailStillPersistsVideoCover(): Unit = runBlocking {
+        val storage = TestDownloadStorage()
+        val repo = repository()
+        val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val id = "dQw4w9WgXcQ"
+        val downloader = FakeStreamDownloader(storage)
+        val manager = FileDownloadManager(
+            repo, FakeResolver(DhunResult.Success(stream(id))), downloader, storage, managerScope,
+        )
+        try {
+            manager.enqueue(track(id))
+            assertEquals(DownloadState.COMPLETED, awaitTerminal(repo, id))
+            val row = withTimeout(5_000) {
+                var value = repo.get(id)
+                while (value?.localArtworkPath == null) {
+                    delay(10)
+                    value = repo.get(id)
+                }
+                value ?: error("row vanished for $id")
+            }
+            assertTrue(storage.exists(row.localArtworkPath ?: error("no local artwork")))
+            assertEquals(ArtworkUrls.videoThumbnail(id), downloader.requestedUrls.last())
         } finally { managerScope.cancel() }
     }
 

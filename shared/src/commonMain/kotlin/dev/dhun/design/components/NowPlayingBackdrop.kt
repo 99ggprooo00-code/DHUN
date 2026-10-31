@@ -18,12 +18,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import coil3.compose.AsyncImage
-import coil3.compose.LocalPlatformContext
-import coil3.request.ImageRequest
-import coil3.request.crossfade
 import dev.dhun.design.ArtworkUrls
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunAppearance
@@ -56,10 +53,11 @@ fun NowPlayingBackdrop(
     artworkUrl: String?,
     modifier: Modifier = Modifier,
     component: BackgroundComponent? = null,
+    fallbackArtworkUrl: String? = null,
 ) {
-    if (!NowPlayingBackdropPolicy.shouldRenderBackdrop(artworkUrl)) return
+    if (!NowPlayingBackdropPolicy.shouldRenderBackdrop(artworkUrl, fallbackArtworkUrl)) return
     val resolvedComponent = component ?: LocalBackgroundComponent.current
-    val url = remember(artworkUrl) { NowPlayingBackdropPolicy.resolveUrl(artworkUrl) } ?: return
+    val url = remember(artworkUrl) { NowPlayingBackdropPolicy.resolveUrl(artworkUrl) }
 
     // Blur is resolved per surface and per the switch: with Background blur off
     // the artwork is not painted *at all* (not sharp, not dimmed) and the
@@ -89,8 +87,9 @@ fun NowPlayingBackdrop(
         label = "pageVeilTint",
     )
 
-    val context = LocalPlatformContext.current
-    var phase by remember(artworkUrl) { mutableStateOf(NowPlayingBackdropPhase.Idle) }
+    var phase by remember(artworkUrl, fallbackArtworkUrl) {
+        mutableStateOf(NowPlayingBackdropPhase.Idle)
+    }
     val artworkAlpha by animateFloatAsState(
         targetValue = if (phase == NowPlayingBackdropPhase.Loaded) 1f else 0f,
         animationSpec = DhunAnimations.slowTween(),
@@ -98,12 +97,19 @@ fun NowPlayingBackdrop(
     )
 
     Box(modifier = modifier.fillMaxSize().clipToBounds()) {
-        AsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(url)
-                .crossfade(true)
-                .build(),
+        // Use the same bounded compatibility chain as Full Player and the
+        // download writer. A new download whose saved remote cover is stale can
+        // still recover its genuine i.ytimg.com video cover; final failure
+        // reveals the ambient surface instead of a full-screen glyph.
+        ArtworkImage(
+            imageUrl = url,
+            fallbackImageUrl = fallbackArtworkUrl,
             contentDescription = null,
+            shape = RectangleShape,
+            placeholderBase = false,
+            showFailurePlaceholder = false,
+            onArtworkLoaded = { phase = NowPlayingBackdropPhase.Loaded },
+            onArtworkFailed = { phase = NowPlayingBackdropPhase.Failed },
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
@@ -122,11 +128,6 @@ fun NowPlayingBackdrop(
                     },
                 ),
             contentScale = ContentScale.Crop,
-            onLoading = { phase = NowPlayingBackdropPhase.Loading },
-            onSuccess = {
-                phase = NowPlayingBackdropPhase.Loaded
-            },
-            onError = { phase = NowPlayingBackdropPhase.Failed },
         )
         // One theme-aware veil, faded with the image. No permanent overlay on
         // the fallback background while a request is loading or has failed.
@@ -178,6 +179,9 @@ fun AmbientBackdrop(
     val secondary by animateColorAsState(palette.mainGlow, DhunAnimations.slowTween(), label = "bgMainGlow")
     val tertiary by animateColorAsState(palette.companionGlow, DhunAnimations.slowTween(), label = "bgCompanionGlow")
     val bloom = AmbientBackdropPolicy.bloomAlpha(tokens.isLight, solid)
+    val brightnessOverlay = AmbientBackdropPolicy.brightnessOverlay(
+        DhunAppearance.backdropBrightnessPercent,
+    )
     Canvas(modifier = modifier.fillMaxSize()) {
         drawRect(color = base)
         AmbientBackdropPolicy.layers(this.size, secondary, tertiary, bloom).forEach { layer ->
@@ -189,6 +193,11 @@ fun AmbientBackdrop(
                 ),
             )
         }
+        // Brightness belongs to the whole background, not only to a successful
+        // artwork request. This relative overlay is transparent at the saved
+        // default, so PR #216's colours stay intact; custom solid colours and
+        // the no-artwork fallback now respond in both directions as well.
+        drawRect(color = brightnessOverlay)
     }
 }
 
@@ -212,6 +221,30 @@ object AmbientBackdropPolicy {
 
     /** A solid surface's glows are stronger than a wash over artwork. */
     const val SOLID_BLOOM_SCALE = 1.45f
+
+    /** Bounded relative adjustment; the neutral setting adds no overlay. */
+    const val BRIGHTNESS_DARKEN_MAX_ALPHA = 0.28f
+    const val BRIGHTNESS_LIGHTEN_MAX_ALPHA = 0.22f
+
+    /**
+     * Brightness for the colour-only background and the ambient fallback under
+     * artwork. At 55 this is transparent, preserving the established palette.
+     * Below it a bounded black veil lowers luminance; above it a bounded white
+     * veil raises it. The selected base and bloom hues are left untouched.
+     */
+    fun brightnessOverlay(brightnessPercent: Int): Color {
+        val value = brightnessPercent.coerceIn(0, 100)
+        val neutral = DhunAppearance.BACKDROP_BRIGHTNESS_DEFAULT
+        return when {
+            value < neutral -> Color.Black.copy(
+                alpha = (neutral - value).toFloat() / neutral * BRIGHTNESS_DARKEN_MAX_ALPHA,
+            )
+            value > neutral -> Color.White.copy(
+                alpha = (value - neutral).toFloat() / (100 - neutral) * BRIGHTNESS_LIGHTEN_MAX_ALPHA,
+            )
+            else -> Color.Transparent
+        }
+    }
 
     /** Bloom radius as a fraction of the shorter viewport edge. */
     const val BLOOM_RADIUS = 0.85f
@@ -300,8 +333,8 @@ object NowPlayingBackdropPolicy {
 
     val artworkSizePx: Int get() = ArtworkUrls.LIST_SIZE_PX
 
-    fun shouldRenderBackdrop(thumbnailUrl: String?): Boolean =
-        resolveUrl(thumbnailUrl) != null
+    fun shouldRenderBackdrop(thumbnailUrl: String?, fallbackArtworkUrl: String? = null): Boolean =
+        resolveUrl(thumbnailUrl) != null || !fallbackArtworkUrl.isNullOrBlank()
 
     fun resolveUrl(thumbnailUrl: String?): String? {
         if (thumbnailUrl.isNullOrBlank()) return null

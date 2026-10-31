@@ -83,6 +83,14 @@ class NowPlayingBackdropPolicyTest {
         kotlin.test.assertFalse(NowPlayingBackdropPolicy.shouldRenderBackdrop(null))
         kotlin.test.assertFalse(NowPlayingBackdropPolicy.shouldRenderBackdrop(""))
         kotlin.test.assertFalse(NowPlayingBackdropPolicy.shouldRenderBackdrop("   "))
+        assertTrue(
+            NowPlayingBackdropPolicy.shouldRenderBackdrop(
+                thumbnailUrl = null,
+                fallbackArtworkUrl = ArtworkUrls.videoThumbnail("utwMHfDZ6SA"),
+            ),
+            "a sparse/new download can still reveal its genuine video cover",
+        )
+        kotlin.test.assertFalse(NowPlayingBackdropPolicy.shouldRenderBackdrop(null, " "))
     }
 
     @Test

@@ -50,6 +50,7 @@ import dev.dhun.data.DataLayer
 import dev.dhun.data.PlayContext
 import dev.dhun.data.SettingsKeys
 import dev.dhun.design.ArtworkColorExtractor
+import dev.dhun.design.ArtworkUrls
 import dev.dhun.design.DhunAnimations
 import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
@@ -394,6 +395,7 @@ fun DhunAppShell(
             AmbientBackdrop(modifier = Modifier.fillMaxSize(), component = pageComponent)
             NowPlayingBackdrop(
                 artworkUrl = currentTrack?.thumbnailUrl,
+                fallbackArtworkUrl = ArtworkUrls.videoThumbnail(currentTrack?.id),
                 modifier = Modifier.fillMaxSize(),
                 component = pageComponent,
             )

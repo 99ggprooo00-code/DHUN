@@ -273,6 +273,35 @@ class GlassSystemTest {
     }
 
     @Test
+    fun ambientCustomColoursRespondToBrightnessWithoutChangingTheDefaultPalette() {
+        val neutral = DhunAppearance.BACKDROP_BRIGHTNESS_DEFAULT
+        assertEquals(Color.Transparent, AmbientBackdropPolicy.brightnessOverlay(neutral))
+
+        val dark = AmbientBackdropPolicy.brightnessOverlay(0)
+        val bright = AmbientBackdropPolicy.brightnessOverlay(100)
+        assertEquals(Color.Black.copy(alpha = dark.alpha), dark)
+        assertEquals(Color.White.copy(alpha = bright.alpha), bright)
+        assertTrue(dark.alpha > 0f && dark.alpha <= 0.28f)
+        assertTrue(bright.alpha > 0f && bright.alpha <= 0.22f)
+        assertEquals(dark, AmbientBackdropPolicy.brightnessOverlay(-100))
+        assertEquals(bright, AmbientBackdropPolicy.brightnessOverlay(200))
+
+        // Composite over a customized solid colour: lowering brightness must
+        // reduce its channels and raising it must increase them, rather than
+        // leaving the colour-only path untouched as it was before.
+        val custom = Color(0xFF66507A)
+        fun composite(overlay: Color): Color = Color(
+            red = custom.red * (1f - overlay.alpha) + overlay.red * overlay.alpha,
+            green = custom.green * (1f - overlay.alpha) + overlay.green * overlay.alpha,
+            blue = custom.blue * (1f - overlay.alpha) + overlay.blue * overlay.alpha,
+        )
+        val lowered = composite(dark)
+        val raised = composite(bright)
+        assertTrue(lowered.red < custom.red && lowered.green < custom.green && lowered.blue < custom.blue)
+        assertTrue(raised.red > custom.red && raised.green > custom.green && raised.blue > custom.blue)
+    }
+
+    @Test
     fun theNavigationChromeNeverFallsBackToMaterialsPill() {
         // The selected tab is a translucent accent pill, never a solid block:
         // the filled accent belongs to buttons, not to chrome.
