@@ -6,15 +6,20 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
+import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asComposeCanvas
 import androidx.compose.ui.graphics.asSkiaBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerButtons
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.InternalTestApi
+import androidx.compose.ui.test.SkikoComposeUiTest
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -75,6 +80,7 @@ import dev.dhun.ui.shell.DetailRoute
 import dev.dhun.ui.shell.DhunAppShell
 import java.io.File
 import org.jetbrains.skia.Image
+import org.jetbrains.skia.Surface
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -95,7 +101,7 @@ import kotlin.test.fail
  * the database and player are deterministic test doubles. No shipped screen,
  * navigation route, callback or test-only product flag is changed.
  */
-@OptIn(ExperimentalComposeUiApi::class, ExperimentalTestApi::class)
+@OptIn(ExperimentalComposeUiApi::class, ExperimentalTestApi::class, InternalTestApi::class, InternalComposeUiApi::class)
 class VisualAppEvidenceTest {
     private val output = File("build/outputs/visual-evidence").apply { mkdirs() }
 
@@ -222,11 +228,17 @@ class VisualAppEvidenceTest {
                             .fetchSemanticsNodes().isNotEmpty()
                         if (!populated) Thread.sleep(20)
                     }
+                    if (!populated) {
+                        captureUiImage(
+                            "app-add-playlist-${mode.id}-failed.png",
+                            renderCurrentFrame(this, 412, 915),
+                        )
+                    }
                     assertTrue(populated, "The playlist dialog did not expose its populated row")
                     onNode(hasText("Visual QA"), useUnmergedTree = true).assertIsDisplayed()
                     onNode(hasText("4 tracks"), useUnmergedTree = true).assertIsDisplayed()
                     mainClock.advanceTimeBy(500)
-                    captureUiImage("app-add-playlist-${mode.id}.png", captureToImage())
+                    captureUiImage("app-add-playlist-${mode.id}.png", renderCurrentFrame(this, 412, 915))
                 }
             }
         }
@@ -246,8 +258,9 @@ class VisualAppEvidenceTest {
                 }
                 fun capture(name: String) {
                     mainClock.advanceTimeBy(500)
-                    waitForIdle()
-                    captureUiImage(name, captureToImage())
+                    // Do not rely on Skiko's private snapshot surface here:
+                    // manual clock mode does not use its implicit idle render.
+                    captureUiImage(name, renderCurrentFrame(this, 1200, 780))
                 }
 
                 capture("desktop-home-dark.png")
@@ -421,6 +434,22 @@ class VisualAppEvidenceTest {
         }
         assertTrue(javax.imageio.ImageIO.write(image, "png", target), "Could not write $label artwork fixture")
         return target.toURI().toString()
+    }
+
+    /** Render the live Skiko scene explicitly; never encode an old idle surface. */
+    private fun renderCurrentFrame(test: SkikoComposeUiTest, width: Int, height: Int): ImageBitmap {
+        val surface = Surface.makeRasterN32Premul(width, height)
+        return try {
+            test.runOnUiThread {
+                test.scene.render(
+                    surface.canvas.asComposeCanvas(),
+                    test.mainClock.currentTime * 1_000_000L,
+                )
+            }
+            surface.makeImageSnapshot().toComposeImageBitmap()
+        } finally {
+            surface.close()
+        }
     }
 
     private fun captureUiImage(name: String, image: ImageBitmap): ByteArray =
