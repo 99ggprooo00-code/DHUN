@@ -108,7 +108,15 @@ class VisualAppEvidenceTest {
                     Shell(fixture, nav, mode, isDesktop = false)
                 }.use { composeScene ->
                     val driver = SceneDriver(composeScene)
-                    driver.capture("app-home-${mode.id}.png", settleFrames = 40)
+                    val homeFrame = driver.capture("app-home-${mode.id}.png", settleFrames = 40)
+                    if (mode == DhunThemeMode.DARK) {
+                        driver.scroll(200f, 430f, 4f)
+                        val scrolledFrame = driver.capture("app-home-scrolled-dark.png")
+                        assertTrue(
+                            !homeFrame.contentEquals(scrolledFrame),
+                            "Mouse-wheel input did not visibly change the Home surface",
+                        )
+                    }
                     nav.selectTab(AppTab.SEARCH)
                     val searchFrame = driver.capture("app-search-${mode.id}.png")
                     driver.tap(355f, 255f)
@@ -148,6 +156,9 @@ class VisualAppEvidenceTest {
                     driver.tap(55f, 879f)
                     val queueFrame = driver.capture("app-player-queue-${mode.id}.png", settleFrames = 24)
                     assertTrue(!playerFrame.contentEquals(queueFrame), "Queue input did not visibly change the player")
+                    driver.tap(310f, 630f) // Related tab in the raised Queue/Related sheet
+                    val relatedFrame = driver.capture("app-player-related-${mode.id}.png", settleFrames = 24)
+                    assertTrue(!queueFrame.contentEquals(relatedFrame), "Related input did not visibly change the player")
                     assertEquals(RECORDED_TRACKS.first(), fixture.player.currentTrack.value)
                     assertIs<PlaybackState.Playing>(fixture.player.state.value)
                 }
@@ -287,6 +298,16 @@ class VisualAppEvidenceTest {
         )
         captureSingleState("app-home-brightness-zero-light.png", DhunThemeMode.LIGHT, brightnessPercent = 0)
         captureSingleState("app-home-brightness-full-light.png", DhunThemeMode.LIGHT, brightnessPercent = 100)
+        for (mode in listOf(DhunThemeMode.DARK, DhunThemeMode.LIGHT)) {
+            for ((label, rgb) in listOf("black" to 0x000000, "white" to 0xFFFFFF)) {
+                captureSingleState(
+                    "app-home-no-blur-$label-artwork-${mode.id}.png",
+                    mode,
+                    blurPercent = 0,
+                    artworkUrl = extremeArtwork(label, rgb),
+                )
+            }
+        }
         captureSingleState("app-home-oled.png", DhunThemeMode.BLACK)
         captureSingleState("app-home-large-text-dark.png", DhunThemeMode.DARK, fontScale = 1.3f)
         captureSingleState("app-settings-large-text-dark.png", DhunThemeMode.DARK, fontScale = 1.3f) {
@@ -301,10 +322,12 @@ class VisualAppEvidenceTest {
         online: Boolean = true,
         blurPercent: Int? = null,
         brightnessPercent: Int? = null,
+        artworkUrl: String? = null,
         fontScale: Float = 1f,
         destination: (AppNavState) -> Unit = {},
     ) {
         withFixture(mode, provider, online) { fixture ->
+            if (artworkUrl != null) fixture.player.useArtwork(artworkUrl)
             if (blurPercent != null) DhunAppearance.setBackdropPrefs(blurPercent = blurPercent)
             if (brightnessPercent != null) DhunAppearance.setBackdropPrefs(brightnessPercent = brightnessPercent)
             val nav = AppNavState().apply(destination)
@@ -365,6 +388,24 @@ class VisualAppEvidenceTest {
         content = content,
     )
 
+    /**
+     * Deterministic extreme artwork loaded by the production Coil file-URI
+     * path. These are test fixtures, not replacement artwork in the app.
+     */
+    private fun extremeArtwork(label: String, rgb: Int): String {
+        val target = File("build/tmp/visual-evidence/$label.png").apply { parentFile.mkdirs() }
+        val image = java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_RGB)
+        val graphics = image.createGraphics()
+        try {
+            graphics.color = java.awt.Color(rgb)
+            graphics.fillRect(0, 0, image.width, image.height)
+        } finally {
+            graphics.dispose()
+        }
+        assertTrue(javax.imageio.ImageIO.write(image, "png", target), "Could not write $label artwork fixture")
+        return target.toURI().toString()
+    }
+
     private fun captureUiImage(name: String, image: ImageBitmap): ByteArray =
         Image.makeFromBitmap(image.asSkiaBitmap()).use { skiaImage ->
             skiaImage.encodeToData()!!.use { encoded ->
@@ -398,6 +439,20 @@ class VisualAppEvidenceTest {
                     bytes
                 }
             }
+        }
+
+        fun scroll(x: Float, y: Float, deltaY: Float) {
+            val position = Offset(x, y)
+            val startMillis = timeNanos / 1_000_000L
+            scene.sendPointerEvent(PointerEventType.Enter, position, timeMillis = startMillis)
+            scene.sendPointerEvent(PointerEventType.Move, position, timeMillis = startMillis + 1)
+            scene.sendPointerEvent(
+                PointerEventType.Scroll,
+                position,
+                scrollDelta = Offset(0f, deltaY),
+                timeMillis = startMillis + 2,
+            )
+            settle(24)
         }
 
         fun tap(x: Float, y: Float) {
@@ -510,6 +565,13 @@ class VisualAppEvidenceTest {
         override val repeatMode = MutableStateFlow(RepeatMode.OFF)
         override val shuffleEnabled = MutableStateFlow(false)
         override val volume = MutableStateFlow(0.75f)
+
+        fun useArtwork(url: String) {
+            val updated = currentTrack.value!!.copy(thumbnailUrl = url)
+            currentTrack.value = updated
+            queue.value = queue.value.map { it.copy(thumbnailUrl = url) }
+            state.value = PlaybackState.Playing(updated)
+        }
 
         override suspend fun prepareQueue(tracks: List<Track>, startIndex: Int, playWhenReady: Boolean) {
             queue.value = tracks
