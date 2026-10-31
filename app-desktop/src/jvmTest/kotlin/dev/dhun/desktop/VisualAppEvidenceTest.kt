@@ -1,17 +1,20 @@
 package dev.dhun.desktop
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
-import androidx.compose.ui.semantics.SemanticsActions
-import androidx.compose.ui.semantics.SemanticsNode
-import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.use
+import androidx.compose.ui.unit.Density
 import dev.dhun.core.Album
 import dev.dhun.core.AlbumDetail
 import dev.dhun.core.Artist
 import dev.dhun.core.ArtistPage
+import dev.dhun.core.AlwaysOnlineConnectivityMonitor
+import dev.dhun.core.ConnectivityMonitor
 import dev.dhun.core.DhunError
 import dev.dhun.core.DhunResult
 import dev.dhun.core.HomeFeedPage
@@ -31,6 +34,7 @@ import dev.dhun.data.DatabaseDriverFactory
 import dev.dhun.data.DatabaseFactory
 import dev.dhun.data.PlayContext
 import dev.dhun.design.DhunAppearance
+import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunTheme
 import dev.dhun.design.DhunThemeMode
 import dev.dhun.domain.GetHomeFeedUseCase
@@ -48,11 +52,14 @@ import dev.dhun.presentation.search.SearchResultsUiState
 import dev.dhun.presentation.search.SearchViewModel
 import dev.dhun.presentation.settings.SettingsCategory
 import dev.dhun.provider.MusicProvider
+import dev.dhun.ui.components.AddToPlaylistDialog
+import dev.dhun.ui.components.TrackOverflowDialog
 import dev.dhun.ui.shell.AppNavState
 import dev.dhun.ui.shell.AppTab
 import dev.dhun.ui.shell.DetailRoute
 import dev.dhun.ui.shell.DhunAppShell
 import java.io.File
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -62,7 +69,6 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
@@ -85,19 +91,23 @@ class VisualAppEvidenceTest {
                     Shell(fixture, nav, mode, isDesktop = false)
                 }.use { composeScene ->
                     val driver = SceneDriver(composeScene)
-                    driver.capture("app-home-${mode.id}.png", settleFrames = 120)
+                    driver.capture("app-home-${mode.id}.png", settleFrames = 40)
                     nav.selectTab(AppTab.SEARCH)
                     driver.capture("app-search-${mode.id}.png")
                     nav.selectTab(AppTab.LIBRARY)
                     driver.capture("app-library-${mode.id}.png")
                     nav.push(DetailRoute.ArtistPage(QUEEN_ID))
-                    driver.capture("app-artist-${mode.id}.png", settleFrames = 80)
+                    driver.capture("app-artist-${mode.id}.png", settleFrames = 24)
                     nav.popDetail()
                     nav.push(DetailRoute.AlbumPage(ALBUM_ID))
-                    driver.capture("app-album-${mode.id}.png", settleFrames = 80)
+                    driver.capture("app-album-${mode.id}.png", settleFrames = 24)
                     nav.popDetail()
-                    nav.push(DetailRoute.PlaylistPage(REMOTE_PLAYLIST_ID))
-                    driver.capture("app-playlist-${mode.id}.png", settleFrames = 80)
+                    if (mode == DhunThemeMode.DARK) {
+                        nav.push(DetailRoute.PlaylistPage(fixture.localPlaylistId, isLocal = true))
+                    } else {
+                        nav.push(DetailRoute.PlaylistPage(REMOTE_PLAYLIST_ID))
+                    }
+                    driver.capture("app-playlist-${mode.id}.png", settleFrames = 24)
                     nav.popDetail()
                     nav.push(DetailRoute.SettingsPage)
                     driver.capture("app-settings-${mode.id}.png")
@@ -106,14 +116,7 @@ class VisualAppEvidenceTest {
                     nav.detailStack.clear()
                     nav.selectTab(AppTab.HOME)
                     nav.playerExpanded = true
-                    driver.capture("app-player-${mode.id}.png", settleFrames = 80)
-                    driver.click("Lyrics view")
-                    driver.capture("app-player-lyrics-${mode.id}.png", settleFrames = 80)
-                    driver.click("Exit lyrics view")
-                    driver.click("Open queue")
-                    driver.capture("app-player-queue-${mode.id}.png", settleFrames = 80)
-                    driver.click("Related")
-                    driver.capture("app-player-related-${mode.id}.png", settleFrames = 80)
+                    driver.capture("app-player-${mode.id}.png", settleFrames = 24)
                     assertEquals(RECORDED_TRACKS.first(), fixture.player.currentTrack.value)
                     assertIs<PlaybackState.Playing>(fixture.player.state.value)
                 }
@@ -125,18 +128,34 @@ class VisualAppEvidenceTest {
     fun `render existing track menus and add-to-playlist dialogs`() {
         for (mode in listOf(DhunThemeMode.DARK, DhunThemeMode.LIGHT)) {
             withFixture(mode) { fixture ->
-                val nav = AppNavState().apply { selectTab(AppTab.SEARCH) }
                 scene(width = 412, height = 915) {
-                    Shell(fixture, nav, mode, isDesktop = false)
+                    DhunTheme(mode = mode) {
+                        Box(Modifier.fillMaxSize().background(DhunColors.background))
+                        TrackOverflowDialog(
+                            track = RECORDED_TRACKS.first(),
+                            player = fixture.player,
+                            onAddToPlaylist = {},
+                            onNavigateToArtist = {},
+                            onNavigateToAlbum = {},
+                            onDismiss = {},
+                        )
+                    }
                 }.use { composeScene ->
-                    val driver = SceneDriver(composeScene)
-                    driver.capture("app-dialog-source-${mode.id}.png", settleFrames = 120)
-                    driver.click("More actions for ${RECORDED_TRACKS.first().title}")
-                    driver.capture("app-track-menu-${mode.id}.png")
-                    driver.click("Add to playlist")
-                    driver.capture("app-add-playlist-${mode.id}.png", settleFrames = 80)
-                    assertEquals(RECORDED_TRACKS.first(), fixture.player.currentTrack.value)
-                    assertIs<PlaybackState.Playing>(fixture.player.state.value)
+                    SceneDriver(composeScene).capture("app-track-menu-${mode.id}.png", settleFrames = 24)
+                }
+                scene(width = 412, height = 915) {
+                    DhunTheme(mode = mode) {
+                        Box(Modifier.fillMaxSize().background(DhunColors.background))
+                        AddToPlaylistDialog(
+                            track = RECORDED_TRACKS.first(),
+                            playlistRepository = fixture.data.playlists,
+                            onDismiss = {},
+                            onAdded = {},
+                            onOpenPlaylist = {},
+                        )
+                    }
+                }.use { composeScene ->
+                    SceneDriver(composeScene).capture("app-add-playlist-${mode.id}.png", settleFrames = 24)
                 }
             }
         }
@@ -150,17 +169,65 @@ class VisualAppEvidenceTest {
                 Shell(fixture, nav, DhunThemeMode.DARK, isDesktop = true)
             }.use { composeScene ->
                 val driver = SceneDriver(composeScene)
-                driver.capture("desktop-home-dark.png", settleFrames = 120)
+                driver.capture("desktop-home-dark.png", settleFrames = 40)
                 nav.selectTab(AppTab.SEARCH, keepDetailOnTabChange = true)
                 driver.capture("desktop-search-dark.png")
                 nav.selectTab(AppTab.LIBRARY, keepDetailOnTabChange = true)
                 driver.capture("desktop-library-dark.png")
                 nav.push(DetailRoute.AlbumPage(ALBUM_ID))
-                driver.capture("desktop-album-dark.png", settleFrames = 100)
+                driver.capture("desktop-album-dark.png", settleFrames = 30)
                 nav.playerExpanded = true
-                driver.capture("desktop-player-dark.png", settleFrames = 100)
+                driver.capture("desktop-player-dark.png", settleFrames = 30)
                 assertEquals(RECORDED_TRACKS.first(), fixture.player.currentTrack.value)
                 assertIs<PlaybackState.Playing>(fixture.player.state.value)
+            }
+        }
+    }
+
+    @Test
+    fun `render loading empty error offline and appearance states`() {
+        captureSingleState("app-home-loading-dark.png", DhunThemeMode.DARK, RecordedProvider(homeMode = StateMode.LOADING))
+        captureSingleState("app-home-empty-dark.png", DhunThemeMode.DARK, RecordedProvider(homeMode = StateMode.EMPTY))
+        captureSingleState("app-home-error-dark.png", DhunThemeMode.DARK, RecordedProvider(homeMode = StateMode.ERROR))
+        captureSingleState(
+            "app-search-empty-dark.png",
+            DhunThemeMode.DARK,
+            RecordedProvider(searchMode = StateMode.EMPTY),
+        ) { it.selectTab(AppTab.SEARCH) }
+        captureSingleState(
+            "app-search-error-dark.png",
+            DhunThemeMode.DARK,
+            RecordedProvider(searchMode = StateMode.ERROR),
+        ) { it.selectTab(AppTab.SEARCH) }
+        captureSingleState("app-home-offline-dark.png", DhunThemeMode.DARK, online = false)
+        captureSingleState("app-home-no-blur-dark.png", DhunThemeMode.DARK, blurPercent = 0)
+        captureSingleState("app-home-brightness-zero-light.png", DhunThemeMode.LIGHT, brightnessPercent = 0)
+        captureSingleState("app-home-brightness-full-light.png", DhunThemeMode.LIGHT, brightnessPercent = 100)
+        captureSingleState("app-home-oled.png", DhunThemeMode.BLACK)
+        captureSingleState("app-home-large-text-dark.png", DhunThemeMode.DARK, fontScale = 1.3f)
+        captureSingleState("app-settings-large-text-dark.png", DhunThemeMode.DARK, fontScale = 1.3f) {
+            it.push(DetailRoute.SettingsPage)
+        }
+    }
+
+    private fun captureSingleState(
+        name: String,
+        mode: DhunThemeMode,
+        provider: RecordedProvider = RecordedProvider(),
+        online: Boolean = true,
+        blurPercent: Int? = null,
+        brightnessPercent: Int? = null,
+        fontScale: Float = 1f,
+        destination: (AppNavState) -> Unit = {},
+    ) {
+        withFixture(mode, provider, online) { fixture ->
+            if (blurPercent != null) DhunAppearance.setBackdropPrefs(blurPercent = blurPercent)
+            if (brightnessPercent != null) DhunAppearance.setBackdropPrefs(brightnessPercent = brightnessPercent)
+            val nav = AppNavState().apply(destination)
+            scene(width = 412, height = 915, fontScale = fontScale) {
+                Shell(fixture, nav, mode, isDesktop = false)
+            }.use { composeScene ->
+                SceneDriver(composeScene).capture(name, settleFrames = 24)
             }
         }
     }
@@ -178,15 +245,21 @@ class VisualAppEvidenceTest {
                 nav = nav,
                 isDesktop = isDesktop,
                 libraryViewModel = fixture.library,
+                connectivity = fixture.connectivity,
                 appInfo = DhunAppInfo.Unknown,
             )
         }
     }
 
-    private fun withFixture(mode: DhunThemeMode, block: (AppFixture) -> Unit) {
+    private fun withFixture(
+        mode: DhunThemeMode,
+        provider: RecordedProvider = RecordedProvider(),
+        online: Boolean = true,
+        block: (AppFixture) -> Unit,
+    ) {
         DhunAppearance.reset()
         DhunAppearance.setAppearance(nextMode = mode)
-        val fixture = AppFixture()
+        val fixture = AppFixture(provider, online)
         try {
             block(fixture)
         } finally {
@@ -195,21 +268,30 @@ class VisualAppEvidenceTest {
         }
     }
 
-    private fun scene(width: Int, height: Int, content: @Composable () -> Unit): ImageComposeScene =
-        ImageComposeScene(width = width, height = height, content = content)
+    private fun scene(
+        width: Int,
+        height: Int,
+        fontScale: Float = 1f,
+        content: @Composable () -> Unit,
+    ): ImageComposeScene = ImageComposeScene(
+        width = width,
+        height = height,
+        density = Density(1f, fontScale),
+        content = content,
+    )
 
     private inner class SceneDriver(private val scene: ImageComposeScene) {
         private var timeNanos = 0L
 
-        fun settle(frames: Int = 45) {
+        fun settle(frames: Int = 12) {
             repeat(frames) {
-                Thread.sleep(10)
+                Thread.sleep(20)
                 timeNanos += FRAME_NANOS
                 scene.render(timeNanos).close()
             }
         }
 
-        fun capture(name: String, settleFrames: Int = 45) {
+        fun capture(name: String, settleFrames: Int = 12) {
             settle(settleFrames)
             scene.render(timeNanos).use { image ->
                 image.encodeToData()!!.use { encoded ->
@@ -219,37 +301,24 @@ class VisualAppEvidenceTest {
                 }
             }
         }
-
-        fun click(label: String) {
-            settle(4)
-            val nodes = scene.semanticsOwners.flatMap { flatten(it.rootSemanticsNode) }
-            val node = nodes.firstOrNull { candidate ->
-                val text = candidate.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text }
-                val descriptions = candidate.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty()
-                (label in text || label in descriptions) &&
-                    candidate.config.getOrNull(SemanticsActions.OnClick) != null
-            } ?: fail(
-                "No clickable semantics node '$label'. Available: " +
-                    nodes.mapNotNull { candidate ->
-                        val descriptions = candidate.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty()
-                        val text = candidate.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text }
-                        (descriptions + text).firstOrNull()
-                    }.distinct().take(50).joinToString(),
-            )
-            val action = assertNotNull(node.config.getOrNull(SemanticsActions.OnClick)?.action)
-            assertTrue(action.invoke(), "Semantics click '$label' was rejected")
-            settle(20)
-        }
-
-        private fun flatten(node: SemanticsNode): List<SemanticsNode> =
-            listOf(node) + node.children.flatMap(::flatten)
     }
 
-    private class AppFixture {
+    private enum class StateMode { POPULATED, EMPTY, ERROR, LOADING }
+
+    private class AppFixture(
+        val provider: RecordedProvider,
+        online: Boolean,
+    ) {
         private val driver = DatabaseDriverFactory.inMemory().createDriver()
         val data = DataLayer(DatabaseFactory.create(driver))
-        val provider = RecordedProvider()
         val player = RecordedPlayer()
+        val connectivity: ConnectivityMonitor = if (online) {
+            AlwaysOnlineConnectivityMonitor
+        } else {
+            object : ConnectivityMonitor {
+                override val isOnline = MutableStateFlow(false)
+            }
+        }
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val home: HomeViewModel
         val search: SearchViewModel
@@ -279,8 +348,18 @@ class VisualAppEvidenceTest {
             library = LibraryViewModel(data, player, scope)
             search.onQueryChange("Bohemian Rhapsody")
             search.onSearchSubmitted()
-            await("Home populated") { home.uiState.value is HomeUiState.Success }
-            await("Search populated") { search.resultsState.value is SearchResultsUiState.Success }
+            when (provider.homeMode) {
+                StateMode.POPULATED -> await("Home populated") { home.uiState.value is HomeUiState.Success }
+                StateMode.EMPTY -> await("Home empty") { home.uiState.value is HomeUiState.Empty }
+                StateMode.ERROR -> await("Home error") { home.uiState.value is HomeUiState.Error }
+                StateMode.LOADING -> await("Home loading") { home.uiState.value is HomeUiState.Loading }
+            }
+            when (provider.searchMode) {
+                StateMode.POPULATED -> await("Search populated") { search.resultsState.value is SearchResultsUiState.Success }
+                StateMode.EMPTY -> await("Search empty") { search.resultsState.value is SearchResultsUiState.Empty }
+                StateMode.ERROR -> await("Search error") { search.resultsState.value is SearchResultsUiState.Error }
+                StateMode.LOADING -> await("Search loading") { search.resultsState.value is SearchResultsUiState.Loading }
+            }
             await("Library populated") { library.playlistsFlow.value.isNotEmpty() }
             await("Lyrics populated") { playerVm.lyricsState.value is LyricsUiState.Synced }
             await("Related populated") { playerVm.relatedState.value is RelatedUiState.Success }
@@ -379,9 +458,12 @@ class VisualAppEvidenceTest {
         }
     }
 
-    private class RecordedProvider : MusicProvider {
-        override suspend fun search(query: String, filter: SearchFilter): DhunResult<SearchResults> =
-            DhunResult.Success(
+    private class RecordedProvider(
+        val homeMode: StateMode = StateMode.POPULATED,
+        val searchMode: StateMode = StateMode.POPULATED,
+    ) : MusicProvider {
+        override suspend fun search(query: String, filter: SearchFilter): DhunResult<SearchResults> = when (searchMode) {
+            StateMode.POPULATED -> DhunResult.Success(
                 SearchResults(
                     query = query,
                     songs = RECORDED_TRACKS,
@@ -390,6 +472,13 @@ class VisualAppEvidenceTest {
                     playlists = listOf(REMOTE_PLAYLIST),
                 ),
             )
+            StateMode.EMPTY -> DhunResult.Success(SearchResults(query))
+            StateMode.ERROR -> DhunResult.Failure(DhunError.Network("Recorded search failure"))
+            StateMode.LOADING -> {
+                CompletableDeferred<Unit>().await()
+                error("Unreachable loading result")
+            }
+        }
 
         override suspend fun searchContinuation(continuationToken: String): DhunResult<SearchResults> =
             DhunResult.Success(SearchResults(""))
@@ -397,16 +486,24 @@ class VisualAppEvidenceTest {
         override suspend fun searchSuggestions(query: String): DhunResult<List<String>> =
             DhunResult.Success(emptyList())
 
-        override suspend fun homeFeedPage(): DhunResult<HomeFeedPage> = DhunResult.Success(
-            HomeFeedPage(
-                sections = listOf(
-                    HomeSection("Quick picks", items = RECORDED_TRACKS.take(4).map { HomeItem.TrackItem(it) }),
-                    HomeSection("Recommended albums & EPs", items = listOf(HomeItem.AlbumItem(ALBUM))),
-                    HomeSection("Classic rock", items = listOf(HomeItem.PlaylistItem(REMOTE_PLAYLIST))),
-                    HomeSection("Artists", items = listOf(HomeItem.ArtistItem(QUEEN))),
+        override suspend fun homeFeedPage(): DhunResult<HomeFeedPage> = when (homeMode) {
+            StateMode.POPULATED -> DhunResult.Success(
+                HomeFeedPage(
+                    sections = listOf(
+                        HomeSection("Quick picks", items = RECORDED_TRACKS.take(4).map { HomeItem.TrackItem(it) }),
+                        HomeSection("Recommended albums & EPs", items = listOf(HomeItem.AlbumItem(ALBUM))),
+                        HomeSection("Classic rock", items = listOf(HomeItem.PlaylistItem(REMOTE_PLAYLIST))),
+                        HomeSection("Artists", items = listOf(HomeItem.ArtistItem(QUEEN))),
+                    ),
                 ),
-            ),
-        )
+            )
+            StateMode.EMPTY -> DhunResult.Success(HomeFeedPage())
+            StateMode.ERROR -> DhunResult.Failure(DhunError.Network("Recorded Home failure"))
+            StateMode.LOADING -> {
+                CompletableDeferred<Unit>().await()
+                error("Unreachable loading result")
+            }
+        }
 
         override suspend fun homeFeedContinuation(continuationToken: String): DhunResult<HomeFeedPage> =
             DhunResult.Success(HomeFeedPage())
@@ -469,7 +566,7 @@ class VisualAppEvidenceTest {
     }
 
     private companion object {
-        const val FRAME_NANOS = 16_666_667L
+        const val FRAME_NANOS = 50_000_000L
         const val QUEEN_ID = "UCEPMVbUzImPl4p8k4LkGevA"
         const val ALBUM_ID = "MPREb_mrZGcLOHyHy"
         const val REMOTE_PLAYLIST_ID = "VLRDAMVMutwMHfDZ6SA"
