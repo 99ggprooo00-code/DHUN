@@ -59,7 +59,7 @@ jobs:
           TEST_VERSION_CODE: ${{ steps.test_version.outputs.version_code }}
         run: |
           ./gradlew :app-android:assembleDebug \
-            "-PdhunReleaseChannel=test" \
+            "-PdhunReleaseChannel=development" \
             "-PdhunTestVersionName=$TEST_VERSION_NAME" \
             "-PdhunTestVersionCode=$TEST_VERSION_CODE" \
             --no-daemon

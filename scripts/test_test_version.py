@@ -64,11 +64,14 @@ class WorkflowTestVersionTest(unittest.TestCase):
     def test_fast_apk_workflow_uses_the_same_test_identity(self):
         workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/build-apk.yml").read_text()
         self.assertIn('python scripts/test_version.py "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_ATTEMPT"', workflow)
-        self.assertIn('"-PdhunReleaseChannel=test"', workflow)
+        self.assertIn('"-PdhunReleaseChannel=development"', workflow)
+        self.assertNotIn('"-PdhunReleaseChannel=test"', workflow)
         self.assertIn('"-PdhunTestVersionName=$TEST_VERSION_NAME"', workflow)
         self.assertIn('"-PdhunTestVersionCode=$TEST_VERSION_CODE"', workflow)
         self.assertIn('python scripts/check_android_identity.py "$aapt"', workflow)
         self.assertIn('--apksigner "$apksigner"', workflow)
+        gradle = (Path(__file__).resolve().parents[1] / "app-android/build.gradle.kts").read_text()
+        self.assertIn('require(dhunReleaseChannel != "public")', gradle)
 
 
 if __name__ == "__main__":

@@ -28,7 +28,10 @@ android {
         val testCode = providers.gradleProperty("dhunTestVersionCode").orNull
         require((testName == null) == (testCode == null)) { "Supply both test version properties" }
         if (testName != null && testCode != null) {
-            require(dhunReleaseChannel == "test") { "Test identity requires the test channel" }
+            // Version identity and experimental feature flags are independent:
+            // Build APK keeps the development channel while receiving an
+            // upgrade-safe test version. Only the fixed public channel is forbidden.
+            require(dhunReleaseChannel != "public") { "Test identity requires a non-public channel" }
             require(Regex("1\\.00\\.[1-9][0-9]*-test\\.[1-9][0-9]*").matches(testName)) { "Invalid test version name" }
             val code = testCode.toIntOrNull()
             require(code != null && code in 1001..2_100_000_000) { "Invalid test version code" }
