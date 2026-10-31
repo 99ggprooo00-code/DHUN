@@ -35,7 +35,8 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 - Both APK workflows now check the actual universal and per-ABI packages with
   `aapt` and require DHUN's expected test certificate through `apksigner`.
   Regression tests cover cross-workflow version ordering, clock bounds, complete
-  package sets and wrong/missing/extra signers. Device installation remains open
+  package sets, current `V2 Signer`/legacy signer output and wrong/missing/extra
+  signers. Device installation remains open
   in `docs/verification/36-pr217-device-install.md`.
 
 ### Simpler surface colours with custom HSL sliders (2026-10-31, session `arena/09e5238e-dhun`)

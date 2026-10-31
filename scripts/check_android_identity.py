@@ -48,7 +48,7 @@ def verify_signature(apksigner_output: str) -> None:
     digests = [
         digest.lower()
         for digest in re.findall(
-            r"(?im)^\s*Signer #\d+ certificate SHA-256 digest:\s*([0-9a-f]{64})\s*$",
+            r"(?im)^\s*(?:Signer #\d+\s+|V[1-4] Signer:\s*)certificate SHA-256 digest:\s*([0-9a-f]{64})\s*$",
             apksigner_output,
         )
     ]

@@ -55,6 +55,16 @@ class AndroidIdentityTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "apksigner output: unexpected format"):
             verify_signature("unexpected format")
 
+    def test_current_v2_signer_output_matches_the_expected_certificate(self):
+        # Exact format emitted by the Android build-tools in Build APK run 41157671683.
+        output = (
+            "V2 Signer: certificate DN: CN=DHUN Test Build, O=DHUN\n"
+            f"V2 Signer: certificate SHA-256 digest: {EXPECTED_CERT_SHA256}\n"
+            "V2 Signer: certificate SHA-1 digest: 72f30fb582d158dc3848ae96adeed50fb779027f\n"
+            "V2 Signer: certificate MD5 digest: 295bc3b1835309feb6e18c616db6fbf8\n"
+        )
+        verify_signature(output)
+
     def test_expected_test_certificate_is_required(self):
         output = (
             "Signer #1 certificate DN: CN=DHUN Test Build, O=DHUN\n"
