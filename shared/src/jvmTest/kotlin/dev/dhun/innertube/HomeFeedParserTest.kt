@@ -177,7 +177,7 @@ class HomeFeedParserTest {
     fun validEmptySectionListIsAnEmptyPageNotMalformedJson() {
         val parsed = parseHomeFeedPage(json(
             """{"contents":{"singleColumnBrowseResultsRenderer":{"tabs":[{"musicTabRenderer":{
-               "selected":true,"content":{"sectionListRenderer":{"contents":[]}}}]}}}""",
+               "selected":true,"content":{"sectionListRenderer":{"contents":[]}}}}]}}}""",
         ))
         assertTrue(parsed.sections.isEmpty())
         assertNull(parsed.continuationToken)
