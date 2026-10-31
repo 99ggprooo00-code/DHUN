@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import dev.dhun.core.Track
+import dev.dhun.data.LocalPlaylist
 import dev.dhun.data.PlaylistRepository
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
@@ -31,7 +32,7 @@ import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.DhunButton
 import dev.dhun.design.components.DhunTextField
 import dev.dhun.design.components.DhunTextButton
-import kotlinx.coroutines.launch
+import dev.dhun.presentation.MutationTracker
 
 /**
  * Local-playlist picker for one track.
@@ -59,9 +60,9 @@ import kotlinx.coroutines.launch
  *   reserves nothing for rows that do not exist, and scrolls only past four;
  * - a DHUN-styled single-line input instead of M3's outlined field.
  *
- * Behaviour is unchanged: same repository calls, same "create & add" flow, same
- * blank-name error, same `onAdded` / `onOpenPlaylist` callbacks, and tap-outside
- * / Back still dismisses.
+ * The repository flow and `onAdded` / `onOpenPlaylist` navigation are preserved.
+ * Writes are result-driven: duplicate submissions are gated, failures stay in
+ * the sheet, and tap-outside / Back cannot dismiss an in-flight write.
  */
 @Composable
 fun AddToPlaylistDialog(
@@ -74,32 +75,63 @@ fun AddToPlaylistDialog(
 ) {
     val playlists by playlistRepository.observePlaylists().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
+    // Result-driven, like every other mutation in the app: `onAdded` and
+    // `onDismiss` run only after the write returned normally, a failure is
+    // shown inside this sheet (it used to escape the coroutine as a crash), and
+    // a second tap while the write is in flight is ignored.
+    val tracker = remember { MutationTracker(scope) }
+    val newPlaylistAction = remember { NewPlaylistAddAction(playlistRepository, tracker) }
+    val mutation by tracker.state.collectAsState()
     var isCreatingNew by remember { mutableStateOf(false) }
     var newPlaylistName by remember { mutableStateOf("") }
     var errorText by remember { mutableStateOf<String?>(null) }
+    val failureText = mutation.errorMessage ?: errorText
 
-    val addToPlaylist: (String, String) -> Unit = { playlistId, name ->
-        scope.launch {
-            playlistRepository.addTrack(playlistId, track)
-            onAdded(name)
-            onDismiss()
+    val addToPlaylist: (String, String) -> Unit = add@{ playlistId, name ->
+        // Read the tracker directly as well as its Compose snapshot: two
+        // different rows tapped in one frame must not run concurrently.
+        if (tracker.state.value.isBusy) return@add
+        errorText = null
+        // The repository tells us WHICH thing happened. Reporting "added" for a
+        // track that was already there is the same class of false confirmation
+        // this sheet used to give on a failed write: say so, keep the sheet open
+        // so the user can pick another playlist, and only close on a real add.
+        var alreadyThere = false
+        tracker.run(
+            key = "add:$playlistId",
+            failureMessage = "Could not add this song to \"$name\". Try again.",
+            onSuccess = {
+                if (alreadyThere) {
+                    errorText = "Already in \"$name\"."
+                } else {
+                    onAdded(name)
+                    onDismiss()
+                }
+            },
+        ) {
+            alreadyThere = !playlistRepository.addTrack(playlistId, track)
         }
     }
-    val createAndAdd: () -> Unit = {
+    val createAndAdd: () -> Unit = create@{
+        if (tracker.state.value.isBusy) return@create
         val name = newPlaylistName.trim()
         if (name.isBlank()) {
             errorText = "Name cannot be empty"
         } else {
-            scope.launch {
-                val playlist = playlistRepository.create(name)
-                playlistRepository.addTrack(playlist.id, track)
-                onAdded(playlist.name)
+            errorText = null
+            newPlaylistAction.run(track, name) { createdName ->
+                onAdded(createdName)
                 onDismiss()
             }
         }
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(onDismissRequest = {
+        if (!tracker.state.value.isBusy) {
+            newPlaylistAction.abandonPendingCreation()
+            onDismiss()
+        }
+    }) {
         TrackMenuSurface(
             artworkUrl = track.thumbnailUrl,
             modifier = Modifier
@@ -128,15 +160,19 @@ fun AddToPlaylistDialog(
                 DhunTextField(
                     value = newPlaylistName,
                     onValueChange = {
-                        newPlaylistName = it
-                        errorText = null
+                        // Once the playlist row exists, a retry keeps its name
+                        // and ID; editing must not turn that retry into a create.
+                        if (!newPlaylistAction.hasPendingCreation && !mutation.isBusy) {
+                            newPlaylistName = it
+                            errorText = null
+                        }
                     },
                     modifier = Modifier.padding(horizontal = DhunSpacing.mdPlus),
                     placeholder = "Playlist name",
-                    isError = errorText != null,
+                    isError = failureText != null,
                     onSubmit = createAndAdd,
                 )
-                errorText?.let {
+                failureText?.let {
                     Text(
                         text = it,
                         color = DhunColors.error,
@@ -154,15 +190,43 @@ fun AddToPlaylistDialog(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Spacer(modifier = Modifier.weight(1f))
-                    DhunTextButton(onClick = { isCreatingNew = false }) {
+                    DhunTextButton(
+                        onClick = {
+                            newPlaylistAction.abandonPendingCreation()
+                            tracker.dismissError()
+                            isCreatingNew = false
+                            newPlaylistName = ""
+                            errorText = null
+                        },
+                        enabled = !mutation.isBusy,
+                    ) {
                         Text("Back")
                     }
                     Spacer(modifier = Modifier.size(DhunSpacing.sm))
-                    DhunButton(onClick = createAndAdd) {
-                        Text("Create & add")
+                    DhunButton(
+                        onClick = createAndAdd,
+                        enabled = newPlaylistName.isNotBlank() && !mutation.isBusy,
+                        loading = mutation.isRunning(NewPlaylistAddAction.KEY),
+                    ) {
+                        Text(if (failureText != null) "Try again" else "Create & add")
                     }
                 }
             } else {
+                // A failure from a playlist row (not the "new playlist" input).
+                if (playlists.isNotEmpty()) {
+                    failureText?.let {
+                        Text(
+                            text = it,
+                            color = DhunColors.error,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(
+                                start = DhunSpacing.mdPlus,
+                                end = DhunSpacing.mdPlus,
+                                bottom = DhunSpacing.xs,
+                            ),
+                        )
+                    }
+                }
                 if (playlists.isEmpty()) {
                     Text(
                         text = "No playlists yet — create one below.",
@@ -192,7 +256,9 @@ fun AddToPlaylistDialog(
                                 supportingText = "${playlist.trackCount} tracks",
                                 onClick = { addToPlaylist(playlist.id, playlist.name) },
                                 trailingLabel = if (openPlaylist != null) "Open" else null,
-                                onTrailingClick = openPlaylist?.let { open -> { open(playlist.id) } },
+                                onTrailingClick = openPlaylist?.let { open ->
+                                    { if (!tracker.state.value.isBusy) open(playlist.id) }
+                                },
                             )
                         }
                     }
@@ -200,7 +266,12 @@ fun AddToPlaylistDialog(
                 MenuActionRow(
                     label = "New playlist",
                     icon = DhunIcon.Add,
-                    onClick = { isCreatingNew = true },
+                    onClick = {
+                        if (!tracker.state.value.isBusy) {
+                            errorText = null
+                            isCreatingNew = true
+                        }
+                    },
                 )
             }
         }
@@ -214,6 +285,45 @@ fun AddToPlaylistDialog(
  * The list is measured to its rows up to [VISIBLE_ROWS]; past that it scrolls.
  * The row height is the menu row's, because these rows *are* menu rows.
  */
+/**
+ * Operation-specific state for Create & add. If playlist creation succeeds but
+ * the membership write fails, a retry reuses that row instead of creating a
+ * duplicate. Leaving the form abandons only this retry state; the visible
+ * playlist is preserved and can still be chosen from the picker.
+ */
+internal class NewPlaylistAddAction(
+    private val playlists: PlaylistRepository,
+    private val tracker: MutationTracker,
+) {
+    private var pendingCreation: LocalPlaylist? = null
+    val hasPendingCreation: Boolean get() = pendingCreation != null
+
+    fun run(track: Track, name: String, onAdded: (String) -> Unit): Boolean {
+        if (tracker.state.value.isBusy) return false
+        var createdName = pendingCreation?.name ?: name
+        return tracker.run(
+            key = KEY,
+            failureMessage = "Could not finish the new playlist and add this song. Try again.",
+            onSuccess = {
+                pendingCreation = null
+                onAdded(createdName)
+            },
+        ) {
+            val playlist = pendingCreation ?: playlists.create(name).also { pendingCreation = it }
+            createdName = playlist.name
+            playlists.addTrack(playlist.id, track)
+        }
+    }
+
+    fun abandonPendingCreation() {
+        if (!tracker.state.value.isBusy) pendingCreation = null
+    }
+
+    companion object {
+        const val KEY = "create-and-add"
+    }
+}
+
 internal object AddToPlaylistPolicy {
 
     /** Playlists visible before the picker starts scrolling. */

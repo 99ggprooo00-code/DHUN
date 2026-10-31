@@ -413,4 +413,56 @@ class BrowseViewModelTest {
             remote.close()
         }
     }
+
+    /**
+     * Playlist row edits were silent: a failed swipe-remove left the row in
+     * place and a failed drag snapped the list back with no word to the user,
+     * and a failed rename closed its dialog as if it had saved.
+     */
+    @Test
+    fun playlistEditsReportFailuresInsteadOfFailingSilently(): Unit = runBlocking {
+        val data = DataLayer(DatabaseFactory.create(DatabaseDriverFactory.inMemory().createDriver()))
+        val created = data.playlists.create("Evening")
+        data.playlists.addTrack(created.id, track("e1"))
+        data.playlists.addTrack(created.id, track("e2"))
+        val repo = object : PlaylistRepository by data.playlists {
+            override suspend fun removeTrack(playlistId: String, trackId: String) {
+                error("remove failed")
+            }
+            override suspend fun move(playlistId: String, fromIndex: Int, toIndex: Int) {
+                error("move failed")
+            }
+            override suspend fun rename(id: String, newName: String) {
+                error("rename failed")
+            }
+        }
+        val vm = PlaylistViewModel(FakeBrowseProvider(), repo, FakePlayer(), created.id, isLocal = true)
+        try {
+            eventually { (vm.state.value as? PlaylistUiState.Local)?.tracks?.size == 2 }
+
+            vm.removeTrack(track("e1"))
+            eventually { vm.mutation.value.errorMessage != null }
+            assertTrue(vm.mutation.value.errorMessage!!.startsWith("Could not remove"))
+
+            vm.dismissMutationError()
+            vm.moveTrack(0, 1)
+            eventually { vm.mutation.value.errorMessage != null }
+            assertEquals("Could not save the new order. The list was put back; try again.", vm.mutation.value.errorMessage)
+
+            // The rename dialog needs the failure itself, not a message field.
+            var renameFailure: String? = null
+            try {
+                vm.rename("Morning")
+            } catch (failure: Exception) {
+                renameFailure = failure.message
+            }
+            assertEquals("rename failed", renameFailure)
+
+            // Nothing escaped, and the two tracks are untouched.
+            assertEquals(2, (vm.state.value as PlaylistUiState.Local).tracks.size)
+            assertEquals("Evening", (vm.state.value as PlaylistUiState.Local).playlist?.name)
+        } finally {
+            vm.close()
+        }
+    }
 }
