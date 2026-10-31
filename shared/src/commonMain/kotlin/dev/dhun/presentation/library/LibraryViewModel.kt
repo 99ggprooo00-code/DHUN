@@ -735,4 +735,4 @@ internal fun DownloadedTrack.toTrack(): Track = Track(
 
 /** Saved cover first, so downloaded playback does not depend on image network. */
 internal val DownloadedTrack.preferredArtworkUrl: String?
-    get() = localArtworkPath?.takeIf { it.isNotBlank() }?.let(localAudioFileUri) ?: thumbnailUrl
+    get() = localArtworkPath?.takeIf { it.isNotBlank() }?.let(::localAudioFileUri) ?: thumbnailUrl

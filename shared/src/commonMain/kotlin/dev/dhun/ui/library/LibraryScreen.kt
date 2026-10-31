@@ -1262,7 +1262,8 @@ private fun ManageableDownloadRow(
         DhunCheckbox(checked = selected, onCheckedChange = { onToggle() })
         ArtworkImage(
             imageUrl = download.preferredArtworkUrl,
-            fallbackImageUrl = download.thumbnailUrl,
+            fallbackImageUrl = download.thumbnailUrl?.takeIf { it.isNotBlank() }
+                ?: ArtworkUrls.videoThumbnail(download.trackId),
             contentDescription = download.title,
             modifier = Modifier.size(DhunSpacing.touchTarget),
         )
@@ -1312,7 +1313,8 @@ private fun DownloadRow(
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md)) {
             ArtworkImage(
                 imageUrl = download.preferredArtworkUrl,
-                fallbackImageUrl = download.thumbnailUrl,
+                fallbackImageUrl = download.thumbnailUrl?.takeIf { it.isNotBlank() }
+                    ?: ArtworkUrls.videoThumbnail(download.trackId),
                 contentDescription = download.title,
                 modifier = Modifier.size(DhunSpacing.touchTarget),
             )

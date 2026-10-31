@@ -1096,7 +1096,7 @@ private fun PlayerArtworkStage(
         LyricsCardOverlay(
             visible = lyricsDominant,
             artworkUrl = artworkUrl,
-            fallbackArtworkUrl = track?.thumbnailUrl ?: ArtworkUrls.videoThumbnail(track?.id),
+            fallbackArtworkUrl = track?.thumbnailUrl?.takeIf { it.isNotBlank() } ?: ArtworkUrls.videoThumbnail(track?.id),
             cacheKey = cacheKey,
             viewModel = viewModel,
             accent = accent,
@@ -1497,7 +1497,7 @@ private fun ArtworkBackdrop(
             key(cacheKey) {
                 PlayerBackdrop(
                     artworkUrl = ArtworkUrls.nowPlaying(track?.thumbnailUrl),
-                    fallbackArtworkUrl = track?.thumbnailUrl ?: ArtworkUrls.videoThumbnail(track?.id),
+                    fallbackArtworkUrl = track?.thumbnailUrl?.takeIf { it.isNotBlank() } ?: ArtworkUrls.videoThumbnail(track?.id),
                     cacheKey = cacheKey,
                 )
             }
@@ -1635,7 +1635,7 @@ private fun ArtworkHeroField(
             ) {
                 ArtworkImage(
                     imageUrl = ArtworkUrls.nowPlaying(t?.thumbnailUrl),
-                    fallbackImageUrl = t?.thumbnailUrl ?: ArtworkUrls.videoThumbnail(t?.id),
+                    fallbackImageUrl = t?.thumbnailUrl?.takeIf { it.isNotBlank() } ?: ArtworkUrls.videoThumbnail(t?.id),
                     contentDescription = t?.title,
                     modifier = Modifier.fillMaxSize(),
                     shape = DhunShapes.artwork,
@@ -1697,8 +1697,8 @@ private fun LyricsCardOverlay(
  * A null/blank URL returns false so the screen falls back to the clean dark
  * surface. Platforms without RenderEffect still paint the cover (dimmed).
  */
-internal fun shouldRenderPlayerBackdrop(artworkUrl: String?): Boolean =
-    !artworkUrl.isNullOrBlank()
+internal fun shouldRenderPlayerBackdrop(artworkUrl: String?, fallbackArtworkUrl: String? = null): Boolean =
+    !artworkUrl.isNullOrBlank() || !fallbackArtworkUrl.isNullOrBlank()
 
 /**
  * Blurred-artwork bleed (ADR-002 P4). [ArtworkBackdrop] mounts this inside
@@ -1715,7 +1715,7 @@ private fun PlayerBackdrop(
     fallbackArtworkUrl: String?,
     cacheKey: String,
 ) {
-    if (!shouldRenderPlayerBackdrop(artworkUrl)) return
+    if (!shouldRenderPlayerBackdrop(artworkUrl, fallbackArtworkUrl)) return
 
     val canBlur = supportsRealtimeBlur
     // The player is its own surface: it has its own blur switch and its own
@@ -1800,7 +1800,7 @@ private fun LyricsCard(
         // Blurred artwork inside the card — keyed like the backdrop so the
         // blur is prepared once per track, never per frame.
         key(cacheKey) {
-            if (paintsArtwork && shouldRenderPlayerBackdrop(artworkUrl)) {
+            if (paintsArtwork && shouldRenderPlayerBackdrop(artworkUrl, fallbackArtworkUrl)) {
                 ArtworkImage(
                     imageUrl = artworkUrl,
                     fallbackImageUrl = fallbackArtworkUrl,
