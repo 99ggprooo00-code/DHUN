@@ -298,6 +298,7 @@ class SettingsPersistenceTest {
 
             assertEquals("IN", vm.countryCode.value)
             assertEquals("IN", countries.lastOrNull(), "the wire provider must retain the newer region")
+            assertEquals(listOf("NP", "IN"), countries, "successful writes must not refresh the provider twice")
             assertEquals("IN", d.settings.getString(SettingsKeys.COUNTRY_CODE))
             assertTrue(h.uncaught.isEmpty(), "the older failure must stay contained: ${h.uncaught}")
         } finally {
@@ -461,6 +462,76 @@ class SettingsPersistenceTest {
             assertEquals(SettingsKeys.EXPLICIT_CONTENT_DEFAULT, vm.explicitContent.value)
             assertNull(d.settings.getString(SettingsKeys.EXPLICIT_CONTENT))
             assertTrue(h.uncaught.isEmpty(), "the ordered writes must not escape: ${h.uncaught}")
+        } finally {
+            h.close()
+        }
+    }
+
+    @Test
+    fun aNewerWriteSurvivesTheRollbackOfAnOlderFailedReset(): Unit = runBlocking {
+        val d = data()
+        val h = Harness()
+        d.settings.putString(SettingsKeys.THEME, "black")
+        val resetStarted = CompletableDeferred<Unit>()
+        val releaseReset = CompletableDeferred<Unit>()
+        val flakySettings = object : SettingsRepository by d.settings {
+            override suspend fun remove(key: String) {
+                if (key == SettingsKeys.THEME) {
+                    resetStarted.complete(Unit)
+                    releaseReset.await()
+                    error("older reset failed")
+                }
+                d.settings.remove(key)
+            }
+        }
+        val vm = SettingsViewModel(GetSettingUseCase(flakySettings), UpdateSettingUseCase(flakySettings), h.scope)
+        try {
+            eventually { vm.loaded.value }
+            vm.reset()
+            resetStarted.await()
+            vm.setThemeId("dark")
+            releaseReset.complete(Unit)
+            eventually { d.settings.getString(SettingsKeys.THEME) == "dark" }
+
+            assertEquals("dark", vm.themeId.value, "the reset rollback must not erase the newer request")
+            assertEquals("dark", d.settings.getString(SettingsKeys.THEME))
+            assertTrue(h.uncaught.isEmpty(), "the reset failure must stay contained: ${h.uncaught}")
+        } finally {
+            h.close()
+        }
+    }
+
+    @Test
+    fun aNewerVisualExperimentSurvivesAnOlderFailedTuningReset(): Unit = runBlocking {
+        val d = data()
+        val h = Harness()
+        val part = VisualPart.LIST_ROWS
+        d.settings.putInt(part.key, 70)
+        val resetStarted = CompletableDeferred<Unit>()
+        val releaseReset = CompletableDeferred<Unit>()
+        val flakySettings = object : SettingsRepository by d.settings {
+            override suspend fun remove(key: String) {
+                if (key == part.key) {
+                    resetStarted.complete(Unit)
+                    releaseReset.await()
+                    error("older tuning reset failed")
+                }
+                d.settings.remove(key)
+            }
+        }
+        val vm = SettingsViewModel(GetSettingUseCase(flakySettings), UpdateSettingUseCase(flakySettings), h.scope)
+        try {
+            eventually { vm.loaded.value }
+            vm.resetVisualTuning()
+            resetStarted.await()
+            vm.previewVisualTuning(part, 95)
+            vm.saveVisualTuning(part)
+            releaseReset.complete(Unit)
+            eventually { d.settings.getInt(part.key, -1) == 95 }
+
+            assertEquals(95, vm.visualTuning.value[part], "the newer slider value is now stored")
+            assertEquals(95, d.settings.getInt(part.key, -1))
+            assertTrue(h.uncaught.isEmpty(), "the reset failure must stay contained: ${h.uncaught}")
         } finally {
             h.close()
         }

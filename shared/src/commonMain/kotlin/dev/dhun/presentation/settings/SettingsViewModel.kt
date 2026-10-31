@@ -136,6 +136,10 @@ class SettingsViewModel(
         enqueueWrite({
             write()
             confirmedStrings.update { it + (key to attempted) }
+            // A failed reset can have re-read storage after this value was
+            // published optimistically. Repair only a stale visible value;
+            // do not repeat country/provider side effects on ordinary writes.
+            if (isLatestWrite(key, generation) && state.value != attempted) publish(attempted)
         }, onFailure = {
             val stored = try {
                 get.string(key, default)
@@ -160,6 +164,7 @@ class SettingsViewModel(
         enqueueWrite({
             write()
             confirmedInts.update { it + (key to attempted) }
+            if (isLatestWrite(key, generation) && state.value != attempted) publish(attempted)
         }, onFailure = {
             val stored = try {
                 get.int(key, default)
@@ -184,6 +189,7 @@ class SettingsViewModel(
         enqueueWrite({
             write()
             confirmedBooleans.update { it + (key to attempted) }
+            if (isLatestWrite(key, generation) && state.value != attempted) publish(attempted)
         }, onFailure = {
             val stored = try {
                 get.boolean(key, default)
@@ -497,6 +503,10 @@ class SettingsViewModel(
         enqueueWrite({
             update.int(part.key, value)
             confirmedTuning.update { it + (part to value) }
+            val visible = _visualTuning.value[part] ?: tuningBaseline
+            if (isLatestWrite(part.key, generation) && visible != value) {
+                publishTuning(_visualTuning.value + (part to value))
+            }
         }) {
             // The slider already shows the dragged value; put the stored one
             // back rather than leaving an unsaved experiment applied. If the
