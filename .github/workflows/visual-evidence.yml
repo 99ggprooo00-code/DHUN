@@ -32,7 +32,7 @@ jobs:
           cache: gradle
 
       - name: Render real Compose evidence
-        run: ./gradlew :app-desktop:jvmTest --tests "dev.dhun.desktop.VisualEvidenceTest" --no-daemon
+        run: ./gradlew :app-desktop:jvmTest --tests "dev.dhun.desktop.Visual*EvidenceTest" --no-daemon
 
       - name: Upload rendered frames and test reports
         if: always()
@@ -109,7 +109,7 @@ jobs:
               "head": os.environ["HEAD_SHA"],
               "run": os.environ["RUN_ID"],
               "renderer": "Compose ImageComposeScene / Skia",
-              "scope": "initial shared-material evidence path; not full application visual acceptance",
+              "scope": "real Compose component/app-shell frames with recorded metadata; not Android device or audible-playback acceptance",
               "images": images,
               "visual_test_reports": reports,
               "visual_test_totals": totals,
