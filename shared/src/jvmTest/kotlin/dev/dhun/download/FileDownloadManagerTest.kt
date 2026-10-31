@@ -305,6 +305,11 @@ class FileDownloadManagerTest {
             }
             assertTrue(storage.exists(versionedArt))
             assertTrue(storage.files[versionedArt]!!.contentEquals("audio-bytes".encodeToByteArray()))
+            // Persisting the new path intentionally precedes old-file cleanup.
+            // Wait for that second phase instead of racing it after the DB emit.
+            withTimeout(15_000) {
+                while (storage.exists(oldArt)) delay(10)
+            }
             assertFalse(storage.exists(oldArt), "old file is removed only after the new path is persisted")
             assertEquals(DownloadState.COMPLETED, repo.get("legacy-art")?.downloadState)
         } finally { managerScope.cancel() }
