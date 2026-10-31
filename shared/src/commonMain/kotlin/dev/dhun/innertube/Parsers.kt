@@ -11,6 +11,7 @@ import dev.dhun.core.SearchResults
 import dev.dhun.core.Track
 import dev.dhun.design.ArtworkUrls
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -50,16 +51,60 @@ internal fun trailingDuration(item: JsonObject): Int? {
     return null
 }
 
+private val thumbnailPaths = listOf(
+    listOf("thumbnail", "musicThumbnailRenderer", "thumbnail", "thumbnails"),
+    listOf("thumbnail", "croppedSquareThumbnailRenderer", "thumbnail", "thumbnails"),
+    listOf("foregroundThumbnail", "musicThumbnailRenderer", "thumbnail", "thumbnails"),
+    listOf("thumbnailRenderer", "musicThumbnailRenderer", "thumbnail", "thumbnails"),
+    listOf("thumbnail", "thumbnails"),
+)
+
+/** One thumbnail contract shared by Home, Search and browse detail pages. */
 internal fun thumbnailOf(item: JsonObject): String? {
-    val thumbs = descend(item, listOf("thumbnail", "musicThumbnailRenderer", "thumbnail", "thumbnails"))
-        as? JsonArray ?: descend(item, listOf("thumbnailRenderer", "musicThumbnailRenderer", "thumbnail", "thumbnails"))
-        as? JsonArray ?: descend(item, listOf("thumbnail", "thumbnails"))
-        as? JsonArray ?: return null
-    // Thumbnail arrays arrive smallest-first — the old code kept the first
-    // (w60) entry and blurred every large surface. Keep the largest and pin
-    // the list tier (proxy-safe; see ArtworkUrls).
-    val biggest = (thumbs.lastOrNull() as? JsonObject)?.str("url")
-    return ArtworkUrls.list(biggest)
+    for (path in thumbnailPaths) {
+        val thumbnails = descend(item, path) as? JsonArray ?: continue
+        bestThumbnailUrl(thumbnails)?.let { return it }
+    }
+    // Alternate headers/cards can nest the same array under a new renderer.
+    // Prefer the array nearest the item root rather than giving up or taking
+    // a deeply nested related entity's artwork first.
+    return firstThumbnailsUrl(item)
+}
+
+/** Largest declared image; source order breaks ties for unsized fixtures. */
+private fun bestThumbnailUrl(thumbnails: JsonArray): String? {
+    var bestUrl: String? = null
+    var bestArea = -1L
+    for (entry in thumbnails) {
+        val thumbnail = entry as? JsonObject ?: continue
+        val url = thumbnail.str("url")?.takeIf { it.isNotBlank() } ?: continue
+        val width = thumbnail.str("width")?.toLongOrNull() ?: 0L
+        val height = thumbnail.str("height")?.toLongOrNull() ?: 0L
+        val area = width * height
+        if (area >= bestArea) {
+            bestArea = area
+            bestUrl = url
+        }
+    }
+    return ArtworkUrls.list(bestUrl)
+}
+
+private fun firstThumbnailsUrl(node: JsonElement): String? {
+    val queue = ArrayDeque<JsonElement>()
+    queue += node
+    while (queue.isNotEmpty()) {
+        when (val current = queue.removeFirst()) {
+            is JsonObject -> {
+                (current["thumbnails"] as? JsonArray)?.let { thumbnails ->
+                    bestThumbnailUrl(thumbnails)?.let { return it }
+                }
+                for (value in current.values) queue += value
+            }
+            is JsonArray -> for (value in current) queue += value
+            else -> {}
+        }
+    }
+    return null
 }
 
 internal fun parseContinuationToken(root: JsonObject): String? {

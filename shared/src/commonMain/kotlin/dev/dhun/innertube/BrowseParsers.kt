@@ -38,64 +38,8 @@ internal fun browseIdsOf(node: JsonElement?): Pair<String?, String?> {
     return artist to album
 }
 
-/** Largest thumbnail URL from any nearby thumbnail renderer. */
-private fun thumbnailsLastUrl(node: JsonObject?): String? {
-    if (node == null) return null
-    val paths = listOf(
-        listOf("thumbnail", "musicThumbnailRenderer", "thumbnail", "thumbnails"),
-        listOf("thumbnail", "croppedSquareThumbnailRenderer", "thumbnail", "thumbnails"),
-        listOf("foregroundThumbnail", "musicThumbnailRenderer", "thumbnail", "thumbnails"),
-        listOf("thumbnailRenderer", "musicThumbnailRenderer", "thumbnail", "thumbnails"),
-        listOf("thumbnail", "thumbnails"),
-    )
-    for (path in paths) {
-        val arr = descend(node, path) as? JsonArray ?: continue
-        val last = arr.lastOrNull() as? JsonObject
-        val url = last?.str("url")
-        if (!url.isNullOrBlank()) return normalizeRemoteUrl(url)
-    }
-    // Nothing named above matched. Real browse headers ship their cover under
-    // arrangements this list has never enumerated (album headers in
-    // particular), and the old code returned null there — losing the cover,
-    // the page backdrop, and every row that inherits it, with no error.
-    // Fall back to the shallowest `thumbnails` array anywhere in the header:
-    // same "largest entry" rule, same normalization, and it can only fire
-    // where we previously gave up, so no working page can change behaviour.
-    return firstThumbnailsUrl(node)
-}
-
-/**
- * Breadth-first search for the shallowest `thumbnails` array in [node],
- * returning its largest (last) entry's URL.
- *
- * Breadth-first, not depth-first, so the array nearest the header root wins:
- * on a header that carries both a portrait and a cover, the one the page is
- * actually about sits closest to the top.
- */
-private fun firstThumbnailsUrl(node: JsonElement): String? {
-    val queue = ArrayDeque<JsonElement>()
-    queue += node
-    while (queue.isNotEmpty()) {
-        when (val current = queue.removeFirst()) {
-            is JsonObject -> {
-                val arr = current["thumbnails"] as? JsonArray
-                if (arr != null) {
-                    val url = (arr.lastOrNull() as? JsonObject)?.str("url")
-                    if (!url.isNullOrBlank()) return normalizeRemoteUrl(url)
-                }
-                for (value in current.values) queue += value
-            }
-            is JsonArray -> for (value in current) queue += value
-            else -> {}
-        }
-    }
-    return null
-}
-
-private fun normalizeRemoteUrl(url: String): String =
-    // List tier via the shared helper: scheme fix + generic w/h rewrite on
-    // proxy hosts (covers w176/w192/… sizes the old literal replaces missed).
-    dev.dhun.design.ArtworkUrls.list(url) ?: url
+/** Largest thumbnail URL from the same extractor used by Home and Search. */
+private fun thumbnailsLastUrl(node: JsonObject?): String? = node?.let(::thumbnailOf)
 
 /**
  * Browsable sections of any page layout, normalized so each entry is a

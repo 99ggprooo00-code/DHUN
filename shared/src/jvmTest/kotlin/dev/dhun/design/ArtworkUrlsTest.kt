@@ -65,6 +65,41 @@ class ArtworkUrlsTest {
     }
 
     @Test
+    fun sharedCandidatesPreserveHighResolutionOriginalAndExplicitFallbacks() {
+        assertEquals(
+            listOf(
+                "https://lh3.googleusercontent.com/abc=w544-h544-l90-rj",
+                "https://lh3.googleusercontent.com/abc=w1024-h1024-l90-rj",
+                "https://lh3.googleusercontent.com/abc",
+                "https://i.ytimg.com/vi/utwMHfDZ6SA/hqdefault.jpg",
+            ),
+            ArtworkUrls.loadingCandidates(
+                "https://lh3.googleusercontent.com/abc=w544-h544-l90-rj",
+                "https://i.ytimg.com/vi/utwMHfDZ6SA/hqdefault.jpg",
+            ),
+        )
+        assertEquals(
+            listOf(
+                "https://lh3.googleusercontent.com/abc=w1024-h1024-l90-rj",
+                "https://lh3.googleusercontent.com/abc",
+                "https://lh3.googleusercontent.com/abc=w544-h544-l90-rj",
+            ),
+            ArtworkUrls.loadingCandidates(
+                "//lh3.googleusercontent.com/abc=w1024-h1024-l90-rj",
+                "https://lh3.googleusercontent.com/abc=w544-h544-l90-rj",
+            ),
+        )
+    }
+
+    @Test
+    fun nonProxyAndBlankCandidatesAreNotDuplicated() {
+        val url = "https://i.ytimg.com/vi/utwMHfDZ6SA/hqdefault.jpg"
+        assertEquals(listOf(url), ArtworkUrls.loadingCandidates(url, url))
+        assertEquals(emptyList(), ArtworkUrls.loadingCandidates(" ", null))
+        assertEquals(url, ArtworkUrls.original(url))
+    }
+
+    @Test
     fun sparseTracksRecoverOnlyRealYoutubeVideoCovers() {
         assertEquals(
             "https://i.ytimg.com/vi/utwMHfDZ6SA/hqdefault.jpg",

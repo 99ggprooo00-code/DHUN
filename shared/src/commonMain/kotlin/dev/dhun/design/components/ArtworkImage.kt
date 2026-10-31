@@ -28,6 +28,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.Alignment
+import dev.dhun.design.ArtworkUrls
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
@@ -72,10 +73,7 @@ fun ArtworkImage(
 ) {
     val resolvedShape: Shape = if (cornerRadius != null) RoundedCornerShape(cornerRadius) else shape
     val candidates = remember(imageUrl, fallbackImageUrl) {
-        listOfNotNull(imageUrl, fallbackImageUrl)
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .distinct()
+        ArtworkUrls.loadingCandidates(imageUrl, fallbackImageUrl)
     }
 
     if (candidates.isEmpty()) {
@@ -95,8 +93,9 @@ fun ArtworkImage(
 
     // Load phase drives the placeholder: pulse only while the fetch is in
     // flight; a failed load settles to a static gradient instead of pulsing
-    // forever (which read as a "skeleton that never resolves"). A derived
-    // URL gets one original-URL attempt before the failure is final.
+    // forever (which read as a "skeleton that never resolves"). A failed
+    // derived URL advances through the bounded shared compatibility chain
+    // before the failure is final.
     var phase by remember(candidates) { mutableStateOf(LoadPhase.Loading) }
     val placeholderAlpha = if (phase == LoadPhase.Loading) {
         // Compose the infinite transition only while it is visible. Keeping
