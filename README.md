@@ -104,7 +104,7 @@ Requires JDK 17. Android builds also need Android SDK 35 and `ANDROID_HOME` set.
 ./gradlew :shared:jvmTest
 ```
 
-The committed Android test key is public and for test builds only. Do not use it for a store release. The Windows MSI's internal version is an installer-upgrade sequence, not the DHUN app version.
+The committed Android test key is public and for development/beta builds only. Do not use it for a store release. The Windows MSI's internal version is an installer-upgrade sequence, not the DHUN app version.
 
 ## Status and scope
 

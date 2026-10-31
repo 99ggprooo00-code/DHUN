@@ -1,7 +1,9 @@
 # CURRENT ACTIVE TASK — 2026-11-01: public rolling DHUN beta + PR #218 delivery
 
-**Branch/base:** `arena/8a70a040-dhun`; reviewed recovery/documentation head
-`a21b5236ca156a07832b0bea64555af5048ce074`. The user installed/tested the supplied
+**Branch/base:** `arena/8a70a040-dhun`; reviewed recovery/documentation base
+`a21b5236ca156a07832b0bea64555af5048ce074`; separate beta migration commit
+`64fa454` is pushed. Its first hosted beta run exposed the stale desktop channel
+allowlist now corrected in this follow-up. The user installed/tested the supplied
 arm64 package and explicitly authorised merging PR #218 and publishing the rolling
 channel publicly as **DHUN beta**. That statement is not a full device, audible,
 accessibility or performance acceptance matrix.
@@ -20,15 +22,15 @@ existing website status passages are migrated. Background preferences remain
 **Background blur + Background brightness**; the five-palette/four-surface custom
 colour models are not restoration targets. The beta workflow carries the old
 run-867 continuity offset, and Windows beta-to-beta checks use GitHub asset
-digests because beta has no sidecars. Local evidence: 520/520 Python guards,
+digests because beta has no sidecars. Local evidence: 521/521 Python guards,
 340/340 app-web tests, 63/63 website rules, website build/minify/docs checks,
 legal generation and workflow YAML/publish-shell syntax all pass. No local JDK,
 Android SDK, emulator, ADB/phone, interactive desktop or pwsh is available;
 Kotlin/MSI/runtime checks require the hosted workflows.
 
-**Next:** inspect the complete staged diff, commit/push this beta change separately,
-obtain exact-head green PR checks, merge PR #218 with a merge commit, then verify
-the public beta target/title/prerelease/four assets and fixed-release immutability.
+**Next:** commit/push the desktop-channel follow-up, obtain green checks for the
+new exact PR head, merge PR #218 with a merge commit, then verify the public beta
+target/title/prerelease/four assets and fixed-release immutability.
 Do not claim merge, publication, replacement or device acceptance before the
 corresponding GitHub result exists.
 

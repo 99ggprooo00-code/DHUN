@@ -82,6 +82,18 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn("viewModel.setThemeId(mode.id)", shell)
         self.assertIn("viewModel.setAccentId(accent.id)", shell)
 
+    def test_both_packagers_accept_and_identify_the_beta_channel(self):
+        # The rolling workflow passes this property to both Gradle builds. A
+        # stale allowlist in either module fails configuration before packaging.
+        for relative in ("app-android/build.gradle.kts", "app-desktop/build.gradle.kts"):
+            gradle = (WORKFLOW.parents[2] / relative).read_text()
+            self.assertIn('setOf("development", "beta", "public")', gradle)
+            self.assertIn("dhunReleaseChannel must be development, beta, or public", gradle)
+            self.assertNotIn('setOf("development", "test", "public")', gradle)
+        desktop = (WORKFLOW.parents[2] / "app-desktop/build.gradle.kts").read_text()
+        self.assertIn('"beta" -> "DHUN - multi-source music client (beta build)"', desktop)
+        self.assertNotIn("(test build)", desktop)
+
     def test_automatic_beta_release_guard_is_main_push_only(self):
         self.assertIn("github.ref == 'refs/heads/main'", self.publish_beta)
         self.assertIn("github.event_name == 'push'", self.publish_beta)

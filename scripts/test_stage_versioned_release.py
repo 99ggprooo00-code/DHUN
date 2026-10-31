@@ -1,4 +1,4 @@
-"""Contract for creating fixed-version assets from a successful test build."""
+"""Contract for creating fixed-version assets from a successful beta build."""
 
 import hashlib
 import tempfile

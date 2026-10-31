@@ -1,3 +1,21 @@
+# Public beta evidence boundaries — 2026-11-01
+
+- Pull-request beta runs build and check packages but never publish. The first
+  migration run (**41252469676**, `64fa454`) rejected the stale desktop channel
+  allowlist before APK/MSI packaging; it is a failed run, not release evidence.
+  Only a later exact-head hosted pass, the merged main workflow and the live
+  GitHub API can establish delivery. Fixed releases remain separate and immutable.
+- The first public migration beta has no preceding `beta` MSI for a beta-to-beta
+  install-over check; its readable baseline is fixed `v1.00.002`. A subsequent
+  beta is required to exercise the beta-first asset-digest path. Static tests do
+  not prove that future hardware result.
+- The user's arm64 install/test report is functional acceptance for the supplied
+  package, not an audible-playback, native accessibility, large-text/reduced-motion,
+  sustained-performance or full update-data-preservation matrix. Do not clear
+  data to manufacture a passing update.
+
+---
+
 # Current native recovery and glass verification limits — 2026-10-31
 
 - Persistent-update recovery is not phone-accepted: the underlying device

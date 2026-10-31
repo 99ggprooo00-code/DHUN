@@ -73,7 +73,7 @@ android {
         // CI or local — share one signature so updates install cleanly.
         //
         // It is a PUBLIC throwaway test key (passwords 'android', repo is
-        // public, test builds only). Real release signing is Phase 14
+        // public, development/beta builds only). Real release signing is Phase 14
         // (see ROADMAP.md); .gitignore keeps real *.jks/*.keystore out.
         create("testBuild") {
             storeFile = file("keystores/dhun-test.p12")

@@ -1,3 +1,21 @@
+## 2026-11-01 — beta packaging exposed a stale desktop channel allowlist
+
+The first exact-head DHUN beta PR run (**41252469676**, commit `64fa454`) failed
+before packaging: both APK and MSI configuration rejected `dhunReleaseChannel=beta`.
+GitHub check annotations identified `app-desktop/build.gradle.kts` line 15 and its
+old `development, test, or public` requirement. The downstream Windows evidence
+job then had no `msi-install-check` artifact; that is a consequence, not an
+independent installer regression. The workflow correctly skipped publication.
+
+The desktop allowlist now matches Android (`development`, `beta`, `public`), and
+its package description distinguishes beta from development and fixed public
+builds. A source regression now checks both packagers so a future channel rename
+cannot leave one side stale. Local guards must pass again and a fresh exact-head
+hosted run must succeed before merge; the failed run is not counted as a pass.
+No release/tag was mutated by the PR run.
+
+---
+
 ## 2026-10-29 — browser result renders detached the composing Search target
 
 Controlled Node regressions: 7 failures / 19 cases before correction. Search
