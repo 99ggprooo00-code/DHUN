@@ -33,7 +33,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.window.Dialog
 import dev.dhun.core.PlaylistDetail
 import dev.dhun.core.Track
 import dev.dhun.design.DhunColors
@@ -45,19 +44,19 @@ import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.dhunContentRowSurface
 import dev.dhun.design.components.lyricsVeilBrush
 import dev.dhun.design.components.DhunButton
-import dev.dhun.design.components.DhunTextField
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.DhunOutlinedButton
 import dev.dhun.design.components.DhunTextButton
 import dev.dhun.design.components.EmptyView
 import dev.dhun.design.components.ErrorView
-import dev.dhun.design.components.GlassCard
 import dev.dhun.design.components.LoadingShimmer
 import dev.dhun.design.components.PageArtworkBackdrop
 import dev.dhun.presentation.browse.PlaylistUiState
 import dev.dhun.presentation.browse.PlaylistViewModel
 import dev.dhun.ui.components.ActionErrorBanner
 import dev.dhun.ui.components.DragHandleGrip
+import dev.dhun.ui.components.PlaylistDeleteDialog
+import dev.dhun.ui.components.PlaylistRenameDialog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import dev.dhun.ui.components.ReorderableList
@@ -191,7 +190,7 @@ fun PlaylistScreen(
         }
     }
     deletingName?.let { name ->
-        DeleteConfirmDialog(
+        PlaylistDeleteDialog(
             playlistName = name,
             isDeleting = deletion.isDeleting,
             errorMessage = deletion.errorMessage,
@@ -388,7 +387,7 @@ private fun LocalPlaylistContent(
     }
 
     if (showRename) {
-        RenameDialog(
+        PlaylistRenameDialog(
             current = title,
             isSaving = isRenaming,
             errorMessage = renameError,
@@ -500,103 +499,6 @@ private fun PlaylistHeader(
             it()
         }
         Spacer(modifier = Modifier.height(DhunSpacing.md))
-    }
-}
-
-@Composable
-private fun RenameDialog(
-    current: String,
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit,
-    isSaving: Boolean = false,
-    errorMessage: String? = null,
-) {
-    var name by remember(current) { mutableStateOf(current) }
-    Dialog(onDismissRequest = { if (!isSaving) onDismiss() }) {
-        GlassCard(
-            modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
-            shape = DhunShapes.large,
-            // A dialog floats over a dimmed page — the opaque base is what
-            // keeps the list underneath from reading through its text.
-            opaqueBase = true,
-        ) {
-            Column(modifier = Modifier.padding(DhunSpacing.lg)) {
-                Text(
-                    "Rename playlist",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = DhunColors.textPrimary,
-                )
-                Spacer(modifier = Modifier.height(DhunSpacing.md))
-                DhunTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    isError = errorMessage != null,
-                )
-                if (errorMessage != null) {
-                    Spacer(modifier = Modifier.height(DhunSpacing.xs))
-                    Text(
-                        text = errorMessage,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = DhunColors.error,
-                    )
-                }
-                Spacer(modifier = Modifier.height(DhunSpacing.md))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    DhunTextButton(onClick = onDismiss, enabled = !isSaving) { Text("Cancel") }
-                    Spacer(modifier = Modifier.weight(1f))
-                    DhunButton(
-                        onClick = { onConfirm(name) },
-                        enabled = name.isNotBlank() && !isSaving,
-                        loading = isSaving,
-                    ) { Text(if (errorMessage != null) "Try again" else "Save") }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DeleteConfirmDialog(
-    playlistName: String,
-    isDeleting: Boolean,
-    errorMessage: String?,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-) {
-    Dialog(onDismissRequest = onDismiss) {
-        GlassCard(
-            modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
-            shape = DhunShapes.large,
-            // A dialog floats over a dimmed page — the opaque base is what
-            // keeps the list underneath from reading through its text.
-            opaqueBase = true,
-        ) {
-            Column(modifier = Modifier.padding(DhunSpacing.lg)) {
-                Text(
-                    "Delete \"$playlistName\"?",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = DhunColors.textPrimary,
-                )
-                Spacer(modifier = Modifier.height(DhunSpacing.sm))
-                Text(
-                    "This removes the playlist from your local library. Songs, downloads, favorites and history are not deleted. Backups or device storage may retain copies; this is not secure erasure.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = DhunColors.textSecondary,
-                )
-                if (errorMessage != null) {
-                    Spacer(modifier = Modifier.height(DhunSpacing.sm))
-                    Text(errorMessage, style = MaterialTheme.typography.bodySmall, color = DhunColors.error)
-                }
-                Spacer(modifier = Modifier.height(DhunSpacing.md))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    DhunTextButton(onClick = onDismiss, enabled = !isDeleting) { Text("Cancel") }
-                    Spacer(modifier = Modifier.weight(1f))
-                    DhunButton(onClick = onConfirm, enabled = !isDeleting, loading = isDeleting) {
-                        Text(if (errorMessage == null) "Delete" else "Retry deletion")
-                    }
-                }
-            }
-        }
     }
 }
 

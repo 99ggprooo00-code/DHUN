@@ -25,6 +25,7 @@ import dev.dhun.presentation.browse.ArtistUiState
 import dev.dhun.presentation.browse.ArtistViewModel
 import dev.dhun.presentation.browse.PlaylistUiState
 import dev.dhun.presentation.browse.PlaylistViewModel
+import dev.dhun.presentation.library.LibraryViewModel
 import dev.dhun.provider.MusicProvider
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -463,6 +464,48 @@ class BrowseViewModelTest {
             assertEquals("Evening", (vm.state.value as PlaylistUiState.Local).playlist?.name)
         } finally {
             vm.close()
+        }
+    }
+
+    @Test
+    fun libraryRenameAndDeleteSynchronizeAnOpenPlaylistDetail(): Unit = runBlocking {
+        val d = DataLayer(DatabaseFactory.create(DatabaseDriverFactory.inMemory().createDriver()))
+        val created = d.playlists.create("Before")
+        d.playlists.addTrack(created.id, track("sync1"))
+        val detail = PlaylistViewModel(FakeBrowseProvider(), d.playlists, FakePlayer(), created.id, isLocal = true)
+        val libraryScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val library = LibraryViewModel(d.playlists, d.library, d.history, FakePlayer(), libraryScope)
+        try {
+            eventually {
+                (detail.state.value as? PlaylistUiState.Local)?.playlist?.name == "Before"
+            }
+
+            library.beginRenamePlaylist(created)
+            library.confirmRenamePlaylist("After")
+            eventually { library.renamingPlaylist.value == null }
+            eventually {
+                (detail.state.value as? PlaylistUiState.Local)?.playlist?.name == "After"
+            }
+            assertEquals(
+                "After",
+                (detail.state.value as PlaylistUiState.Local).playlist?.name,
+                "the open detail title must follow a Library-list rename",
+            )
+
+            library.beginDeletePlaylist(created)
+            library.confirmDeletePlaylist()
+            eventually { library.deletingPlaylist.value == null }
+            eventually {
+                val state = detail.state.value as? PlaylistUiState.Local
+                state?.playlist == null && state.tracks.isEmpty()
+            }
+            val state = detail.state.value as PlaylistUiState.Local
+            assertNull(state.playlist, "an externally deleted playlist must not remain as a saved detail")
+            assertEquals(0, state.tracks.size)
+            assertFalse(detail.deleted.value, "external deletion must not impersonate this screen's own delete action")
+        } finally {
+            detail.close()
+            libraryScope.cancel()
         }
     }
 }

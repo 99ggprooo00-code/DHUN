@@ -208,7 +208,10 @@ private const val DOWNLOAD_PAUSE_FAILED = "Could not pause that download. Try ag
 private const val DOWNLOAD_RESUME_FAILED = "Could not resume that download. Try again."
 private const val DOWNLOAD_CANCEL_FAILED = "Could not cancel that download. Try again."
 private const val DOWNLOAD_REMOVE_FAILED = "Could not delete that download. The file may still be on disk."
+private const val PLAYLIST_RENAME_KEY_PREFIX = "playlist-rename:"
+private const val PLAYLIST_DELETE_KEY_PREFIX = "playlist-delete:"
 private const val PLAYLIST_RENAME_FAILED = "Could not rename that playlist. Try again."
+private const val PLAYLIST_DELETE_FAILED = "Could not delete that playlist. Check the playlist and try again."
 private const val PLAYLIST_PLAY_FAILED = "Could not read that playlist to start playing it. Try again."
 private const val FAVORITE_FAILED = "Could not update Liked Songs. Try again."
 private const val HISTORY_REMOVE_FAILED = "Could not remove that play from history. Try again."
@@ -254,7 +257,7 @@ class LibraryViewModel(
     /**
      * Pending/failure state for the single-row mutations this screen runs
      * (history removal, like/unlike, download enqueue/pause/resume/cancel/remove,
-     * playlist rename). Before this existed each of them was a bare
+     * playlist rename/delete from the Library list). Before this existed each of them was a bare
      * `scope.launch { runCatching { … } }`: a failure changed nothing on screen
      * and said nothing, so the tap looked like it had worked when it had not.
      */
@@ -470,14 +473,111 @@ class LibraryViewModel(
     suspend fun createPlaylist(name: String, description: String? = null): LocalPlaylist =
         playlists.create(name, description)
 
-    fun renamePlaylist(id: String, newName: String) {
-        if (newName.isBlank()) return
-        mutations.run("playlist-rename:$id", PLAYLIST_RENAME_FAILED) { playlists.rename(id, newName) }
+    /**
+     * The playlist whose rename dialog is open, or null.
+     *
+     * The row menu sets it ([beginRenamePlaylist]); it is cleared only by a
+     * save that returned normally ([confirmRenamePlaylist]) or by the user
+     * cancelling. A failed write therefore leaves the dialog open with its
+     * inline error, and the Library still shows the stored name.
+     */
+    private val _renamingPlaylist = MutableStateFlow<LocalPlaylist?>(null)
+    val renamingPlaylist: StateFlow<LocalPlaylist?> = _renamingPlaylist.asStateFlow()
+
+    /** The playlist whose delete confirmation is open, or null. Same rule as above. */
+    private val _deletingPlaylist = MutableStateFlow<LocalPlaylist?>(null)
+    val deletingPlaylist: StateFlow<LocalPlaylist?> = _deletingPlaylist.asStateFlow()
+
+    /** Opens the rename dialog for [playlist]. */
+    fun beginRenamePlaylist(playlist: LocalPlaylist) {
+        _renamingPlaylist.value = playlist
     }
 
-    // No current UI caller. Keep failures and cancellation observable to the
-    // Library management stage rather than silently discarding them here.
-    suspend fun deletePlaylist(id: String) = playlists.delete(id)
+    /** Opens the delete confirmation for [playlist]. Nothing is deleted yet. */
+    fun beginDeletePlaylist(playlist: LocalPlaylist) {
+        _deletingPlaylist.value = playlist
+    }
+
+    /** Closes the rename dialog. A rename that is still running cannot be dismissed. */
+    fun cancelRenamePlaylist() {
+        val target = _renamingPlaylist.value ?: return
+        if (!mutations.state.value.isRunning(renameActionKey(target.id))) _renamingPlaylist.value = null
+    }
+
+    /** Closes the delete confirmation without deleting anything. */
+    fun cancelDeletePlaylist() {
+        val target = _deletingPlaylist.value ?: return
+        if (!mutations.state.value.isRunning(deleteActionKey(target.id))) _deletingPlaylist.value = null
+    }
+
+    /**
+     * Saves the name typed into the open rename dialog.
+     *
+     * The app's one name rule applies here too: a blank (or whitespace-only)
+     * name is refused, and re-saving the current name closes the dialog without
+     * a write. The dialog closes only when the store returned.
+     */
+    fun confirmRenamePlaylist(newName: String) {
+        val target = _renamingPlaylist.value ?: return
+        if (mutations.state.value.isRunning(renameActionKey(target.id))) return
+        val name = newName.trim()
+        if (name.isBlank()) return
+        if (name == target.name) {
+            _renamingPlaylist.value = null
+            return
+        }
+        renamePlaylist(target.id, name) { _renamingPlaylist.value = null }
+    }
+
+    /** Deletes the playlist the confirmation names, and closes it only on success. */
+    fun confirmDeletePlaylist() {
+        val target = _deletingPlaylist.value ?: return
+        deletePlaylist(target.id) { _deletingPlaylist.value = null }
+    }
+
+    /**
+     * Renames one saved playlist. Failures reach [mutation] under
+     * [renameActionKey], so the calling dialog shows its own error and the list
+     * keeps the stored name (both come from the same database row).
+     */
+    fun renamePlaylist(id: String, newName: String, onSuccess: (() -> Unit)? = null) {
+        val name = newName.trim()
+        if (name.isBlank()) return
+        mutations.run(renameActionKey(id), PLAYLIST_RENAME_FAILED, onSuccess = onSuccess) {
+            playlists.rename(id, name)
+        }
+    }
+
+    /**
+     * Deletes one saved playlist, with the same pending/failure contract as the
+     * other single-row actions. There is no optimistic UI removal: the row
+     * follows the observed database, while the confirmation closes only after
+     * the store returned.
+     */
+    fun deletePlaylist(id: String, onSuccess: (() -> Unit)? = null) {
+        mutations.run(deleteActionKey(id), PLAYLIST_DELETE_FAILED, onSuccess = onSuccess) {
+            playlists.delete(id)
+        }
+    }
+
+    /** Mutation key of the rename of [id] (the dialog reads its pending/error state). */
+    fun renameActionKey(id: String): String = "$PLAYLIST_RENAME_KEY_PREFIX$id"
+
+    /** Mutation key of the deletion of [id]. */
+    fun deleteActionKey(id: String): String = "$PLAYLIST_DELETE_KEY_PREFIX$id"
+
+    /**
+     * True when the open playlist dialog already reports the failure in
+     * [state] inline, so the screen banner must not repeat it. Every other
+     * single-row failure keeps going to the banner.
+     */
+    fun playlistDialogOwnsError(state: MutationState = mutations.state.value): Boolean {
+        val key = state.errorKey ?: return false
+        val renaming = _renamingPlaylist.value
+        if (renaming != null && key == renameActionKey(renaming.id)) return true
+        val deleting = _deletingPlaylist.value
+        return deleting != null && key == deleteActionKey(deleting.id)
+    }
 
     // ---- Favorite actions ----
     fun removeFavorite(trackId: String) {
