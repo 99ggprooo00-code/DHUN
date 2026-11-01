@@ -1702,6 +1702,13 @@ private fun PlayerBackdrop(
 
     val canBlur = supportsRealtimeBlur
     val blurPercent = DhunAppearance.backdropBlurPercent
+    // Blur off (slider at 0) or unavailable (Android below API 31) leaves the
+    // cover SHARP. The page backdrop answers that by fading its layer to
+    // [NowPlayingBackdropPolicy.loadedLayerAlpha] over the theme base; the
+    // player must answer identically, or a bright cover sits at full strength
+    // under the light "NOW PLAYING" caption (and a black letterbox bar under
+    // the dark caption in light mode). One policy, both surfaces.
+    val blurActive = canBlur && blurPercent > 0
 
     var prepared by remember {
         mutableStateOf(cacheKey.isNotBlank() && BlurredArtworkCache.isPrepared(cacheKey))
@@ -1715,7 +1722,7 @@ private fun PlayerBackdrop(
     var shown by remember { mutableStateOf(prepared) }
     LaunchedEffect(Unit) { shown = true }
     val backdropAlpha by animateFloatAsState(
-        targetValue = if (shown) 1f else 0f,
+        targetValue = if (shown) NowPlayingBackdropPolicy.loadedLayerAlpha(blurActive) else 0f,
         animationSpec = DhunAnimations.slowTween(),
         label = "backdropFade",
     )

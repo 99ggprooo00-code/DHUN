@@ -495,7 +495,7 @@ class VisualAppEvidenceTest {
             DhunThemeMode.DARK,
             width = 840,
             height = 393,
-            taps = listOf(355f to 357f),
+            taps = listOf(793f to 363f),
         ) { it.playerExpanded = true }
     }
 
