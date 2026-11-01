@@ -4,7 +4,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.FullPlayerLayoutMode
-import dev.dhun.design.fittedPlayerArtworkSize
+import dev.dhun.design.fittedPlayerArtworkBox
 import dev.dhun.design.fullPlayerLayoutMode
 import dev.dhun.design.playerWideControlsWidth
 import dev.dhun.design.usesCompactPlayerControls
@@ -18,8 +18,9 @@ import kotlin.test.assertTrue
 /**
  * Player chrome + Queue/Related sheet geometry, as pure logic.
  *
- * 1. the sharp artwork is sized by [fittedPlayerArtworkSize] and drawn `Fit`,
- *    so nothing is cropped by the *layout*;
+ * 1. the sharp artwork box is sized by [fittedPlayerArtworkBox] from the
+ *    measured field and the artwork's own aspect, so nothing is stretched or
+ *    cropped by the *layout*, and its feathered edges blend into the bleed;
  * 2. the sheet's height and the Full Player's rise are **the same measured
  *    number** ([relatedSheetTravel] from the safe-area height and the
  *    density-corrected [chromeHeightDp]), so one reversible
@@ -50,38 +51,58 @@ class PlayerSheetLayoutTest {
     /* -------- bug 1: fit-to-card artwork, both axes ---------------------- */
 
     @Test
-    fun heroArtworkUsesThePaddedFieldOnPhoneAndDesktopAndNeverOverflows() {
-        // (field width, field height) as measured inside the hero stage.
-        val fields = listOf(
-            328.dp to 380.dp, // 360dp phone after the 16dp side inset
-            361.dp to 520.dp, // 393dp phone: 91.9% of the safe content width
-            688.dp to 760.dp, // 720dp content column after the same inset
-            1_400.dp to 800.dp, // huge window: the token caps it
-            120.dp to 240.dp, // narrow pane
+    fun heroArtworkBoxFillsTheFieldWidthAndHonoursTheArtworkAspect() {
+        // (field width, field height, artwork aspect) as measured inside the
+        // hero stage. The 2026-11 contract: the box is the largest
+        // aspect-correct rectangle the field admits — full-bleed width for
+        // square and wide art, full height for tall art — never stretched,
+        // never cropped by the layout, never past the desktop ceiling.
+        val cases = listOf(
+            Triple(393.dp, 520.dp, 1f), // square cover on a phone
+            Triple(393.dp, 520.dp, 16f / 9f), // wide cover: full-width band
+            Triple(393.dp, 520.dp, 9f / 16f), // tall cover: full height, centred
+            Triple(1_400.dp, 800.dp, 1f), // huge window: the token caps it
+            Triple(120.dp, 240.dp, 1f), // narrow pane
         )
-        fields.forEach { (width, height) ->
-            val size = fittedPlayerArtworkSize(width, height)
-            assertTrue(size <= width, "hero $size must fit a $width field")
-            assertTrue(size <= height, "hero $size must fit a $height field")
-            assertTrue(size <= DhunSpacing.playerArtworkMaxSize)
-            assertEquals(minOf(width, height, DhunSpacing.playerArtworkMaxSize), size)
+        cases.forEach { (width, height, aspect) ->
+            val box = fittedPlayerArtworkBox(width, height, aspect)
+            assertTrue(box.width <= width, "hero ${box.width} must fit a $width field")
+            assertTrue(box.height <= height + 0.01.dp, "hero ${box.height} must fit a $height field")
+            assertTrue(box.width <= DhunSpacing.playerArtworkMaxSize)
+            assertClose(
+                aspect,
+                box.width.value / box.height.value,
+                tolerance = 0.01f,
+                message = "the box must keep the artwork's aspect",
+            )
         }
-        assertEquals(0.dp, fittedPlayerArtworkSize(320.dp, 0.dp), "no field, no artwork")
+        // Square art on a phone spans the whole stage width — the immersive
+        // full-bleed hero the feathered edges make possible.
+        assertEquals(393.dp, fittedPlayerArtworkBox(393.dp, 520.dp, 1f).width)
+        assertEquals(0.dp, fittedPlayerArtworkBox(320.dp, 0.dp, 1f).width, "no field, no artwork")
+        assertEquals(0.dp, fittedPlayerArtworkBox(320.dp, 0.dp, 1f).height, "no field, no artwork")
+        // A degenerate aspect falls back to square, never NaN/Infinity.
+        val degenerate = fittedPlayerArtworkBox(393.dp, 520.dp, Float.NaN)
+        assertEquals(degenerate.width, degenerate.height)
+        val negative = fittedPlayerArtworkBox(393.dp, 520.dp, -2f)
+        assertEquals(negative.width, negative.height)
     }
 
     @Test
-    fun portraitHeroKeepsTheCoverInTheRequestedWidthRange() {
-        val phoneWidths = listOf(360.dp, 393.dp)
-        phoneWidths.forEach { screenWidth ->
+    fun portraitHeroIsFullBleedAcrossTheStage() {
+        // The card frame is gone: the stage hands the hero its whole width and
+        // the feather blends the edges into the blurred bleed, so any side
+        // inset would re-create the floating-thumbnail look.
+        assertEquals(DhunSpacing.zero, DhunSpacing.playerArtworkHorizontalInset)
+        assertEquals(DhunSpacing.zero, DhunSpacing.playerArtworkVerticalInset)
+        assertEquals(DhunSpacing.zero, DhunSpacing.playerArtworkAnimationInset)
+        listOf(360.dp, 393.dp).forEach { screenWidth ->
             val stageWidth = screenWidth -
                 DhunSpacing.playerArtworkHorizontalInset * 2 -
                 DhunSpacing.playerArtworkAnimationInset * 2
-            val cover = fittedPlayerArtworkSize(stageWidth, 600.dp)
-            val fraction = cover.value / screenWidth.value
-            assertTrue(
-                fraction in 0.80f..0.92f,
-                "$cover should be 80–92% of a $screenWidth portrait player, was ${fraction * 100}%",
-            )
+            val box = fittedPlayerArtworkBox(stageWidth, 600.dp, 1f)
+            assertEquals(screenWidth, box.width, "square art must span a $screenWidth player")
+            assertTrue(box.height <= 600.dp, "the hero must stay inside its field")
         }
     }
 

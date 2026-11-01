@@ -62,12 +62,21 @@ class PlayerRenderingTest {
     }
 
     @Test
-    fun artworkConsumesItsMeasuredHeroFieldUntilTheDesktopCeiling() {
-        assertEquals(180.dp, fittedPlayerArtworkSize(1_400.dp, 180.dp))
-        assertEquals(280.dp, fittedPlayerArtworkSize(280.dp, 600.dp))
+    fun artworkBoxConsumesItsMeasuredHeroFieldUntilTheDesktopCeiling() {
+        // Square art: the box is a square capped by both axes and the token.
+        assertEquals(180.dp, fittedPlayerArtworkBox(1_400.dp, 180.dp, 1f).width)
+        assertEquals(280.dp, fittedPlayerArtworkBox(280.dp, 600.dp, 1f).width)
         assertEquals(640.dp, DhunSpacing.playerArtworkMaxSize, "desktop/tablet ceiling must stay intentionally large")
-        assertEquals(DhunSpacing.playerArtworkMaxSize, fittedPlayerArtworkSize(1_400.dp, 800.dp))
-        assertEquals(DhunSpacing.playerArtworkMaxSize, fittedPlayerArtworkSize(688.dp, 760.dp))
-        assertEquals(0.dp, fittedPlayerArtworkSize(800.dp, 0.dp))
+        assertEquals(DhunSpacing.playerArtworkMaxSize, fittedPlayerArtworkBox(1_400.dp, 800.dp, 1f).width)
+        assertEquals(DhunSpacing.playerArtworkMaxSize, fittedPlayerArtworkBox(688.dp, 760.dp, 1f).width)
+        assertEquals(0.dp, fittedPlayerArtworkBox(800.dp, 0.dp, 1f).width)
+        // Wide art on a phone: full-width band whose height follows the aspect.
+        val band = fittedPlayerArtworkBox(393.dp, 520.dp, 16f / 9f)
+        assertEquals(393.dp, band.width)
+        assertTrue(abs(band.height.value - 393f * 9f / 16f) <= 0.01f, "band height ${band.height} must follow 16:9")
+        // Tall art: height-limited, centred by the caller.
+        val tall = fittedPlayerArtworkBox(393.dp, 520.dp, 0.5f)
+        assertEquals(260.dp, tall.width)
+        assertEquals(520.dp, tall.height)
     }
 }

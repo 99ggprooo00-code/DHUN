@@ -7,6 +7,7 @@ import dev.dhun.core.DhunResult
 import dev.dhun.core.HomeFeedPage
 import dev.dhun.core.HomeSection
 import dev.dhun.core.Lyrics
+import dev.dhun.core.withProvider
 import dev.dhun.core.LyricsLine
 import dev.dhun.core.PlaylistDetail
 import dev.dhun.core.SearchResults
@@ -142,11 +143,13 @@ class LyricsRepositoryTest {
             val repo = LyricsRepository(cache, YouTubeLyricsSource(provider), lrcLib)
             val result = repo.getLyrics(track("t2"))
             assertTrue(result is DhunResult.Success)
-            assertEquals(ytmLyrics, result.value)
+            // Fetched lyrics carry the serving source's id, in the result
+            // and in the cache row written for them.
+            assertEquals(ytmLyrics.withProvider("ytm"), result.value)
             assertEquals(1, cache.getCalls)
             assertEquals(1, provider.getLyricsCalls)
             assertEquals(1, cache.putCalls)
-            assertEquals(ytmLyrics, cache.storage["t2"])
+            assertEquals(ytmLyrics.withProvider("ytm"), cache.storage["t2"])
         } finally {
             client.close()
         }
@@ -202,7 +205,7 @@ class LyricsRepositoryTest {
             val repo = LyricsRepository(cache, YouTubeLyricsSource(provider), lrcLib)
             val result = repo.getLyrics(track("t5"))
             assertTrue(result is DhunResult.Success)
-            assertEquals(ytmLyrics, result.value)
+            assertEquals(ytmLyrics.withProvider("ytm"), result.value)
         } finally {
             client.close()
         }

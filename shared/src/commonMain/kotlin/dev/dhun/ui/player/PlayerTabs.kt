@@ -51,6 +51,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import dev.dhun.core.Track
 import dev.dhun.data.PlayContext
@@ -70,6 +71,7 @@ import dev.dhun.design.components.DhunTonalButton
 import dev.dhun.design.components.EmptyView
 import dev.dhun.design.components.ErrorView
 import dev.dhun.design.components.LoadingShimmer
+import dev.dhun.design.components.fadeVerticalEdges
 import dev.dhun.lyrics.LyricsTiming
 import dev.dhun.presentation.player.LyricsUiState
 import dev.dhun.presentation.player.PlayerViewModel
@@ -419,6 +421,7 @@ internal fun LyricsTabContent(
     val savedTiming by viewModel.lyricsTiming.collectAsState()
     val positionMs by viewModel.positionMs.collectAsState()
     val currentTrack by viewModel.currentTrack.collectAsState()
+    val textSize by viewModel.lyricsTextSize.collectAsState()
     val track = currentTrack
     if (track == null) {
         EmptyView(
@@ -431,6 +434,23 @@ internal fun LyricsTabContent(
 
     val timing = savedTiming.takeIf { it.trackId == track.id } ?: LyricsTiming(track.id)
     Column(modifier = modifier.fillMaxSize()) {
+        // Attribution over the lyrics column: the source when it is known,
+        // and an honest "Not time-synced" note under it for plain text. Both
+        // are captions, never a chip pinned inside a card corner.
+        val captionProvider = when (val captionState = lyricsState) {
+            is LyricsUiState.Synced -> captionState.provider
+            is LyricsUiState.Unsynced -> captionState.provider
+            else -> null
+        }
+        if (lyricsState is LyricsUiState.Synced || lyricsState is LyricsUiState.Unsynced) {
+            LyricsAttributionCaption(
+                provider = captionProvider,
+                synced = lyricsState is LyricsUiState.Synced,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = DhunSpacing.sm, bottom = DhunSpacing.lyricsCaptionSpacing),
+            )
+        }
         val lyricsBodyModifier = Modifier.fillMaxWidth().weight(1f)
 
         // Scroll position and manual-follow preference belong to this track, not
@@ -481,31 +501,45 @@ internal fun LyricsTabContent(
                             modifier = lyricsBodyModifier,
                         )
                     } else {
+                        // Same presentation language as the synced list — centred,
+                        // stanza-spaced, feathered into the backdrop — with every
+                        // line primary because unsynced text has no sung line.
+                        val allLines = state.text.lines()
                         Column(
                             modifier = lyricsBodyModifier
+                                .fadeVerticalEdges(DhunSpacing.lyricsEdgeFeather)
                                 .verticalScroll(rememberScrollState())
-                                .padding(horizontal = DhunSpacing.xxl, vertical = DhunSpacing.md),
-                            verticalArrangement = Arrangement.spacedBy(DhunSpacing.md),
+                                .padding(horizontal = DhunSpacing.lyricsHorizontalPadding),
+                            verticalArrangement = Arrangement.spacedBy(DhunSpacing.lyricsGroupSpacing),
+                            horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            Text(
-                                text = "Not time-synced",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = DhunColors.textTertiary,
-                            )
-                            val plainLines = if (romanizationEnabled && state.text.lines().size <= 2_000) state.text.lines() else listOf(state.text)
-                            plainLines.forEachIndexed { index, original ->
-                                Text(
-                                    text = original,
-                                    style = when (viewModel.lyricsTextSize.collectAsState().value) {
-                                        "small" -> MaterialTheme.typography.bodyLarge
-                                        "large" -> MaterialTheme.typography.titleLarge
-                                        else -> MaterialTheme.typography.titleMedium
-                                    },
-                                    color = DhunColors.textSecondary,
-                                    lineHeight = DhunTypographyTokens.bodyRelaxed.lineHeight * 1.15f,
-                                )
-                                if (romanizationEnabled) romanized.line(track.id, index, original)?.let { secondary ->
-                                    Text(secondary, style = MaterialTheme.typography.bodyMedium, color = DhunColors.textTertiary)
+                            Spacer(modifier = Modifier.height(DhunSpacing.lg))
+                            lyricStanzaIndices(allLines).forEach { stanza ->
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(DhunSpacing.lyricsSecondarySpacing),
+                                ) {
+                                    stanza.forEach { index ->
+                                        val original = allLines[index]
+                                        Text(
+                                            text = original,
+                                            style = DhunTypographyTokens.lyricActiveStyle(textSize),
+                                            color = DhunColors.textPrimary,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.fillMaxWidth(),
+                                        )
+                                        if (romanizationEnabled) {
+                                            romanized.line(track.id, index, original)?.let { secondary ->
+                                                Text(
+                                                    secondary,
+                                                    style = DhunTypographyTokens.lyricSecondaryStyle(textSize),
+                                                    color = DhunColors.textTertiary,
+                                                    textAlign = TextAlign.Center,
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                             Spacer(modifier = Modifier.height(DhunSpacing.huge))
@@ -523,11 +557,53 @@ internal fun LyricsTabContent(
                     },
                     modifier = lyricsBodyModifier,
                     autoScroll = viewModel.lyricsAutoScroll.collectAsState().value,
-                    textSize = viewModel.lyricsTextSize.collectAsState().value,
+                    textSize = textSize,
                 )
             }
         }
     }
+}
+
+/**
+ * Centred attribution caption above the lyrics column ("Lyrics from YouTube
+ * Music"), with an honest sub-caption when the text carries no timing. Pure
+ * label mapping lives in [lyricsProviderCaption] so tests can pin the words.
+ */
+@Composable
+internal fun LyricsAttributionCaption(
+    provider: String?,
+    synced: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs),
+    ) {
+        Text(
+            text = lyricsProviderCaption(provider),
+            style = DhunTypographyTokens.lyricCaption,
+            color = DhunColors.textTertiary,
+            textAlign = TextAlign.Center,
+        )
+        if (!synced) {
+            Text(
+                text = "Not time-synced",
+                style = DhunTypographyTokens.lyricCaption,
+                color = DhunColors.textHint,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+/** Stable source ids → human names. Unknown/null providers say just "Lyrics": never invent a source. */
+internal fun lyricsProviderCaption(provider: String?): String = when (provider) {
+    "ytm" -> "Lyrics from YouTube Music"
+    "lrclib" -> "Lyrics from LRCLIB"
+    "lrclib_search" -> "Lyrics from LRCLIB search"
+    "kugou" -> "Lyrics from KuGou"
+    else -> "Lyrics"
 }
 
 private val lyricsProviderOptions = listOf(

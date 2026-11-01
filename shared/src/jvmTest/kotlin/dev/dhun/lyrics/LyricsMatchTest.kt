@@ -3,6 +3,7 @@ package dev.dhun.lyrics
 import dev.dhun.core.DhunError
 import dev.dhun.core.DhunResult
 import dev.dhun.core.Lyrics
+import dev.dhun.core.withProvider
 import dev.dhun.core.Track
 import dev.dhun.data.LyricsCacheRepository
 import dev.dhun.data.SettingsKeys
@@ -104,7 +105,7 @@ class LyricsMatchTest {
         runCurrent()
         assertEquals(preview, repo.selectedMatch(track.id))
         val reopened = LyricsRepository(Cache(), source, source, settings)
-        assertEquals(DhunResult.Success(preview.lyrics), reopened.getLyrics(track))
+        assertEquals(DhunResult.Success(preview.lyrics.withProvider(preview.provider)), reopened.getLyrics(track))
         assertEquals(0, source.calls)
         val line = (preview.lyrics as Lyrics.Synced).lines.single()
         assertEquals(5_000L, line.endTimeMs)
@@ -218,7 +219,8 @@ class LyricsMatchTest {
         repo.clearCache()
         val reopened = LyricsRepository(cache, source, source, settings, source)
         assertEquals(match, reopened.selectedMatch(track.id))
-        assertEquals(DhunResult.Success(timed), reopened.getLyrics(track))
+        // A saved choice attributes its lyrics to the chosen provider.
+        assertEquals(DhunResult.Success(timed.withProvider(match.provider)), reopened.getLyrics(track))
         assertEquals(0, source.calls)
         assertNull(reopened.selectedMatch("another-song"))
         reopened.resetMatch(track.id)
@@ -237,7 +239,7 @@ class LyricsMatchTest {
         val failed = Source { throw IllegalStateException("offline") }
         val settings = store("ytm", "lrclib", "lrclib_search", "kugou")
         val repo = LyricsRepository(Cache(), plain, synced, settings, candidates, failed)
-        assertEquals(DhunResult.Success(timed), repo.getLyrics(track))
+        assertEquals(DhunResult.Success(timed.withProvider("lrclib")), repo.getLyrics(track))
         assertEquals(0, candidates.fetchCalls)
         assertEquals(0, failed.calls)
         val result = repo.searchMatches(track, "manual query")
@@ -251,7 +253,7 @@ class LyricsMatchTest {
         val slow = Source { delay(10_000); DhunResult.Success(timed) }
         val fallback = Source { DhunResult.Success(Lyrics.Unsynced("fallback")) }
         val repo = LyricsRepository(Cache(), slow, fallback, store("ytm", "lrclib"), providerTimeoutMs = 100)
-        assertEquals(DhunResult.Success(Lyrics.Unsynced("fallback")), repo.getLyrics(track))
+        assertEquals(DhunResult.Success(Lyrics.Unsynced("fallback", "lrclib")), repo.getLyrics(track))
         assertEquals(100L, testScheduler.currentTime)
         val pending = async { repo.searchMatches(track, "query") }
         runCurrent()
@@ -276,7 +278,7 @@ class LyricsMatchTest {
         settings.putString(SettingsKeys.lyricsMatchKey(track.id), "{invalid json")
         val source = Source { DhunResult.Success(timed) }
         val repo = LyricsRepository(Cache(), source, source, settings, source)
-        assertEquals(DhunResult.Success(timed), repo.getLyrics(track))
+        assertEquals(DhunResult.Success(timed.withProvider("ytm")), repo.getLyrics(track))
         assertFailsWith<IllegalArgumentException> { repo.selectMatch(track.id, match.copy(provider = "unknown")) }
         assertFailsWith<IllegalArgumentException> {
             repo.selectMatch(track.id, match.copy(lyrics = Lyrics.Unsynced("x".repeat(600_000))))

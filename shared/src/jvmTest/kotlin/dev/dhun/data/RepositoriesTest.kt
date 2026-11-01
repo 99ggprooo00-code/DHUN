@@ -5,6 +5,7 @@ import dev.dhun.core.DownloadState
 import dev.dhun.core.RepeatMode
 import dev.dhun.core.Track
 import dev.dhun.database.DhunDatabase
+import dev.dhun.core.withProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -351,7 +352,7 @@ class RepositoriesTest {
         val reopened = dev.dhun.lyrics.LyricsRepository(cache, source, source,
             SqlDelightSettingsRepository(db, Dispatchers.Unconfined))
         assertEquals(match, reopened.selectedMatch("song"))
-        assertEquals(dev.dhun.core.DhunResult.Success(match.lyrics), reopened.getLyrics(dev.dhun.core.Track("song", "Song", "Artist")))
+        assertEquals(dev.dhun.core.DhunResult.Success(match.lyrics.withProvider(match.provider)), reopened.getLyrics(dev.dhun.core.Track("song", "Song", "Artist")))
     }
 
     @Test
@@ -383,9 +384,9 @@ class RepositoriesTest {
         assertEquals(lyrics, reopened.get("ttml"))
         assertEquals(lyrics, reopened.observe("ttml").first())
         // Historical line/enhanced LRC cache rows need no migration.
-        db.lyricsCacheQueries.insert("old", true, "[00:01]<00:01>old<00:02>", 1L)
+        db.lyricsCacheQueries.insert("old", true, "[00:01]<00:01>old<00:02>", 1L, null)
         assertEquals(dev.dhun.core.Lyrics.Synced(dev.dhun.lyrics.LrcParser.parse("[00:01]<00:01>old<00:02>")), reopened.get("old"))
-        db.lyricsCacheQueries.insert("corrupt", true, "{broken-json", 1L)
+        db.lyricsCacheQueries.insert("corrupt", true, "{broken-json", 1L, null)
         assertEquals(dev.dhun.core.Lyrics.NotAvailable, reopened.get("corrupt"))
         val source = object : dev.dhun.lyrics.LyricsSource {
             override suspend fun fetch(track: dev.dhun.core.Track) = dev.dhun.core.DhunResult.Success(dev.dhun.core.Lyrics.NotAvailable)
@@ -452,8 +453,24 @@ class RepositoriesTest {
     /* ---------------- Schema ---------------- */
 
     @Test
-    fun schemaVersionIsThree() {
-        // v1 base + 1.sqm (LyricsCache) → 2 + 2.sqm (DownloadedTrack) → 3.
-        assertEquals(3L, DhunDatabase.Schema.version)
+    fun schemaVersionIsFour() {
+        // v1 base + 1.sqm (LyricsCache) → 2 + 2.sqm (DownloadedTrack) → 3 +
+        // 3.sqm (LyricsCache.provider attribution) → 4.
+        assertEquals(4L, DhunDatabase.Schema.version)
+    }
+
+    @Test
+    fun lyricsProviderAttributionSurvivesTheCache(): Unit = runBlocking {
+        val db = newDb()
+        val cache = SqlDelightLyricsCacheRepository(db, FakeClock(), Dispatchers.Unconfined)
+        cache.put("p1", dev.dhun.core.Lyrics.Unsynced("plain words", "ytm"))
+        assertEquals("ytm", (cache.get("p1") as dev.dhun.core.Lyrics.Unsynced).provider)
+        cache.put("p2", dev.dhun.core.Lyrics.Synced(dev.dhun.lyrics.LrcParser.parse("[00:01]line"), "lrclib"))
+        assertEquals("lrclib", (cache.get("p2") as dev.dhun.core.Lyrics.Synced).provider)
+        assertEquals("lrclib", cache.observe("p2").first()?.let { (it as dev.dhun.core.Lyrics.Synced).provider })
+        // Rows written before attribution (schema v3) read back unattributed:
+        // the caption then says "Lyrics" instead of inventing a source.
+        db.lyricsCacheQueries.insert("old", false, "legacy row", 1L, null)
+        assertNull((cache.get("old") as dev.dhun.core.Lyrics.Unsynced).provider)
     }
 }

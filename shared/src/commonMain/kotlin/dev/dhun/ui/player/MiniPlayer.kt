@@ -212,7 +212,10 @@ fun MiniPlayer(
                             DhunIconView(
                                 icon = DhunIcon.SkipPrevious,
                                 contentDescription = null,
-                                modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                                // Same glyph size as Next: one transport row,
+                                // one icon scale (the old 18dp vs 24dp mismatch
+                                // made the pair look misaligned).
+                                modifier = Modifier.size(DhunSpacing.iconSize),
                                 tint = DhunColors.textSecondary,
                             )
                         }

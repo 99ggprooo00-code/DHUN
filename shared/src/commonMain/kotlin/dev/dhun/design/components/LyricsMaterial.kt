@@ -92,6 +92,33 @@ object LyricsMaterialPolicy {
      */
     const val BLUR_SCALE = 2
 
+    /**
+     * Open (card-less) lyrics veil, top → middle → bottom. The 2026-11 lyrics
+     * pass retired the rounded lyrics card: lines now sit directly on the
+     * player's once-blurred bleed, which already carries a lyrics-mode dim.
+     * This veil is only the *readability* top-up — a soft band behind the
+     * centred column, lightest at the extremes so the first/last lines and the
+     * attribution caption fade into the backdrop instead of hitting a frame.
+     */
+    const val OPEN_LYRICS_VEIL_TOP = 0.10f
+    const val OPEN_LYRICS_VEIL_MID = 0.24f
+    const val OPEN_LYRICS_VEIL_BOTTOM = 0.16f
+
+    fun openLyricsVeilStops(): List<Pair<Float, Float>> = listOf(
+        0f to OPEN_LYRICS_VEIL_TOP,
+        0.5f to OPEN_LYRICS_VEIL_MID,
+        1f to OPEN_LYRICS_VEIL_BOTTOM,
+    )
+
+    /**
+     * Frosted highlight behind the sung line. Two layers, both whisper-level:
+     * a theme-background base lifts contrast on bright artwork, a white frost
+     * reads as glass on dark artwork. Applied to a pill clipped around the
+     * line's own wrapped width — a frame for the words, not a panel.
+     */
+    const val ACTIVE_HIGHLIGHT_BASE = 0.22f
+    const val ACTIVE_HIGHLIGHT_FROST = 0.10f
+
     fun lyricsVeilStops(): List<Pair<Float, Float>> = listOf(
         0f to LYRICS_VEIL_TOP,
         1f to LYRICS_VEIL_BOTTOM,
@@ -141,6 +168,44 @@ fun lyricsVeilBrush(part: VisualPart? = null): Brush = Brush.verticalGradient(
 @Composable
 fun Modifier.lyricsVeil(shape: Shape = RectangleShape, part: VisualPart? = null): Modifier =
     background(lyricsVeilBrush(part), shape)
+
+/**
+ * Readability veil for the card-less lyrics overlay: the player backdrop is
+ * already blurred and dimmed, so this only tops up contrast behind the
+ * centred line column (see [LyricsMaterialPolicy.openLyricsVeilStops]).
+ */
+@Composable
+fun openLyricsVeilBrush(part: VisualPart = VisualPart.LYRICS): Brush = Brush.verticalGradient(
+    colorStops = LyricsMaterialPolicy.openLyricsVeilStops()
+        .map { (offset, alpha) ->
+            offset to DhunColors.background.copy(alpha = DhunVisualTuning.veilAlpha(part, alpha))
+        }
+        .toTypedArray(),
+)
+
+/**
+ * Frosted pill behind the sung lyric line: a theme-background base for
+ * contrast over bright artwork, then a milky horizontal frost that tapers to
+ * nothing at both ends so the highlight hugs the words instead of reading as
+ * a slab. Clipped by the caller to [DhunShapes.large] around the wrapped line.
+ */
+@Composable
+fun lyricsActiveHighlightBrush(): Brush = Brush.horizontalGradient(
+    colorStops = arrayOf(
+        0f to Color.White.copy(alpha = 0f),
+        0.18f to Color.White.copy(alpha = LyricsMaterialPolicy.ACTIVE_HIGHLIGHT_FROST),
+        0.82f to Color.White.copy(alpha = LyricsMaterialPolicy.ACTIVE_HIGHLIGHT_FROST),
+        1f to Color.White.copy(alpha = 0f),
+    ),
+)
+
+/** The contrast base under [lyricsActiveHighlightBrush], as a modifier layer. */
+@Composable
+fun Modifier.lyricsActiveHighlightBase(shape: Shape = RectangleShape): Modifier =
+    background(
+        DhunColors.background.copy(alpha = LyricsMaterialPolicy.ACTIVE_HIGHLIGHT_BASE),
+        shape,
+    )
 
 /**
  * Mini-player acrylic: a theme-aware veil lighter than the lyrics card;
