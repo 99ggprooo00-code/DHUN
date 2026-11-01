@@ -351,7 +351,7 @@ class RepositoriesTest {
         val reopened = dev.dhun.lyrics.LyricsRepository(cache, source, source,
             SqlDelightSettingsRepository(db, Dispatchers.Unconfined))
         assertEquals(match, reopened.selectedMatch("song"))
-        assertEquals(dev.dhun.core.DhunResult.Success(match.lyrics.withProvider(match.provider)), reopened.getLyrics(dev.dhun.core.Track("song", "Song", "Artist")))
+        assertEquals(dev.dhun.core.DhunResult.Success(dev.dhun.core.withProvider(match.lyrics, match.provider)), reopened.getLyrics(dev.dhun.core.Track("song", "Song", "Artist")))
     }
 
     @Test
