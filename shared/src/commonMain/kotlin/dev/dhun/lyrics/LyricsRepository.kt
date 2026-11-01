@@ -3,6 +3,7 @@ package dev.dhun.lyrics
 import dev.dhun.core.DhunResult
 import dev.dhun.core.Lyrics
 import dev.dhun.core.Track
+import dev.dhun.core.withProvider
 import dev.dhun.data.LyricsCacheRepository
 import dev.dhun.data.SettingsKeys
 import dev.dhun.data.SettingsRepository
