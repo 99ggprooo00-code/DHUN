@@ -1,3 +1,4 @@
+import org.jetbrains.compose.ExperimentalComposeLibrary
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
@@ -11,8 +12,8 @@ plugins {
 // Rolling CI supplies a strictly increasing value, including workflow reruns.
 val installerVersion = providers.gradleProperty("dhunInstallerVersion").getOrElse("1.0.6")
 val dhunReleaseChannel = providers.gradleProperty("dhunReleaseChannel").getOrElse("development")
-require(dhunReleaseChannel in setOf("development", "test", "public")) {
-    "dhunReleaseChannel must be development, test, or public"
+require(dhunReleaseChannel in setOf("development", "beta", "public")) {
+    "dhunReleaseChannel must be development, beta, or public"
 }
 val installerParts = installerVersion.split('.').map { it.toIntOrNull() ?: -1 }
 require(installerParts.size == 3 &&
@@ -51,6 +52,10 @@ kotlin {
         val jvmTest by getting {
             dependencies {
                 implementation(kotlin("test"))
+                // Headless Compose semantics and geometry checks.
+                // Test-only: no UI-test runtime is packaged into DHUN.
+                @OptIn(ExperimentalComposeLibrary::class)
+                implementation(compose.uiTest)
             }
         }
     }
@@ -71,7 +76,7 @@ compose.desktop {
             // StackOverflow cases with H2/sqlite on Compose Desktop required
             // explicit java.sql or includeAllModules. Keep both: explicit list
             // documents the minimum, includeAllModules guarantees launch even
-            // if the list drifts (size cost acceptable for test builds). Run
+            // if the list drifts (size cost acceptable for beta builds). Run
             // :app-desktop:suggestModules on a full JDK to tighten later.
             modules(
                 "java.sql",
@@ -88,7 +93,11 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "DHUN"
             // Product direction is multi-source; this native build currently uses YouTube Music.
-            description = if (dhunReleaseChannel == "public") "DHUN - multi-source music client" else "DHUN - multi-source music client (test build)"
+            description = when (dhunReleaseChannel) {
+                "public" -> "DHUN - multi-source music client"
+                "beta" -> "DHUN - multi-source music client (beta build)"
+                else -> "DHUN - multi-source music client (development build)"
+            }
             vendor = "DHUN"
             copyright = "© DHUN contributors. GPL-3.0."
             packageVersion = installerVersion
@@ -100,8 +109,8 @@ compose.desktop {
                 perUserInstall = true
                 dirChooser = false
                 menuGroup = "DHUN"
-                // Stable across every test/release MSI. Changing it orphans
-                // the previous install in Apps & Features.
+                // Stable across every beta/fixed-release MSI. Changing it
+                // orphans the previous install in Apps & Features.
                 upgradeUuid = "31ddb86b-9666-4071-b11c-45f16fa4682d"
             }
         }

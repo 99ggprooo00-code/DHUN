@@ -19,12 +19,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -66,6 +62,9 @@ import dev.dhun.design.components.dhunContentRowSurface
 import dev.dhun.design.components.DhunAssistChip
 import dev.dhun.design.components.DhunFilterChip
 import dev.dhun.design.components.DhunHorizontalRail
+import dev.dhun.design.components.DhunPullToRefresh
+import dev.dhun.design.components.DhunSpinner
+import dev.dhun.design.components.DhunTextButton
 import dev.dhun.design.components.EmptyView
 import dev.dhun.design.components.ErrorView
 import dev.dhun.design.components.LoadingShimmer
@@ -84,7 +83,7 @@ import dev.dhun.ui.components.TrackDownloadRowActions
 import kotlinx.coroutines.delay
 
 /**
- * Home — Material 3, deep scroll (not a 3-row stub).
+ * Home — DHUN glass, deep scroll (not a 3-row stub).
  *
  * Layout top → bottom:
  * 1. Brand + greeting
@@ -100,7 +99,6 @@ import kotlinx.coroutines.delay
  *
  * Typography is clean sans only; brand wordmark uses [DhunTypographyTokens.brand].
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
@@ -167,7 +165,7 @@ fun HomeScreen(
                 )
             }
         }
-        PullToRefreshBox(
+        DhunPullToRefresh(
             isRefreshing = isRefreshing,
             onRefresh = viewModel::refresh,
             modifier = Modifier.fillMaxWidth().weight(1f),
@@ -484,7 +482,7 @@ private fun HomeFeedContent(
             ) {
                 when {
                     isLoadingMore -> {
-                        CircularProgressIndicator(
+                        DhunSpinner(
                             modifier = Modifier.size(DhunSpacing.iconSizeSm),
                             strokeWidth = DhunSpacing.iconStroke,
                             color = DhunColors.accent,
@@ -493,15 +491,15 @@ private fun HomeFeedContent(
                     }
                     loadMoreError != null -> {
                         Text(loadMoreError, color = DhunColors.textSecondary)
-                        TextButton(onClick = onRetryMore, enabled = !isRefreshing) { Text("Retry loading more") }
+                        DhunTextButton(onClick = onRetryMore, enabled = !isRefreshing) { Text("Retry loading more") }
                     }
-                    canLoadMore -> TextButton(onClick = onLoadMore, enabled = !isRefreshing) { Text("Load more music") }
+                    canLoadMore -> DhunTextButton(onClick = onLoadMore, enabled = !isRefreshing) { Text("Load more music") }
                     else -> {
                         Text("You're all caught up", color = DhunColors.textTertiary)
                     }
                 }
                 // Mouse/keyboard/accessibility fallback; no header refresh icon.
-                TextButton(onClick = onRefresh, enabled = !isRefreshing) { Text("Refresh music") }
+                DhunTextButton(onClick = onRefresh, enabled = !isRefreshing) { Text("Refresh music") }
             }
         }
     }

@@ -7,12 +7,12 @@ import kotlin.test.assertTrue
 class DhunAppInfoTest {
 
     @Test
-    fun `only the explicit test release channel unlocks test-only surfaces`() {
-        assertTrue(appInfo(DhunAppInfo.TEST_RELEASE_CHANNEL).isTestRelease)
-        assertTrue(appInfo("Test Release").isTestRelease)
-        assertFalse(appInfo("public pre-release").isTestRelease)
-        assertFalse(appInfo("debug build").isTestRelease)
-        assertFalse(DhunAppInfo.Unknown.isTestRelease)
+    fun `only the explicit beta release channel unlocks test-only surfaces`() {
+        assertTrue(appInfo(DhunAppInfo.BETA_RELEASE_CHANNEL).isBetaRelease)
+        assertTrue(appInfo("Beta Release").isBetaRelease)
+        assertFalse(appInfo("public pre-release").isBetaRelease)
+        assertFalse(appInfo("debug build").isBetaRelease)
+        assertFalse(DhunAppInfo.Unknown.isBetaRelease)
     }
 
     private fun appInfo(channel: String) = DhunAppInfo(

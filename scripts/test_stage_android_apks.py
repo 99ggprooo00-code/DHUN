@@ -1,4 +1,4 @@
-"""Contract for the three-APK staging step the test-release apk job runs."""
+"""Contract for the three-APK staging step the beta-release apk job runs."""
 
 import hashlib
 import io
@@ -22,7 +22,7 @@ class StageAndroidApksTest(unittest.TestCase):
         )
         self.assertEqual(
             [published for _, _, published in GLOBS],
-            ["dhun-test.apk", "dhun-test-arm64-v8a.apk", "dhun-test-armeabi-v7a.apk"],
+            ["dhun-beta.apk", "dhun-beta-arm64-v8a.apk", "dhun-beta-armeabi-v7a.apk"],
         )
 
     def test_exactly_one_match_per_glob_is_copied_and_identical_bytes_are_reported(self):
@@ -39,7 +39,7 @@ class StageAndroidApksTest(unittest.TestCase):
             staged = stage_android_apks(src, out)
 
             self.assertEqual([item.published_name for item in staged], [
-                "dhun-test.apk", "dhun-test-arm64-v8a.apk", "dhun-test-armeabi-v7a.apk",
+                "dhun-beta.apk", "dhun-beta-arm64-v8a.apk", "dhun-beta-armeabi-v7a.apk",
             ])
             expected = hashlib.sha256(payload).hexdigest()
             for item in staged:
@@ -49,7 +49,7 @@ class StageAndroidApksTest(unittest.TestCase):
                 self.assertEqual(item.size, len(payload))
             report = format_report(staged)
             self.assertIn("IDENTICAL to universal", report)
-            self.assertIn("dhun-test.apk <= app-android-universal-debug.apk", report)
+            self.assertIn("dhun-beta.apk <= app-android-universal-debug.apk", report)
             self.assertNotIn("DIFFERS from universal", report)
 
     def test_a_byte_difference_is_reported_and_does_not_fail_staging(self):
@@ -68,7 +68,7 @@ class StageAndroidApksTest(unittest.TestCase):
             self.assertFalse(by_role["arm64-v8a"].identical_to_universal)
             self.assertTrue(by_role["armeabi-v7a"].identical_to_universal)
             report = format_report(staged)
-            self.assertIn("dhun-test-arm64-v8a.apk <= app-arm64-v8a-debug.apk", report)
+            self.assertIn("dhun-beta-arm64-v8a.apk <= app-arm64-v8a-debug.apk", report)
             self.assertIn("DIFFERS from universal", report)
 
     def test_zero_or_two_matches_names_the_glob_and_the_directory(self):

@@ -49,10 +49,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -118,6 +115,8 @@ import dev.dhun.design.DhunVisualTuning
 import dev.dhun.design.VisualPart
 import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.DhunIconButton
+import dev.dhun.design.components.DhunSlider
+import dev.dhun.design.components.DhunTextButton
 import dev.dhun.design.components.dhunMouseDragScroll
 import dev.dhun.design.components.LyricsArtworkSheet
 import dev.dhun.design.components.NowPlayingBackdropPolicy
@@ -718,10 +717,10 @@ private fun PlayerControlCluster(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(onClick = { onShowErrorDetails() }) {
+                DhunTextButton(onClick = { onShowErrorDetails() }) {
                     Text("Details", color = DhunColors.textPrimary)
                 }
-                TextButton(onClick = viewModel::retry) {
+                DhunTextButton(onClick = viewModel::retry) {
                     Text("Retry", color = DhunColors.error)
                 }
             }
@@ -885,16 +884,13 @@ private fun PlayerControlCluster(
                 tint = DhunColors.textSecondary,
             )
             Spacer(modifier = Modifier.width(DhunSpacing.sm))
-            Slider(
+            DhunSlider(
                 value = volume.coerceIn(0f, 1f),
                 onValueChange = viewModel::setVolume,
                 valueRange = 0f..1f,
                 modifier = Modifier.weight(1f).semantics { contentDescription = if (isDesktop) "In-app volume" else "Media volume" },
-                colors = SliderDefaults.colors(
-                    thumbColor = accent,
-                    activeTrackColor = accent.copy(alpha = 0.85f),
-                    inactiveTrackColor = DhunColors.border,
-                ),
+                accent = accent,
+                inactiveTrackColor = DhunColors.border,
             )
             Spacer(modifier = Modifier.width(DhunSpacing.sm))
             Text(
@@ -2169,7 +2165,9 @@ private fun PanelTabRow(
         listOf(1 to "Queue", 2 to "Related").forEach { (index, title) ->
             val selected = index == selectedTab
             val color by animateColorAsState(
-                targetValue = if (selected) accent else DhunColors.textTertiary,
+                // Accent stays in the pill/underline. Small text uses the
+                // readable theme roles over the artwork-veiled sheet.
+                targetValue = if (selected) DhunColors.textPrimary else DhunColors.textSecondary,
                 animationSpec = DhunAnimations.fastTween(),
                 label = "panelTabColor$index",
             )

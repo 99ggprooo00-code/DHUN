@@ -1,284 +1,287 @@
-# DHUN glass system — the visual source of truth
+# DHUN glass system — native visual source of truth
 
-Status: **authoritative for native UI** (`shared/src/commonMain/kotlin/dev/dhun/ui`,
-`app-android`, `app-desktop`). If any other document, older session note, task
-prompt or comment disagrees with this page about how a surface looks, **this
-page wins** and the other text should be corrected (see §7).
+**Status: authoritative for the native UI on 2026-10-31.** This page governs
+`shared/src/commonMain/kotlin/dev/dhun/ui`, `shared/src/commonMain/kotlin/dev/dhun/design`,
+`app-android`, and `app-desktop`. Other active documents may explain product
+flows, but must defer to this page for appearance, components, background
+preferences, accessibility, and fallback behavior. Dated verification reports
+and changelogs describe their own branches; they are not permission to restore
+an old visual model.
 
-DHUN is a **premium translucent frosted-glass** interface: artwork-led,
-dark-first, layered, with soft blur behind sharp content. Material 3 is an
-**implementation detail**, never the look. A screen that renders stock Material
-3 is a defect, exactly like a broken button.
+DHUN has its own **translucent frosted-glass identity**: artwork-led,
+dark-first, quiet and immersive, with an independently designed light mode.
+The Compose toolkit is an implementation mechanism, not the product's visual
+identity. Stock toolkit appearance must not reach a shipped screen when a DHUN
+component owns that role.
+
+This is a source specification, not a claim of visual acceptance. No emulator,
+physical phone, or interactive desktop display was available for this stage.
 
 ---
 
-## 1. The one rule
+## 1. Preserve the product while changing the paint
 
-> Every surface that visually belongs to DHUN is painted with the glass
-> material in `design/components/`, composited over artwork. A flat opaque fill,
-> a Material `Card`/`Surface`/`AlertDialog`, a default `OutlinedTextField`, or a
-> `background(DhunColors.surface)` panel is drift, not a shortcut.
+Visual work must not silently redesign the app.
 
-"Glassy" means **all four** of these are present, not a variable called `glass`:
+- Keep Home, Search, and Library as the primary tabs. Keep the existing detail,
+  Settings, player, queue, lyrics, and Related navigation and back order.
+- Preserve control locations, information hierarchy, action names, callbacks,
+  pending/error behavior, and data ownership unless a separate functional
+  change explicitly requires otherwise.
+- A visual commit must not change transport, seeking, queue mutation or
+  reordering, lyrics selection/import, settings persistence, downloads, or
+  playlist transactions.
+- Use shared tokens and policies. Do not scatter one-off colors, radii, opacity
+  values, or control metrics through screens.
 
-| Cue | Where it lives | Why it matters |
+## 2. The layer model — not everything is a glass card
+
+DHUN uses several deliberate surface classes. Choosing the quiet one is part of
+the design; adding frost, blur, gradients, and shadows everywhere is incorrect.
+
+### A. Theme base and page artwork
+
+`NowPlayingBackdrop` / `PageArtworkBackdrop` paints the current track's
+list-tier artwork behind a page, with overscan and one theme-aware veil. The
+base theme remains visible when artwork is absent, loading, or fails. Artwork
+alpha and veil alpha fade together; a failed request must not leave a stale
+veil or grey placeholder slab.
+
+The page backdrop is one atmospheric layer. Do not add another full-screen
+bloom, scrim, or independently loading copy of the same cover in each screen.
+
+### B. Quiet content and reading surfaces
+
+`Modifier.dhunContentRowSurface()` and
+`Modifier.dhunContentSurface(reading = true)` provide stable tonal fills for
+lists, forms, and reading groups. They intentionally do **not** blur every row
+or paint a heavy specular treatment on every item.
+
+Default fill opacity in `ContentSurfacePolicy` is:
+
+| Surface | Dark | Light |
+| --- | ---: | ---: |
+| Ordinary content | 0.82 | 0.83 |
+| Reading content | 0.88 | 0.89 |
+
+Test-channel visual tuning may adjust values only through its existing clamped
+policy; it is not a second product theme. Production defaults remain the design
+baseline.
+
+### C. Glass cards and dialogs
+
+`GlassCard` owns the readable panel recipe:
+
+1. optional restrained shadow;
+2. clipped shape and directional hairline edge;
+3. a three-stop body gradient;
+4. an optional capped semantic tint;
+5. a top sheen which fades before mid-panel;
+6. sharp content above all paint.
+
+`GlassDialog` uses the same recipe at a high-opacity floor. It does **not** take
+an artwork URL and does not pretend to frost artwork itself. Artwork-bearing
+menus and sheets use the materials in §2D instead.
+
+`GlassCard.blurRadius` is retained only for call-site compatibility. Passing it
+does not blur a card; do not add new call sites that rely on it. Blur belongs to
+an artwork layer behind sharp content.
+
+### D. Artwork-backed player, queue, dock, and menus
+
+Use the existing material that matches the surface:
+
+- `LyricsMaterial` for lyrics/Related content and `TrackMenuSurface` menus;
+- `LyricsArtworkSheet` for the raised Queue/Related sheet, whose opaque base is
+  an intentional readability floor;
+- `AcrylicSurface` for a floating mini-player;
+- `GlassDock` for the phone's continuous mini-player/navigation dock, so the
+  artwork layer is shared rather than decoded once per child band;
+- `lyricsVeil` / `acrylicGlass` only where the caller already owns the correct
+  artwork layer.
+
+These surfaces keep artwork behind the veil and content sharp. They are not a
+licence to put an image and blur inside every settings row or music row.
+
+### E. Navigation and small controls
+
+`DhunNavigationBar` and `DhunNavigationRail` own the container, full-cell tab
+semantics, label, and translucent selected pill. The pill has a stronger rim
+than its fill and independently tuned light/dark alpha values. The rail width
+must remain identical to `DhunShellPolicy.railAllowance(true)`; changing one
+without the other breaks the two-pane layout.
+
+Small controls use the shared component and policy rather than restyling a
+stock control independently in each screen.
+
+## 3. Component map
+
+| Need | Required component/policy | Source |
 | --- | --- | --- |
-| Frosted artwork behind the panel | `LyricsArtworkLayer` via `GlassCard(frostArtwork = true, artworkUrl = …)`, `LyricsMaterial`, `AcrylicSurface`, `TrackMenuSurface` | the surface is visibly *made of* the cover, not just tinted |
-| Ambient artwork colour under everything | `AmbientBackdrop(section)` (two blooms from the section palette over its base) | a page with no cover is still artwork-led, never one flat background |
-| Body gradient (lifted top → deepened bottom) | `GlassMaterialPolicy.bodyStops` | one flat colour is the M3 tell |
-| Specular sheen along the top edge | `GlassMaterialPolicy.sheenStops` | reads as light hitting glass |
-| Gradient hairline edge | `GlassMaterialPolicy.edgeStops` + `DhunColors.glassEdge` | a uniform stroke reads as a Material outline |
+| Panel, Settings group, notice | `GlassCard` | `design/components/GlassCard.kt` |
+| Confirmation, diagnostics, rationale | `GlassDialog` | `design/components/GlassCard.kt` |
+| Glass numbers and blur gate | `GlassMaterialPolicy` | `design/components/GlassMaterialPolicy.kt` |
+| Quiet list/reading surface | `dhunContentRowSurface` / `dhunContentSurface` | `design/components/ContentRowSurface.kt` |
+| Page artwork atmosphere | `NowPlayingBackdrop` / `PageArtworkBackdrop` | `design/components/NowPlayingBackdrop.kt` |
+| Lyrics, queue, mini-player artwork | `LyricsMaterial`, `LyricsArtworkSheet`, `AcrylicSurface`, `GlassDock` | `design/components/LyricsMaterial.kt`, `GlassCard.kt` |
+| Anchored menu | transparent `DropdownMenu` + `TrackMenuSurface` + `MenuActionRow` | `ui/components/TrackOverflowDialog.kt` |
+| Single/multiline input | `DhunTextField` | `design/components/DhunTextField.kt` |
+| Button family | `DhunButton`, `DhunTonalButton`, `DhunOutlinedButton`, `DhunTextButton`, `DhunIconButton` | `design/components/DhunButton.kt` |
+| Switch, slider, checkbox, progress | `DhunSwitch`, `DhunSlider`, `DhunCheckbox`, `DhunProgressBar` | `design/components/DhunControls.kt` |
+| Spinner and refresh | `DhunSpinner`, `DhunPullToRefresh` | `design/components/DhunSpinner.kt`, `DhunPullToRefresh.kt` |
+| Bottom tabs / desktop rail | `DhunNavigationBar(Item)`, `DhunNavigationRail(Item)` | `design/components/DhunNavigation.kt` |
+| Filter chips | `DhunFilterChip` / `FrostedChipSurface` | `design/components/Chip.kt`, `GlassCard.kt` |
+| Screen-level mutation failure | `ActionErrorBanner` | `ui/components/ActionErrorBanner.kt` |
 
-## 2. Component map — use these, not raw Material
+Toolkit primitives may remain **inside these wrappers** for mechanics and
+semantics. Their colors, shape, elevation, indicators, and metrics must come
+from DHUN policies. `Text` and `MaterialTheme.typography` are allowed holders
+for DHUN's own type scale. A simple `HorizontalDivider` is a separator, not a
+surface. `Scaffold` is layout only and keeps a transparent container.
 
-| Need | Use | File |
-| --- | --- | --- |
-| Card, group, notice, generic panel | `GlassCard` | `design/components/GlassCard.kt` |
-| Dialog (confirm, rename, diagnostics, pickers) | `GlassDialog` | `design/components/GlassCard.kt` |
-| List row / settings row body | `Modifier.dhunContentRowSurface()` | `design/components/ContentRowSurface.kt` |
-| Lyrics card, queue sheet, floating player | `LyricsMaterial`, `LyricsArtworkSheet`, `AcrylicSurface` | `design/components/LyricsMaterial.kt` |
-| Overflow menu surface | `TrackMenuSurface` + `MenuActionRow` | `ui/components/TrackOverflowDialog.kt` |
-| One-line text input | `DhunTextField` | `design/components/DhunTextField.kt` |
-| Switch / ordinary slider / colour-ramp slider | `DhunSwitch` / `DhunSlider` / `DhunColourSlider` | `design/components/DhunControls.kt` |
-| Multi-select box (offline selection) | `DhunCheckbox` | `design/components/DhunControls.kt` |
-| Progress bar (download, storage) | `DhunProgressBar` | `design/components/DhunControls.kt` |
-| Loading spinner (buttons, pagination) | `DhunSpinner` (thin accent arc in a faint glass track) | `design/components/DhunSpinner.kt` |
-| Page base under the artwork backdrop | `AmbientBackdrop(component)` (that surface's palette) | `design/components/NowPlayingBackdrop.kt` |
-| Surface tint for dock / navigation / player chrome | `Modifier.backgroundComponentTint(component)` | `design/background/BackgroundSurface.kt` |
-| Background blur and colour resolution | `DhunBackgrounds`, `BackgroundComponent`, `BackgroundPalette`, `BackgroundPalettePolicy` | `design/background/` |
-| Anchored menu (provider picker, mode picker, overflow) | `DropdownMenu(containerColor = Color.Transparent)` + `TrackMenuSurface` + `MenuActionRow` | `ui/components/TrackOverflowDialog.kt` |
-| Collapsible page toolbar / any chrome strip | `Modifier.dhunGlassBody(fill)` | `design/components/GlassCard.kt` |
-| Bottom tab bar (glass band + tabs) | `DhunNavigationBar` + `DhunNavigationBarItem` | `design/components/DhunNavigation.kt` |
-| Desktop navigation rail | `DhunNavigationRail` + `DhunNavigationRailItem` | `design/components/DhunNavigation.kt` |
-| Button family | `DhunButton`, `DhunTextButton`, `DhunOutlinedButton`, `DhunIconButton` | `design/components/DhunButton.kt` |
-| Chips | `DhunFilterChip` / `FrostedChipSurface` | `design/components/Chip.kt` |
-| Separator line | `DhunDivider` (tapered hairline, not a full-width rule) | `design/components/DhunDivider.kt` |
-| Pull-to-refresh | `DhunPullToRefresh` (glass disc + accent arc) | `design/components/DhunPullToRefresh.kt` |
-| Bottom dock | `GlassDock` | `design/components/GlassCard.kt` |
-| Error strip at screen level | `ActionErrorBanner` (glass + error tint) | `ui/components/ActionErrorBanner.kt` |
+Every `DropdownMenu` is only an anchor: its container is transparent and tonal
+and shadow elevation are zero. `TrackMenuSurface` is the visible material.
 
-Material components **may** be used inside these wrappers — a `Switch` inside
-`DhunSwitch`, a `Slider` inside `DhunSlider` or `DhunColourSlider`, a `Checkbox` inside
-`DhunCheckbox`, `DropdownMenu`, `LinearProgressIndicator` — with DHUN tokens
-driving colours, shapes and elevation. What is forbidden is their *default
-appearance* reaching the user.
+## 4. Numeric material contract
 
-Two rules follow from that and are enforced mechanically
-(`scripts/test_design_system.py`):
+Keep these decisions in policy code rather than copying them into screens.
 
-1. **Never call the raw control from a screen.** `Switch(...)`, `Slider(...)`,
-   `Checkbox(...)`, `Button(...)`, `TextButton(...)`, `IconButton(...)`,
-   `LinearProgressIndicator(...)`, `CircularProgressIndicator(...)`,
-   `DropdownMenuItem(...)` outside `design/` is a defect; the wrapper exists so
-   the palette, shape and metrics are defined once (`DhunControlPolicy`,
-   `DhunSpinnerPolicy`, `DhunNavigationPolicy`).
-   Navigation is not an exception: `NavigationBar` / `NavigationRail` and their
-   items are banned too. Their *container* was never the problem — the selection
-   pill, item metrics and label type inside them are Material's, so the tab bar
-   and the rail are DHUN components now.
-2. **Anchors stay transparent.** `DropdownMenu` is only an anchor: it must pass
-   `containerColor = Color.Transparent` (and zero tonal/shadow elevation) and let
-   `TrackMenuSurface` be what you see. A Material `containerColor` in a menu is
-   a flat plate inside the glass.
-
-### What Material is still allowed to be
-
-A census of the app after the correction, so nobody mistakes the remainder for
-drift — or re-opens it as work:
-
-| Left in `shared/.../ui`, `app-android`, `app-desktop` | Why it is not the Material look |
+| Decision | Current policy |
 | --- | --- |
-| `Text` | A text primitive. It renders `LocalTextStyle`, which `DhunTheme` fills from `DhunTypographyTokens` — DHUN's family, sizes, tracking and colours. |
-| `MaterialTheme.typography` (215 reads) | Reads DHUN's own scale through Material's holder (`DhunTypography` is built from `DhunTypographyTokens`). There is no `MaterialTheme.colorScheme` read left in `shared/ui`: colour always comes from `DhunColors`. |
-| `DropdownMenu` (3 sites) | The anchor only: transparent container, zero tonal/shadow elevation, `TrackMenuSurface` + `MenuActionRow` draw the glass. |
-| `Scaffold` (1 site) | Slot layout in the shell, container transparent, so the ambient + artwork backdrops show through. |
-| Wrappers in `design/components/` | `Button`, `Switch`, `Slider`, `Checkbox`, `FilterChip`, `IconButton`, `Scaffold`-free progress, `PullToRefreshBox` — used as *mechanics*; every colour, shape, size and indicator is DHUN's, and screens may not call them. |
+| Body gradient | top white lift 0.06; middle stop 0.55; bottom black deepen 0.10 |
+| Dialog sheen | top 0.16, mid 0.05, gone by 0.45 of panel height |
+| Light sheen | 0.45× the dark sheen, not an inverted dark value |
+| Ordinary dark-card sheen | quieter 0.05 top cut |
+| Edge | full top alpha to 0.34 bottom; light top edge 0.70× |
+| Minimum strengthened content-card body alpha | 0.70 |
+| Dialog body alpha | dark 0.91; light 0.93 |
+| Card shadow alpha | dark 0.18; light 0.10 |
+| Dock shadow alpha | dark 0.28; light 0.16 |
 
-That is the whole list. Anything else from Material reaching a screen fails
-`scripts/test_design_system.py`.
+The gradient preserves the input color's alpha. Increasing legibility means
+raising the appropriate body/veil opacity, not stacking extra shadows or
+turning every panel into an opaque rectangle.
 
-## 3. Numbers (do not re-invent per screen)
+## 5. Dark, light, artwork, and accessibility
 
-All glass constants live in `GlassMaterialPolicy` and `LyricsMaterialPolicy`.
-Text must never sit on a blur; blur is always the backdrop.
+### Independent schemes
 
-- Content/reading body opacity: `ContentSurfacePolicy` (0.82–0.89 band).
-- Dialog body opacity floor: `GlassMaterialPolicy.DIALOG_BODY_ALPHA_DARK/LIGHT`
-  (0.91 / 0.93) — "sufficiently opaque" is this number, **not** a flat plate.
-- Sheen: `SHEEN_TOP 0.16` → `SHEEN_EXTENT 0.45` of the panel height; rows use
-  32% of that (`ROW_SHEEN_SCALE`).
-- Edge: glass edge token at full alpha on top, `0.34×` at the bottom.
-- Blur: `DhunSpacing.glassBlur` × `LyricsMaterialPolicy.BLUR_SCALE`, computed
-  once per artwork and cached (`BlurredArtworkCache`). Never per frame.
+Dark, OLED, and light tokens are deliberate peers. Light mode has its own
+surface, text, border, sheen, gradient, scrim, and shadow values. Never derive
+it by inverting the dark scheme or by reusing dark-mode white highlights at the
+same strength.
 
-## 3a. Backgrounds: blur and colour are two independent switches
+Artwork may supply atmosphere and a tamed control accent. It must not choose
+text colors directly or bypass contrast policy. Dynamic accent mode colors
+controls; it is not a per-surface background-color system.
 
-Two questions, answered separately, and four surfaces the user can colour:
+### Legibility and state
 
-| Switch | On | Off |
-| --- | --- | --- |
-| **Background blur** | the playing track's artwork is painted, blurred, behind the interface | **no artwork is painted at all** — not sharp, not dimmed — and every surface is its own colour |
-| **Dynamic colours** | surfaces take their colour from that artwork | surfaces use the colour the user picked for them |
+- Primary, secondary, tertiary, disabled, and hint text retain their defined
+  hierarchy over both bright and dark artwork.
+- Text and controls remain sharp; blur is never applied to the content layer.
+- Selected state uses shape/semantics as well as color. Navigation items use
+  `Role.Tab` and `selectable`; icon-only controls retain content descriptions.
+- Touch targets, keyboard actions, focus registration, disabled state, pending
+  state, and live-region error announcements must survive visual adoption.
+- Do not communicate success, failure, selection, or progress by color alone.
+- Large text and long diagnostics must remain scrollable and selectable where
+  the existing interaction requires it.
 
-They are independent by construction: `BackgroundBlurPolicy` never reads a colour
-switch and `BackgroundPalettePolicy.resolve` never reads a blur switch
-(`scripts/test_design_system.py` asserts both). All four combinations are valid:
+`DhunThemeContrastTest` checks the token ladder, semantic colors, accents,
+reading/content surfaces, and extreme backdrop stops in both schemes.
+`GlassMaterialPolicyTest`, `LyricsMaterialPolicyTest`,
+`NowPlayingBackdropPolicyTest`, `DhunControlPolicyTest`,
+`DhunNavigationPolicyTest`, `DhunSpinnerPolicyTest`, and
+`DhunRefreshPolicyTest` pin their respective pure policies. These are numeric
+and source tests, not screenshots or proof of TalkBack/frame behavior.
 
-```
-blur off + colours off   solid backgrounds, the user's colours, no artwork
-blur off + colours on    artwork-derived colours, still no artwork
-blur on  + colours off   blurred artwork tinted with the user's colours
-blur on  + colours on    blurred artwork with artwork-derived colours
-```
+## 6. Background preferences — deliberately simple
 
-**Four surfaces, not five sections and not three palette layers.** The
-customisation unit is the thing the user recognises
-(`BackgroundComponent`):
+The current product exposes **Background blur** and **Background brightness**
+under Appearance & Backdrop. Defaults are **100% blur** and **55% brightness**.
+The existing `SettingsViewModel` persists both values and owns rollback after a
+failed write; the live appearance update is not a second persistence engine.
 
-| Component | What it paints |
+- **Blur** scales artwork blur where real blur is supported. At **0%**, artwork
+  is not removed: the non-blurred, dimmed artwork and veil remain. Do not label
+  this control “artwork on/off.”
+- **Brightness** adjusts the veil/artwork presentation independently of blur.
+  It is not a custom-surface-color brightness control.
+- Where real blur is unavailable, the blur slider is hidden and Settings
+  explains that the sharp cover is dimmed instead. The brightness preference
+  still applies.
+- There is no current five-palette editor, four-surface color editor, HSL color
+  pipeline, or global “dynamic surface colours” switch. Those were historical
+  experiments, not requirements to restore. Do not reintroduce their control
+  count or user-facing palette assembly.
+
+This simple model is the accepted #216 outcome for this tree: useful defaults,
+two understandable controls, existing preferences, and no new schema or
+per-surface background pipeline.
+
+## 7. Performance and fallback rules
+
+- Request the existing list-tier artwork for atmospheric layers; do not decode
+  full-resolution hero art for every row or menu.
+- Reuse stable artwork keys and `BlurredArtworkCache` where the component
+  already provides them. Guard against late results painting the previous
+  track's artwork.
+- Gate real blur with `GlassMaterialPolicy.shouldBlurArtwork`. Unsupported
+  platforms and a zero blur preference must skip the blur modifier.
+- The non-blur fallback is **sharp, dimmed artwork plus the theme veil**, not a
+  CPU blur implementation and not an unmodulated cover under text. Its loaded
+  artwork+veil layer uses **0.40 opacity over the theme base** (the real-blur
+  path remains 1.0), protecting direct text as well as card-row text over
+  extreme black/white artwork and the full brightness range.
+- No artwork or a failed image leaves the theme base and readable surfaces;
+  never substitute fake artwork or a placeholder cover as atmosphere.
+- Animate opacity/position on established materials rather than animating blur
+  radius or adding repeated full-screen effects. Do not add per-row blur.
+- Reduced-motion, high-contrast, large-text, and platform fallback behavior
+  requires real environment QA when supported; do not infer it from a JVM test.
+
+## 8. Correct and incorrect implementation
+
+| Correct | Incorrect |
 | --- | --- |
-| `PAGES` | Home, Search, Library and the pages opened from them (album/artist/playlist) |
-| `NAVIGATION` | the bottom tab band, or the side rail on a wide window |
-| `MINI_PLAYER` | the docked now-playing bar |
-| `FULL_PLAYER` | the immersive player |
+| `GlassDialog(onDismissRequest = …) { … }` for a confirmation | A stock alert/dialog container with default colors and elevation |
+| `DhunTextField` for search, names, and multiline TTML | A stock outlined field or a new one-off field decoration |
+| `DhunSlider`, `DhunSwitch`, `DhunCheckbox`, `DhunProgressBar` | Calling their stock counterparts directly from a screen |
+| `DhunNavigationBarItem` / `DhunNavigationRailItem` | Stock navigation containers/items with a transparent container but stock pill and metrics |
+| Transparent `DropdownMenu` anchor around `TrackMenuSurface` | A visible stock popup plate inside the glass menu |
+| Quiet `dhunContentRowSurface()` for ordinary rows | A shadowed, blurred glass card around every row |
+| `GlassCard(opaqueBase = true)` or `GlassDialog` for high-opacity reading | Treating “opaque enough” as permission for a featureless flat plate |
+| `GlassMaterialPolicy.shouldBlurArtwork` before blur | Installing a no-op blur modifier or adding a CPU blur fallback |
+| Blur 0 = non-blurred dimmed artwork | Claiming blur 0 removes artwork |
+| A separate light token/sheen/scrim policy | Inverting dark colors or copying dark highlights into light mode |
+| Preserving callbacks and pending/error state during visual work | Closing dialogs, changing navigation, or dropping retry behavior for a visual rewrite |
 
-Each one saves **one colour** (or "DHUN default"). **Quick colours** applies a
-named swatch with one tap. **More colours** opens a custom-colour view with Hue,
-Saturation and Lightness gradient sliders and a large preview; nothing is saved
-until **Use colour**, and Cancel/back discards the draft. Both paths call the
-same component-colour setter and the same palette/contrast policy. The sliders
-are a way to choose that one colour, not another theme or background pipeline.
-That colour is the feature; the two switches inside a surface — *Background blur here* and *Take colour from
-artwork* — are **overrides for that surface only**, they sit after the colour in
-the dialog, they are disabled while their global is off, and their captions name
-the global that suspends them. They exist for "keep the dock solid while the pages
-show the cover"; they are not a second copy of the two global switches, and a
-surface that has never been opened behaves exactly as the globals say.
+A flat color is not inherently wrong: the theme base, quiet rows, and the
+Queue/Related sheet's readability base intentionally use one. It is wrong when
+it substitutes for the component that owns the requested glass surface.
 
-This replaced the earlier five-section, `primary`/`secondary`/`tertiary` model:
-asking a user to assemble a palette was asking them to think like the renderer.
+## 9. Enforcement and review evidence
 
-**The palette is derived, never assembled.** `BackgroundPalettePolicy.paletteFrom`
-turns one colour into the three layers the background is painted from — a base
-wash plus a main and a companion glow, the last two related by a 38° hue shift —
-and the settings swatches render the result of that same derivation. Artwork
-colour and a manual pick therefore cannot drift into different recipes.
+`python3 -m unittest discover -s scripts` runs
+`scripts/test_design_system.py`. Its raw-call scan covers every Kotlin source in
+the shared native UI, Android, and desktop roots; wrapper implementations under
+`design/components` are intentionally outside that ban. The script also pins
+critical callbacks and the product-identity wording. There is no current
+allowlist of known stock screens.
 
-**The base is luminance-clamped, not contrast-clamped by eye.**
-`BASE_LUMINANCE_DRIFT` (0.05) keeps the base inside the band the text ladder was
-measured against in both themes; a clamped colour reads back within
-`CLAMP_TOLERANCE` (0.002) of that edge because `Color` packs its components, and
-the tests assert exactly that bound. With no artwork behind it the surface needs more
-of the hue to be visible at all, so `SOLID_BASE_TINT_ALPHA` (0.55) is used instead of
-`BASE_TINT_ALPHA` (0.30) — chroma, not brightness, which is why the contrast band
-still holds in the "blur off, my colours" state. The two glows get a little more
-presence there as well (`AmbientBackdropPolicy.SOLID_BLOOM_SCALE`).
+Required review for a visual change:
 
-**The veil carries the surface's colour.** Where artwork is painted, a translucent
-veil sits between it and the rows. `BackgroundPalettePolicy.veilTintFor(palette,
-veilTint)` gives that veil the surface's hue at the theme's own veil luminance
-pinned exactly (`drift = 0`), so the measured text contrast is unchanged by
-whichever colour the user picked. Both artwork backdrops call it — the page
-backdrop and the player's scrim/dim — so "blur on, my colours" is visible on the
-full player too, not just on the pages. The contrast gate measures rows over that
-one veil, which is now literally the veil every surface paints.
+1. inspect the stage-specific diff and confirm only intended surfaces changed;
+2. run the available source/policy tests and exact-head CI compilation/tests;
+3. capture real Android and desktop screenshots where a display/device exists;
+4. check dark, OLED, and light over bright and dark artwork, plus large text,
+   keyboard/screen-reader state, pending/error/empty/offline states, and the
+   non-blur fallback;
+5. record unsupported environments as **NOT RUN**. Source checks, green CI,
+   package installation, and visual/audible acceptance are separate evidence.
 
-**Blur off means no image layer.** `BackgroundBlurPolicy.paintsArtwork(percent)`
-is the single answer every artwork layer asks for: `NowPlayingBackdrop`,
-`LyricsArtworkLayer` (dock, lyrics card, dialogs, queue sheet), `GlassCard`'s
-frost, `PlayerBackdrop`, the player's `ArtworkBackdrop` and its lyrics card all
-return before drawing when it is false. A sharp or dimmed copy of the cover is
-*not* the fallback for "off" — that was the behaviour that made the switch
-indistinguishable from a weaker blur.
-
-**A backdrop is never pinned to a surface.** `NowPlayingBackdrop`,
-`AmbientBackdrop`, `PageArtworkBackdrop` and `LyricsArtworkLayer` take a *nullable*
-component that resolves to `LocalBackgroundComponent.current`, so panels, menus
-and detail pages inherit the surface they are composed on; surfaces that own one
-(the dock is `MINI_PLAYER`, the player is `FULL_PLAYER`, the tab band is
-`NAVIGATION`) pass it explicitly.
-
-**Two globals, and only two.** *Background blur* and *Dynamic colours* are the
-whole global model and neither reads the other's switch. `Adaptive blur` is not a
-third global: it is a detail of an enabled blur (a bright, busy cover keeps the
-full frost; a dark, calm one is blurred slightly less), it is suspended while blur
-is off, and it lives with the strength slider in *Backdrop detail* rather than
-between the two switches.
-
-**Blur strength cannot impersonate the switch.** The slider scales the radius and
-is floored at `MIN_EFFECTIVE_STRENGTH` (20%) for an enabled blur; the switch is
-the only off control.
-
-**One image pipeline.** `DhunBackgrounds.setArtworkSeed(...)` is the only artwork
-input: it reuses `ArtworkColorExtractor` (the palette the player tint already
-computes), caches per seed, and is called once per track from the shell. No
-decode, no sampling, no per-frame work; palette changes animate on
-`DhunAnimations.slowTween`.
-
-**Fallbacks.** A device without real blur (Android < 12, no Skiko RenderEffect)
-still saves the switches and draws the dimmed cover, and says so in Settings.
-Nothing playing, or an extraction that fell back to the accent, leaves each
-surface on its own colour — never a transparent hole. The pre-API-31 path adds no
-CPU blur.
-
-## 4. Legibility beats translucency (unchanged, and it is not a licence to go flat)
-
-If text, icons, focus or progress become hard to read over artwork, raise the
-**opacity of the body** (or use an opaque tonal rung) — never remove the
-gradient, sheen, edge or frost. `docs/TRD.md` and the design contract's "opaque
-enough base under dialogs" mean: dialogs use `GlassCard(opaqueBase = true)`,
-which is milky glass at the documented floor, **not** a stock `AlertDialog`
-container.
-
-Contrast gates: `shared/src/jvmTest/.../DhunThemeContrastTest.kt` asserts text
-ladder vs. row/reading fills over black and white artwork in both themes. A
-change to a fill must keep those green — and must not lower a fill's opacity to
-buy "more glass".
-
-## 5. Fallbacks
-
-- No real blur (Android < 12, no Skiko RenderEffect): draw the dimmed cover or
-  the gradient + sheen + edge alone. Never skip the material.
-- Nothing playing / no artwork: `LocalNowPlayingArtwork` is null and the frost
-  cut falls back to gradient + sheen over the scrim. That is intended — and the
-  page still has the `AmbientBackdrop` colour, so "nothing playing" is not the
-  same thing as "plain surface".
-
-`LocalNowPlayingArtwork` is provided once by `DhunAppShell`; `GlassDialog` reads
-it, so every dialog in the app frosts over the playing cover without a call site
-threading a URL. Call sites that know better pass `artworkUrl` explicitly.
-- Light theme: the same recipe, white veil, weaker sheen (`light` branches in
-  `GlassMaterialPolicy`).
-
-## 6. Enforcement (so this cannot silently rot again)
-
-- `scripts/test_design_system.py` (runs in `python3 -m unittest discover -s scripts`)
-  fails the repo gate when a banned Material-default composable appears in
-  `shared/.../ui/`, `app-android` or `app-desktop` outside the design system,
-  unless it is listed with a reason in `scripts/design_system_allowlist.txt`; it
-  also fails when a menu anchor is left with a default `containerColor` or when a
-  screen re-invents the glass gradient. Navigation is covered by the same list:
-  `NavigationBar`/`NavigationRail` and their items are banned outright, because
-  what looked wrong was inside them, not their container.
-- `shared/src/jvmTest/.../design/GlassSystemTest.kt` asserts the material
-  numbers (gradient ordered, sheen capped, edge fading, dialog floor above the
-  row fill, light/dark asymmetry), the control palette, the spinner geometry, the
-  ambient bloom bounds, the navigation pill (never a solid accent, rim stronger
-  than the fill, fades to nothing) and the fact that the rail is exactly the
-  width `DhunShellPolicy.railAllowance` reserves for it.
-- Screens are reviewed visually on hardware when hardware exists; a lack of
-  device access is recorded in `.ai/KNOWN_LIMITATIONS.md`, not used to justify a
-  flat build.
-
-## 7. Instructions that this page supersedes
-
-Kept on purpose so the next agent does not resurrect them:
-
-| Older text | Correction |
-| --- | --- |
-| `.ai/MASTER_PROMPT.md` roadmap row "GlassCard real blur" | `GlassCard` had **no** blur for a long time; it does now for the frost cut (`opaqueBase`/`frostArtwork`). Treat this file as the description of what ships. |
-| "Content panels above the dock stay neutral" (older shell notes) | Neutral *tint*, never a flat **material**: rows use `dhunContentRowSurface()` with body gradient + sheen. |
-| "Use an opaque base under dialogs" (design contract §5, TRD) | Still true as an opacity floor (`GlassMaterialPolicy.DIALOG_BODY_ALPHA_*`); it does not permit `AlertDialog` or a flat rectangle. |
-| "Material 3 only" (pre-ADR-002 wording, historical) | Superseded: Material 3 is not the visual target (`docs/ui-ux-design.md` §Status). |
-| "Keep the layout container and pass `containerColor = Color.Transparent`" (earlier §2, applied to the navigation bar and rail) | Not enough for navigation: Material's `NavigationBarItem`/`NavigationRailItem` paint their **own** selection pill, metrics and label type, so a transparent container still rendered a stock Material tab bar. The shell uses `DhunNavigationBar`/`DhunNavigationRail`; only `DropdownMenu` remains a transparent anchor. |
-| Visual-tuning sliders / test channel | These change *opacity percentages*; they never change the material recipe. A tuning value of 100% is a contrast fallback, not the design. |
+Historical documents may record an older toolkit-centered target only when the
+passage is clearly dated and labelled historical. Active instructions must link
+here and must not revive that identity, the rejected background palettes, or
+unimplemented component names.

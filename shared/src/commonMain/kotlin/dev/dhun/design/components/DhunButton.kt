@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
@@ -49,7 +48,7 @@ fun DhunButton(
         contentPadding = contentPadding,
         content = {
             if (loading) {
-                CircularProgressIndicator(
+                DhunSpinner(
                     modifier = Modifier.size(16.dp),
                     strokeWidth = 2.dp,
                     color = DhunColors.onAccent,
@@ -79,7 +78,7 @@ fun DhunTonalButton(
             contentColor = DhunColors.onAccentContainer,
         ),
         content = {
-            if (loading) CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+            if (loading) DhunSpinner(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
             else content()
         },
     )

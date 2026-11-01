@@ -14,13 +14,13 @@ class StageArtifactTest(unittest.TestCase):
             "GITHUB_REF": "refs/heads/arena/example",
             "GITHUB_RUN_ID": "1234",
             "GITHUB_RUN_ATTEMPT": "2",
-            "GITHUB_WORKFLOW": "test-release",
+            "GITHUB_WORKFLOW": "DHUN beta",
             "GH_TOKEN": "DO-NOT-COPY-THIS",
         }
 
     def test_checksum_and_manifest_describe_the_exact_binary(self):
         with tempfile.TemporaryDirectory() as directory:
-            binary = Path(directory) / "dhun-test.msi"
+            binary = Path(directory) / "dhun-beta.msi"
             binary.write_bytes(b"test binary\0\xff")
             metadata = stage_artifact(
                 binary, self.environment(), build_only=True, installer_version="1.33.2",
@@ -32,7 +32,7 @@ class StageArtifactTest(unittest.TestCase):
             self.assertEqual(metadata["sourceSha"], "a" * 40)
             self.assertEqual(metadata["installerVersion"], "1.33.2")
             self.assertTrue(metadata["buildOnly"])
-            self.assertEqual(binary.with_name(binary.name + ".sha256").read_text(), f"{expected}  dhun-test.msi\n")
+            self.assertEqual(binary.with_name(binary.name + ".sha256").read_text(), f"{expected}  dhun-beta.msi\n")
             sidecar = binary.with_name(binary.name + ".provenance.txt")
             text = sidecar.read_text(encoding="ascii")
             self.assertEqual(parse_provenance(text), metadata)
@@ -40,12 +40,12 @@ class StageArtifactTest(unittest.TestCase):
             self.assertNotIn("GH_TOKEN", text)
             # Release assets must not add JSON: no .json sidecar may be produced.
             self.assertEqual(sorted(p.name for p in Path(directory).iterdir()), sorted([
-                "dhun-test.msi", "dhun-test.msi.sha256", "dhun-test.msi.provenance.txt",
+                "dhun-beta.msi", "dhun-beta.msi.sha256", "dhun-beta.msi.provenance.txt",
             ]))
 
     def test_provenance_text_is_flat_key_value_with_whitelisted_fields(self):
         with tempfile.TemporaryDirectory() as directory:
-            binary = Path(directory) / "dhun-test.apk"
+            binary = Path(directory) / "dhun-beta.apk"
             binary.write_bytes(b"apk fixture")
             stage_artifact(binary, self.environment(), build_only=True)
             lines = binary.with_name(binary.name + ".provenance.txt").read_text(encoding="ascii").splitlines()
@@ -74,7 +74,7 @@ class StageArtifactTest(unittest.TestCase):
 
     def test_apk_does_not_claim_an_msi_version(self):
         with tempfile.TemporaryDirectory() as directory:
-            binary = Path(directory) / "dhun-test.apk"
+            binary = Path(directory) / "dhun-beta.apk"
             binary.write_bytes(b"apk fixture")
             info = stage_artifact(binary, self.environment(), build_only=False)
             self.assertIsNone(info["installerVersion"])
@@ -92,7 +92,7 @@ class StageArtifactTest(unittest.TestCase):
 
     def test_provenance_cannot_silently_use_an_unknown_source(self):
         with tempfile.TemporaryDirectory() as directory:
-            binary = Path(directory) / "dhun-test.msi"
+            binary = Path(directory) / "dhun-beta.msi"
             binary.write_bytes(b"fixture")
             for field, value in (("GITHUB_SHA", "short"), ("GITHUB_RUN_ID", ""), ("GITHUB_REPOSITORY", "")):
                 with self.subTest(field=field):

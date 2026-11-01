@@ -17,7 +17,7 @@ package dev.dhun.legal
  *   metadata must pass an explicit sentinel such as `"unknown"`.
  * @param versionCode Android's integer version code; null on desktop, where no
  *   equivalent exists.
- * @param releaseChannel Where this build came from (`test release`,
+ * @param releaseChannel Where this build came from (`beta release`,
  *   `public pre-release`, `development`, …).
  * @param platform `Android` / `Windows` / `JVM desktop`.
  */
@@ -27,12 +27,12 @@ data class DhunAppInfo(
     val releaseChannel: String,
     val platform: String,
 ) {
-    /** True only for artifacts explicitly built for the rolling test release. */
-    val isTestRelease: Boolean
-        get() = releaseChannel.equals(TEST_RELEASE_CHANNEL, ignoreCase = true)
+    /** True only for artifacts explicitly built for the rolling beta release. */
+    val isBetaRelease: Boolean
+        get() = releaseChannel.equals(BETA_RELEASE_CHANNEL, ignoreCase = true)
 
     companion object {
-        const val TEST_RELEASE_CHANNEL = "test release"
+        const val BETA_RELEASE_CHANNEL = "beta release"
 
         /**
          * Used when the platform cannot read its own metadata. A visible

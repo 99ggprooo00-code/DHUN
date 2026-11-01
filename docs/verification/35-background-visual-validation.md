@@ -1,15 +1,14 @@
 # 35 — Background blur, dynamic colours and surface colours: on-device validation
 
-> **Status: OPEN.** No Android device, emulator or interactive Windows session has
-> been available to the agent that wrote this feature, so **none of the checks
-> below has been performed**. CI proves the code compiles and its unit tests pass;
-> it says nothing about how the app looks. This page is the procedure for the
-> person who *can* look — it is written so it can be followed without reading any
-> code.
+> **Status: SUPERSEDED HISTORICAL PROCEDURE (2026-10-31).** This checklist
+> describes the experimental two-switch/four-surface colour model on another
+> branch. Its checks were not performed, and its controls are not in the current
+> tree. Do not use it as acceptance for the current build.
 >
-> The model under test (2026-10-30): **two independent switches** —
-> *Background blur* and *Dynamic colours* — plus **one colour per interface
-> surface**. See `docs/design/glass-system.md` §3a.
+> The current model is **Background blur + Background brightness**; zero blur
+> keeps sharp, dimmed artwork. Use `docs/design/glass-system.md` §6–§9 for the
+> current fallback and visual-QA requirements. The older procedure below is kept
+> only as evidence of what was once proposed, not as an implementation instruction.
 
 ## 0. What is proven, and what is not
 

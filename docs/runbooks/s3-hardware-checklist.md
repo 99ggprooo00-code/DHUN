@@ -1,5 +1,7 @@
 # Runbook: S3 hardware checklist (pre-tag device testing)
 
+> **Current download channel (2026-11-01):** use the public [DHUN beta prerelease](https://github.com/99ggprooo00-code/DHUN/releases/tag/beta), not the removed `test` tag. Current assets are `dhun-beta.apk`, the two ABI APKs and `dhun-beta.msi`; exactly four installers, no release sidecars. Each new beta replaces the previous beta after its gates pass. Dated `test`/`dhun-test*` identities and results below remain historical evidence, not current download instructions.
+
 ## Current Mobile Search / keyboard / IME record — 2026-10-29
 
 **Physical native Android result: NOT RUN / access blocked.** In the current
@@ -28,7 +30,7 @@ Android SDK 35, minimum API 24. Existing checks/build are:
 
 Debug APKs are under `app-android/build/outputs/apk/debug/`; choose the universal
 output unless deliberately testing a matching ABI split. Default public identity
-is versionName `1.00.002` / versionCode `7`; rolling test properties can override
+is versionName `1.00.002` / versionCode `7`; rolling beta properties can override
 both, so record the **actual installed** name/code, source commit, APK filename
 and SHA-256, not the defaults or an old digest from this document.
 
@@ -91,12 +93,14 @@ for this Search-only matrix; audible provider playback remains a separate gate.
 and no Windows taskbar. Everything below must be seen/heard on real
 hardware. Budget ~2 hours wall-clock (mostly the unattended soaks).
 
-Builds: the rolling [`test` pre-release](https://github.com/99ggprooo00-code/DHUN/releases/tag/test)
-(`dhun-test.apk`, `dhun-test.msi`), replaced on every push to `main`.
-Always re-download after the merge you are qualifying, and note the
-`main@<sha>` you tested.
+Builds: the rolling [`beta` prerelease](https://github.com/99ggprooo00-code/DHUN/releases/tag/beta)
+(`dhun-beta.apk`, `dhun-beta.msi` and the two ABI APKs), replaced on each qualifying
+beta publication after its Android/Windows gates pass. Always re-download after
+the merge you are qualifying, and note the `main@<sha>` you tested. Beta has no
+release checksum sidecars; record the asset digest shown by GitHub or the internal
+workflow provenance instead of expecting an old `.sha256` download.
 
-**Build identity (rechecked 2026-10-08, after PR #131 merged):** rolling `test`
+**Historical build identity (rechecked 2026-10-08, after PR #131 merged):** rolling `test`
 targets **`1ee85b092aa1ad57c314b77c05ce0cf18a10e7e5`**, published
 **2026-10-08T08:50:21Z** from test-release **37751721906** (`publish` ran).
 CI **37751722312** and Build APK **37751722015** also passed. This package
@@ -274,7 +278,7 @@ not re-litigated, with scope stated honestly — everything else below is still 
 
 ## A. Android (upgrade first; clean install separately)
 
-- [ ] Upgrade-install `dhun-test.apk`; verify existing playlists/settings/downloads.
+- [ ] Upgrade-install `dhun-beta.apk`; verify existing playlists, favourites, settings, downloads, queue and history.
 - [ ] Separately, clean-install on a disposable device/profile; record that environment.
 - [ ] Cold start → Home feed loads within ~10 s on Wi-Fi.
 - [ ] Search a song → play → audio starts; MiniPlayer appears; expand to
@@ -305,7 +309,7 @@ not re-litigated, with scope stated honestly — everything else below is still 
 
 ## B. Desktop Windows (upgrade first, needs VLC installed)
 
-- [ ] Upgrade-install `dhun-test.msi`; verify existing playlists/settings/downloads.
+- [ ] Upgrade-install `dhun-beta.msi`; verify existing playlists, favourites, settings, downloads, queue and history.
 - [ ] Separately, clean-install on a disposable Windows profile/VM.
 - [ ] On that disposable installation only, verify ordinary uninstall removes
       test userdata (intentional, unlike upgrade); never use personal data here.

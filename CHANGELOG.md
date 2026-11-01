@@ -9,9 +9,11 @@ otherwise.
 **Release status:** `v1.00.002` is the current fixed **public pre-release**.
 The older `v1.00.001` tag remains immutable (published 2026-10-10). This
 is not a stable or store-ready build; real-device acceptance remains open.
-The rolling `test` tag is a separate private draft and can expose experimental
-UI controls that public builds do not. Both releases use a public Android test
-key; the Windows MSI ProductVersion is an independent increasing sequence.
+The rolling `beta` tag is the separate public **DHUN beta** prerelease, not a
+draft. Each beta publication replaces the previous beta release/tag and can
+expose experimental UI controls that fixed public builds do not. Both channels
+use a public Android test key; the Windows MSI ProductVersion is an independent
+increasing sequence.
 
 The padded release/version strings `1.00.001` and `1.00.002` are preserved
 exactly as requested; they are not silently normalized.
@@ -21,6 +23,53 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 `.ai/RISK_REGISTER.md`).
 
 ## [Unreleased]
+
+### Public rolling DHUN beta (2026-11-01, session `arena/8a70a040-dhun`)
+
+- Renamed the rolling release workflow, version allocator, channel mapping and
+  user-facing test-tools label to beta. Beta/development Android packages use
+  `1.00.<run>-beta.<attempt>`; the rolling tag is `beta`, the release title is
+  **DHUN beta**, and the four installers are `dhun-beta.apk`, both ABI APKs and
+  `dhun-beta.msi`. The renamed workflow carries an explicit 867 run offset so
+  its first Android/MSI identities cannot downgrade the old run-867 packages.
+- Every authorised beta publication replaces the previous `beta` release/tag
+  only after the Android/Windows package gates pass. The new release is directly
+  public and marked as a prerelease, never left as a draft. Migration removes the
+  legacy `test` release/tag only after the replacement beta is verified; fixed
+  releases, including `v1.00.002`, are not rewritten.
+- Rolling beta exposes exactly four installers and no text sidecars. Internal
+  checksum/provenance artifacts remain available to the workflow, and Windows
+  beta-to-beta install-over checks use GitHub's release-asset SHA-256 digest.
+  Android application/signing identity and the Windows UpgradeCode are unchanged;
+  updates must not clear playlists, favourites, settings, downloads, queues or
+  history.
+- Root/documentation indexes, installation/security guidance, release policy,
+  legal parity fixtures and the two existing website status passages now describe
+  the public beta accurately. Dated evidence keeps its original `test` artifact
+  names, and the fixed website release CTA is unchanged.
+
+### Selective native restoration and DHUN glass (2026-10-31, session `arena/8a70a040-dhun`)
+
+- Glass foundations, shared controls, Home/Search/browse/Library surfaces,
+  player/queue/lyrics controls, Settings/dialogs, and DHUN navigation were
+  implemented in separately reviewable stages. Stock visual calls are banned by
+  a source guardrail across shared native UI, Android, and desktop; toolkit
+  primitives remain only inside DHUN wrappers or as allowed text/layout/anchor
+  mechanics.
+- The authoritative `docs/design/glass-system.md` now describes the components
+  and fallback behavior in this tree, with independent light/dark rules,
+  accessibility requirements, and correct/incorrect examples. Active agent and
+  product guidance defers to it; dated reports remain historical evidence.
+- **Background preferences are deliberately simple:** Background blur and
+  Background brightness (defaults 100% and 55%). Zero blur keeps sharp, dimmed
+  artwork; unsupported platforms hide only the blur slider. The five-palette,
+  four-surface custom-colour, and HSL entries below describe their original
+  branches and are not the current product model or a restoration target.
+- Transport, seeking, queue mutation/reordering, lyrics state machines,
+  Settings persistence/rollback, and playlist/download transactions were not
+  rewritten for the visual stages. Local source/Python checks are not Kotlin
+  compilation or visual QA; exact-head CI and real Android/desktop acceptance
+  remain separate gates. Persistent-update phone recovery remains open.
 
 ### Native loading, artwork and continuation recovery (2026-10-31, PR #217)
 

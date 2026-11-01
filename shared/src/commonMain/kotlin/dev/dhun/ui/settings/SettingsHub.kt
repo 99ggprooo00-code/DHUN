@@ -57,7 +57,7 @@ internal fun SettingsHub(
     if (showThemeCatalogue) {
         GlassCard(modifier = Modifier.fillMaxWidth(), elevated = false) {
             Column(Modifier.fillMaxWidth().padding(vertical = DhunSpacing.sm)) {
-                SectionHeader(title = "Test tools")
+                SectionHeader(title = "Beta tools")
                 Row(
                     modifier = Modifier.fillMaxWidth()
                         .clickable(role = Role.Button, onClickLabel = "Open theme catalogue", onClick = onOpenThemeCatalogue)
@@ -70,7 +70,7 @@ internal fun SettingsHub(
                         modifier = Modifier.size(DhunSpacing.iconSize), tint = DhunColors.accent)
                     Column(Modifier.weight(1f)) {
                         Text("Theme catalogue", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
-                        Text("Preview themes and shared components · test release only",
+                        Text("Preview themes and shared components · beta release only",
                             style = MaterialTheme.typography.bodySmall, color = DhunColors.textSecondary)
                     }
                     Spacer(Modifier.width(DhunSpacing.xs))

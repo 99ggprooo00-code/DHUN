@@ -3,7 +3,7 @@
 A reviewed, newly added intent file is the one-shot alternative to Actions
 workflow_dispatch for v1.00.002. Merely retaining or editing the file on later
 main pushes must not publish another build. A separate one-shot build-only
-intent can preserve the current rolling draft on one reviewed main merge.
+intent can preserve the current rolling beta on one reviewed main merge.
 PRs never publish.
 """
 
@@ -12,7 +12,9 @@ import subprocess
 from pathlib import Path
 
 INTENT = ".github/release-intent/v1.00.002"
-PRESERVE_DRAFT = ".github/release-intent/preserve-rolling-test-draft"
+# Keep the legacy internal marker path: renaming it would look like a newly
+# added build-only intent on the beta migration merge itself.
+PRESERVE_BETA = ".github/release-intent/preserve-rolling-test-draft"
 MAIN = "refs/heads/main"
 
 
@@ -38,16 +40,16 @@ def plan(event: str, ref: str, manual_build_only: str, sha: str, repository: Pat
         if manual_build_only not in ("true", "false"):
             raise ValueError("A manual build must explicitly supply the typed build_only input")
         public = ref == MAIN and manual_build_only == "false"
-        return ("public", "false") if public else ("test", "true")
+        return ("public", "false") if public else ("beta", "true")
     if event == "push" and ref == MAIN:
         public = newly_added_intent(repository, sha)
-        preserve = newly_added_file(repository, sha, PRESERVE_DRAFT)
+        preserve = newly_added_file(repository, sha, PRESERVE_BETA)
         if public and preserve:
-            raise ValueError("Cannot publish a public release and preserve the rolling draft in the same merge")
+            raise ValueError("Cannot publish a public release and preserve the rolling beta in the same merge")
         if public:
             return "public", "false"
-        return "test", "true" if preserve else "false"
-    return "test", "true"
+        return "beta", "true" if preserve else "false"
+    return "beta", "true"
 
 
 def main() -> None:

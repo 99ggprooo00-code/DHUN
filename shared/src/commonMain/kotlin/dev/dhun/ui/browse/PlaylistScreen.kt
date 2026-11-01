@@ -26,13 +26,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.window.Dialog
 import dev.dhun.core.PlaylistDetail
 import dev.dhun.core.Track
 import dev.dhun.design.DhunColors
@@ -44,18 +44,21 @@ import dev.dhun.design.components.ArtworkImage
 import dev.dhun.design.components.dhunContentRowSurface
 import dev.dhun.design.components.lyricsVeilBrush
 import dev.dhun.design.components.DhunButton
-import dev.dhun.design.components.DhunTextField
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.DhunOutlinedButton
 import dev.dhun.design.components.DhunTextButton
 import dev.dhun.design.components.EmptyView
 import dev.dhun.design.components.ErrorView
-import dev.dhun.design.components.GlassCard
 import dev.dhun.design.components.LoadingShimmer
 import dev.dhun.design.components.PageArtworkBackdrop
 import dev.dhun.presentation.browse.PlaylistUiState
 import dev.dhun.presentation.browse.PlaylistViewModel
+import dev.dhun.ui.components.ActionErrorBanner
 import dev.dhun.ui.components.DragHandleGrip
+import dev.dhun.ui.components.PlaylistDeleteDialog
+import dev.dhun.ui.components.PlaylistRenameDialog
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import dev.dhun.ui.components.ReorderableList
 
 /**
@@ -83,6 +86,12 @@ fun PlaylistScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val deleted by viewModel.deleted.collectAsState()
+    val deletion by viewModel.deletion.collectAsState()
+    val mutation by viewModel.mutation.collectAsState()
+    // Keep the confirmation above the content. SQLDelight can publish the
+    // missing row before delete() returns; that observer emission is not the
+    // operation's success acknowledgement and must not dismiss this dialog.
+    var deletingName by remember(viewModel) { mutableStateOf<String?>(null) }
 
     LaunchedEffect(deleted) { if (deleted) onDeleted() }
 
@@ -124,8 +133,8 @@ fun PlaylistScreen(
                 val playlist = s.playlist
                 if (playlist == null) {
                     EmptyView(
-                        title = "Playlist deleted",
-                        message = "This local playlist no longer exists.",
+                        title = "Playlist unavailable",
+                        message = "This local playlist is no longer available.",
                         actionLabel = "Back",
                         onAction = onBack,
                         modifier = Modifier.fillMaxSize(),
@@ -139,9 +148,22 @@ fun PlaylistScreen(
                         onPlayAll = { viewModel.play(0) },
                         onShuffle = { viewModel.playShuffled() },
                         onTrackPlay = onTrackPlay,
+                        onDelete = { deletingName = playlist.name },
                     )
                 }
             }
+        }
+
+        // Row-edit failures (swipe-remove, drag-reorder) have no dialog, so
+        // they are reported here; the row itself stays for a retry.
+        mutation.errorMessage?.let { message ->
+            ActionErrorBanner(
+                message = message,
+                onDismiss = viewModel::dismissMutationError,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = DhunSpacing.touchTarget + DhunSpacing.sm),
+            )
         }
 
         // Floating frosted back chip
@@ -166,6 +188,22 @@ fun PlaylistScreen(
                 )
             }
         }
+    }
+    deletingName?.let { name ->
+        PlaylistDeleteDialog(
+            playlistName = name,
+            isDeleting = deletion.isDeleting,
+            errorMessage = deletion.errorMessage,
+            onDismiss = {
+                // Read the synchronous gate too: a back press can race the
+                // StateFlow snapshot while the first delete is starting.
+                if (!viewModel.deletion.value.isDeleting) {
+                    deletingName = null
+                    viewModel.clearDeletionError()
+                }
+            },
+            onConfirm = { viewModel.delete() },
+        )
     }
 }
 
@@ -275,9 +313,12 @@ private fun LocalPlaylistContent(
     onPlayAll: () -> Unit,
     onShuffle: () -> Unit,
     onTrackPlay: (Track, List<Track>, Int) -> Unit,
+    onDelete: () -> Unit,
 ) {
     var showRename by remember { mutableStateOf(false) }
-    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var isRenaming by remember { mutableStateOf(false) }
+    var renameError by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     Column(modifier = Modifier.fillMaxSize()) {
         PlaylistHeader(
@@ -292,7 +333,7 @@ private fun LocalPlaylistContent(
             actions = {
                 Row(horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm)) {
                     DhunOutlinedButton(onClick = { showRename = true }) { Text("Rename") }
-                    DhunOutlinedButton(onClick = { showDeleteConfirm = true }) { Text("Delete") }
+                    DhunOutlinedButton(onClick = onDelete) { Text("Delete") }
                 }
             },
         )
@@ -346,20 +387,35 @@ private fun LocalPlaylistContent(
     }
 
     if (showRename) {
-        RenameDialog(
+        PlaylistRenameDialog(
             current = title,
-            onDismiss = { showRename = false },
-            onConfirm = { newName ->
-                viewModel.rename(newName)
-                showRename = false
+            isSaving = isRenaming,
+            errorMessage = renameError,
+            onDismiss = {
+                if (!isRenaming) {
+                    showRename = false
+                    renameError = null
+                }
             },
-        )
-    }
-    if (showDeleteConfirm) {
-        DeleteConfirmDialog(
-            playlistName = title,
-            onDismiss = { showDeleteConfirm = false },
-            onConfirm = { viewModel.delete(); showDeleteConfirm = false },
+            onConfirm = { newName ->
+                if (!isRenaming) {
+                    isRenaming = true
+                    renameError = null
+                    scope.launch {
+                        try {
+                            viewModel.rename(newName)
+                            // Closes only for a write that returned normally.
+                            showRename = false
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            renameError = "Could not rename this playlist. Try again."
+                        } finally {
+                            isRenaming = false
+                        }
+                    }
+                }
+            },
         )
     }
 }
@@ -443,80 +499,6 @@ private fun PlaylistHeader(
             it()
         }
         Spacer(modifier = Modifier.height(DhunSpacing.md))
-    }
-}
-
-@Composable
-private fun RenameDialog(
-    current: String,
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit,
-) {
-    var name by remember(current) { mutableStateOf(current) }
-    Dialog(onDismissRequest = onDismiss) {
-        GlassCard(
-            modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
-            shape = DhunShapes.large,
-            // A dialog floats over a dimmed page — the opaque base is what
-            // keeps the list underneath from reading through its text.
-            opaqueBase = true,
-        ) {
-            Column(modifier = Modifier.padding(DhunSpacing.lg)) {
-                Text(
-                    "Rename playlist",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = DhunColors.textPrimary,
-                )
-                Spacer(modifier = Modifier.height(DhunSpacing.md))
-                DhunTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                )
-                Spacer(modifier = Modifier.height(DhunSpacing.md))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    DhunTextButton(onClick = onDismiss) { Text("Cancel") }
-                    Spacer(modifier = Modifier.weight(1f))
-                    DhunButton(onClick = { onConfirm(name) }, enabled = name.isNotBlank()) { Text("Save") }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DeleteConfirmDialog(
-    playlistName: String,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit,
-) {
-    Dialog(onDismissRequest = onDismiss) {
-        GlassCard(
-            modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
-            shape = DhunShapes.large,
-            // A dialog floats over a dimmed page — the opaque base is what
-            // keeps the list underneath from reading through its text.
-            opaqueBase = true,
-        ) {
-            Column(modifier = Modifier.padding(DhunSpacing.lg)) {
-                Text(
-                    "Delete \"$playlistName\"?",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = DhunColors.textPrimary,
-                )
-                Spacer(modifier = Modifier.height(DhunSpacing.sm))
-                Text(
-                    "This removes the local playlist. Tracks stay in your favorites/history if saved there.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = DhunColors.textSecondary,
-                )
-                Spacer(modifier = Modifier.height(DhunSpacing.md))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    DhunTextButton(onClick = onDismiss) { Text("Cancel") }
-                    Spacer(modifier = Modifier.weight(1f))
-                    DhunButton(onClick = onConfirm) { Text("Delete") }
-                }
-            }
-        }
     }
 }
 

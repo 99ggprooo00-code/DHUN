@@ -47,7 +47,7 @@ Every page renders the application's shell rather than a marketing header:
 2. Home → Interface → Features → repository; browser Back/Forward restores expected page.
 3. Direct-open each nested URL under `/DHUN/` (not only localhost root) and refresh it; it must not 404.
 4. From every route, verify all header/footer internal links, CTA links, active-page marker and 404 recovery.
-5. Open test-release CTA and confirm it reaches the release page, not a stale direct artifact or unrelated root path.
+5. Open the fixed-release CTA and confirm it reaches the intended release page, not a stale direct artifact, the removed `test` tag, or an unrelated root path.
 
 ## 4. Search flow
 

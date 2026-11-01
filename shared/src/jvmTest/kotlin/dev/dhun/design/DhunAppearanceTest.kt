@@ -122,7 +122,11 @@ class DhunAppearanceTest {
         assertEquals(0.701f, DhunColors.surface.alpha, 0.01f)
         assertEquals(DhunTokens.light.textPrimary, DhunColors.textPrimary)
         assertEquals(DhunTokens.light.glass, DhunColors.glass)
+        assertEquals(DhunTokens.light.glassEdge, DhunColors.glassEdge)
         assertEquals(DhunTokens.light.border, DhunColors.border)
+        assertEquals(DhunTokens.light.borderStrong, DhunColors.borderStrong)
+        assertEquals(DhunTokens.light.scrim, DhunColors.scrim)
+        assertEquals(DhunTokens.light.scrimStrong, DhunColors.scrimStrong)
         assertEquals(DhunTokens.light.error, DhunColors.error)
         assertEquals(DhunTokens.light.shimmerBase, DhunColors.shimmerBase)
         // ...and nothing dark survives by omission.

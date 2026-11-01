@@ -90,7 +90,7 @@ CITATION = re.compile(
     r"(ADR-\d+|PR #\d+|Phase \d+|MASTER_PROMPT|README\.md|LICENSE|THIRD_PARTY|"
     r"\.ai/[A-Za-z_]+\.md|scripts/[a-z_]+\.py|AndroidManifest|app-android|"
     r"app-desktop|shared/src|minSdk|"
-    r"DhunAppearance|test-release\.yml|sitemap\.njk|shared/src)",
+    r"DhunAppearance|beta-release\.yml|sitemap\.njk|shared/src)",
     re.I,
 )
 

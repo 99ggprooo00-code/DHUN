@@ -16,7 +16,7 @@ See the authoritative [product direction](docs/PRD.md#1-product-definition-and-s
 [provider matrix](docs/research/05-source-capability-matrix.md) and
 [ADR-010](docs/decisions/ADR-010-multi-source-provider-direction.md).
 
-> **Pre-release:** `v1.00.002` is an experimental build, not a stable or store-ready release. Playback depends on upstream YouTube behavior and can stop working without warning. Android and Windows hardware acceptance is still in progress. The rolling `test` build is restricted to repository collaborators.
+> **Pre-release:** `v1.00.002` is a fixed experimental build; **DHUN beta** is the public rolling prerelease. Neither is stable or store-ready. Playback depends on upstream YouTube behavior and can stop working without warning, and broad Android/Windows hardware acceptance is not established. Each beta publication replaces the previous `beta` release and tag after its build gates pass.
 
 ## Native screenshots and separate browser entry points
 
@@ -73,12 +73,26 @@ equaliser or lyrics are implemented.** Its legal drafts describe browser data
 flows separately from the native app. Live catalogue access and audible playback
 from the deployed origin remain unverified; see [browser status](docs/web-player/IMPLEMENTATION-STATUS.md).
 
-## Install the pre-release
+## Install a prerelease
 
-Download builds from the [DHUN v1.00.002 pre-release](https://github.com/99ggprooo00-code/DHUN/releases/tag/v1.00.002). Read the [installation guide](docs/INSTALL.md) first, and verify each file against its `.sha256` sidecar before installing. These builds use a public test signing key and are not intended for a daily-use device. Security reports: see [SECURITY.md](SECURITY.md). Release rules: see [release policy (proposal)](docs/releases/RELEASE-POLICY.md).
+Read the [installation guide](docs/INSTALL.md) first. Android requires 7.0 (API 24) or newer; Windows installs per user and needs VLC separately for desktop audio. The Android packages use a public test signing key, and the Windows MSI is unsigned. Security reports: see [SECURITY.md](SECURITY.md). Release rules: see the [release policy](docs/releases/RELEASE-POLICY.md).
 
-- **Android:** Android 7.0 (API 24) or newer. Install the universal APK unless you specifically need an ABI split.
-- **Windows:** install the MSI per user. Windows SmartScreen may warn because the installer is unsigned; playback requires VLC installed separately.
+### Fixed public build
+
+[DHUN `v1.00.002`](https://github.com/99ggprooo00-code/DHUN/releases/tag/v1.00.002) is the fixed public prerelease. Its release and assets are not rewritten by beta updates. Verify each fixed-release download against the `.sha256` sidecar with the matching asset name, as shown in the installation guide.
+
+### Rolling DHUN beta
+
+[Download **DHUN beta**](https://github.com/99ggprooo00-code/DHUN/releases/tag/beta). It is a **public prerelease, not a draft**. A successful beta publication deletes and replaces the previous rolling `beta` release/tag, so this page always represents the newest published beta rather than a fixed archive.
+
+The beta has exactly four installer assets and no text sidecars:
+
+- `dhun-beta.apk` — universal Android APK; preferred for most devices.
+- `dhun-beta-arm64-v8a.apk` — optional 64-bit ARM APK from the same build.
+- `dhun-beta-armeabi-v7a.apk` — optional 32-bit ARM APK from the same build.
+- `dhun-beta.msi` — per-user Windows installer; SmartScreen may warn because it is unsigned.
+
+Beta checksums and provenance remain in the internal workflow artifacts; they are not published as release sidecars. Android keeps application ID `dev.dhun.android` and its signing identity, and Windows keeps its MSI UpgradeCode, so a newer beta can install over the previous one without clearing app data. Do not clear data or uninstall as an update step: uninstalling Android removes app-private playlists, settings, downloads, queues and history. A rolling beta's higher Android versionCode also means the lower fixed public APK cannot directly replace it; back up anything you cannot replace before any uninstall.
 
 ## Build from source
 
@@ -90,7 +104,7 @@ Requires JDK 17. Android builds also need Android SDK 35 and `ANDROID_HOME` set.
 ./gradlew :shared:jvmTest
 ```
 
-The committed Android test key is public and for test builds only. Do not use it for a store release. The Windows MSI's internal version is an installer-upgrade sequence, not the DHUN app version.
+The committed Android test key is public and for development/beta builds only. Do not use it for a store release. The Windows MSI's internal version is an installer-upgrade sequence, not the DHUN app version.
 
 ## Status and scope
 

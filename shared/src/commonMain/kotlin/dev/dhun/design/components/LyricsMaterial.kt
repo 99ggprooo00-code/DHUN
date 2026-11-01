@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -40,8 +41,8 @@ import dev.dhun.design.supportsRealtimeBlur
  * The lyrics-card material, as numbers — so the lyrics card, the Related
  * list, the nav band under the mini-player, and small chrome cannot drift.
  *
- * This is still the ADR-002 recipe (blur **once** per track, translucent M3
- * veil, sharp content). It is not Liquid Glass and not a platform Acrylic API.
+ * This is still the ADR-002 recipe (blur **once** per track, a translucent
+ * DHUN veil and sharp content). It is not a platform Acrylic API.
  * "Acrylic" below is the lighter milky cut of the same recipe used by the
  * mini-player: more of the blur shows through than the old `glassStrong`
  * slab (~72% near-black), which read as a translucent black disc/bar.
@@ -53,6 +54,16 @@ object LyricsMaterialPolicy {
 
     /** Lyrics-card readability veil, bottom. Heavier so lines stay legible. */
     const val LYRICS_VEIL_BOTTOM = 0.62f
+
+    /**
+     * Queue/Related needs a stronger veil than the lyrics card: its small
+     * primary/secondary labels sit directly over the sheet artwork. These
+     * stops retain visible artwork while meeting contrast even after the
+     * test-channel tuning control lowers them. The tint still comes from the
+     * active theme; this is not a return to the old opaque black slab.
+     */
+    const val QUEUE_VEIL_TOP = 0.80f
+    const val QUEUE_VEIL_BOTTOM = 0.88f
 
     /**
      * Theme background laid under the acrylic veil. The dock's art is undimmed (unlike the shell
@@ -86,6 +97,11 @@ object LyricsMaterialPolicy {
         1f to LYRICS_VEIL_BOTTOM,
     )
 
+    fun queueVeilStops(): List<Pair<Float, Float>> = listOf(
+        0f to QUEUE_VEIL_TOP,
+        1f to QUEUE_VEIL_BOTTOM,
+    )
+
     fun acrylicVeilStops(): List<Pair<Float, Float>> = listOf(
         0f to ACRYLIC_VEIL_TOP,
         1f to ACRYLIC_VEIL_BOTTOM,
@@ -109,7 +125,11 @@ object LyricsMaterialPolicy {
 /** The lyrics-card veil. Call sites that already sit on a blurred backdrop use this alone. */
 @Composable
 fun lyricsVeilBrush(part: VisualPart? = null): Brush = Brush.verticalGradient(
-    colorStops = LyricsMaterialPolicy.lyricsVeilStops()
+    colorStops = (if (part == VisualPart.QUEUE_SHEET) {
+        LyricsMaterialPolicy.queueVeilStops()
+    } else {
+        LyricsMaterialPolicy.lyricsVeilStops()
+    })
         .map { (offset, alpha) ->
             offset to DhunColors.background.copy(alpha =
                 if (part == null) alpha else DhunVisualTuning.veilAlpha(part, alpha))
@@ -177,7 +197,7 @@ fun LyricsMaterial(
 
 /**
  * The **blur-backed sheet** cut of the lyrics-card material: the same
- * once-per-track blurred artwork and lyrics veil as [LyricsMaterial], but over
+ * once-per-track blurred artwork with the stronger queue-specific veil, over
  * an **opaque** base and with an elevation shadow — for a surface that carries
  * rows and rises over the player (the FullPlayer Queue/Related panel).
  *
@@ -185,10 +205,10 @@ fun LyricsMaterial(
  * the near-black `glassBarTop` → `glassStrong` slab with no artwork at all. That
  * is the one surface left outside the artwork-veiled family the dock, the ⋮
  * menus and the page backdrops moved to ([LyricsMaterial] / [AcrylicSurface]), so
- * opening the queue read as a slice of the old interface. The lyrics veil alone
- * (≈42–62% over the page) is not enough for a sheet of rows floating over sharp
- * player chrome, so the base stays: rows keep their contrast even on a bright
- * cover.
+ * opening the queue read as a slice of the old interface. The lyrics-card veil
+ * (≈42–62% over the page) is not enough for a sheet of rows over bright or dark
+ * artwork, so this surface uses [LyricsMaterialPolicy.queueVeilStops] as well as
+ * the base instead of merely assuming that the base creates contrast.
  *
  * The shape is the caller's ([DhunShapes.bottomSheet] for the panel): rounded
  * top corners, flush lower edge.
@@ -251,7 +271,12 @@ fun AcrylicSurface(
     ) {
         LyricsArtworkLayer(artworkUrl = artworkUrl, modifier = Modifier.matchParentSize())
         Box(modifier = Modifier.matchParentSize().acrylicGlass())
-        Box(modifier = Modifier.fillMaxSize(), content = content)
+        // This surface wraps the standalone MiniPlayer. Filling the incoming
+        // max height here made the unweighted dock consume the whole Column on
+        // rail layouts, leaving Home/Search/Library with zero height. Artwork
+        // and veil already use matchParentSize; only the content determines
+        // the surface's height.
+        Box(modifier = Modifier.fillMaxWidth(), content = content)
     }
 }
 
@@ -295,7 +320,7 @@ internal fun LyricsArtworkLayer(
                         scaleY = NowPlayingBackdropPolicy.OVERSCAN
                     }
                     .then(
-                        if (canBlur && DhunAppearance.backdropBlurPercent > 0) {
+                        if (GlassMaterialPolicy.shouldBlurArtwork(canBlur, DhunAppearance.backdropBlurPercent)) {
                             Modifier.blur(
                                 DhunSpacing.glassBlur * LyricsMaterialPolicy.BLUR_SCALE *
                                     NowPlayingBackdropPolicy.blurMultiplier(

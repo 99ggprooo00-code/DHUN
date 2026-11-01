@@ -707,11 +707,14 @@ class DistributionBoundary(DistCopyMixin):
         violations = self.mutate("features/index.html", "Read the code", "Sideload the build")
         self.assertTrue(any("installation" in v for v in violations), violations)
 
-    def test_the_public_release_page_is_reachable_not_the_private_test_tag(self):
+    def test_the_public_release_page_is_reachable_not_the_legacy_test_tag(self):
         """Banning artifacts must not ban the honest pointer to the public release."""
         markup = (DIST / "features" / "index.html").read_text(encoding="utf-8")
         self.assertIn("/releases/tag/v1.00.002", markup)
         self.assertNotIn("/releases/tag/test", markup)
+        self.assertNotIn("rolling test", markup.lower())
+        self.assertNotIn("restricted to repository collaborators", markup)
+        self.assertIn("DHUN beta", markup)
         self.assertEqual(quality.distribution_boundary_violations(DIST), [])
 
 

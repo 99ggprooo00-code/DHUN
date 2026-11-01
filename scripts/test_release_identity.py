@@ -20,7 +20,7 @@ def read(relative):
 class ReleaseIdentityTest(unittest.TestCase):
     def setUp(self):
         self.gradle = read("app-android/build.gradle.kts")
-        self.workflow = read(".github/workflows/test-release.yml")
+        self.workflow = read(".github/workflows/beta-release.yml")
 
     def test_android_identity_is_declared_once_in_gradle(self):
         self.assertEqual(1, len(re.findall(r'applicationId = "dev\.dhun\.android"', self.gradle)))

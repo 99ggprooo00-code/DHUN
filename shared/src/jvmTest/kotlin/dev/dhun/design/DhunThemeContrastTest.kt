@@ -1,6 +1,8 @@
 package dev.dhun.design
 
 import androidx.compose.ui.graphics.Color
+import dev.dhun.design.components.GlassMaterialPolicy
+import dev.dhun.design.components.LyricsMaterialPolicy
 import dev.dhun.design.components.contentRowFill
 import dev.dhun.design.components.readingSurfaceFill
 import dev.dhun.design.components.NowPlayingBackdropPolicy
@@ -244,7 +246,77 @@ class DhunThemeContrastTest {
                 assertAtLeast(contrast(tokens.textPrimary.compositedOver(reading), reading), 4.5f, "$mode primary on legal reader over $artwork")
                 assertAtLeast(contrast(tokens.textSecondary.compositedOver(reading), reading), 4.5f, "$mode secondary on legal reader over $artwork")
                 assertAtLeast(contrast(tokens.textTertiary.compositedOver(reading), reading), 3f, "$mode tertiary on legal reader over $artwork")
+
+                val dialog = GlassMaterialPolicy.dialogBody(tokens.isLight, tokens.surfaceVariant)
+                    .compositedOver(page)
+                assertAtLeast(contrast(tokens.textPrimary.compositedOver(dialog), dialog), 4.5f, "$mode primary on dialog over $artwork")
+                assertAtLeast(contrast(tokens.textSecondary.compositedOver(dialog), dialog), 4.5f, "$mode secondary on dialog over $artwork")
+                assertAtLeast(contrast(tokens.textTertiary.compositedOver(dialog), dialog), 3f, "$mode tertiary on dialog over $artwork")
+
+                assertGlassStopContrast(
+                    mode, tokens, GlassMaterialPolicy.contentBody(readingSurfaceFill()), page,
+                    content = true, label = "content card over $artwork",
+                )
+                assertGlassStopContrast(
+                    mode, tokens, GlassMaterialPolicy.dialogBody(tokens.isLight, tokens.surfaceVariant), page,
+                    content = false, label = "dialog over $artwork",
+                )
             }
+        }
+    }
+
+    @Test
+    fun nonBlurBackdropProtectsDirectTextOverExtremeArtwork() {
+        eachMode { mode, tokens ->
+            val layerAlpha = NowPlayingBackdropPolicy.loadedLayerAlpha(blurActive = false)
+            listOf(Color.Black, Color.White).forEach { artwork ->
+                listOf(0, 55, 100).forEach { brightness ->
+                    val veilTint = NowPlayingBackdropPolicy.veilTint(tokens)
+                    NowPlayingBackdropPolicy.veilStops(tokens.isLight, brightness).forEach { (stop, veilAlpha) ->
+                        val veiledArtwork = veilTint.copy(alpha = veilAlpha).compositedOver(artwork)
+                        val page = veiledArtwork.copy(alpha = layerAlpha).compositedOver(tokens.background)
+                        val where = "$mode direct text over $artwork, brightness=$brightness, stop=$stop"
+                        assertAtLeast(contrast(tokens.textPrimary.compositedOver(page), page), 4.5f, "$where primary")
+                        assertAtLeast(contrast(tokens.textSecondary.compositedOver(page), page), 4.5f, "$where secondary")
+                        assertAtLeast(contrast(tokens.textTertiary.compositedOver(page), page), 3f, "$where tertiary")
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun queueSheetProtectsTextOverExtremeArtworkInBothReleaseModes() {
+        // The queue has small labels directly on its artwork material, unlike
+        // rows with their own fill. Test the actual public/test-channel veil
+        // interpolation; the nominal constants alone would miss the beta.
+        try {
+            listOf(false, true).forEach { testChannel ->
+                DhunVisualTuning.restore(emptyMap(), enabled = testChannel)
+                eachMode { mode, tokens ->
+                    listOf(Color.Black, Color.White).forEach { artwork ->
+                        LyricsMaterialPolicy.queueVeilStops().forEach { (stop, baseAlpha) ->
+                            val alpha = DhunVisualTuning.veilAlpha(VisualPart.QUEUE_SHEET, baseAlpha)
+                            val page = tokens.background.copy(alpha = alpha).compositedOver(artwork)
+                            val where = "$mode/testChannel=$testChannel/artwork=$artwork/stop=$stop"
+                            assertAtLeast(
+                                contrast(tokens.textPrimary.compositedOver(page), page), 7f,
+                                "$where primary",
+                            )
+                            assertAtLeast(
+                                contrast(tokens.textSecondary.compositedOver(page), page), 4.5f,
+                                "$where secondary",
+                            )
+                            assertAtLeast(
+                                contrast(tokens.textTertiary.compositedOver(page), page), 3f,
+                                "$where tertiary",
+                            )
+                        }
+                    }
+                }
+            }
+        } finally {
+            DhunVisualTuning.restore(emptyMap(), enabled = false)
         }
     }
 
@@ -312,6 +384,32 @@ class DhunThemeContrastTest {
 
     private fun assertAtLeast(actual: Float, minimum: Float, what: String) {
         assertTrue(actual >= minimum, "$what = ${"%.2f".format(actual)}:1, need $minimum:1")
+    }
+
+    /** Measures the actual lifted/sheened top and deepened bottom, not only the middle fill. */
+    private fun assertGlassStopContrast(
+        mode: DhunThemeMode,
+        tokens: DhunTokens,
+        base: Color,
+        page: Color,
+        content: Boolean,
+        label: String,
+    ) {
+        val body = GlassMaterialPolicy.bodyStops(base, tokens.isLight)
+        val sheen = if (content) {
+            GlassMaterialPolicy.contentSheenStops(tokens.isLight)
+        } else {
+            GlassMaterialPolicy.sheenStops(tokens.isLight)
+        }
+        listOf(body.first(), body.last()).forEach { (offset, color) ->
+            val bodyOverPage = color.compositedOver(page)
+            val sheenAlpha = if (offset == 0f) sheen.first().second else 0f
+            val surface = Color.White.copy(alpha = sheenAlpha).compositedOver(bodyOverPage)
+            val where = "$mode $label at stop $offset"
+            assertAtLeast(contrast(tokens.textPrimary.compositedOver(surface), surface), 4.5f, "$where primary")
+            assertAtLeast(contrast(tokens.textSecondary.compositedOver(surface), surface), 4.5f, "$where secondary")
+            assertAtLeast(contrast(tokens.textTertiary.compositedOver(surface), surface), 3f, "$where tertiary")
+        }
     }
 
     /** WCAG 2.1 relative luminance. */

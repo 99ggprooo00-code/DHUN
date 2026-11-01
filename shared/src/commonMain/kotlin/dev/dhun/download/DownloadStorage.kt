@@ -19,12 +19,24 @@ interface DownloadStorage {
     /** Append bytes to [path], creating parents if missing. */
     suspend fun append(path: String, bytes: ByteArray)
 
+    /** Read a small temporary-file metadata record; null when it is absent. */
+    suspend fun readText(path: String): String?
+
+    /** Replace a small temporary-file metadata record. */
+    suspend fun writeText(path: String, text: String)
+
     /** Atomically move [part] to [final] (delete [final] first if present). */
     suspend fun commit(part: String, final: String)
 
     suspend fun delete(path: String)
     suspend fun ensureDirExists(path: String)
 }
+
+/**
+ * Versioned artwork filename. Version 2 makes old, potentially damaged covers
+ * refresh to a new URI after an update instead of reusing a cached failure.
+ */
+fun downloadArtworkFileName(trackId: String): String = "${safeTrackId(trackId)}.v2.jpg"
 
 /** Map a stream MIME type to the audio file extension (no dot on return). */
 fun extensionForMimeType(mimeType: String): String = when {

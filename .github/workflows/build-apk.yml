@@ -2,19 +2,19 @@ name: Build APK
 
 # Fast, artifact-only debug APK for every push to main and every PR — the
 # job a reviewer/agent uses to sanity-check "does Android still assemble"
-# without waiting on the release pipeline. The private rolling `test` draft
-# and fixed v1.00.001 prerelease are created by `test-release.yml`; this one
-# only uploads a run-scoped artifact.
+# without waiting on the release pipeline. The public rolling DHUN beta and
+# fixed v1.00.002 release are created by `beta-release.yml`; this one only
+# uploads a run-scoped artifact and never replaces either release.
 #
 # Module names are not guesses in this repo: the Android application module is
 # `:app-android` (settings.gradle.kts), NOT `:app` — `:app` is *ambiguous*
 # (candidates `app-android`, `app-desktop`) and Gradle fails the task lookup.
 # ABI splits replace the single `app-android-debug.apk`. assembleDebug writes
 # `*universal*`, `*arm64-v8a*` and `*armeabi-v7a*` APKs under
-# `app-android/build/outputs/apk/debug/`; test-release.yml stages those three
+# `app-android/build/outputs/apk/debug/`; beta-release.yml stages those three
 # as the rolling-release names. This job only uploads the raw outputs.
-# Every variant receives the same time-ordered test versionCode as test-release;
-# public versionCode 7 must not make a PR artifact a downgrade over a test build.
+# Every variant receives the same time-ordered beta versionCode as beta-release;
+# public versionCode 7 must not make a PR artifact a downgrade over a beta build.
 
 on:
   push:
@@ -49,25 +49,25 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Allocate increasing Android test identity
-        id: test_version
-        run: python scripts/test_version.py "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+      - name: Allocate increasing Android beta identity
+        id: beta_version
+        run: python scripts/beta_version.py "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
 
       - name: Assemble debug APK
         env:
-          TEST_VERSION_NAME: ${{ steps.test_version.outputs.version_name }}
-          TEST_VERSION_CODE: ${{ steps.test_version.outputs.version_code }}
+          BETA_VERSION_NAME: ${{ steps.beta_version.outputs.version_name }}
+          BETA_VERSION_CODE: ${{ steps.beta_version.outputs.version_code }}
         run: |
           ./gradlew :app-android:assembleDebug \
             "-PdhunReleaseChannel=development" \
-            "-PdhunTestVersionName=$TEST_VERSION_NAME" \
-            "-PdhunTestVersionCode=$TEST_VERSION_CODE" \
+            "-PdhunBetaVersionName=$BETA_VERSION_NAME" \
+            "-PdhunBetaVersionCode=$BETA_VERSION_CODE" \
             --no-daemon
 
       - name: Verify all APK packages and signatures
         env:
-          TEST_VERSION_NAME: ${{ steps.test_version.outputs.version_name }}
-          TEST_VERSION_CODE: ${{ steps.test_version.outputs.version_code }}
+          BETA_VERSION_NAME: ${{ steps.beta_version.outputs.version_name }}
+          BETA_VERSION_CODE: ${{ steps.beta_version.outputs.version_code }}
         run: |
           aapt=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)
           apksigner=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
@@ -75,7 +75,7 @@ jobs:
           test -n "$apksigner"
           python scripts/check_android_identity.py "$aapt" \
             app-android/build/outputs/apk/debug \
-            "$TEST_VERSION_NAME" "$TEST_VERSION_CODE" --apksigner "$apksigner"
+            "$BETA_VERSION_NAME" "$BETA_VERSION_CODE" --apksigner "$apksigner"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v6

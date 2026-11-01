@@ -1,18 +1,21 @@
 # Release policy (versioning decided 2026-10-10; other rules pending approval)
 
-> **Status:** the versioning choice in section 2 (Option A) was decided by the maintainer on 2026-10-10. The numbered rules in section 3 remain **proposals** until the maintainer approves them. Nothing here changes an existing tag, release, or asset. Items marked **[decision]** need the maintainer's approval before they take effect. This file describes the release candidate, what each identifier means, and what a future release must prove.
+> **Status:** the fixed-version choice in section 2 (Option A) was decided on 2026-10-10. On 2026-11-01 the maintainer authorised the rolling channel to become the public **DHUN beta** prerelease: no draft state, with each publication replacing the previous `beta` release/tag after its gates pass. The numbered rules for future fixed releases remain **proposals** except where existing workflow/user decisions are stated. Items marked **[decision]** still need approval. Fixed versioned releases and their assets are not rewritten by the rolling-beta migration.
 
 ## 1. Release candidate identifiers
 
 | Identifier | Current value | Meaning | Where it is declared |
 |---|---|---|---|
-| Git tag / GitHub release | `v1.00.002` (after the reviewed release-intent merge builds and publishes successfully); `v1.00.001` remains fixed at `6ebc45c` | Fixed public pre-releases | `test-release.yml` (hard-coded) |
+| Git tag / GitHub release | `v1.00.002` (after the reviewed release-intent merge builds and publishes successfully); `v1.00.001` remains fixed at `6ebc45c` | Fixed public pre-releases | `beta-release.yml` (hard-coded) |
 | App version (`versionName`) | `1.00.002` | What users see on Android | `app-android/build.gradle.kts` |
 | Android `applicationId` | `dev.dhun.android` | Package identity | `app-android/build.gradle.kts` |
 | Android `versionCode` | `7` | Integer Android uses for upgrades; must increase on each published build | `app-android/build.gradle.kts` |
 | MSI `ProductVersion` | increasing workflow counter (`3.61.1` for v1.00.001) | Windows Installer sequence; **not** the app version | computed by `scripts/installer_version.py` from the run number and attempt |
 | MSI `UpgradeCode` | `31ddb86b-9666-4071-b11c-45f16fa4682d` | Stable identity; changing it orphans existing installs | `app-desktop/build.gradle.kts` |
-| Rolling tag | `test` | Private draft, replaced on every `main` build | `test-release.yml` |
+| Rolling tag / release | `beta` / **DHUN beta** | Public prerelease (`isDraft=false`); each successful beta publication replaces the previous beta release/tag | `beta-release.yml` |
+| Rolling Android `versionName` | `1.00.<run>-beta.<attempt>` | Readable beta/development package identity; the renamed beta workflow's run includes the 867 continuity offset; fixed public versions do not use this suffix | `scripts/beta_version.py` |
+| Rolling Android `versionCode` | allocation time in Unix seconds | Nondecreasing across APK workflows; same-second packages may reinstall, never downgrade | `scripts/beta_version.py` |
+| Rolling assets | `dhun-beta.apk`, `dhun-beta-arm64-v8a.apk`, `dhun-beta-armeabi-v7a.apk`, `dhun-beta.msi` | Exactly four installers; no release text sidecars | `beta-release.yml` |
 
 The identifier `1.00.001` is not canonical SemVer: SemVer forbids leading zeros in numeric identifiers, and a Git tag `v1.00.001` is not the same string as `v1.0.1`. The project changelog asks for SemVer unless the maintainer requests otherwise. This identifier stays preserved exactly. The 1.00.002 candidate uses the same padded format.
 
@@ -29,18 +32,18 @@ The v1.00.002 workflow deliberately marks it as a **pre-release**, not Latest, b
 
 ## 3. Rules that apply to every future release (proposed)
 
-1. **`versionCode` strictly increases** for each published Android build. Never reuse or lower it.
-2. **MSI `ProductVersion` strictly increases** over every published MSI. It is derived from the workflow run number and attempt (`1 + run // 256 . run % 256 . attempt`), so any build from a newer run outranks the previous one. Do not reset it. A local `packageMsi` without `-PdhunInstallerVersion` uses the fallback `1.0.6`, which is **lower** than the published `3.61.1` and would be refused as a downgrade. Such a file must never be published.
-3. **`UpgradeCode` never changes.**
-4. **Tags are immutable.** A published tag is never moved or re-pointed. A fix is a new version.
-5. **The tag, the commit, and the built binaries must match.** The publish job refuses a superseded `main` commit. For the fixed `v1.00.002` path, `stage_versioned_release.py requires every input's `sourceSha` to equal `GITHUB_SHA`, which is also the release `--target`. The rolling `test` draft uses `--target $GITHUB_SHA` but does not re-check its inputs.
-6. **Assets are never edited in place.** A change to a published asset requires a new version.
-7. **No `.json` files are added to release assets.** Future sidecars are `*.sha256` (standard `sha256sum` format) and `*.provenance.txt` (flat `key=value`). The v1.00.001 release keeps its historical `.build-info.json` assets, which are not modified.
-8. **Destructive cleanup is opt-in.** A manual publish deletes the legacy `dev`, `dev-v0.1.0` and `dev-v0.1.1` releases and tags only when `purge_legacy_dev_releases` is ticked for that dispatch (default off). The rolling `test` draft is replaced on main app-code pushes, not by a manual public dispatch. Restricting who may approve a publish needs a GitHub environment with required reviewers; see `.ai/KNOWN_LIMITATIONS.md`.
+1. **Android never downgrades.** Fixed public `versionCode` values strictly increase. Rolling beta/development codes come from allocation time: later allocations increase, while a same-second build may reuse a code for an accepted reinstall. Never wrap or lower a code.
+2. **MSI `ProductVersion` strictly increases** over every published MSI. It is derived from the effective workflow run number and attempt (`1 + run // 256 . run % 256 . attempt`), so any build from a newer run outranks the previous one. The renamed beta workflow adds 867 to its raw run number to continue the old `test-release` sequence whether GitHub resets or continues that counter. Do not reset it. A local `packageMsi` without `-PdhunInstallerVersion` uses the fallback `1.0.6`, which is **lower** than the published `3.61.1` and would be refused as a downgrade. Such a file must never be published.
+3. **Application and upgrade identities never change.** Android keeps `dev.dhun.android` and its signing identity; Windows keeps `UpgradeCode` `31ddb86b-9666-4071-b11c-45f16fa4682d`. Updates must not require clearing playlists, favourites, settings, downloads, queues or history.
+4. **Fixed tags are immutable; rolling `beta` is the explicit exception.** A fixed published tag is never moved or re-pointed, and a fix gets a new fixed version. Each authorised rolling-beta publication instead deletes and recreates the `beta` release/tag at the verified new `main` commit. A failed build does not delete the current beta.
+5. **The tag, the commit, and the built binaries must match.** The publish job refuses a superseded `main` commit. For the fixed `v1.00.002` path, `stage_versioned_release.py` requires every input's `sourceSha` to equal `GITHUB_SHA`, which is also the release `--target`. Rolling beta consumes artifacts from the same workflow run and targets `$GITHUB_SHA`.
+6. **Fixed assets are never edited in place.** A change to a fixed published asset requires a new version. Rolling beta is replaced as a complete four-installer release rather than having individual assets edited.
+7. **No `.json` files are added to release assets.** Fixed-release sidecars are `*.sha256` (standard `sha256sum` format) and, where staged, `*.provenance.txt` (flat `key=value`). Rolling beta exposes only its four installers; checksums/provenance stay in internal workflow artifacts. Historical fixed-release assets are inspected and preserved as published, not rewritten to fit later asset rules.
+8. **Unrelated destructive cleanup is opt-in.** A manual fixed publish deletes the legacy `dev`, `dev-v0.1.0` and `dev-v0.1.1` releases and tags only when `purge_legacy_dev_releases` is ticked for that dispatch (default off). Rolling beta replacement is the separately authorised automatic exception. During migration, the legacy `test` release/tag is removed only after the replacement public beta is verified; fixed public releases are never cleanup targets. Restricting who may approve a fixed publish needs a GitHub environment with required reviewers; see `.ai/KNOWN_LIMITATIONS.md`.
 
 ## 4. Verifying a published file
 
-Checksums only prove that a download matches the release page. They do not prove who built the file.
+Checksums only prove that a download matches the release page. They do not prove who built the file. The commands below are for fixed releases with published sidecars. Rolling **DHUN beta** deliberately has exactly four installer assets and no checksum/provenance sidecars; its verification records remain in internal workflow artifacts.
 
 **Linux / macOS**
 
@@ -69,20 +72,21 @@ Expected for the current test key: certificate SHA-256 `d8e57ec69f40956d34adff13
 | Gate | Current state | Proposed |
 |---|---|---|
 | Unit tests (shared, Android, desktop) | In CI (`ci.yml`) | Keep |
-| Android build, debug-signed | In `test-release.yml` | Keep |
+| Android build, debug-signed | In `beta-release.yml` | Keep |
 | Release-only Android build (`assembleRelease`) | Not built. `release` buildType has no signing config and is not minified. | **[decision]** whether a release build type is needed |
-| MSI build and identity check | In `test-release.yml` | Keep |
+| MSI build and identity check | In `beta-release.yml` | Keep |
 | MSI install-over on hosted Windows | Required on `main` (skip fails); skipped on PR/branch | Keep |
-| Public release creation | Hard-coded to `v1.00.002`; a reviewed one-shot main merge or manual dispatch builds, checks and publishes a verified draft once | Keep reviewed version changes and draft verification |
-| Human approval before publishing | Ordinary pushes to `main` build and test only. The reviewed PR adding `.github/release-intent/v1.00.002` selects a public build exactly once when merged into `main`; a manual `workflow_dispatch` with `build_only=false` remains supported. Either path requires APK/MSI gates and a verified draft before publication. | **[decision]** add a protected approval environment for future release jobs |
-| Hardware acceptance (Android, Windows) | Not done | Required before any "works on device" claim |
+| Fixed public release creation | Hard-coded to `v1.00.002`; a reviewed one-shot main merge or manual dispatch builds, checks and publishes a verified draft once | Keep reviewed version changes and draft verification |
+| Rolling beta creation | Ordinary verified `main` app/build updates publish **DHUN beta** directly as a public prerelease (never a draft), replacing the previous `beta` release/tag. Exactly four installers; no sidecars. PRs upload run-scoped artifacts only. | Keep replacement, target, title, prerelease and asset assertions |
+| Human approval before fixed publishing | The reviewed PR adding `.github/release-intent/v1.00.002` selects a fixed public build exactly once when merged into `main`; a manual `workflow_dispatch` with `build_only=false` remains supported. Either path requires APK/MSI gates and a verified draft before publication. Ordinary `main` pushes can update only rolling beta, not a fixed tag. | **[decision]** add a protected approval environment for future fixed release jobs |
+| Hardware acceptance (Android, Windows) | Not complete; individual install reports and hosted checks are not a full device/playback/accessibility/performance matrix | Required before broad "works on device" claims |
 
 ## 6. Known risks in the publish path (not yet changed)
 
 - `publish.sh` at the repository root rewrites `origin` to an SSH remote and pushes `main` directly. It is not part of the release path, but it bypasses CI. **[decision]** remove it or move it under `.ai/`.
 - The publish job deletes old `dev-*` releases and tags with `|| true`, so a failed delete is silently ignored.
-- `publish` does not run on ordinary pushes to `main`. An ordinary merge refreshes only the private test draft. The single merge that **adds** `.github/release-intent/v1.00.002` selects the public build and publishes the fixed tag only after its own build gates; subsequent pushes cannot reuse the existing marker. A manual dispatch with `build_only=false` remains available. The push path cannot purge legacy dev releases.
+- Fixed `publish` does not run on ordinary pushes to `main`. An ordinary qualifying merge instead replaces the public rolling **DHUN beta** prerelease after its gates. The single merge that **adds** `.github/release-intent/v1.00.002` selects the fixed public build and publishes that fixed tag only after its own build gates; subsequent pushes cannot reuse the existing marker. A manual dispatch with `build_only=false` remains available. The push path cannot purge legacy dev releases or rewrite fixed releases.
 
-## Live public-release metadata (2026-10-16)
+## Live fixed-release metadata (verified 2026-11-01)
 
-The published `v1.00.002` tag still targets `1280e34`. Its GitHub metadata is now **non-prerelease**, its universal APK asset is named `dhun-universal-v1.00.002.apk`, and the release lists eight nonempty assets: four binaries and four checksum sidecars. The four provenance text assets present in the original draft are not currently listed. This differs from the one-shot publisher and historical candidate notes above. The historical `sha256sum -c` example in section 4 no longer applies to the renamed universal APK: its sidecar still names the original file; use the digest-comparison recipe in `docs/INSTALL.md`. The maintainer chose to preserve the current public release rather than reclassify, rename, replace, or upload any assets. The stale one-time provenance-repair proposal in PR #170 is therefore not safe to run; it expected the original prerelease flag and filenames. No release/tag mutation is part of the replacement verification fix.
+Release API snapshot: `v1.00.002` is release ID `414955833`, `draft=false`, `prerelease=true`, targeting `1e672f45d77547161d76ecc4de2bbe03c252ab93`; the tag ref resolves to that same commit. Its universal APK is `dhun-v1.00.002.apk`. It lists 12 nonempty assets: four installers, four matching `.sha256` sidecars and four `.provenance.txt` records. The release's `updated_at` value is `2026-10-16T12:47:16Z`. The rolling-beta migration must leave this release, its tag and every asset unchanged; historical candidate notes that describe other names or asset counts are not current download guidance.

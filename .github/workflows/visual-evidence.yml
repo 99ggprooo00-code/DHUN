@@ -1,0 +1,123 @@
+name: Visual evidence
+
+# Real Compose/Skia rendered frames. The normal artifact remains the reviewer
+# handoff. A tiny manifest of Git blobs is also emitted because some automation
+# environments can reach api.github.com but not the signed Actions artifact
+# hosts; those environments must not substitute source audits for screenshots.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "shared/**"
+      - "app-desktop/**"
+      - ".github/workflows/visual-evidence.yml"
+  workflow_dispatch:
+
+# Same-repository PRs only. No ref, release, tag, or branch is written: the
+# evidence step creates content-addressed Git blobs and reports their hashes.
+permissions:
+  contents: write
+
+jobs:
+  compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Render real Compose evidence
+        run: ./gradlew :app-desktop:jvmTest --tests "dev.dhun.desktop.Visual*EvidenceTest" --no-daemon
+
+      - name: Upload rendered frames and test reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: compose-visual-evidence
+          if-no-files-found: warn
+          path: |
+            app-desktop/build/outputs/visual-evidence/*.png
+            app-desktop/build/test-results/jvmTest/*.xml
+            app-desktop/build/reports/tests/jvmTest/**
+
+      - name: Publish inspectable evidence manifest
+        if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          RUN_ID: ${{ github.run_id }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import base64
+          import glob
+          import hashlib
+          import json
+          import os
+          import subprocess
+          import tempfile
+          import xml.etree.ElementTree as ET
+
+          root = "app-desktop/build/outputs/visual-evidence"
+          repository = os.environ["GITHUB_REPOSITORY"]
+
+          def create_blob(path=None, raw=None):
+              if raw is None:
+                  with open(path, "rb") as handle:
+                      raw = handle.read()
+              payload = json.dumps({
+                  "encoding": "base64",
+                  "content": base64.b64encode(raw).decode("ascii"),
+              }).encode("utf-8")
+              with tempfile.NamedTemporaryFile() as body:
+                  body.write(payload)
+                  body.flush()
+                  result = subprocess.run(
+                      ["gh", "api", f"repos/{repository}/git/blobs", "--input", body.name, "--jq", ".sha"],
+                      check=True,
+                      text=True,
+                      capture_output=True,
+                  )
+              return result.stdout.strip()
+
+          images = []
+          for path in sorted(glob.glob(f"{root}/*.png")):
+              with open(path, "rb") as handle:
+                  raw = handle.read()
+              images.append({
+                  "name": os.path.basename(path),
+                  "blob": create_blob(raw=raw),
+                  "bytes": len(raw),
+                  "sha256": hashlib.sha256(raw).hexdigest(),
+              })
+
+          totals = {"tests": 0, "failures": 0, "errors": 0, "skipped": 0}
+          reports = []
+          for path in sorted(glob.glob("app-desktop/build/test-results/jvmTest/TEST-*.xml")):
+              suite = ET.parse(path).getroot()
+              counts = {key: int(float(suite.attrib.get(key, "0"))) for key in totals}
+              for key in totals:
+                  totals[key] += counts[key]
+              reports.append({"name": os.path.basename(path), **counts})
+
+          manifest = {
+              "head": os.environ["HEAD_SHA"],
+              "run": os.environ["RUN_ID"],
+              "renderer": "Compose ImageComposeScene / Skia",
+              "scope": "real Compose component/app-shell frames with recorded metadata; not Android device or audible-playback acceptance",
+              "images": images,
+              "visual_test_reports": reports,
+              "visual_test_totals": totals,
+          }
+          encoded = json.dumps(manifest, indent=2, sort_keys=True).encode("utf-8")
+          manifest_blob = create_blob(raw=encoded)
+          print(
+              f"::notice title=DHUN visual evidence::manifest={manifest_blob} "
+              f"images={len(images)} tests={totals['tests']} failures={totals['failures']} errors={totals['errors']}"
+          )
+          PY

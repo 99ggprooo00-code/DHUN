@@ -215,7 +215,7 @@ class NavStatePersistenceTest {
     }
 
     @Test
-    fun `restored catalogue page is kept for test release and dropped for public release`() {
+    fun `restored catalogue page is kept for beta release and dropped for public release`() {
         val bundle = Bundle().apply {
             putStringArrayList(
                 NavStatePersistence.KEY_DETAIL_ROUTES,

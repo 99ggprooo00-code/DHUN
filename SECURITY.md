@@ -6,8 +6,9 @@ DHUN is an experimental, pre-release project. There is no commitment to security
 
 | Version | Status |
 |---|---|
-| `v1.00.001` (public pre-release) | Experimental. No fixes are promised for it. |
-| Rolling `test` build | Private draft for collaborators. Not a public release. |
+| `v1.00.002` (fixed public build) | Experimental. No fixes are promised for it. |
+| `v1.00.001` (historical fixed build) | Experimental and superseded. No fixes are promised for it. |
+| Rolling `beta` / **DHUN beta** | Public prerelease, not a draft. Each publication replaces the previous beta release/tag; no support or fix timeline is promised. |
 
 ## How to report a vulnerability
 
@@ -21,7 +22,7 @@ Please include, when you can: the affected version or commit, the platform (Andr
 
 - **Android:** the APK is signed with a public test key that is committed to this repository (`app-android/keystores/dhun-test.p12`). Because the key is public, a matching signature does not prove that a file came from the maintainers.
 - **Windows:** the MSI is not Authenticode-signed.
-- **Integrity:** a `.sha256` file from the same release page only shows that a download matches what that page published. It does not prove who built the file. Verify the checksum against the release page itself, and see `docs/INSTALL.md`.
+- **Integrity:** for fixed releases with sidecars, a `.sha256` file from the same release page only shows that a download matches what that page published. It does not prove who built the file. Verify the checksum against the release page itself, and see `docs/INSTALL.md`. Rolling DHUN beta publishes exactly four installers and no checksum/provenance sidecars; those records remain in internal workflow artifacts.
 
 ## Scope
 

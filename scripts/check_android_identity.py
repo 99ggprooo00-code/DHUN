@@ -7,9 +7,9 @@ from pathlib import Path
 
 EXPECTED_CERT_SHA256 = "d8e57ec69f40956d34adff137872db9fec3b817e149e2d0c33af5924142468c3"
 STAGED_APKS = (
-    "dhun-test.apk",
-    "dhun-test-arm64-v8a.apk",
-    "dhun-test-armeabi-v7a.apk",
+    "dhun-beta.apk",
+    "dhun-beta-arm64-v8a.apk",
+    "dhun-beta-armeabi-v7a.apk",
 )
 RAW_APKS = (
     "app-android-universal-debug.apk",

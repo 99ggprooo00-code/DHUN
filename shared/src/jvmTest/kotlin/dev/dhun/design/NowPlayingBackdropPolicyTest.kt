@@ -102,4 +102,13 @@ class NowPlayingBackdropPolicyTest {
         assertEquals(1f, NowPlayingBackdropPolicy.blurMultiplier(100), absoluteTolerance = 0.0001f)
         assertEquals(1f, NowPlayingBackdropPolicy.blurMultiplier(250), absoluteTolerance = 0.0001f)
     }
+
+    @Test
+    fun nonBlurFallbackDimsTheEstablishedLayerWithoutRemovingArtwork() {
+        assertEquals(1f, NowPlayingBackdropPolicy.loadedLayerAlpha(blurActive = true))
+        val fallback = NowPlayingBackdropPolicy.loadedLayerAlpha(blurActive = false)
+        assertEquals(NowPlayingBackdropPolicy.NON_BLUR_LAYER_ALPHA, fallback)
+        assertTrue(fallback > 0f, "zero/unsupported blur must retain visible sharp artwork")
+        assertTrue(fallback < 1f, "the non-blur layer must be dimmed over the theme base")
+    }
 }

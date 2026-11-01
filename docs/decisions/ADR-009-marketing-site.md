@@ -7,6 +7,10 @@
 > clarifies current native/browser scope, design-only capabilities and no expansion
 > or implied provider permission. Architecture acceptance is not authorisation to
 > download content; historical B1/single-source framing is not a current vision.
+> Release-channel amendment (2026-11-01): the old rolling `test` URL is retired;
+> current rolling-channel copy means the public **DHUN beta** prerelease at `beta`,
+> which replaces the previous beta on each publication. The existing fixed-release
+> CTA and no-direct-artifact boundary remain unchanged; this adds no beta CTA.
 
 - **Status:** PROPOSED (written by the `arena/fc918d37-dhun` session, 2026-10-08,
   on the user's explicit instruction to build the site; **not** an architecture

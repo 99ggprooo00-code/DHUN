@@ -1,13 +1,13 @@
 """Copy AGP ABI-split debug APKs to the three rolling-release names.
 
-The test-release ``apk`` job's contract, and the only place that contract is
+The beta-release ``apk`` job's contract, and the only place that contract is
 implemented: in the ``assembleDebug`` output directory, each of the globs
 ``*universal*``, ``*arm64-v8a*`` and ``*armeabi-v7a*`` must match exactly one
 file. Those files are copied to:
 
-- ``dhun-test.apk``              universal (stable install URL)
-- ``dhun-test-arm64-v8a.apk``
-- ``dhun-test-armeabi-v7a.apk``
+- ``dhun-beta.apk``              universal (stable install URL)
+- ``dhun-beta-arm64-v8a.apk``
+- ``dhun-beta-armeabi-v7a.apk``
 
 The script prints each file's size and SHA-256, and whether each per-ABI APK
 is byte-identical to the universal. Identity is reported, not enforced. DHUN
@@ -30,9 +30,9 @@ from pathlib import Path
 # These three globs are the apk-job contract. Each must match exactly one
 # file in the assembleDebug output directory — not zero, not two.
 GLOBS = (
-    ("universal", "*universal*", "dhun-test.apk"),
-    ("arm64-v8a", "*arm64-v8a*", "dhun-test-arm64-v8a.apk"),
-    ("armeabi-v7a", "*armeabi-v7a*", "dhun-test-armeabi-v7a.apk"),
+    ("universal", "*universal*", "dhun-beta.apk"),
+    ("arm64-v8a", "*arm64-v8a*", "dhun-beta-arm64-v8a.apk"),
+    ("armeabi-v7a", "*armeabi-v7a*", "dhun-beta-armeabi-v7a.apk"),
 )
 
 

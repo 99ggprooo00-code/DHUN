@@ -1,28 +1,39 @@
-# CURRENT ACTIVE TASK — 2026-10-29: native mutation feedback
+# CURRENT ACTIVE TASK — 2026-11-01: public rolling DHUN beta + PR #218 delivery
 
-**Branch/base:** `arena/8b985cde-dhun` / `main` `1ec8c06` (merge of PR #211).
-Starting tree clean. Owner authorises scoped native implementation, tests,
-commit/push/PR and merge after every applicable gate; no public app release and
-no provider change.
+**Branch/base:** `arena/8a70a040-dhun`; reviewed recovery/documentation base
+`a21b5236ca156a07832b0bea64555af5048ce074`; separate beta migration commit
+`64fa454` is pushed. Hosted beta runs then exposed the stale desktop channel
+allowlist and a reset-rollback ordering hole; both are corrected in follow-up
+work. The user installed/tested the supplied
+arm64 package and explicitly authorised merging PR #218 and publishing the rolling
+channel publicly as **DHUN beta**. That statement is not a full device, audible,
+accessibility or performance acceptance matrix.
 
-**Why this task:** the playlist-deletion cycle (PR #210 closed as superseded,
-PR #211 merged) fixed one instance of "the UI confirms before the write does".
-The native audit found the same class across Settings, Library, the playlist page
-and the Like control — including two crash paths, because those call sites had no
-error handling at all. Evidence table:
-[verification 31](../docs/verification/31-native-mutation-feedback.md).
+**Release contract:** use tag `beta`, title **DHUN beta**, public prerelease
+(`isDraft=false`), and exactly four `dhun-beta*` installers with no release text
+sidecars. Every beta publication replaces the previous beta release/tag after
+package gates. Migrate the legacy `test` release/tag only after the replacement
+is verified. Fixed releases, especially `v1.00.002`, stay unchanged. Android
+application/signing identity and Windows UpgradeCode stay unchanged; updates must
+preserve playlists, favourites, settings, downloads, queue and history without
+clearing data.
 
-**Work:** shared `MutationTracker`/`MutationState`; result-driven Settings
-dialogs (pending, failure, retry, success-gated close); banner feedback for
-row-level mutations; create-playlist and rename dialogs that stay open on
-failure; add-to-playlist sheet with in-sheet failures. New `MutationTrackerTest`
-and `SettingsMaintenanceActionsTest` plus regressions in the Library, downloads,
-Home and playlist suites.
+**Implementation status:** beta workflow/scripts/channel/assets/docs and the two
+existing website status passages are migrated. Background preferences remain
+**Background blur + Background brightness**; the five-palette/four-surface custom
+colour models are not restoration targets. The beta workflow carries the old
+run-867 continuity offset, and Windows beta-to-beta checks use GitHub asset
+digests because beta has no sidecars. Local evidence: 521/521 Python guards,
+340/340 app-web tests, 63/63 website rules, website build/minify/docs checks,
+legal generation and workflow YAML/publish-shell syntax all pass. No local JDK,
+Android SDK, emulator, ADB/phone, interactive desktop or pwsh is available;
+Kotlin/MSI/runtime checks require the hosted workflows.
 
-**Verification limits:** this sandbox has no JDK, Gradle distribution, Android
-SDK/emulator, ADB or interactive Windows session, so compilation, unit tests and
-lint are CI-only here and no device interaction is claimed. Local: the Python
-repository-hygiene suite.
+**Next:** commit/push the reset-rollback follow-up, obtain green checks for the
+new exact PR head, merge PR #218 with a merge commit, then verify the public beta
+target/title/prerelease/four assets and fixed-release immutability.
+Do not claim merge, publication, replacement or device acceptance before the
+corresponding GitHub result exists.
 
 ---
 
@@ -331,7 +342,7 @@ overflow was escaped markup, not layout.
 
 1. **Destructive download/history actions (P0):** clear-all used to hide failures and dismiss early; batch deletion and clear history had the same issue. This branch makes all three result-driven: pending disables duplicate submits, failures stay visible with retry, and confirmation/selection resets only after success. The manager serializes download mutations with clear-all and joins workers before deleting final/partial files. JVM tests cover clear-all failure/retry and successful file/row cleanup. Still needs CI confirmation and Android/desktop interaction verification.
 2. **GitHub Pages internal links (P1):** templates emitted root URLs such as `/`, `/features/` and `/ui/` although the canonical project site is hosted beneath `/DHUN/`. A `sitePath` filter preserves root-hosted local tests and prefixes internal paths for a separate Pages artifact build. The Pages workflow now builds and smoke-checks that artifact separately from the root-built artifact used by browser tests.
-3. **Design-system drift:** the current visual direction is **translucent frosted glass**, artwork-led, with cached/lightweight blur, tint/scrim and accessible fallback. Material libraries may be implementation primitives; “Material 3 only” is stale and must not direct new work. **2026-10-30:** background customisation is two orthogonal switches (background blur, dynamic colours) over four surfaces (pages, navigation bar, miniplayer, full player), each with one picked colour — see `docs/design/glass-system.md` §3a. The earlier five-section `primary`/`secondary`/`tertiary` model is superseded; do not restore it.
+3. **Design-system drift:** the current visual direction is **translucent frosted glass**, artwork-led, with cached/lightweight blur, tint/scrim and accessible fallback. Material libraries may be implementation primitives; “Material 3 only” is stale and must not direct new work. **2026-10-30 historical experiment:** background customisation briefly used two switches and four per-surface colours on another branch. **Superseded 2026-10-31:** that model is not in the current tree; the authoritative glass specification keeps Background blur + Background brightness and rejects both that editor and the earlier five-palette model.
 4. **AI operating-file drift:** update this file, MASTER_PROMPT, KNOWN_LIMITATIONS, DEBUG_LOG, WEBSITE_PLAN, HANDOFF and README together. Preserve old session notes as history; never present their old branch/commit/status or “do not touch FullPlayer” restrictions as current instructions.
 5. **Product specs:** reconcile PRD, TRD, app flow, UI/UX, data schema and implementation plan with current source and this accepted contract. Separate native app, static marketing site and experimental `app-web/`; no production browser player or new backend is implied.
 

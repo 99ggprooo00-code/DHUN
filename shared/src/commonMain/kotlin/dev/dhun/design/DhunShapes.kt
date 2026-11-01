@@ -5,8 +5,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 
 /**
- * Material 3 shape scale — extra-large on primary media cards, pill chips.
- * Keeps the product feeling rounded and premium without Liquid Glass.
+ * DHUN shape scale — extra-large on primary media cards, pill chips.
+ * Rounded geometry supports the glass material without becoming decoration on every row.
  */
 object DhunShapes {
     val extraSmall = RoundedCornerShape(4.dp)
@@ -17,7 +17,7 @@ object DhunShapes {
     val extraExtraLarge = RoundedCornerShape(32.dp)
     val full = CircleShape
 
-    // Semantic aliases (M3 roles)
+    // Semantic aliases for DHUN surfaces and controls
     val card = large
     val cardLarge = extraLarge
     val chip = full // pill filter / assist chips

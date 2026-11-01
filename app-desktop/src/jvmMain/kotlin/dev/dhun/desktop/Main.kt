@@ -662,7 +662,7 @@ private fun desktopAppInfo(): DhunAppInfo {
         versionName = installer ?: DhunAppInfo.UNKNOWN,
         versionCode = null,
         releaseChannel = when (channel) {
-            "test" -> DhunAppInfo.TEST_RELEASE_CHANNEL
+            "beta" -> DhunAppInfo.BETA_RELEASE_CHANNEL
             "public" -> "public pre-release"
             else -> if (installer != null) "packaged installer" else "run from source"
         },

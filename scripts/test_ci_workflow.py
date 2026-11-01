@@ -21,7 +21,7 @@ green theater, which is the exact failure mode this file exists to catch.
 
 The same "exists but never executes" shape applies to the App Bundle. Stage
 S6 requires a clean-installed AAB, yet the only job that builds one
-(test-release.yml `aab`) is `workflow_dispatch`-gated, and the maintenance
+(beta-release.yml `aab`) is `workflow_dispatch`-gated, and the maintenance
 agent's token gets HTTP 403 on dispatch. ci.yml must therefore name
 `:app-android:bundleDebug` itself, or the bundle path stays unverified until
 release day.
@@ -72,7 +72,7 @@ class CiWorkflowTest(unittest.TestCase):
         )
 
     def test_app_bundle_path_is_a_named_step(self):
-        # S6 needs a clean-installed AAB, but test-release.yml's `aab` job is
+        # S6 needs a clean-installed AAB, but beta-release.yml's `aab` job is
         # workflow_dispatch-gated and the maintenance agent's token gets 403 on
         # dispatch — so without this step `:app-android:bundleDebug` has no
         # automated coverage at all, and it now builds alongside a

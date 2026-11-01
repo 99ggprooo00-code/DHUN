@@ -1,3 +1,41 @@
+## 2026-11-01 — Windows CI exposed stale reset rollback publication
+
+The second exact-head DHUN beta PR run (**41253429335**, commit `8c3e40a`) built
+APKs successfully but failed Windows `:shared:jvmTest`:
+`aNewerWriteSurvivesTheRollbackOfAnOlderFailedReset` expected visible `dark` and
+observed `black` after durable storage had accepted `dark`. Publication stayed
+skipped. This is not renamed-channel behavior and is not dismissed as a flaky
+test: it exposes a real ordering hole in the preceding recovery work.
+
+`loadPersistedValues()` read and committed its snapshot outside `writeMutex`.
+A failed Reset could therefore read old values, allow a newer write to complete,
+then publish the old snapshot over the newer optimistic state. The existing
+post-write repair only covered the opposite interleaving. The complete read and
+publish now runs under the same mutex as writes (without recursively locking the
+beta-profile migration). The regression still requires the newer value and now
+waits for both visible and persisted state, avoiding an assertion in the middle
+of a successful write. A fresh exact-head Windows run remains mandatory.
+
+---
+
+## 2026-11-01 — beta packaging exposed a stale desktop channel allowlist
+
+The first exact-head DHUN beta PR run (**41252469676**, commit `64fa454`) failed
+before packaging: both APK and MSI configuration rejected `dhunReleaseChannel=beta`.
+GitHub check annotations identified `app-desktop/build.gradle.kts` line 15 and its
+old `development, test, or public` requirement. The downstream Windows evidence
+job then had no `msi-install-check` artifact; that is a consequence, not an
+independent installer regression. The workflow correctly skipped publication.
+
+The desktop allowlist now matches Android (`development`, `beta`, `public`), and
+its package description distinguishes beta from development and fixed public
+builds. A source regression now checks both packagers so a future channel rename
+cannot leave one side stale. Local guards must pass again and a fresh exact-head
+hosted run must succeed before merge; the failed run is not counted as a pass.
+No release/tag was mutated by the PR run.
+
+---
+
 ## 2026-10-29 — browser result renders detached the composing Search target
 
 Controlled Node regressions: 7 failures / 19 cases before correction. Search
