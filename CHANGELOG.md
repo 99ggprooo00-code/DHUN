@@ -24,6 +24,36 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Immersive player artwork + modern lyrics presentation (2026-11-01, session `arena/6b3931dd-dhun`)
+
+- Full-player artwork is no longer a small rounded card floating over the
+  backdrop. The hero box now fills the stage width and derives its height from
+  the artwork's own measured aspect (`fittedPlayerArtworkBox`), and an alpha
+  feather (`featherEdges`, offscreen + `DstIn`) dissolves its edges into the
+  once-blurred bleed: one continuous surface, no border, no scrim slab, no
+  crop, no stretch. Side/vertical/animation insets retired to zero.
+- Lyrics-dominant mode retired the rounded lyrics card (and its duplicate
+  blur pass): lines ride an open overlay on the player's own blurred bleed
+  with a soft readability veil (`openLyricsVeilBrush`) and fade into the
+  backdrop at both ends (`fadeVerticalEdges`).
+- Lyric text is a three-role ladder: the sung line is large, bold, centred and
+  framed by a frosted pill; other timed lines recede to a smaller, reduced-
+  opacity style (still readable); translations/transliterations sit under
+  their primary line, smaller and lighter. Unsynced text is centred and
+  stanza-grouped the same way, with no false karaoke emphasis.
+- Attribution caption above the lyrics column names the serving source
+  ("Lyrics from YouTube Music"); unsynced text adds an honest "Not time-synced"
+  sub-caption. Provider attribution persists through the lyrics cache via
+  schema migration `3.sqm` (`LyricsCache.provider`); pre-migration rows read
+  back unattributed and caption as plain "Lyrics".
+- Shared tokens consolidated: lyrics type ladder (`lyricActive/line/secondary`
+  per text-size setting), lyrics spacing tokens, `dialogBodyMaxHeight` for
+  tall dialog bodies (lyrics match picker, country picker), and the mini-player
+  Previous/Next glyph mismatch (18dp vs 24dp) unified at `iconSize`.
+- Tests: artwork-box geometry contract rewritten around aspect-true sizing,
+  new `LyricsPresentationTest` (hierarchy, stanza grouping, attribution,
+  highlight/veil floors), lyrics-cache attribution round-trip, schema v4.
+
 ### Public rolling DHUN beta (2026-11-01, session `arena/8a70a040-dhun`)
 
 - Renamed the rolling release workflow, version allocator, channel mapping and

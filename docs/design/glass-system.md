@@ -98,7 +98,17 @@ Use the existing material that matches the surface:
 - `GlassDock` for the phone's continuous mini-player/navigation dock, so the
   artwork layer is shared rather than decoded once per child band;
 - `lyricsVeil` / `acrylicGlass` only where the caller already owns the correct
-  artwork layer.
+  artwork layer;
+- `openLyricsVeilBrush` for the **card-less** full-player lyrics overlay, which
+  sits directly on the player's once-blurred bleed (no rounded card, no second
+  blur pass), and `lyricsActiveHighlightBrush` +
+  `lyricsActiveHighlightBase` for the frosted pill that frames only the sung
+  line;
+- `featherEdges` / `fadeVerticalEdges` (`FeatherMask.kt`) wherever sharp content
+  must melt into the layer behind it — the now-playing hero's four edges and
+  the lyrics column's top/bottom — instead of wearing a border or clipping at
+  a card rim. The mask multiplies the node's own alpha (offscreen + `DstIn`),
+  so what shows through the fade is exactly the surface behind it.
 
 These surfaces keep artwork behind the veil and content sharp. They are not a
 licence to put an image and blur inside every settings row or music row.
@@ -124,6 +134,8 @@ stock control independently in each screen.
 | Quiet list/reading surface | `dhunContentRowSurface` / `dhunContentSurface` | `design/components/ContentRowSurface.kt` |
 | Page artwork atmosphere | `NowPlayingBackdrop` / `PageArtworkBackdrop` | `design/components/NowPlayingBackdrop.kt` |
 | Lyrics, queue, mini-player artwork | `LyricsMaterial`, `LyricsArtworkSheet`, `AcrylicSurface`, `GlassDock` | `design/components/LyricsMaterial.kt`, `GlassCard.kt` |
+| Card-less lyrics overlay + sung-line pill | `openLyricsVeilBrush`, `lyricsActiveHighlightBrush` / `lyricsActiveHighlightBase` | `design/components/LyricsMaterial.kt` |
+| Edge blending into the layer behind | `featherEdges`, `fadeVerticalEdges` | `design/components/FeatherMask.kt` |
 | Anchored menu | transparent `DropdownMenu` + `TrackMenuSurface` + `MenuActionRow` | `ui/components/TrackOverflowDialog.kt` |
 | Single/multiline input | `DhunTextField` | `design/components/DhunTextField.kt` |
 | Button family | `DhunButton`, `DhunTonalButton`, `DhunOutlinedButton`, `DhunTextButton`, `DhunIconButton` | `design/components/DhunButton.kt` |

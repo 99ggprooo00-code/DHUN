@@ -38,7 +38,7 @@ internal fun LyricsMatchPicker(track: Track, controller: LyricsMatchController, 
     Dialog(onDismissRequest = onDismiss) {
         GlassCard(modifier = Modifier.fillMaxWidth(), opaqueBase = true) {
             Column(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 600.dp)
+                modifier = Modifier.fillMaxWidth().heightIn(max = DhunSpacing.dialogBodyMaxHeight)
                     .verticalScroll(rememberScrollState()).padding(DhunSpacing.lg),
                 verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
             ) {

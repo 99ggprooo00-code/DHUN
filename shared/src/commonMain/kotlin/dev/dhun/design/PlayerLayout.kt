@@ -1,6 +1,7 @@
 package dev.dhun.design
 
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 
 /**
  * Full-player layout modes. Portrait keeps the familiar artwork → metadata →
@@ -51,18 +52,32 @@ internal fun usesCompactPlayerControls(availableHeight: Dp): Boolean =
         availableHeight <= DhunSpacing.playerCompactControlsHeight
 
 /**
- * Both axes constrain the square. Callers hand this the *padded hero field*,
+ * Both axes constrain the hero. Callers hand this the *padded hero field*,
  * not a guessed device size, so the cover naturally expands into the room
- * between the header and the persistent metadata/control cluster. The final
- * ceiling prevents absurd artwork on desktop while raising the old 360dp cap
- * enough for tablets and desktop windows to remain immersive.
+ * between the header and the persistent metadata/control cluster. The width
+ * ceiling prevents absurd artwork on desktop while keeping tablets and
+ * desktop windows immersive.
+ *
+ * Aspect-aware (2026-11 immersive artwork pass): the old square card cropped
+ * every non-square cover and left the "framed thumbnail" look on square ones.
+ * The box now fills the field's **width** (up to [DhunSpacing.playerArtworkMaxSize])
+ * and derives its height from the artwork's own measured aspect ratio, capped
+ * by the field height — i.e. the largest aspect-correct rectangle the field
+ * admits. Square art on a phone therefore spans the whole stage width, a 16:9
+ * cover becomes a full-width band, and a tall cover centres at full height;
+ * nothing is ever stretched, and nothing is cropped by the layout.
+ *
+ * [aspectRatio] is width/height as measured from the decoded image (1:1 until
+ * the first frame arrives). Non-finite or non-positive values fall back to
+ * square rather than producing a NaN box.
  */
-internal fun fittedPlayerArtworkSize(availableWidth: Dp, availableHeight: Dp): Dp =
-    minOf(
-        finiteNonNegativePlayerDimension(availableWidth),
-        finiteNonNegativePlayerDimension(availableHeight),
-        DhunSpacing.playerArtworkMaxSize,
-    )
+internal fun fittedPlayerArtworkBox(availableWidth: Dp, availableHeight: Dp, aspectRatio: Float): DpSize {
+    val fieldWidth = finiteNonNegativePlayerDimension(availableWidth).coerceAtMost(DhunSpacing.playerArtworkMaxSize)
+    val fieldHeight = finiteNonNegativePlayerDimension(availableHeight)
+    val aspect = if (aspectRatio.isFinite() && aspectRatio > 0f) aspectRatio else 1f
+    val width = minOf(fieldWidth, fieldHeight * aspect)
+    return DpSize(width, width / aspect)
+}
 
 private fun finiteNonNegativePlayerDimension(value: Dp): Dp =
     if (value.value.isFinite()) value.coerceAtLeast(DhunSpacing.zero) else DhunSpacing.zero

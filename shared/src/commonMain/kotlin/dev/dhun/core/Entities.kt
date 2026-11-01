@@ -177,9 +177,23 @@ data class StreamInfo(
 /* ---------------- Lyrics ------------------------------------------------ */
 
 sealed interface Lyrics {
-    data class Synced(val lines: List<LyricsLine>) : Lyrics
-    data class Unsynced(val text: String) : Lyrics
+    /**
+     * [provider] is the stable id of the source that produced these lyrics
+     * (`ytm`, `lrclib`, `kugou`, …). It is attribution for the lyrics caption
+     * ("Lyrics from YouTube Music"), never a guess: cache rows persisted
+     * before attribution existed carry `null` and the UI then shows a plain
+     * "Lyrics" caption instead of inventing a source.
+     */
+    data class Synced(val lines: List<LyricsLine>, val provider: String? = null) : Lyrics
+    data class Unsynced(val text: String, val provider: String? = null) : Lyrics
     data object NotAvailable : Lyrics
+}
+
+/** Returns the same lyrics attributed to [provider]; `NotAvailable` stays unattributed. */
+fun Lyrics.withProvider(provider: String?): Lyrics = when (this) {
+    is Lyrics.Synced -> copy(provider = provider)
+    is Lyrics.Unsynced -> copy(provider = provider)
+    is Lyrics.NotAvailable -> this
 }
 
 data class LyricsLine(

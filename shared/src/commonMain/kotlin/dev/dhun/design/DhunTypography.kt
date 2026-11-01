@@ -93,6 +93,50 @@ object DhunTypographyTokens {
         fontWeight = FontWeight.W700, letterSpacing = 3.sp,
     )
     val compactLetterSpacing = 1.sp
+
+    /* ---------------- lyrics scale (2026-11 immersive lyrics pass) --------
+     * Three roles, one ladder, so the active line is unmistakably the focus
+     * while everything else recedes but stays readable:
+     *   active  » the line being sung — large, bold, centred, frosted pill;
+     *   line    » timed/inactive lines and unsynced primary text;
+     *   second  » translations / transliterations under their primary line.
+     * The `textSize` setting ("small" / "large" / default) shifts the whole
+     * ladder instead of restyling single roles, so the hierarchy survives
+     * every user-chosen size. Line heights are generous on purpose: Devanagari
+     * and other tall scripts need the extra leading the old scale denied them.
+     */
+    val lyricActive = TextStyle(fontFamily = ui, fontSize = 28.sp, lineHeight = 40.sp, fontWeight = FontWeight.W700)
+    val lyricActiveSmall = TextStyle(fontFamily = ui, fontSize = 24.sp, lineHeight = 34.sp, fontWeight = FontWeight.W700)
+    val lyricActiveLarge = TextStyle(fontFamily = ui, fontSize = 32.sp, lineHeight = 46.sp, fontWeight = FontWeight.W700)
+    val lyricLine = TextStyle(fontFamily = ui, fontSize = 16.sp, lineHeight = 26.sp, fontWeight = FontWeight.W500)
+    val lyricLineSmall = TextStyle(fontFamily = ui, fontSize = 14.sp, lineHeight = 22.sp, fontWeight = FontWeight.W500)
+    val lyricLineLarge = TextStyle(fontFamily = ui, fontSize = 18.sp, lineHeight = 28.sp, fontWeight = FontWeight.W500)
+    val lyricSecondary = TextStyle(fontFamily = ui, fontSize = 13.sp, lineHeight = 20.sp, fontWeight = FontWeight.W400, letterSpacing = 0.2.sp)
+    val lyricSecondarySmall = TextStyle(fontFamily = ui, fontSize = 12.sp, lineHeight = 18.sp, fontWeight = FontWeight.W400, letterSpacing = 0.2.sp)
+    val lyricSecondaryLarge = TextStyle(fontFamily = ui, fontSize = 14.sp, lineHeight = 22.sp, fontWeight = FontWeight.W400, letterSpacing = 0.2.sp)
+    /** Attribution / status caption above the lyrics ("Lyrics from YouTube Music"). */
+    val lyricCaption = TextStyle(fontFamily = ui, fontSize = 11.sp, lineHeight = 16.sp, fontWeight = FontWeight.W600, letterSpacing = 1.2.sp)
+
+    /** The sung/focused line for a user-chosen size setting. */
+    fun lyricActiveStyle(textSize: String): TextStyle = when (textSize) {
+        "small" -> lyricActiveSmall
+        "large" -> lyricActiveLarge
+        else -> lyricActive
+    }
+
+    /** Inactive timed lines and unsynced primary text. */
+    fun lyricLineStyle(textSize: String): TextStyle = when (textSize) {
+        "small" -> lyricLineSmall
+        "large" -> lyricLineLarge
+        else -> lyricLine
+    }
+
+    /** Translation / transliteration under a primary line. */
+    fun lyricSecondaryStyle(textSize: String): TextStyle = when (textSize) {
+        "small" -> lyricSecondarySmall
+        "large" -> lyricSecondaryLarge
+        else -> lyricSecondary
+    }
 }
 
 /** Material3 Typography wired to Dhun tokens — used by DhunTheme. */

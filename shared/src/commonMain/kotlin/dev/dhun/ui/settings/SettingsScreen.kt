@@ -513,11 +513,11 @@ private fun CountryRegionPicker(viewModel: SettingsViewModel) {
 
     if (showPicker) Dialog(onDismissRequest = { showPicker = false }) {
         GlassCard(
-            modifier = Modifier.fillMaxWidth().widthIn(max = 480.dp).heightIn(max = 560.dp),
+            modifier = Modifier.fillMaxWidth().widthIn(max = DhunSpacing.dialogWideMaxWidth).heightIn(max = DhunSpacing.dialogBodyMaxHeight),
             opaqueBase = true,
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp).padding(DhunSpacing.lg),
+                modifier = Modifier.fillMaxWidth().padding(DhunSpacing.lg),
                 verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
             ) {
                 Text("Choose a country or region", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)

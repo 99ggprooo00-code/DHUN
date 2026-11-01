@@ -63,6 +63,13 @@ fun ArtworkImage(
      * glyph placeholder either way.
      */
     placeholderBase: Boolean = true,
+    /**
+     * Reports the decoded image's width/height ratio once per successful load.
+     * The now-playing hero sizes itself from the artwork's *own* aspect (see
+     * `fittedPlayerArtworkBox`); every other caller leaves this null and the
+     * callback costs nothing.
+     */
+    onAspectResolved: ((Float) -> Unit)? = null,
 ) {
     val resolvedShape: Shape = if (cornerRadius != null) RoundedCornerShape(cornerRadius) else shape
 
@@ -120,7 +127,16 @@ fun ArtworkImage(
                 contentScale = contentScale,
                 // Coil handles crossfade; we keep the placeholder underneath.
                 onLoading = { phase = LoadPhase.Loading },
-                onSuccess = { phase = LoadPhase.Loaded },
+                onSuccess = { state ->
+                    phase = LoadPhase.Loaded
+                    // The decoded painter's intrinsic size is the artwork's
+                    // own pixel ratio — the now-playing hero sizes its box
+                    // from it so the cover is never stretched or cropped.
+                    val intrinsic = state.painter.intrinsicSize
+                    if (intrinsic.height > 0f && intrinsic.width.isFinite() && intrinsic.height.isFinite()) {
+                        onAspectResolved?.invoke(intrinsic.width / intrinsic.height)
+                    }
+                },
                 onError = { phase = LoadPhase.Failed },
             )
         }

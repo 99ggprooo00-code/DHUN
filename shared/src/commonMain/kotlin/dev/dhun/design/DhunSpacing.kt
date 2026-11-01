@@ -56,11 +56,38 @@ object DhunSpacing {
      * so it remains a deliberate album-art focal point rather than a wall.
      */
     val playerArtworkMaxSize = 640.dp
-    /** The breathing room that makes the hero land at roughly 80–92% of a phone's width. */
-    val playerArtworkHorizontalInset = md
-    val playerArtworkVerticalInset = sm
-    /** Headroom around the animated cover, so its existing play/skip motion cannot clip at the stage edge. */
-    val playerArtworkAnimationInset = xs
+    /**
+     * Horizontal inset of the now-playing hero. Zero on purpose (2026-11
+     * immersive artwork pass): the cover now spans the full stage width and
+     * blends into the blurred bleed through [artworkEdgeFeather], so any side
+     * inset re-created the "small card floating over the background" look the
+     * feather replaced. Wide/landscape keeps the same full-bleed pane.
+     */
+    val playerArtworkHorizontalInset = zero
+    val playerArtworkVerticalInset = zero
+    /**
+     * Headroom around the animated cover. Zero with the feathered hero: the
+     * feather zone is already transparent at the stage edge, so the play-scale
+     * and skip-slide motion fades out instead of clipping against a hard rim.
+     */
+    val playerArtworkAnimationInset = zero
+    /**
+     * How far the sharp hero's edges fade into the blurred backdrop
+     * (alpha feather, all four sides). This is what makes the artwork read as
+     * part of the background instead of a framed card; see
+     * `dev.dhun.design.components.featherEdges`.
+     */
+    val artworkEdgeFeather = 28.dp
+    /** Top/bottom fade of the lyrics list into the player backdrop. */
+    val lyricsEdgeFeather = 56.dp
+    /** Reading measure inset for lyric lines (both synced and unsynced). */
+    val lyricsHorizontalPadding = xl
+    /** Space between lyric groups (stanzas / timed lines). */
+    val lyricsGroupSpacing = xl
+    /** Space between a primary lyric and its translation/transliteration. */
+    val lyricsSecondarySpacing = xs
+    /** Space under the lyrics attribution caption. */
+    val lyricsCaptionSpacing = md
     /** Space reserved above artwork when the collapse header overlays a wide player. */
     val playerArtworkHeaderInset = huge + md
     /** Wide/landscape layout: artwork receives the remaining room beside this compact chrome column. */
@@ -116,6 +143,13 @@ object DhunSpacing {
     val quickPickWidth = 260.dp
     val dialogMinWidth = 280.dp
     val dialogMaxWidth = 380.dp
+    /**
+     * Ceiling for tall dialog bodies (lyrics match picker, country picker).
+     * One token for every scrollable dialog column so a phone keeps the scrim
+     * visible above and below instead of each dialog inventing its own 520 /
+     * 560 / 600dp cap.
+     */
+    val dialogBodyMaxHeight = 560.dp
     val windowDefaultWidth = 1200.dp
     val windowDefaultHeight = 780.dp
     val dialogWideMaxWidth = 400.dp

@@ -45,8 +45,9 @@ sealed interface RelatedUiState {
 
 sealed interface LyricsUiState {
     data object Loading : LyricsUiState
-    data class Unsynced(val text: String) : LyricsUiState
-    data class Synced(val lines: List<LyricsLine>) : LyricsUiState
+    /** [provider] is the attributed source id, null when unknown (see [Lyrics.provider]). */
+    data class Unsynced(val text: String, val provider: String? = null) : LyricsUiState
+    data class Synced(val lines: List<LyricsLine>, val provider: String? = null) : LyricsUiState
     data object Unavailable : LyricsUiState
     data object Disabled : LyricsUiState
     data class Error(val message: String) : LyricsUiState
@@ -758,8 +759,8 @@ class PlayerViewModel(
             if (currentTrack.value?.id != track.id) return@launch
             _lyricsState.value = when (result) {
                 is DhunResult.Success -> when (val lyrics = result.value) {
-                    is Lyrics.Synced -> LyricsUiState.Synced(lyrics.lines)
-                    is Lyrics.Unsynced -> LyricsUiState.Unsynced(lyrics.text)
+                    is Lyrics.Synced -> LyricsUiState.Synced(lyrics.lines, lyrics.provider)
+                    is Lyrics.Unsynced -> LyricsUiState.Unsynced(lyrics.text, lyrics.provider)
                     is Lyrics.NotAvailable -> LyricsUiState.Unavailable
                 }
                 is DhunResult.Failure -> LyricsUiState.Error(result.error.toUserMessage())

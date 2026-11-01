@@ -114,6 +114,7 @@ import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.DhunVisualTuning
 import dev.dhun.design.VisualPart
 import dev.dhun.design.components.ArtworkImage
+import dev.dhun.design.components.featherEdges
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.DhunSlider
 import dev.dhun.design.components.DhunTextButton
@@ -121,8 +122,9 @@ import dev.dhun.design.components.dhunMouseDragScroll
 import dev.dhun.design.components.LyricsArtworkSheet
 import dev.dhun.design.components.NowPlayingBackdropPolicy
 import dev.dhun.design.components.lyricsVeilBrush
+import dev.dhun.design.components.openLyricsVeilBrush
 import dev.dhun.design.FullPlayerLayoutMode
-import dev.dhun.design.fittedPlayerArtworkSize
+import dev.dhun.design.fittedPlayerArtworkBox
 import dev.dhun.design.fullPlayerLayoutMode
 import dev.dhun.design.playerWideControlsWidth
 import dev.dhun.design.supportsRealtimeBlur
@@ -135,9 +137,11 @@ import kotlinx.coroutines.launch
 /**
  * FullPlayer — the immersive, full-screen Now Playing view.
  *
- * Two artwork layers, one source: a **fit-to-card** sharp artwork in the upper
- * field, over a once-per-track **blurred, darkened bleed** of the same image
- * that carries the whole screen and glows behind the controls at the bottom.
+ * Two artwork layers, one source: an **immersive, aspect-true, edge-feathered**
+ * sharp artwork in the upper field, over a once-per-track **blurred, darkened
+ * bleed** of the same image that carries the whole screen and glows behind the
+ * controls at the bottom. The feather is what joins the two layers: the cover
+ * no longer sits *on* the backdrop as a framed card, it grows *out of* it.
  *
  * Layout:
  *  1. **Stacked / portrait** — collapse strip, dominant artwork hero, then
@@ -145,11 +149,13 @@ import kotlinx.coroutines.launch
  *  2. **Wide / landscape and desktop** — the same hero and control cluster
  *     share a row, so the cover uses the viewport height instead of collapsing
  *     into the strip above a tall control stack;
- *  3. the hero sizes itself from its *measured, safely padded field* through
- *     [dev.dhun.design.fittedPlayerArtworkSize]. It is `ContentScale.Fit`, so
- *     square album art stays square and non-square artwork is never stretched
- *     or unnecessarily cropped. In lyrics-dominant mode the rounded lyrics
- *     card rises into this same reusable stage.
+ *  3. the hero sizes itself from its *measured field* and the artwork's own
+ *     aspect ratio through [dev.dhun.design.fittedPlayerArtworkBox]: the cover
+ *     fills the stage width (height follows the aspect, capped by the field),
+ *     so nothing is stretched or cropped, and an alpha feather blends its
+ *     edges into the blurred bleed instead of framing it as a card. In
+ *     lyrics-dominant mode the open lyrics overlay rises into this same
+ *     reusable stage.
  *
  * In stacked mode the hero is an always-emitted `weight(1f)` field, so the
  * chrome remains bottom-docked instead of drifting below the header. Busy
@@ -540,8 +546,6 @@ fun FullPlayer(
                                         isPlaying = isPlaying,
                                         lyricsDominant = lyricsDominant,
                                         busyLabel = playbackBusyLabel(state),
-                                        artworkUrl = ArtworkUrls.nowPlaying(current?.thumbnailUrl),
-                                        cacheKey = artworkCacheKey,
                                         viewModel = viewModel,
                                         accent = accent,
                                         modifier = Modifier
@@ -573,8 +577,6 @@ fun FullPlayer(
                                         isPlaying = isPlaying,
                                         lyricsDominant = lyricsDominant,
                                         busyLabel = playbackBusyLabel(state),
-                                        artworkUrl = ArtworkUrls.nowPlaying(current?.thumbnailUrl),
-                                        cacheKey = artworkCacheKey,
                                         viewModel = viewModel,
                                         accent = accent,
                                         modifier = Modifier
@@ -1065,8 +1067,6 @@ private fun PlayerArtworkStage(
     isPlaying: Boolean,
     lyricsDominant: Boolean,
     busyLabel: String?,
-    artworkUrl: String?,
-    cacheKey: String,
     viewModel: PlayerViewModel,
     accent: Color,
     modifier: Modifier = Modifier,
@@ -1085,8 +1085,6 @@ private fun PlayerArtworkStage(
         )
         LyricsCardOverlay(
             visible = lyricsDominant,
-            artworkUrl = artworkUrl,
-            cacheKey = cacheKey,
             viewModel = viewModel,
             accent = accent,
             modifier = Modifier.fillMaxSize(),
@@ -1500,8 +1498,12 @@ private fun ArtworkBackdrop(
  */
 internal const val PLAYER_BACKDROP_DIM = 0.08f
 
-/** Heavier dim while the lyrics card is up. Still under the old 0.52 wash. */
-internal const val PLAYER_BACKDROP_DIM_LYRICS = 0.40f
+/**
+ * Heavier dim while the lyrics overlay is up — but only a top-up now that the
+ * card and its own veil are gone: the open lyrics veil plus this dim keep
+ * lines legible while the blurred artwork stays clearly visible behind them.
+ */
+internal const val PLAYER_BACKDROP_DIM_LYRICS = 0.30f
 
 /**
  * Ambient scrim color stops (`offset to alpha`, alphas applied to the tonal
@@ -1541,17 +1543,24 @@ private fun ambientScrimBrush(): Brush {
 }
 
 /**
- * The sharp artwork, fit to a square card in the upper field.
+ * The sharp artwork, immersive and aspect-true in the upper field.
  *
- * The card is sized by [fittedPlayerArtworkSize], so it respects the width,
- * the *height* and the max-artwork token. The image fills that square card
- * with [ContentScale.Crop], Apple-Music style: the source aspect ratio no
- * longer decides how much of the frame is covered, so a 16:9 cover or a tall
- * avatar fills it instead of leaving letterbox bands over the blurred
- * backdrop. A square cover — the overwhelming majority — is unchanged; only
- * non-square art trades its edges for a filled frame. Slide + fade on track
- * change, a gentle play-scale, and a fade-out while lyrics-dominant
- * (ADR-002 P6).
+ * Sized by [fittedPlayerArtworkBox]: the box fills the stage width (up to the
+ * desktop ceiling) and takes its height from the artwork's **own measured
+ * aspect ratio**, capped by the stage height — the largest aspect-correct
+ * rectangle the field admits. A square cover therefore spans the whole phone
+ * width, a 16:9 cover becomes a full-width band, a tall cover centres at full
+ * height; nothing is stretched and the layout never crops.
+ *
+ * Presentation (2026-11 immersive artwork pass): no border, no scrim slab, no
+ * heavy rounding. Instead the box's edges carry an alpha feather
+ * ([dev.dhun.design.components.featherEdges]) so the sharp cover dissolves
+ * into the once-blurred bleed behind it — one continuous surface rather than
+ * a framed thumbnail floating over it. [ContentScale.Crop] is safe here
+ * *because* the box converges on the true aspect: any transient mismatch is
+ * trimmed inside the feather zone, where it is already transparent.
+ * Slide + fade on track change, a gentle play-scale, and a fade-out while
+ * lyrics-dominant (ADR-002 P6).
  */
 @Composable
 private fun ArtworkHeroField(
@@ -1575,7 +1584,8 @@ private fun ArtworkHeroField(
         modifier = modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
-        val cardSize = fittedPlayerArtworkSize(maxWidth, maxHeight)
+        val fieldWidth = maxWidth
+        val fieldHeight = maxHeight
         AnimatedContent(
             targetState = track,
             transitionSpec = {
@@ -1596,34 +1606,39 @@ private fun ArtworkHeroField(
             contentAlignment = Alignment.Center,
             label = "heroArtworkChange",
         ) { t ->
+            // Measured from the decoded bytes, per track: square until the
+            // first frame arrives, then the artwork's real ratio. The box
+            // animates to it so a track change re-fits instead of jumping.
+            var sourceAspect by remember { mutableFloatStateOf(1f) }
+            val fitted = fittedPlayerArtworkBox(fieldWidth, fieldHeight, sourceAspect)
+            val boxWidth by animateDpAsState(fitted.width, DhunAnimations.mediumTween(), label = "heroBoxWidth")
+            val boxHeight by animateDpAsState(fitted.height, DhunAnimations.mediumTween(), label = "heroBoxHeight")
             Box(
                 modifier = Modifier
-                    .size(cardSize)
+                    .size(boxWidth, boxHeight)
                     .graphicsLayer {
                         alpha = sharpAlpha
                         scaleX = playScale
                         scaleY = playScale
                     }
-                    .clip(DhunShapes.artworkHero)
-                    .background(DhunColors.scrim.copy(alpha = 0.35f))
-                    .border(BorderStroke(DhunSpacing.border, DhunColors.glassEdge), DhunShapes.artworkHero),
+                    .clip(DhunShapes.large),
                 contentAlignment = Alignment.Center,
             ) {
                 ArtworkImage(
                     imageUrl = ArtworkUrls.nowPlaying(t?.thumbnailUrl),
                     contentDescription = t?.title,
-                    modifier = Modifier.fillMaxSize(),
-                    shape = DhunShapes.artwork,
-                    // Crop, not Fit: the card is square and the cover should
-                    // fill it edge to edge. Fit letterboxed any cover that was
-                    // not square, and those bands showed the blurred backdrop
-                    // behind the card — read on device as a dark, blurred
-                    // frame around the artwork.
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .featherEdges(DhunSpacing.artworkEdgeFeather),
+                    shape = RectangleShape,
+                    // The box carries the artwork's aspect, so Crop fills it
+                    // exactly; any pre-measure mismatch is trimmed inside the
+                    // feather, never as a visible letterbox band.
                     contentScale = ContentScale.Crop,
-                    // With Crop there are no bands left to reveal, so the
-                    // opaque base is back on: a loading or failed cover reads
-                    // as artwork-shaped rather than a hole over the blur.
-                    placeholderBase = true,
+                    // The blurred bleed behind this box is the loading state
+                    // now: an opaque grey base would flash a slab over it.
+                    placeholderBase = false,
+                    onAspectResolved = { ratio -> if (ratio.isFinite() && ratio > 0f) sourceAspect = ratio },
                 )
             }
         }
@@ -1642,8 +1657,6 @@ private fun ArtworkHeroField(
 @Composable
 private fun LyricsCardOverlay(
     visible: Boolean,
-    artworkUrl: String?,
-    cacheKey: String,
     viewModel: PlayerViewModel,
     accent: Color,
     modifier: Modifier = Modifier,
@@ -1657,8 +1670,6 @@ private fun LyricsCardOverlay(
             fadeOut(DhunAnimations.fastTween()),
     ) {
         LyricsCard(
-            artworkUrl = artworkUrl,
-            cacheKey = cacheKey,
             viewModel = viewModel,
             accent = accent,
         )
@@ -1734,57 +1745,26 @@ private fun PlayerBackdrop(
 }
 
 /**
- * Lyrics-dominant card (ADR-002 P6): a rounded panel carrying the synced
- * lyrics over a blurred artwork, raised into the open field while the sharp
- * backdrop recedes to a darkened blur.
+ * Lyrics-dominant overlay (ADR-002 P6, restyled 2026-11): the synced lyrics
+ * rise into the open field **without a card**. The player's own once-blurred
+ * bleed is already behind this stage, so a second blurred copy inside a
+ * rounded, bordered panel only bought a framed-box look and a duplicate blur
+ * pass. What remains is a soft readability veil ([openLyricsVeilBrush]) and
+ * the lyrics column itself, whose lines feather into the backdrop at the top
+ * and bottom (see [dev.dhun.design.components.fadeVerticalEdges]).
  */
 @Composable
 private fun LyricsCard(
-    artworkUrl: String?,
-    cacheKey: String,
     viewModel: PlayerViewModel,
     accent: Color,
     modifier: Modifier = Modifier,
 ) {
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = DhunSpacing.xl, vertical = DhunSpacing.sm)
-            .clip(DhunShapes.artworkHero)
-            .border(BorderStroke(DhunSpacing.border, DhunColors.glassEdge), DhunShapes.artworkHero)
-            .clipToBounds(),
-    ) {
-        // Blurred artwork inside the card — keyed like the backdrop so the
-        // blur is prepared once per track, never per frame.
-        key(cacheKey) {
-            if (shouldRenderPlayerBackdrop(artworkUrl)) {
-                ArtworkImage(
-                    imageUrl = artworkUrl,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .then(
-                            if (supportsRealtimeBlur && DhunAppearance.backdropBlurPercent > 0) {
-                                Modifier.blur(
-                                    DhunSpacing.glassBlur * 2 *
-                                        NowPlayingBackdropPolicy.blurMultiplier(
-                                            DhunAppearance.backdropBlurPercent,
-                                        ),
-                                )
-                            } else {
-                                Modifier
-                            },
-                        ),
-                    shape = RectangleShape,
-                    contentScale = ContentScale.Crop,
-                )
-            }
-        }
+    Box(modifier = modifier.fillMaxSize()) {
         // The lyrics panel can be tuned independently from Queue/Related.
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(lyricsVeilBrush(VisualPart.LYRICS)),
+                .background(openLyricsVeilBrush(VisualPart.LYRICS)),
         )
         PlayerTabContent(
             tab = LYRICS_TAB_INDEX,

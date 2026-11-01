@@ -72,7 +72,13 @@ persistence, and correct/incorrect rules.
 
 ### Normal mode
 - Full-screen Now Playing is a core signature screen.
-- Keep sharp artwork fitted in the upper/central field; do not crop faces to make a full-bleed cover.
+- The sharp hero is **immersive and aspect-true** (2026-11 pass): its box fills
+  the stage width (height follows the artwork's measured aspect, capped by the
+  stage and `playerArtworkMaxSize`), so nothing is stretched and the layout
+  never crops faces or subjects. Its edges carry an alpha feather
+  (`featherEdges`) that dissolves the cover into the once-blurred bleed — one
+  continuous surface, **no border, no scrim slab, no card rounding**. Any side
+  inset or frame that re-detaches the artwork from its background is a defect.
 - Track title and artist remain readable; secondary metadata is visually quieter.
 - Seek/progress and transport controls form a stable bottom cluster; essential controls must not jump vertically when lyrics or queue content appears.
 - Like, queue, repeat, shuffle and overflow controls follow one shared spacing/touch-target contract.
@@ -80,9 +86,11 @@ persistence, and correct/incorrect rules.
 
 ### Lyrics / CC mode
 - A clear Lyrics/CC control enters lyrics-dominant mode. In this mode, the player’s ⋮ opens lyrics controls (romanization, provider, synced timing and match search), not track actions; outside CC mode ⋮ still opens track actions. Keep these controls out of the lyric text area.
-- Sharp artwork recedes by a lightweight scale/fade transition; the same track's blurred artwork remains behind a frosted lyrics surface.
+- Sharp artwork recedes by a lightweight scale/fade transition; the same track's blurred artwork remains behind the lyrics. The lyrics ride an **open overlay** (2026-11 pass): no rounded card, no border, no second blur — only a soft readability veil (`openLyricsVeilBrush`) over the player's own blurred bleed, with the line column feathered into the backdrop at both ends (`fadeVerticalEdges`).
+- Lyric text is a three-role ladder: the **sung line** is large, bold, centred and framed by a frosted pill that hugs its wrapped width; **other timed lines** are smaller at reduced (still readable) opacity; **translations/transliterations** sit under their primary line, smaller and lighter, grouped with it. Stanzas breathe via `lyricsGroupSpacing`; line→secondary hugs via `lyricsSecondarySpacing`.
+- An attribution caption ("Lyrics from YouTube Music") centres above the column and names only the source that actually served the text; unsynced text adds an honest "Not time-synced" sub-caption and never gets karaoke emphasis.
 - Current synced line is visually dominant, neighbors remain readable, auto-scroll is stable and line tap seeks.
-- Unsynced lyrics are readable without false karaoke emphasis.
+- Unsynced lyrics are readable without false karaoke emphasis, centred and stanza-grouped exactly like the synced list.
 - Playback controls and Back/dismiss remain reachable; entering/leaving lyrics never restarts playback.
 - Loading, unavailable, no-lyrics and error states each have designed copy and an escape path.
 

@@ -48,7 +48,7 @@ class LyricsRepository(
     suspend fun getLyrics(track: Track): DhunResult<Lyrics> {
         if (settings?.getBoolean(SettingsKeys.LYRICS_ENABLED, true) == false)
             return DhunResult.Success(Lyrics.NotAvailable)
-        selectedMatch(track.id)?.let { return DhunResult.Success(it.lyrics) }
+        selectedMatch(track.id)?.let { return DhunResult.Success(it.lyrics.withProvider(it.provider)) }
         bestEffort { cache.get(track.id) }?.takeUnless { it == Lyrics.NotAvailable }?.let {
             return DhunResult.Success(it)
         }
@@ -57,7 +57,7 @@ class LyricsRepository(
         var plain: Lyrics.Unsynced? = null
         for (adapter in orderedProviders()) {
             val result = bounded { adapter.source.fetch(track) }
-            val lyrics = (result as? DhunResult.Success)?.value
+            val lyrics = (result as? DhunResult.Success)?.value?.withProvider(adapter.id)
             if (lyrics != null && (lyrics is Lyrics.Synced || (lyrics is Lyrics.Unsynced && (!syncedFirst || preferred != "auto")))) {
                 bestEffort { cache.put(track.id, lyrics) }
                 return DhunResult.Success(lyrics)

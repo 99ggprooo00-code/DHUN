@@ -46,10 +46,10 @@ class SqlDelightLyricsCacheRepository(
                 // Preserve real independent word/line ends, including silence gaps.
                 // Old line/enhanced LRC entries remain readable without a migration.
                 val lrc = SyncedLyricsCodec.encode(lyrics.lines)
-                db.lyricsCacheQueries.insert(trackId, true, lrc, now)
+                db.lyricsCacheQueries.insert(trackId, true, lrc, now, lyrics.provider)
             }
             is Lyrics.Unsynced -> {
-                db.lyricsCacheQueries.insert(trackId, false, lyrics.text, now)
+                db.lyricsCacheQueries.insert(trackId, false, lyrics.text, now, lyrics.provider)
             }
             is Lyrics.NotAvailable -> {
                 // Do not cache negative result — future fetches may succeed
@@ -68,11 +68,13 @@ class SqlDelightLyricsCacheRepository(
         }
 
     private fun rowToLyrics(row: dev.dhun.database.LyricsCache): Lyrics {
+        // Rows written before attribution (schema v3) carry a null provider;
+        // the UI captions those as plain "Lyrics" rather than naming a source.
         return if (row.isSynced) {
             val lines = SyncedLyricsCodec.decode(row.content)
-            if (lines.isEmpty()) Lyrics.NotAvailable else Lyrics.Synced(lines)
+            if (lines.isEmpty()) Lyrics.NotAvailable else Lyrics.Synced(lines, row.provider)
         } else {
-            if (row.content.isBlank()) Lyrics.NotAvailable else Lyrics.Unsynced(row.content)
+            if (row.content.isBlank()) Lyrics.NotAvailable else Lyrics.Unsynced(row.content, row.provider)
         }
     }
 
