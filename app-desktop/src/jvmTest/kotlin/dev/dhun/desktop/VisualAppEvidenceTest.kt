@@ -24,6 +24,9 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runSkikoComposeUiTest
 import androidx.compose.ui.use
 import androidx.compose.ui.unit.Density
@@ -367,6 +370,178 @@ class VisualAppEvidenceTest {
         }
     }
 
+    /**
+     * Lyrics are the product's centrepiece, so every presentation variant the
+     * shell can receive gets its own rendered frame: Devanagari + Latin synced
+     * lines with a deliberately over-long wrapping line and romanization
+     * secondary lines, provider attribution, unsynced stanzas in both themes,
+     * and the honest unavailable/error states.
+     */
+    @Test
+    fun `render lyrics presentation matrix across scripts providers and states`() {
+        val syncedDevanagari = Lyrics.Synced(
+            listOf(
+                LyricsLine(0, "धुन बजती रहे"),
+                LyricsLine(15_000, "First line"),
+                LyricsLine(
+                    30_000,
+                    "यह एक जानबूझकर लंबी रखी गई पंक्ति है जो प्लेयर की चौड़ाई पर कई पंक्तियों में लिपट जाएगी ताकि रैपिंग और हाइलाइट दोनों दिखें",
+                ),
+                LyricsLine(60_000, "संगत और असंगत"),
+                LyricsLine(90_000, "Last line"),
+            ),
+            provider = "ytm",
+        )
+        val unsyncedStanzas = Lyrics.Unsynced(
+            listOf(
+                "धुन बजती रहे",
+                "संगत और असंगत",
+                "यह एक अनसिंक्ड स्टैंज़ा है",
+                "",
+                "Second stanza begins here",
+                "with a Latin companion line",
+            ).joinToString("\n"),
+            provider = "lrclib",
+        )
+        for (mode in listOf(DhunThemeMode.DARK, DhunThemeMode.LIGHT)) {
+            captureSingleState(
+                "app-player-lyrics-devanagari-romanized-${mode.id}.png",
+                mode,
+                provider = RecordedProvider(lyrics = syncedDevanagari),
+                romanization = true,
+                taps = listOf(355f to 879f),
+            ) { it.playerExpanded = true }
+            captureSingleState(
+                "app-player-lyrics-unsynced-${mode.id}.png",
+                mode,
+                provider = RecordedProvider(lyrics = unsyncedStanzas),
+                taps = listOf(355f to 879f),
+            ) { it.playerExpanded = true }
+        }
+        captureSingleState(
+            "app-player-lyrics-unavailable-dark.png",
+            DhunThemeMode.DARK,
+            provider = RecordedProvider(lyrics = Lyrics.NotAvailable),
+            taps = listOf(355f to 879f),
+        ) { it.playerExpanded = true }
+        captureSingleState(
+            "app-player-lyrics-error-dark.png",
+            DhunThemeMode.DARK,
+            provider = RecordedProvider(lyrics = null),
+            taps = listOf(355f to 879f),
+        ) { it.playerExpanded = true }
+    }
+
+    /**
+     * Artwork arrives in arbitrary aspects and can be missing or fail to load;
+     * the fitted hero box must letterbox the source without stretching it (the
+     * white centre stripe stays vertical and centred) while the backdrop keeps
+     * feathering. Backdrop/accent combinations are rendered on the player too,
+     * not only on Home.
+     */
+    @Test
+    fun `render player artwork aspect fallback and backdrop matrix`() {
+        for ((label, url) in listOf(
+            "square" to artworkFixture("square", 600, 600),
+            "wide" to artworkFixture("wide", 640, 360),
+            "tall" to artworkFixture("tall", 360, 640),
+        )) {
+            captureSingleState("app-player-art-$label-dark.png", DhunThemeMode.DARK, artworkUrl = url) {
+                it.playerExpanded = true
+            }
+        }
+        captureSingleState("app-player-art-missing-dark.png", DhunThemeMode.DARK, noArtwork = true) {
+            it.playerExpanded = true
+        }
+        captureSingleState(
+            "app-player-art-failed-dark.png",
+            DhunThemeMode.DARK,
+            artworkUrl = File("build/tmp/visual-evidence/does-not-exist.png").toURI().toString(),
+        ) { it.playerExpanded = true }
+        for (mode in listOf(DhunThemeMode.DARK, DhunThemeMode.LIGHT)) {
+            captureSingleState("app-player-no-blur-${mode.id}.png", mode, blurPercent = 0) {
+                it.playerExpanded = true
+            }
+        }
+        captureSingleState(
+            "app-player-no-blur-static-accent-dark.png",
+            DhunThemeMode.DARK,
+            blurPercent = 0,
+            accentMode = "static",
+        ) { it.playerExpanded = true }
+        captureSingleState("app-player-static-accent-dark.png", DhunThemeMode.DARK, accentMode = "static") {
+            it.playerExpanded = true
+        }
+    }
+
+    /** Short and landscape phone viewports: nothing may clip or overlap. */
+    @Test
+    fun `render responsive player viewports`() {
+        captureSingleState("app-player-short-dark.png", DhunThemeMode.DARK, width = 412, height = 640) {
+            it.playerExpanded = true
+        }
+        captureSingleState(
+            "app-player-short-lyrics-dark.png",
+            DhunThemeMode.DARK,
+            width = 412,
+            height = 640,
+            taps = listOf(355f to 604f),
+        ) { it.playerExpanded = true }
+        captureSingleState("app-player-landscape-dark.png", DhunThemeMode.DARK, width = 840, height = 393) {
+            it.playerExpanded = true
+        }
+        captureSingleState(
+            "app-player-landscape-lyrics-dark.png",
+            DhunThemeMode.DARK,
+            width = 840,
+            height = 393,
+            taps = listOf(355f to 357f),
+        ) { it.playerExpanded = true }
+    }
+
+    /**
+     * Behavioural evidence in the same rendered surface: the highlighted line
+     * follows the playback position without snapping artifacts, tapping a line
+     * seeks the player to that line's start, and switching tracks re-resolves
+     * lyrics instead of showing the previous track's lines.
+     */
+    @Test
+    fun `lyrics follow position and tap-seek in the rendered player`() {
+        withFixture(DhunThemeMode.DARK) { fixture ->
+            val nav = AppNavState().apply { playerExpanded = true }
+            runSkikoComposeUiTest(size = Size(412f, 915f)) {
+                mainClock.autoAdvance = false
+                setContent { Shell(fixture, nav, DhunThemeMode.DARK, isDesktop = false) }
+                fun settle(frames: Int) = repeat(frames) { mainClock.advanceTimeBy(16) }
+                settle(40)
+                onRoot().performTouchInput {
+                    down(Offset(355f, 879f))
+                    advanceEventTime(50)
+                    up()
+                }
+                settle(40)
+                assertEquals(62_000L, fixture.player.positionMs.value)
+                val at62 = captureUiImage("app-lyrics-follow-62s-dark.png", renderCurrentFrame(this, 412, 915))
+                fixture.player.positionMs.value = 5_000L
+                settle(40)
+                val at5 = captureUiImage("app-lyrics-follow-5s-dark.png", renderCurrentFrame(this, 412, 915))
+                assertTrue(!at62.contentEquals(at5), "Active lyric line did not visibly follow the position")
+                onNodeWithText("Last line").assertIsDisplayed()
+                onNodeWithText("Last line").performClick()
+                settle(24)
+                assertEquals(90_000L, fixture.player.positionMs.value, "Tapping a lyric line must seek to its start")
+                val afterTap = captureUiImage("app-lyrics-after-tapseek-dark.png", renderCurrentFrame(this, 412, 915))
+                assertTrue(!at5.contentEquals(afterTap), "Tap-seek did not visibly move the highlight")
+                fixture.player.playAt(1)
+                settle(40)
+                assertEquals(RECORDED_TRACKS[1], fixture.player.currentTrack.value)
+                assertIs<LyricsUiState.Synced>(fixture.playerVm.lyricsState.value)
+                val afterSwitch = captureUiImage("app-lyrics-after-track-switch-dark.png", renderCurrentFrame(this, 412, 915))
+                assertTrue(!at5.contentEquals(afterSwitch), "Track switch left the previous lyric surface untouched")
+            }
+        }
+    }
+
     private fun captureSingleState(
         name: String,
         mode: DhunThemeMode,
@@ -375,10 +550,20 @@ class VisualAppEvidenceTest {
         blurPercent: Int? = null,
         brightnessPercent: Int? = null,
         artworkUrl: String? = null,
+        noArtwork: Boolean = false,
         fontScale: Float = 1f,
+        width: Int = 412,
+        height: Int = 915,
+        romanization: Boolean = false,
+        accentMode: String? = null,
+        taps: List<Pair<Float, Float>> = emptyList(),
         destination: (AppNavState) -> Unit = {},
     ) {
-        withFixture(mode, provider, online) { fixture ->
+        withFixture(mode, provider, online, romanization = romanization, accentMode = accentMode) { fixture ->
+            if (noArtwork) {
+                fixture.player.clearArtwork()
+                assertEquals(null, fixture.playerVm.currentTrack.value?.thumbnailUrl)
+            }
             if (artworkUrl != null) {
                 fixture.player.useArtwork(artworkUrl)
                 assertEquals(artworkUrl, fixture.playerVm.currentTrack.value?.thumbnailUrl)
@@ -391,10 +576,12 @@ class VisualAppEvidenceTest {
             if (blurPercent != null) DhunAppearance.setBackdropPrefs(blurPercent = blurPercent)
             if (brightnessPercent != null) DhunAppearance.setBackdropPrefs(brightnessPercent = brightnessPercent)
             val nav = AppNavState().apply(destination)
-            scene(width = 412, height = 915, fontScale = fontScale) {
+            scene(width = width, height = height, fontScale = fontScale) {
                 Shell(fixture, nav, mode, isDesktop = false)
             }.use { composeScene ->
-                SceneDriver(composeScene).capture(name, settleFrames = 24)
+                val driver = SceneDriver(composeScene)
+                taps.forEach { (x, y) -> driver.tap(x, y) }
+                driver.capture(name, settleFrames = 24)
             }
         }
     }
@@ -422,13 +609,21 @@ class VisualAppEvidenceTest {
         mode: DhunThemeMode,
         provider: RecordedProvider = RecordedProvider(),
         online: Boolean = true,
+        romanization: Boolean = false,
+        accentMode: String? = null,
         block: (AppFixture) -> Unit,
     ) {
         DhunAppearance.reset()
         DhunAppearance.setAppearance(nextMode = mode)
+        if (accentMode != null) DhunAppearance.setAccentMode(accentMode)
         val fixture = AppFixture(provider, online)
         try {
-            runBlocking { fixture.data.settings.putString(SettingsKeys.THEME, mode.id) }
+            runBlocking {
+                fixture.data.settings.putString(SettingsKeys.THEME, mode.id)
+                if (romanization) {
+                    fixture.data.settings.putString(SettingsKeys.LYRICS_ROMANIZATION_ENABLED, "true")
+                }
+            }
             block(fixture)
         } finally {
             fixture.close()
@@ -459,6 +654,39 @@ class VisualAppEvidenceTest {
         try {
             graphics.color = java.awt.Color(rgb)
             graphics.fillRect(0, 0, image.width, image.height)
+        } finally {
+            graphics.dispose()
+        }
+        assertTrue(javax.imageio.ImageIO.write(image, "png", target), "Could not write $label artwork fixture")
+        return target.toURI().toString()
+    }
+
+    /**
+     * Aspect fixtures with a white centre stripe and four colour quadrants:
+     * any stretch, wrong crop or rotation is visible in the rendered frame
+     * because the stripe must stay vertical, centred and unsplit.
+     */
+    private fun artworkFixture(label: String, width: Int, height: Int): String {
+        val target = File("build/tmp/visual-evidence/$label.png").apply { parentFile.mkdirs() }
+        val image = java.awt.image.BufferedImage(width, height, java.awt.image.BufferedImage.TYPE_INT_RGB)
+        val graphics = image.createGraphics()
+        try {
+            val quadrants = listOf(
+                java.awt.Color(0x8A, 0x2A, 0x2A),
+                java.awt.Color(0xD9, 0xC6, 0xA5),
+                java.awt.Color(0x2A, 0x4A, 0x8A),
+                java.awt.Color(0x3E, 0x7A, 0x4E),
+            )
+            graphics.color = quadrants[0]
+            graphics.fillRect(0, 0, width / 2, height / 2)
+            graphics.color = quadrants[1]
+            graphics.fillRect(width / 2, 0, width - width / 2, height / 2)
+            graphics.color = quadrants[2]
+            graphics.fillRect(0, height / 2, width / 2, height - height / 2)
+            graphics.color = quadrants[3]
+            graphics.fillRect(width / 2, height / 2, width - width / 2, height - height / 2)
+            graphics.color = java.awt.Color(0xFF, 0xFF, 0xFF)
+            graphics.fillRect(width / 2 - 4, 0, 8, height)
         } finally {
             graphics.dispose()
         }
@@ -613,7 +841,12 @@ class VisualAppEvidenceTest {
                 StateMode.LOADING -> await("Search loading") { search.resultsState.value is SearchResultsUiState.Loading }
             }
             await("Library populated") { library.playlistsFlow.value.isNotEmpty() }
-            await("Lyrics populated") { playerVm.lyricsState.value is LyricsUiState.Synced }
+            when (provider.lyrics) {
+                is Lyrics.Synced -> await("Lyrics populated") { playerVm.lyricsState.value is LyricsUiState.Synced }
+                is Lyrics.Unsynced -> await("Lyrics unsynced") { playerVm.lyricsState.value is LyricsUiState.Unsynced }
+                is Lyrics.NotAvailable -> await("Lyrics unavailable") { playerVm.lyricsState.value is LyricsUiState.Unavailable }
+                null -> await("Lyrics error") { playerVm.lyricsState.value is LyricsUiState.Error }
+            }
             await("Related populated") { playerVm.relatedState.value is RelatedUiState.Success }
         }
 
@@ -646,6 +879,14 @@ class VisualAppEvidenceTest {
             val updated = currentTrack.value!!.copy(thumbnailUrl = url)
             currentTrack.value = updated
             queue.value = queue.value.map { it.copy(thumbnailUrl = url) }
+            state.value = PlaybackState.Playing(updated)
+        }
+
+        /** Missing-artwork path: the track carries no URL at all. */
+        fun clearArtwork() {
+            val updated = currentTrack.value!!.copy(thumbnailUrl = null)
+            currentTrack.value = updated
+            queue.value = queue.value.map { it.copy(thumbnailUrl = null) }
             state.value = PlaybackState.Playing(updated)
         }
 
@@ -720,6 +961,15 @@ class VisualAppEvidenceTest {
     private class RecordedProvider(
         val homeMode: StateMode = StateMode.POPULATED,
         val searchMode: StateMode = StateMode.POPULATED,
+        /** `null` records a provider failure so the lyrics error state is rendered. */
+        val lyrics: Lyrics? = Lyrics.Synced(
+            listOf(
+                LyricsLine(0, "First line"),
+                LyricsLine(30_000, "Second line"),
+                LyricsLine(60_000, "Third line"),
+                LyricsLine(90_000, "Last line"),
+            ),
+        ),
     ) : MusicProvider {
         override suspend fun search(query: String, filter: SearchFilter): DhunResult<SearchResults> = when (searchMode) {
             StateMode.POPULATED -> DhunResult.Success(
@@ -779,16 +1029,8 @@ class VisualAppEvidenceTest {
         override suspend fun getStreamInfo(videoId: String): DhunResult<StreamInfo> =
             DhunResult.Failure(DhunError.Unavailable("Visual evidence does not resolve audio"))
 
-        override suspend fun getLyrics(videoId: String): DhunResult<Lyrics> = DhunResult.Success(
-            Lyrics.Synced(
-                listOf(
-                    LyricsLine(0, "First line"),
-                    LyricsLine(30_000, "Second line"),
-                    LyricsLine(60_000, "Third line"),
-                    LyricsLine(90_000, "Last line"),
-                ),
-            ),
-        )
+        override suspend fun getLyrics(videoId: String): DhunResult<Lyrics> = lyrics?.let { DhunResult.Success(it) }
+            ?: DhunResult.Failure(DhunError.Network("Recorded lyrics failure"))
 
         override suspend fun artistPage(browseId: String): DhunResult<ArtistPage> = DhunResult.Success(
             ArtistPage(
