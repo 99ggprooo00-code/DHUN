@@ -24,6 +24,22 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Post-merge visual QA: blur-off player backdrop parity (2026-11-02, session `arena/d99ba4fb-dhun`)
+
+- Fixed: with background blur at 0 (or unavailable, Android below API 31) the
+  full player kept the sharp cover at full strength while every other surface
+  fades that layer (`NowPlayingBackdropPolicy.loadedLayerAlpha`), putting the
+  light "NOW PLAYING" caption on near-white art in dark mode and the dark
+  caption on the source letterbox bar in light mode. `PlayerBackdrop` now
+  reuses the same fallback alpha; blur-on rendering is unchanged.
+- Test: the desktop visual-evidence harness gained 23 rendered frames —
+  lyrics matrix (Devanagari + Latin synced with wrapping and romanization,
+  attribution captions, unsynced stanzas, unavailable/error), artwork aspect
+  and fallback matrix (square/wide/tall stripe fixtures, missing, failed),
+  backdrop/accent combinations on the player, short and landscape viewports,
+  and behavioural evidence that the active line follows position, tap-seek
+  seeks and re-follows, and track switches re-resolve lyrics.
+
 ### Immersive player artwork + modern lyrics presentation (2026-11-01, session `arena/6b3931dd-dhun`)
 
 - Full-player artwork is no longer a small rounded card floating over the
