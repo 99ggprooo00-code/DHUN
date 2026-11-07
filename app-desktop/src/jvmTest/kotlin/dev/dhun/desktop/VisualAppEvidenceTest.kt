@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.InternalComposeUiApi
@@ -21,6 +22,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.InternalTestApi
 import androidx.compose.ui.test.SkikoComposeUiTest
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -59,6 +61,8 @@ import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunTheme
 import dev.dhun.design.DhunThemeMode
+import dev.dhun.design.catalog.ComponentCatalogScreen
+import dev.dhun.design.components.DhunConfirmDialog
 import dev.dhun.domain.GetHomeFeedUseCase
 import dev.dhun.domain.GetRecommendationsUseCase
 import dev.dhun.innertube.SearchFilter
@@ -343,8 +347,13 @@ class VisualAppEvidenceTest {
 
                     onNodeWithContentDescription("Edit lyrics using local TTML").performClick()
                     mainClock.advanceTimeBy(500)
+                    onNodeWithText("Lyrics matches for this song").assertIsDisplayed()
                     onNodeWithText("Paste local TTML lyrics").assertIsDisplayed()
                     onNodeWithText("Preview local TTML").assertIsDisplayed()
+                    captureUiImage(
+                        "lyrics-match-picker-${mode.id}.png",
+                        renderCurrentFrame(this, 412, 915),
+                    )
                     onNodeWithText("Close").performClick()
                     mainClock.advanceTimeBy(400)
 
@@ -399,6 +408,99 @@ class VisualAppEvidenceTest {
                     mainClock.advanceTimeBy(400)
                 }
             }
+        }
+    }
+
+    @Test
+    fun `confirmation dialog guards pending actions and preserves retry callbacks`() {
+        val pending = mutableStateOf(true)
+        val confirms = AtomicInteger()
+        val dismissals = AtomicInteger()
+
+        runSkikoComposeUiTest(size = Size(412f, 915f)) {
+            mainClock.autoAdvance = false
+            setContent {
+                DhunTheme(mode = DhunThemeMode.DARK) {
+                    Box(Modifier.fillMaxSize().background(DhunColors.background))
+                    DhunConfirmDialog(
+                        title = "Delete playlist?",
+                        message = "This removes the playlist from the local library.",
+                        confirmLabel = "Delete",
+                        retryLabel = "Retry deletion",
+                        pendingLabel = "Deleting…",
+                        isPending = pending.value,
+                        errorMessage = "Could not delete the playlist. Try again.",
+                        onConfirm = { confirms.incrementAndGet() },
+                        onDismissRequest = { dismissals.incrementAndGet() },
+                    )
+                }
+            }
+            mainClock.advanceTimeBy(500)
+            onNodeWithText("Cancel").assertIsNotEnabled()
+            onNodeWithText("Deleting…").assertIsNotEnabled()
+
+            runOnIdle { pending.value = false }
+            mainClock.advanceTimeBy(100)
+            onNodeWithText("Cancel").performClick()
+            onNodeWithText("Retry deletion").performClick()
+            assertEquals(1, dismissals.get(), "Cancel should keep its original dismissal callback")
+            assertEquals(1, confirms.get(), "Retry should call the original mutation callback once")
+        }
+    }
+
+    @Test
+    fun `render confirmations at large text scale in both themes`() {
+        DhunAppearance.reset()
+        try {
+            for (mode in listOf(DhunThemeMode.DARK, DhunThemeMode.LIGHT)) {
+                DhunAppearance.setAppearance(nextMode = mode)
+                scene(width = 360, height = 800, fontScale = 1.3f) {
+                    DhunTheme(mode = mode) {
+                        Box(Modifier.fillMaxSize().background(DhunColors.background))
+                        DhunConfirmDialog(
+                            title = "Clear lyrics cache?",
+                            message = "Automatic lyrics will be fetched again. Saved per-song choices remain; use Use automatic in the lyrics match picker to reset one.",
+                            confirmLabel = "Clear",
+                            pendingLabel = "Clearing…",
+                            onConfirm = {},
+                            onDismissRequest = {},
+                        )
+                    }
+                }.use { composeScene ->
+                    SceneDriver(composeScene).capture("confirm-dialog-large-text-${mode.id}.png", settleFrames = 24)
+                }
+            }
+        } finally {
+            DhunAppearance.reset()
+        }
+    }
+
+    @Test
+    fun `component catalog title yields room for its close action at phone width`() {
+        DhunAppearance.reset()
+        val closeCount = AtomicInteger()
+        try {
+            runSkikoComposeUiTest(size = Size(360f, 800f)) {
+                mainClock.autoAdvance = false
+                setContent {
+                    ComponentCatalogScreen(onClose = { closeCount.incrementAndGet() })
+                }
+                mainClock.advanceTimeBy(500)
+                onNodeWithText("Close").assertIsDisplayed()
+                val closeBounds = onNodeWithText("Close").fetchSemanticsNode().boundsInRoot
+                assertTrue(
+                    closeBounds.left >= 0f && closeBounds.right <= 360f,
+                    "The catalogue's Close action must stay inside the phone viewport: $closeBounds",
+                )
+                captureUiImage(
+                    "component-catalog-header-phone-dark.png",
+                    renderCurrentFrame(this, 360, 800),
+                )
+                onNodeWithText("Close").performClick()
+                assertEquals(1, closeCount.get())
+            }
+        } finally {
+            DhunAppearance.reset()
         }
     }
 

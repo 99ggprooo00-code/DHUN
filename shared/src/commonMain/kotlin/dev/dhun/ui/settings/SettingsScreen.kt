@@ -14,18 +14,18 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.ui.window.Dialog
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import dev.dhun.design.components.DhunConfirmDialog
 import dev.dhun.design.components.GlassCard
+import dev.dhun.design.components.GlassDialog
 import dev.dhun.design.components.dhunContentSurface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -53,7 +53,6 @@ import dev.dhun.design.VisualPart
 import dev.dhun.design.supportsRealtimeBlur
 import dev.dhun.design.components.DhunAppearanceControls
 import dev.dhun.design.components.DhunFilterChip
-import dev.dhun.design.components.DhunButton
 import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.DhunSlider
 import dev.dhun.design.components.DhunSwitch
@@ -312,10 +311,10 @@ fun SettingsScreen(
                 }
             }
         }
-        if (confirmAudioClear) SettingsConfirmDialog(
+        if (confirmAudioClear) DhunConfirmDialog(
             onDismissRequest = { confirmAudioClear = false },
-            title = { Text("Clear audio cache?") },
-            text = { Text("Streamed tracks may need to load again.") },
+            title = "Clear audio cache?",
+            message = "Streamed tracks may need to load again.",
             isPending = maintenance.isRunning(SettingsViewModel.KEY_CLEAR_AUDIO),
             errorMessage = maintenance.errorFor(SettingsViewModel.KEY_CLEAR_AUDIO),
             confirmLabel = "Clear",
@@ -328,10 +327,10 @@ fun SettingsScreen(
             } else {
                 SettingsViewModel.KEY_CLEAR_PLAY
             }
-            SettingsConfirmDialog(
+            DhunConfirmDialog(
                 onDismissRequest = { confirmHistory = "" },
-                title = { Text("Clear ${confirmHistory} history?") },
-                text = { Text("This cannot be undone.") },
+                title = "Clear $confirmHistory history?",
+                message = "This cannot be undone.",
                 isPending = maintenance.isRunning(historyKey),
                 errorMessage = maintenance.errorFor(historyKey),
                 confirmLabel = "Clear",
@@ -341,20 +340,20 @@ fun SettingsScreen(
                 },
             )
         }
-        if (confirmLyricsClear) SettingsConfirmDialog(
+        if (confirmLyricsClear) DhunConfirmDialog(
             onDismissRequest = { confirmLyricsClear = false },
-            title = { Text("Clear lyrics cache?") },
-            text = { Text("Automatic lyrics will be fetched again. Saved per-song choices remain; use Use automatic in the lyrics match picker to reset one.") },
+            title = "Clear lyrics cache?",
+            message = "Automatic lyrics will be fetched again. Saved per-song choices remain; use Use automatic in the lyrics match picker to reset one.",
             isPending = maintenance.isRunning(SettingsViewModel.KEY_CLEAR_LYRICS),
             errorMessage = maintenance.errorFor(SettingsViewModel.KEY_CLEAR_LYRICS),
             confirmLabel = "Clear",
             pendingLabel = "Clearing…",
             onConfirm = { viewModel.clearLyricsCache() },
         )
-        if (confirmReset) SettingsConfirmDialog(
+        if (confirmReset) DhunConfirmDialog(
             onDismissRequest = { confirmReset = false },
-            title = { Text("Reset settings?") },
-            text = { Text("All preferences will return to their defaults.") },
+            title = "Reset settings?",
+            message = "All preferences will return to their defaults.",
             isPending = maintenance.isRunning(SettingsViewModel.KEY_RESET),
             errorMessage = maintenance.errorFor(SettingsViewModel.KEY_RESET),
             confirmLabel = "Reset",
@@ -363,67 +362,6 @@ fun SettingsScreen(
             // appearance palette is applied above only after overall success.
             onConfirm = { viewModel.reset() },
         )
-    }
-}
-
-/**
- * One confirmation surface for every destructive Settings action.
- *
- * It is result-driven, not tap-driven: while [isPending] the confirm button
- * shows [pendingLabel] and cannot be tapped again; when [errorMessage] is set
- * the message stays on screen and the button offers a retry. The caller closes
- * the dialog when its action actually succeeded.
- */
-@Composable
-private fun SettingsConfirmDialog(
-    onDismissRequest: () -> Unit,
-    title: @Composable () -> Unit,
-    text: @Composable () -> Unit,
-    isPending: Boolean = false,
-    errorMessage: String? = null,
-    confirmLabel: String = "Clear",
-    pendingLabel: String = "Clearing…",
-    onConfirm: () -> Unit,
-    dismissLabel: String = "Cancel",
-) {
-    Dialog(onDismissRequest = { if (!isPending) onDismissRequest() }) {
-        GlassCard(
-            modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
-            opaqueBase = true,
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(DhunSpacing.lg),
-                verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
-            ) {
-                title()
-                text()
-                if (errorMessage != null) {
-                    Text(
-                        text = errorMessage,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = DhunColors.error,
-                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                    )
-                }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    DhunTextButton(onClick = onDismissRequest, enabled = !isPending) { Text(dismissLabel) }
-                    Spacer(modifier = Modifier.weight(1f))
-                    DhunButton(
-                        onClick = onConfirm,
-                        enabled = !isPending,
-                        loading = isPending,
-                    ) {
-                        Text(
-                            when {
-                                isPending -> pendingLabel
-                                errorMessage != null -> "Try again"
-                                else -> confirmLabel
-                            },
-                        )
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -511,56 +449,59 @@ private fun CountryRegionPicker(viewModel: SettingsViewModel) {
         )
     }
 
-    if (showPicker) Dialog(onDismissRequest = { showPicker = false }) {
-        GlassCard(
-            modifier = Modifier.fillMaxWidth().widthIn(max = DhunSpacing.dialogWideMaxWidth).heightIn(max = DhunSpacing.dialogBodyMaxHeight),
-            opaqueBase = true,
+    if (showPicker) GlassDialog(
+        onDismissRequest = { showPicker = false },
+        modifier = Modifier.fillMaxWidth().heightIn(max = DhunSpacing.dialogBodyMaxHeight),
+        maxWidth = DhunSpacing.dialogWideMaxWidth,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(DhunSpacing.lg),
-                verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
-            ) {
-                Text("Choose a country or region", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
-                DhunTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = "Search by name or code",
+            Text(
+                "Choose a country or region",
+                style = MaterialTheme.typography.titleMedium,
+                color = DhunColors.textPrimary,
+            )
+            DhunTextField(
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = "Search by name or code",
+            )
+            if (matches.isEmpty()) {
+                Text(
+                    text = "No matching country or region.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = DhunColors.textSecondary,
+                    modifier = Modifier.padding(vertical = DhunSpacing.md),
                 )
-                if (matches.isEmpty()) {
-                    Text(
-                        text = "No matching country or region.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = DhunColors.textSecondary,
-                        modifier = Modifier.padding(vertical = DhunSpacing.md),
-                    )
-                } else {
-                    LazyColumn(modifier = Modifier.weight(1f, fill = false)) {
-                        items(matches, key = { it.code }) { region ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth()
-                                    .clickable(role = Role.Button) {
-                                        viewModel.setCountryCode(region.code)
-                                        showPicker = false
-                                    }
-                                    .padding(horizontal = DhunSpacing.sm, vertical = DhunSpacing.md),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    text = region.name,
-                                    modifier = Modifier.weight(1f),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = if (region.code == selected.code) DhunColors.accent else DhunColors.textPrimary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Spacer(modifier = Modifier.width(DhunSpacing.md))
-                                Text(
-                                    text = region.code,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = DhunColors.textSecondary,
-                                )
-                            }
+            } else {
+                LazyColumn(modifier = Modifier.weight(1f, fill = false)) {
+                    items(matches, key = { it.code }) { region ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth()
+                                .clickable(role = Role.Button) {
+                                    viewModel.setCountryCode(region.code)
+                                    showPicker = false
+                                }
+                                .padding(horizontal = DhunSpacing.sm, vertical = DhunSpacing.md),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = region.name,
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = if (region.code == selected.code) DhunColors.accent else DhunColors.textPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Spacer(modifier = Modifier.width(DhunSpacing.md))
+                            Text(
+                                text = region.code,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = DhunColors.textSecondary,
+                            )
                         }
                     }
                 }
