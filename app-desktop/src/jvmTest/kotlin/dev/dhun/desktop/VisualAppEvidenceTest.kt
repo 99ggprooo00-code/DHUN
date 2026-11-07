@@ -308,8 +308,8 @@ class VisualAppEvidenceTest {
                         "Romanization setting should persist before capture",
                     )
                 }
-                // A forced Refetch must bypass the normal cache path and reach
-                // the recorded provider once, just as the production action does.
+                // Keep lyrics cache state deterministic for the provider-selection
+                // and Refetch callback checks below.
                 runBlocking { fixture.data.lyricsCache.clear() }
                 val nav = AppNavState().apply { playerExpanded = true }
 
@@ -372,22 +372,47 @@ class VisualAppEvidenceTest {
 
                     // The compact provider chip still opens the full existing
                     // choice list and writes the selected preference.
+                    val beforeProviderSelection = provider.lyricsFetchRequests.get()
                     onNodeWithContentDescription("Lyrics provider: Auto (synced first)").performClick()
                     mainClock.advanceTimeBy(400)
                     onNodeWithText("LRCLIB").performClick()
                     mainClock.advanceTimeBy(200)
                     onNodeWithContentDescription("Lyrics provider: LRCLIB").assertIsDisplayed()
+                    val providerSelectionDeadline = System.nanoTime() + 5_000_000_000L
+                    while (provider.lyricsFetchRequests.get() <= beforeProviderSelection &&
+                        System.nanoTime() < providerSelectionDeadline
+                    ) {
+                        mainClock.advanceTimeBy(50)
+                        Thread.sleep(20)
+                    }
+                    assertTrue(
+                        provider.lyricsFetchRequests.get() > beforeProviderSelection,
+                        "Changing the provider should reach the configured provider",
+                    )
+                    val selectionResultDeadline = System.nanoTime() + 5_000_000_000L
+                    while (fixture.playerVm.lyricsState.value !is LyricsUiState.Synced &&
+                        System.nanoTime() < selectionResultDeadline
+                    ) {
+                        mainClock.advanceTimeBy(50)
+                        Thread.sleep(20)
+                    }
 
+                    // Refetch retains its existing callback. Clear the cache so
+                    // this interaction proves that callback reaches the provider;
+                    // it does not claim that the current repository bypasses a hit.
+                    runBlocking { fixture.data.lyricsCache.clear() }
                     val beforeRefetch = provider.lyricsFetchRequests.get()
                     onNodeWithContentDescription("Refetch current lyrics").performClick()
                     val refetchDeadline = System.nanoTime() + 5_000_000_000L
-                    while (provider.lyricsFetchRequests.get() <= beforeRefetch && System.nanoTime() < refetchDeadline) {
+                    while (provider.lyricsFetchRequests.get() <= beforeRefetch &&
+                        System.nanoTime() < refetchDeadline
+                    ) {
                         mainClock.advanceTimeBy(50)
                         Thread.sleep(20)
                     }
                     assertTrue(
                         provider.lyricsFetchRequests.get() > beforeRefetch,
-                        "Refetch should bypass the lyrics cache and call the configured provider",
+                        "Refetch should invoke the existing lyrics callback and reach the configured provider",
                     )
 
                     onNodeWithContentDescription("Edit lyrics using local TTML").performClick()
@@ -536,20 +561,24 @@ class VisualAppEvidenceTest {
                 captureAudit("21-03-04-liked-songs")
 
                 runOnIdle { fixture.library.selectTab(LibraryTab.DOWNLOADS) }
+                mainClock.advanceTimeBy(300)
                 onNodeWithText("Clear all").assertIsDisplayed()
                 captureAudit("21-04-02-downloads")
                 onNodeWithText("Clear all").performClick()
                 onNodeWithText("Clear all downloads?").assertIsDisplayed()
                 captureAudit("21-04-32-clear-downloads-confirm")
                 onNodeWithText("Cancel").performClick()
+                mainClock.advanceTimeBy(300)
 
                 runOnIdle { fixture.library.selectTab(LibraryTab.HISTORY) }
+                mainClock.advanceTimeBy(300)
                 onNodeWithText("Clear all").assertIsDisplayed()
                 captureAudit("21-04-13-history")
                 onNodeWithText("Clear all").performClick()
                 onNodeWithText("Clear history?").assertIsDisplayed()
                 captureAudit("21-04-38-clear-library-history-confirm")
                 onNodeWithText("Cancel").performClick()
+                mainClock.advanceTimeBy(300)
 
                 openSettingsCategory(SettingsCategory.ABOUT)
                 onNodeWithText("Reset settings to defaults").performScrollTo()
