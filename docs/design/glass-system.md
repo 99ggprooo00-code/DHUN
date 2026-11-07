@@ -79,9 +79,19 @@ baseline.
 5. a top sheen which fades before mid-panel;
 6. sharp content above all paint.
 
-`GlassDialog` uses the same recipe at a high-opacity floor. It does **not** take
-an artwork URL and does not pretend to frost artwork itself. Artwork-bearing
-menus and sheets use the materials in §2D instead.
+`GlassDialog` uses the same recipe at a high-opacity floor, the shared compact
+width/padding/shape, and supplies the active DHUN `textPrimary` and body-medium
+style as its default text locals. Specialized content still sets explicit
+secondary/error roles. It does **not** take an artwork URL and does not pretend
+to frost artwork itself. Artwork-bearing menus and sheets use the materials in
+§2D instead.
+
+Use `DhunConfirmDialog` for plain confirm/cancel flows: it owns the title/body
+hierarchy, error state, pending/retry label, and right-aligned action pair while
+the caller retains mutation and dismissal callbacks. Do not rebuild a
+`Dialog` + `GlassCard` confirmation independently; that split previously let
+plain `Text` inherit a dark default on dark glass and let the same footer drift
+between left/right-spread and right-grouped actions.
 
 `GlassCard.blurRadius` is retained only for call-site compatibility. Passing it
 does not blur a card; do not add new call sites that rely on it. Blur belongs to
@@ -129,7 +139,7 @@ stock control independently in each screen.
 | Need | Required component/policy | Source |
 | --- | --- | --- |
 | Panel, Settings group, notice | `GlassCard` | `design/components/GlassCard.kt` |
-| Confirmation, diagnostics, rationale | `GlassDialog` | `design/components/GlassCard.kt` |
+| Confirmation, diagnostics, rationale | `DhunConfirmDialog` for simple confirmation; `GlassDialog` for tailored content | `design/components/DhunConfirmDialog.kt`, `design/components/GlassCard.kt` |
 | Glass numbers and blur gate | `GlassMaterialPolicy` | `design/components/GlassMaterialPolicy.kt` |
 | Quiet list/reading surface | `dhunContentRowSurface` / `dhunContentSurface` | `design/components/ContentRowSurface.kt` |
 | Page artwork atmosphere | `NowPlayingBackdrop` / `PageArtworkBackdrop` | `design/components/NowPlayingBackdrop.kt` |
@@ -257,7 +267,7 @@ per-surface background pipeline.
 
 | Correct | Incorrect |
 | --- | --- |
-| `GlassDialog(onDismissRequest = …) { … }` for a confirmation | A stock alert/dialog container with default colors and elevation |
+| `DhunConfirmDialog` for a plain confirmation; `GlassDialog` for tailored content | Reimplementing `Dialog` + `GlassCard` locally or relying on default content colors |
 | `DhunTextField` for search, names, and multiline TTML | A stock outlined field or a new one-off field decoration |
 | `DhunSlider`, `DhunSwitch`, `DhunCheckbox`, `DhunProgressBar` | Calling their stock counterparts directly from a screen |
 | `DhunNavigationBarItem` / `DhunNavigationRailItem` | Stock navigation containers/items with a transparent container but stock pill and metrics |

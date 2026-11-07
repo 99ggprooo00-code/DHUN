@@ -76,3 +76,6 @@ node_modules/
 __pycache__/
 *.pyc
 agent-1-status.md
+
+# Local audit inputs, generated screenshot conversions, and CI-evidence scratch
+.cache/

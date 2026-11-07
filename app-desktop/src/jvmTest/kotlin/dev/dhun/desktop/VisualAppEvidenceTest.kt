@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.InternalComposeUiApi
@@ -14,17 +16,24 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asComposeCanvas
 import androidx.compose.ui.graphics.asSkiaBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerButtons
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.InternalTestApi
 import androidx.compose.ui.test.SkikoComposeUiTest
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.runSkikoComposeUiTest
 import androidx.compose.ui.use
 import androidx.compose.ui.unit.Density
@@ -36,6 +45,8 @@ import dev.dhun.core.AlwaysOnlineConnectivityMonitor
 import dev.dhun.core.ConnectivityMonitor
 import dev.dhun.core.DhunError
 import dev.dhun.core.DhunResult
+import dev.dhun.core.DownloadState
+import dev.dhun.core.DownloadedTrack
 import dev.dhun.core.HomeFeedPage
 import dev.dhun.core.HomeItem
 import dev.dhun.core.HomeSection
@@ -55,10 +66,14 @@ import dev.dhun.data.LocalPlaylist
 import dev.dhun.data.PlayContext
 import dev.dhun.data.PlaylistRepository
 import dev.dhun.data.SettingsKeys
+import dev.dhun.download.DownloadManager
+import dev.dhun.download.DownloadProgress
 import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunTheme
 import dev.dhun.design.DhunThemeMode
+import dev.dhun.design.catalog.ComponentCatalogScreen
+import dev.dhun.design.components.DhunConfirmDialog
 import dev.dhun.domain.GetHomeFeedUseCase
 import dev.dhun.domain.GetRecommendationsUseCase
 import dev.dhun.innertube.SearchFilter
@@ -68,6 +83,7 @@ import dev.dhun.lyrics.LyricsSource
 import dev.dhun.player.DhunPlayer
 import dev.dhun.presentation.home.HomeUiState
 import dev.dhun.presentation.home.HomeViewModel
+import dev.dhun.presentation.library.LibraryTab
 import dev.dhun.presentation.library.LibraryViewModel
 import dev.dhun.presentation.player.LyricsUiState
 import dev.dhun.presentation.player.PlayerViewModel
@@ -95,7 +111,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -292,8 +310,8 @@ class VisualAppEvidenceTest {
                         "Romanization setting should persist before capture",
                     )
                 }
-                // A forced Refetch must bypass the normal cache path and reach
-                // the recorded provider once, just as the production action does.
+                // Keep lyrics cache state deterministic for the provider-selection
+                // and Refetch callback checks below.
                 runBlocking { fixture.data.lyricsCache.clear() }
                 val nav = AppNavState().apply { playerExpanded = true }
 
@@ -308,18 +326,20 @@ class VisualAppEvidenceTest {
                     mainClock.advanceTimeBy(500)
 
                     onNodeWithText("Lyrics controls").assertIsDisplayed()
-                    onNodeWithContentDescription("Current song title: Bohemian Rhapsody").assertIsDisplayed()
-                    onNodeWithText("From Queen").assertIsDisplayed()
+                    onNodeWithContentDescription("Current song title: Bohemian Rhapsody. From Queen").assertIsDisplayed()
+                    onNodeWithText("Bohemian Rhapsody (From Queen)").assertIsDisplayed()
                     onNodeWithText("Lyrics provider").assertIsDisplayed()
+                    onNodeWithContentDescription("Lyrics provider: Auto (synced first)").assertIsDisplayed()
                     onNodeWithText("Auto (synced first)").assertIsDisplayed()
                     onNodeWithContentDescription("Romanization mode: Auto (conservative)").assertIsDisplayed()
                     onNodeWithText("Lyrics offset").assertIsDisplayed()
                     onNodeWithText("0 ms").assertIsDisplayed()
-                    onNodeWithText("Reset").assertIsDisplayed()
+                    onAllNodesWithContentDescription("Reset lyrics offset").assertCountEquals(0)
                     onNodeWithContentDescription("Offset marker: minus five seconds").assertIsDisplayed()
                     onNodeWithContentDescription("Offset marker: zero seconds").assertIsDisplayed()
                     onNodeWithContentDescription("Offset marker: plus five seconds").assertIsDisplayed()
                     onNodeWithContentDescription("Find lyrics matches").assertIsDisplayed()
+                    onNodeWithText("Find lyrics matches for this song").assertIsDisplayed()
                     onNodeWithText("Close").assertIsDisplayed()
                     onNodeWithContentDescription("Edit lyrics using local TTML").assertIsDisplayed()
                     onNodeWithContentDescription("Refetch current lyrics").assertIsDisplayed()
@@ -329,28 +349,102 @@ class VisualAppEvidenceTest {
                         renderCurrentFrame(this, 412, 915),
                     )
 
+                    // Timing persistence and the conditional reset affordance
+                    // remain tied to the existing repository callbacks.
+                    onNodeWithContentDescription("Lyrics offset")
+                        .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
+                            assertTrue(setProgress(700f), "Lyrics offset must retain its accessible SetProgress action")
+                        }
+                    val offsetDeadline = System.nanoTime() + 5_000_000_000L
+                    while (fixture.playerVm.lyricsTiming.value.offsetMs != 700 &&
+                        System.nanoTime() < offsetDeadline
+                    ) {
+                        mainClock.advanceTimeBy(50)
+                        Thread.sleep(20)
+                    }
+                    onNodeWithText("+700 ms").assertIsDisplayed()
+                    onNodeWithContentDescription("Reset lyrics offset").performClick()
+                    val resetDeadline = System.nanoTime() + 5_000_000_000L
+                    while (fixture.playerVm.lyricsTiming.value.offsetMs != 0 &&
+                        System.nanoTime() < resetDeadline
+                    ) {
+                        mainClock.advanceTimeBy(50)
+                        Thread.sleep(20)
+                    }
+                    onNodeWithText("0 ms").assertIsDisplayed()
+                    onAllNodesWithContentDescription("Reset lyrics offset").assertCountEquals(0)
+
+                    // The compact provider chip still opens the full existing
+                    // choice list and writes the selected preference.
+                    val beforeProviderSelection = provider.lyricsFetchRequests.get()
+                    onNodeWithContentDescription("Lyrics provider: Auto (synced first)").performClick()
+                    mainClock.advanceTimeBy(400)
+                    onNodeWithText("LRCLIB").performClick()
+                    mainClock.advanceTimeBy(200)
+                    onNodeWithContentDescription("Lyrics provider: LRCLIB").assertIsDisplayed()
+                    val providerSelectionDeadline = System.nanoTime() + 5_000_000_000L
+                    while (provider.lyricsFetchRequests.get() <= beforeProviderSelection &&
+                        System.nanoTime() < providerSelectionDeadline
+                    ) {
+                        mainClock.advanceTimeBy(50)
+                        Thread.sleep(20)
+                    }
+                    assertTrue(
+                        provider.lyricsFetchRequests.get() > beforeProviderSelection,
+                        "Changing the provider should reach the configured provider",
+                    )
+                    val selectionResultDeadline = System.nanoTime() + 5_000_000_000L
+                    while (fixture.playerVm.lyricsState.value !is LyricsUiState.Synced &&
+                        System.nanoTime() < selectionResultDeadline
+                    ) {
+                        mainClock.advanceTimeBy(50)
+                        Thread.sleep(20)
+                    }
+
+                    // Refetch retains its existing callback. Clear the cache so
+                    // this interaction proves that callback reaches the provider;
+                    // it does not claim that the current repository bypasses a hit.
+                    runBlocking { fixture.data.lyricsCache.clear() }
                     val beforeRefetch = provider.lyricsFetchRequests.get()
                     onNodeWithContentDescription("Refetch current lyrics").performClick()
                     val refetchDeadline = System.nanoTime() + 5_000_000_000L
-                    while (provider.lyricsFetchRequests.get() <= beforeRefetch && System.nanoTime() < refetchDeadline) {
+                    while (provider.lyricsFetchRequests.get() <= beforeRefetch &&
+                        System.nanoTime() < refetchDeadline
+                    ) {
                         mainClock.advanceTimeBy(50)
                         Thread.sleep(20)
                     }
                     assertTrue(
                         provider.lyricsFetchRequests.get() > beforeRefetch,
-                        "Refetch should bypass the lyrics cache and call the configured provider",
+                        "Refetch should invoke the existing lyrics callback and reach the configured provider",
                     )
+                    val refetchResultDeadline = System.nanoTime() + 5_000_000_000L
+                    while (fixture.playerVm.lyricsState.value !is LyricsUiState.Synced &&
+                        System.nanoTime() < refetchResultDeadline
+                    ) {
+                        mainClock.advanceTimeBy(50)
+                        Thread.sleep(20)
+                    }
+                    seedSavedLyricsChoice(fixture)
 
                     onNodeWithContentDescription("Edit lyrics using local TTML").performClick()
                     mainClock.advanceTimeBy(500)
+                    onNodeWithText("Lyrics matches for this song").assertIsDisplayed()
+                    onNodeWithText("Saved choice: lrclib · Bohemian Rhapsody").assertIsDisplayed()
                     onNodeWithText("Paste local TTML lyrics").assertIsDisplayed()
                     onNodeWithText("Preview local TTML").assertIsDisplayed()
+                    captureUiImage(
+                        "lyrics-match-picker-${mode.id}.png",
+                        renderCurrentFrame(this, 412, 915),
+                    )
                     onNodeWithText("Close").performClick()
                     mainClock.advanceTimeBy(400)
 
                     onNodeWithContentDescription("Lyrics controls").performClick()
                     mainClock.advanceTimeBy(400)
                     val beforeSearch = provider.lyricsFetchRequests.get()
+                    val searchGate = CompletableDeferred<Unit>()
+                    provider.lyricsGate = searchGate
                     onNodeWithContentDescription("Search lyrics matches").performClick()
                     val searchDeadline = System.nanoTime() + 5_000_000_000L
                     while (provider.lyricsFetchRequests.get() < beforeSearch + 2 && System.nanoTime() < searchDeadline) {
@@ -361,6 +455,15 @@ class VisualAppEvidenceTest {
                         provider.lyricsFetchRequests.get() >= beforeSearch + 2,
                         "Search should run the existing match controller against its enabled sources",
                     )
+                    mainClock.advanceTimeBy(100)
+                    onNodeWithText("Searching / parsing / saving…").assertIsDisplayed()
+                    onNodeWithText("Saved choice: lrclib · Bohemian Rhapsody").assertIsDisplayed()
+                    captureUiImage(
+                        "lyrics-match-searching-${mode.id}.png",
+                        renderCurrentFrame(this, 412, 915),
+                    )
+                    searchGate.complete(Unit)
+                    provider.lyricsGate = null
                     val searchCompleteDeadline = System.nanoTime() + 5_000_000_000L
                     while (fixture.playerVm.lyricsMatches?.state?.value?.loading == true &&
                         System.nanoTime() < searchCompleteDeadline
@@ -399,6 +502,286 @@ class VisualAppEvidenceTest {
                     mainClock.advanceTimeBy(400)
                 }
             }
+        }
+    }
+
+    @Test
+    fun `capture full player track action overlay over artwork`() {
+        withFixture(DhunThemeMode.DARK) { fixture ->
+            fixture.player.useArtwork(extremeArtwork("audit-player-actions", 0x6D4C82))
+            val nav = AppNavState().apply { playerExpanded = true }
+            runSkikoComposeUiTest(size = Size(412f, 915f)) {
+                mainClock.autoAdvance = false
+                setContent { Shell(fixture, nav, DhunThemeMode.DARK, isDesktop = false) }
+                mainClock.advanceTimeBy(600)
+                onNodeWithContentDescription("More player actions").performClick()
+                mainClock.advanceTimeBy(100)
+                captureUiImage(
+                    "audit-21-03-01-full-player-track-actions-dark.png",
+                    renderCurrentFrame(this, 412, 915),
+                )
+                mainClock.advanceTimeBy(500)
+                onNodeWithText("Play next").assertIsDisplayed()
+                onNodeWithText("Add to queue").assertIsDisplayed()
+                onNodeWithText("Add to playlist").assertIsDisplayed()
+                onNodeWithText("Download").assertIsDisplayed()
+                onNodeWithText("Go to artist").assertIsDisplayed()
+                onNodeWithText("Go to album").assertIsDisplayed()
+                captureUiImage(
+                    "audit-21-03-04-track-menu-settled-dark.png",
+                    renderCurrentFrame(this, 412, 915),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `capture one-to-one screenshot audit library and settings states`() {
+        withFixture(
+            DhunThemeMode.DARK,
+            withLyricsMatches = true,
+            includeDownloads = true,
+            includeHistoryAuditData = true,
+        ) { fixture ->
+            val downloadDeadline = System.nanoTime() + 5_000_000_000L
+            while (fixture.library.downloadsForUi.value.totalCount != 1 &&
+                System.nanoTime() < downloadDeadline
+            ) {
+                Thread.sleep(20)
+            }
+            assertEquals(1, fixture.library.downloadsForUi.value.totalCount)
+            val historyDeadline = System.nanoTime() + 5_000_000_000L
+            while (fixture.library.groupedHistory.value.sumOf { it.entries.size } != 8 &&
+                System.nanoTime() < historyDeadline
+            ) {
+                Thread.sleep(20)
+            }
+            assertEquals(8, fixture.library.groupedHistory.value.sumOf { it.entries.size })
+            val nav = AppNavState()
+            runSkikoComposeUiTest(size = Size(360f, 800f)) {
+                mainClock.autoAdvance = false
+                setContent { Shell(fixture, nav, DhunThemeMode.DARK, isDesktop = false) }
+                mainClock.advanceTimeBy(600)
+
+                fun captureAudit(name: String) {
+                    mainClock.advanceTimeBy(500)
+                    captureUiImage("audit-$name.png", renderCurrentFrame(this, 360, 800))
+                }
+                fun openSettingsCategory(category: SettingsCategory) {
+                    runOnIdle {
+                        nav.detailStack.clear()
+                        nav.push(DetailRoute.SettingsCategoryPage(category))
+                    }
+                    mainClock.advanceTimeBy(600)
+                }
+
+                runOnIdle {
+                    nav.selectTab(AppTab.LIBRARY)
+                    fixture.library.openLikedSongs()
+                }
+                mainClock.advanceTimeBy(600)
+                onNodeWithText("Liked Songs").assertIsDisplayed()
+                captureAudit("21-03-51-liked-songs")
+
+                runOnIdle { fixture.library.selectTab(LibraryTab.DOWNLOADS) }
+                mainClock.advanceTimeBy(300)
+                onNodeWithText("Clear all").assertIsDisplayed()
+                captureAudit("21-04-04-downloads")
+                onNodeWithText("Clear all").performClick()
+                mainClock.advanceTimeBy(300)
+                onNodeWithText("Clear all downloads?").assertIsDisplayed()
+                captureAudit("21-04-32-clear-downloads-confirm")
+                onNodeWithText("Cancel").performClick()
+                mainClock.advanceTimeBy(300)
+
+                runOnIdle { fixture.library.selectTab(LibraryTab.HISTORY) }
+                mainClock.advanceTimeBy(300)
+                onNodeWithText("Clear all").assertIsDisplayed()
+                captureAudit("21-04-02-history")
+                onNodeWithText("Clear all").performClick()
+                mainClock.advanceTimeBy(300)
+                onNodeWithText("Clear history?").assertIsDisplayed()
+                captureAudit("21-04-38-clear-library-history-confirm")
+                onNodeWithText("Cancel").performClick()
+                mainClock.advanceTimeBy(300)
+
+                openSettingsCategory(SettingsCategory.ABOUT)
+                onNodeWithText("Reset settings to defaults").performScrollTo()
+                onNodeWithText("Reset settings to defaults").performClick()
+                mainClock.advanceTimeBy(300)
+                onNodeWithText("Reset settings?").assertIsDisplayed()
+                captureAudit("21-04-23-reset-settings-confirm")
+                onNodeWithText("Cancel").performClick()
+
+                openSettingsCategory(SettingsCategory.LYRICS)
+                onNodeWithText("Clear lyrics cache").performScrollTo()
+                onNodeWithText("Clear lyrics cache").performClick()
+                mainClock.advanceTimeBy(300)
+                onNodeWithText("Clear lyrics cache?").assertIsDisplayed()
+                captureAudit("21-05-23-clear-lyrics-cache-confirm")
+                onNodeWithText("Cancel").performClick()
+
+                openSettingsCategory(SettingsCategory.CONTENT)
+                onNodeWithText("United States (US)").performClick()
+                mainClock.advanceTimeBy(300)
+                onNodeWithText("Choose a country or region").assertIsDisplayed()
+                captureAudit("21-05-35-country-region-picker")
+                // Select the already-active country to close the picker without
+                // changing the screenshot's setting before continuing.
+                onNodeWithText("United States").performScrollTo()
+                onNodeWithText("United States").performClick()
+                mainClock.advanceTimeBy(300)
+
+                openSettingsCategory(SettingsCategory.PRIVACY)
+                onNodeWithText("Clear search history").performScrollTo()
+                onNodeWithText("Clear search history").performClick()
+                mainClock.advanceTimeBy(300)
+                onNodeWithText("Clear search history?").assertIsDisplayed()
+                captureAudit("21-05-44-clear-search-history-confirm")
+                onNodeWithText("Cancel").performClick()
+                mainClock.advanceTimeBy(300)
+                onNodeWithText("Clear play history").performScrollTo()
+                onNodeWithText("Clear play history").performClick()
+                mainClock.advanceTimeBy(300)
+                onNodeWithText("Clear play history?").assertIsDisplayed()
+                captureAudit("21-05-47-clear-play-history-confirm")
+                onNodeWithText("Cancel").performClick()
+
+                openSettingsCategory(SettingsCategory.STORAGE)
+                onNodeWithText("Clear audio cache").performScrollTo()
+                onNodeWithText("Clear audio cache").performClick()
+                mainClock.advanceTimeBy(300)
+                onNodeWithText("Clear audio cache?").assertIsDisplayed()
+                captureAudit("21-06-07-clear-audio-cache-confirm")
+            }
+        }
+    }
+
+    @Test
+    fun `lyrics controls dialog remains usable at narrow large text size`() {
+        withFixture(DhunThemeMode.DARK, withLyricsMatches = true) { fixture ->
+            val nav = AppNavState().apply { playerExpanded = true }
+            runSkikoComposeUiTest(size = Size(360f, 640f)) {
+                mainClock.autoAdvance = false
+                setContent {
+                    CompositionLocalProvider(LocalDensity provides Density(density = 1f, fontScale = 1.25f)) {
+                        Shell(fixture, nav, DhunThemeMode.DARK, isDesktop = false)
+                    }
+                }
+                mainClock.advanceTimeBy(600)
+                onNodeWithContentDescription("Lyrics view").performClick()
+                mainClock.advanceTimeBy(500)
+                onNodeWithContentDescription("Lyrics controls").performClick()
+                mainClock.advanceTimeBy(500)
+
+                onNodeWithText("Lyrics controls").assertIsDisplayed()
+                onNodeWithContentDescription("Lyrics provider: Auto (synced first)").assertIsDisplayed()
+                onNodeWithContentDescription("Lyrics offset").assertIsDisplayed()
+                onNodeWithText("Close").performScrollTo()
+                onNodeWithText("Close").assertIsDisplayed()
+                captureUiImage(
+                    "lyrics-controls-compact-large-text-dark.png",
+                    renderCurrentFrame(this, 360, 640),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `confirmation dialog guards pending actions and preserves retry callbacks`() {
+        val pending = mutableStateOf(true)
+        val confirms = AtomicInteger()
+        val dismissals = AtomicInteger()
+
+        runSkikoComposeUiTest(size = Size(412f, 915f)) {
+            mainClock.autoAdvance = false
+            setContent {
+                DhunTheme(mode = DhunThemeMode.DARK) {
+                    Box(Modifier.fillMaxSize().background(DhunColors.background))
+                    DhunConfirmDialog(
+                        title = "Delete playlist?",
+                        message = "This removes the playlist from the local library.",
+                        confirmLabel = "Delete",
+                        retryLabel = "Retry deletion",
+                        pendingLabel = "Deleting…",
+                        isPending = pending.value,
+                        errorMessage = "Could not delete the playlist. Try again.",
+                        onConfirm = { confirms.incrementAndGet() },
+                        onDismissRequest = { dismissals.incrementAndGet() },
+                    )
+                }
+            }
+            mainClock.advanceTimeBy(500)
+            onNodeWithText("Cancel").assertIsNotEnabled()
+            onNodeWithText("Deleting…").assertIsNotEnabled()
+
+            runOnIdle { pending.value = false }
+            mainClock.advanceTimeBy(100)
+            onNodeWithText("Cancel").performClick()
+            onNodeWithText("Retry deletion").performClick()
+            assertEquals(1, dismissals.get(), "Cancel should keep its original dismissal callback")
+            assertEquals(1, confirms.get(), "Retry should call the original mutation callback once")
+        }
+    }
+
+    @Test
+    fun `render confirmations at large text scale in both themes`() {
+        DhunAppearance.reset()
+        try {
+            for (mode in listOf(DhunThemeMode.DARK, DhunThemeMode.LIGHT)) {
+                DhunAppearance.setAppearance(nextMode = mode)
+                scene(width = 360, height = 800, fontScale = 1.3f) {
+                    DhunTheme(mode = mode) {
+                        Box(Modifier.fillMaxSize().background(DhunColors.background))
+                        DhunConfirmDialog(
+                            title = "Clear lyrics cache?",
+                            message = "Automatic lyrics will be fetched again. Saved per-song choices remain; use Use automatic in the lyrics match picker to reset one.",
+                            confirmLabel = "Clear",
+                            pendingLabel = "Clearing…",
+                            onConfirm = {},
+                            onDismissRequest = {},
+                        )
+                    }
+                }.use { composeScene ->
+                    SceneDriver(composeScene).capture("confirm-dialog-large-text-${mode.id}.png", settleFrames = 24)
+                }
+            }
+        } finally {
+            DhunAppearance.reset()
+        }
+    }
+
+    @Test
+    fun `component catalog title yields room for its close action at phone width`() {
+        DhunAppearance.reset()
+        val closeCount = AtomicInteger()
+        try {
+            runSkikoComposeUiTest(size = Size(360f, 800f)) {
+                mainClock.autoAdvance = false
+                setContent {
+                    ComponentCatalogScreen(onClose = { closeCount.incrementAndGet() })
+                }
+                mainClock.advanceTimeBy(500)
+                onNodeWithText("Close").assertIsDisplayed()
+                val closeLabelBounds = onNodeWithText("Close", useUnmergedTree = true)
+                    .fetchSemanticsNode().boundsInRoot
+                assertTrue(
+                    closeLabelBounds.left >= 0f && closeLabelBounds.right <= 360f,
+                    "The catalogue's Close label must stay inside the phone viewport: $closeLabelBounds",
+                )
+                assertTrue(
+                    closeLabelBounds.height <= 24f,
+                    "The catalogue's Close label must remain on one line at phone width: $closeLabelBounds",
+                )
+                captureUiImage(
+                    "component-catalog-header-phone-dark.png",
+                    renderCurrentFrame(this, 360, 800),
+                )
+                onNodeWithText("Close").performClick()
+                assertEquals(1, closeCount.get())
+            }
+        } finally {
+            DhunAppearance.reset()
         }
     }
 
@@ -610,9 +993,26 @@ class VisualAppEvidenceTest {
                 isDesktop = isDesktop,
                 libraryViewModel = fixture.library,
                 connectivity = fixture.connectivity,
+                downloadManager = fixture.downloadManager,
                 appInfo = DhunAppInfo.Unknown,
+                clearAudioCache = { 2_700_000L },
             )
         }
+    }
+
+    private fun seedSavedLyricsChoice(fixture: AppFixture) {
+        val track = requireNotNull(fixture.playerVm.currentTrack.value)
+        val controller = requireNotNull(fixture.playerVm.lyricsMatches)
+        controller.search(track.id, "${track.artistName} ${track.title}")
+        val searchDeadline = System.nanoTime() + 5_000_000_000L
+        while (controller.state.value.loading && System.nanoTime() < searchDeadline) Thread.sleep(20)
+        val matches = controller.state.value.matches
+        assertTrue(matches.isNotEmpty(), "The deterministic lyrics fixture should return a saved-choice candidate")
+        val selected = matches.firstOrNull { it.provider == "lrclib" } ?: matches.first()
+        controller.choose(track.id, selected)
+        val saveDeadline = System.nanoTime() + 5_000_000_000L
+        while (controller.state.value.loading && System.nanoTime() < saveDeadline) Thread.sleep(20)
+        assertEquals(selected, controller.state.value.selected, "The in-memory saved choice should be durable before capture")
     }
 
     private fun withFixture(
@@ -620,11 +1020,13 @@ class VisualAppEvidenceTest {
         provider: RecordedProvider = RecordedProvider(),
         online: Boolean = true,
         withLyricsMatches: Boolean = false,
+        includeDownloads: Boolean = false,
+        includeHistoryAuditData: Boolean = false,
         block: (AppFixture) -> Unit,
     ) {
         DhunAppearance.reset()
         DhunAppearance.setAppearance(nextMode = mode)
-        val fixture = AppFixture(provider, online, withLyricsMatches)
+        val fixture = AppFixture(provider, online, withLyricsMatches, includeDownloads, includeHistoryAuditData)
         try {
             runBlocking { fixture.data.settings.putString(SettingsKeys.THEME, mode.id) }
             block(fixture)
@@ -759,6 +1161,8 @@ class VisualAppEvidenceTest {
         val provider: RecordedProvider,
         online: Boolean,
         withLyricsMatches: Boolean = false,
+        includeDownloads: Boolean = false,
+        includeHistoryAuditData: Boolean = false,
     ) {
         private val driver = DatabaseDriverFactory.inMemory().createDriver()
         val data = DataLayer(DatabaseFactory.create(driver))
@@ -776,6 +1180,28 @@ class VisualAppEvidenceTest {
         val playerVm: PlayerViewModel
         val library: LibraryViewModel
         val localPlaylistId: String
+        val downloadManager: DownloadManager? = if (includeDownloads) {
+            EvidenceDownloadManager(
+                listOf(
+                    DownloadedTrack(
+                        trackId = RECORDED_TRACKS.first().id,
+                        title = RECORDED_TRACKS.first().title,
+                        artistName = RECORDED_TRACKS.first().artistName,
+                        albumName = RECORDED_TRACKS.first().albumName,
+                        durationSeconds = RECORDED_TRACKS.first().durationSeconds ?: 0,
+                        thumbnailUrl = RECORDED_TRACKS.first().thumbnailUrl,
+                        localAudioPath = "/tmp/visual-evidence/download.webm",
+                        fileSizeBytes = 2_700_000L,
+                        mimeType = "audio/webm",
+                        bitrateKbps = 160,
+                        downloadState = DownloadState.COMPLETED,
+                        downloadedAtEpochMs = System.currentTimeMillis(),
+                    ),
+                ),
+            )
+        } else {
+            null
+        }
 
         init {
             localPlaylistId = runBlocking {
@@ -785,6 +1211,15 @@ class VisualAppEvidenceTest {
                 val playlist = data.playlists.create("Visual QA", "In-memory acceptance fixture")
                 RECORDED_TRACKS.take(4).forEach { data.playlists.addTrack(playlist.id, it) }
                 playlist.id
+            }
+            if (includeHistoryAuditData) {
+                runBlocking {
+                    data.history.clear()
+                    repeat(8) { index ->
+                        data.history.recordPlay(RECORDED_TRACKS[index % RECORDED_TRACKS.size], PlayContext.QUEUE)
+                        Thread.sleep(3)
+                    }
+                }
             }
             home = HomeViewModel(
                 getHomeFeed = GetHomeFeedUseCase(provider, data.history),
@@ -815,7 +1250,7 @@ class VisualAppEvidenceTest {
                 lyricsRepository = lyricsRepository,
                 settings = data.settings,
             )
-            library = LibraryViewModel(data, player, scope)
+            library = LibraryViewModel(data, player, scope, downloadManager = downloadManager)
             search.onQueryChange("Bohemian Rhapsody")
             search.onSearchSubmitted()
             when (provider.homeMode) {
@@ -846,6 +1281,24 @@ class VisualAppEvidenceTest {
                 if (System.nanoTime() > deadline) fail("Timed out waiting for $label")
                 Thread.sleep(20)
             }
+        }
+    }
+
+    private class EvidenceDownloadManager(initial: List<DownloadedTrack>) : DownloadManager {
+        private val rows = MutableStateFlow(initial)
+        override val downloads: StateFlow<List<DownloadedTrack>> = rows
+
+        override fun observeProgress(trackId: String): Flow<DownloadProgress?> = flowOf(null)
+        override suspend fun enqueue(track: Track) = Unit
+        override suspend fun enqueueAll(tracks: List<Track>) = Unit
+        override suspend fun pause(trackId: String) = Unit
+        override suspend fun resume(trackId: String) = Unit
+        override suspend fun cancel(trackId: String) = Unit
+        override suspend fun remove(trackId: String) {
+            rows.value = rows.value.filterNot { it.trackId == trackId }
+        }
+        override suspend fun clearAll() {
+            rows.value = emptyList()
         }
     }
 
@@ -945,6 +1398,7 @@ class VisualAppEvidenceTest {
     ) : MusicProvider {
         val continuationRequests = CopyOnWriteArrayList<String>()
         val lyricsFetchRequests = AtomicInteger()
+        @Volatile var lyricsGate: CompletableDeferred<Unit>? = null
         override suspend fun search(query: String, filter: SearchFilter): DhunResult<SearchResults> = when (searchMode) {
             StateMode.POPULATED -> DhunResult.Success(
                 SearchResults(
@@ -1008,6 +1462,7 @@ class VisualAppEvidenceTest {
 
         override suspend fun getLyrics(videoId: String): DhunResult<Lyrics> {
             lyricsFetchRequests.incrementAndGet()
+            lyricsGate?.await()
             return DhunResult.Success(
                 Lyrics.Synced(
                     listOf(

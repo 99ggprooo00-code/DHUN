@@ -136,3 +136,4 @@ jobs:
             app-android/build/test-results/testDebugUnitTest/*.xml
             tools/playback-probe/build/test-results/test/*.xml
             app-desktop/build/test-results/jvmTest/*.xml
+            app-desktop/build/outputs/visual-evidence/*.png

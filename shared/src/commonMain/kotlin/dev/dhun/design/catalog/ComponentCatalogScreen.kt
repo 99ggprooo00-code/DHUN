@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -24,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -123,16 +125,24 @@ fun ComponentCatalogScreen(
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(DhunSpacing.lg),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            "DHUN Theme & Component Catalogue",
+                            text = "DHUN Theme & Component Catalogue",
+                            modifier = Modifier.weight(1f),
                             style = MaterialTheme.typography.headlineSmall,
                             color = DhunColors.textPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                         if (onClose != null) {
-                            DhunTextButton(onClick = onClose) { Text("Close") }
+                            DhunTextButton(
+                                onClick = onClose,
+                                modifier = Modifier.widthIn(min = DhunSpacing.huge + DhunSpacing.xl),
+                            ) {
+                                Text("Close", maxLines = 1, overflow = TextOverflow.Clip)
+                            }
                         }
                     }
                 }

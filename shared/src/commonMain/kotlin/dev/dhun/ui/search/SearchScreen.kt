@@ -7,14 +7,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -32,7 +30,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,7 +50,7 @@ import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.components.AlbumCard
 import dev.dhun.design.components.ArtistCard
 import dev.dhun.design.components.DhunAssistChip
-import dev.dhun.design.components.DhunButton
+import dev.dhun.design.components.DhunConfirmDialog
 import dev.dhun.design.components.DhunFilterChip
 import dev.dhun.design.components.DhunHorizontalRail
 import dev.dhun.design.components.DhunIconButton
@@ -61,7 +58,6 @@ import dev.dhun.design.components.DhunTextButton
 import dev.dhun.design.components.DhunTextField
 import dev.dhun.design.components.EmptyView
 import dev.dhun.design.components.ErrorView
-import dev.dhun.design.components.GlassCard
 import dev.dhun.design.components.LoadingShimmer
 import dev.dhun.design.components.PlaylistCard
 import dev.dhun.design.components.SectionHeader
@@ -396,57 +392,33 @@ private fun ClearRecentSearchesConfirmDialog(
     var isClearing by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    Dialog(onDismissRequest = { if (!isClearing) onDismiss() }) {
-        GlassCard(
-            modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
-            shape = DhunShapes.large,
-            opaqueBase = true,
-        ) {
-            Column(modifier = Modifier.padding(DhunSpacing.lg)) {
-                Text("Clear recent searches?", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
-                Spacer(modifier = Modifier.height(DhunSpacing.sm))
-                Text(
-                    "This removes all recent search terms from this device. Your history, playlists and favorites stay.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = DhunColors.textSecondary,
-                )
-                if (errorMessage != null) {
-                    Spacer(modifier = Modifier.height(DhunSpacing.sm))
-                    Text(errorMessage!!, style = MaterialTheme.typography.bodySmall, color = DhunColors.error)
-                }
-                Spacer(modifier = Modifier.height(DhunSpacing.md))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    DhunTextButton(onClick = { if (!isClearing) onDismiss() }, enabled = !isClearing) {
-                        Text("Cancel")
-                    }
-                    Spacer(modifier = Modifier.width(DhunSpacing.sm))
-                    DhunButton(
-                        onClick = {
-                            if (!isClearing) {
-                                isClearing = true
-                                errorMessage = null
-                                scope.launch {
-                                    try {
-                                        onConfirm()
-                                        onDismiss()
-                                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                                        throw cancelled
-                                    } catch (_: Exception) {
-                                        errorMessage = "Could not clear recent searches. Please try again."
-                                    } finally {
-                                        isClearing = false
-                                    }
-                                }
-                            }
-                        },
-                        enabled = !isClearing,
-                    ) {
-                        Text(if (isClearing) "Clearing…" else if (errorMessage != null) "Try again" else "Clear")
+    DhunConfirmDialog(
+        title = "Clear recent searches?",
+        message = "This removes all recent search terms from this device. Your history, playlists and favorites stay.",
+        confirmLabel = "Clear",
+        pendingLabel = "Clearing…",
+        isPending = isClearing,
+        errorMessage = errorMessage,
+        onDismissRequest = { if (!isClearing) onDismiss() },
+        onConfirm = {
+            if (!isClearing) {
+                isClearing = true
+                errorMessage = null
+                scope.launch {
+                    try {
+                        onConfirm()
+                        onDismiss()
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        errorMessage = "Could not clear recent searches. Please try again."
+                    } finally {
+                        isClearing = false
                     }
                 }
             }
-        }
-    }
+        },
+    )
 }
 
 @Composable

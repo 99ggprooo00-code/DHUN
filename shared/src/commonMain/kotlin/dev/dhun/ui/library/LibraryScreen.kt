@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.DropdownMenu
@@ -38,7 +37,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.window.Dialog
 import dev.dhun.core.DownloadState
 import dev.dhun.core.DownloadedTrack
 import dev.dhun.core.HistoryEntry
@@ -62,7 +60,9 @@ import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.DhunOutlinedButton
 import dev.dhun.design.components.DhunTextButton
 import dev.dhun.design.components.EmptyView
+import dev.dhun.design.components.DhunConfirmDialog
 import dev.dhun.design.components.GlassCard
+import dev.dhun.design.components.GlassDialog
 import dev.dhun.design.components.SectionHeader
 import dev.dhun.domain.HistoryDay
 import dev.dhun.presentation.library.ClearDownloadsUiState
@@ -710,67 +710,53 @@ private fun CreatePlaylistDialog(
     var creating by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    Dialog(onDismissRequest = { if (!creating) onDismiss() }) {
-        GlassCard(
-            modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
-            shape = DhunShapes.large,
-            // A dialog floats over a dimmed page — the opaque base is what
-            // keeps the list underneath from reading through its text.
-            opaqueBase = true,
-        ) {
-            Column(modifier = Modifier.padding(DhunSpacing.lg)) {
-                Text("New playlist", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
-                Spacer(modifier = Modifier.height(DhunSpacing.md))
-                // The DHUN input, not Material 3's outlined field: the same
-                // control the Add to playlist sheet uses, and the same defect
-                // class this file used to share with it (an M3 box inside a
-                // glass card). See `DhunTextField`.
-                DhunTextField(
-                    value = name,
-                    onValueChange = { name = it; errorText = null },
-                    placeholder = "My playlist",
-                    isError = errorText != null,
-                )
-                if (errorText != null) {
-                    Spacer(modifier = Modifier.height(DhunSpacing.xs))
-                    Text(
-                        text = errorText.orEmpty(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = DhunColors.error,
-                    )
-                }
-                Spacer(modifier = Modifier.height(DhunSpacing.md))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    DhunTextButton(onClick = onDismiss, enabled = !creating) { Text("Cancel") }
-                    Spacer(modifier = Modifier.width(DhunSpacing.sm))
-                    DhunButton(
-                        onClick = {
-                            if (name.isNotBlank() && !creating) {
-                                creating = true
-                                errorText = null
-                                scope.launch {
-                                    try {
-                                        onCreate(name.trim())
-                                        // Only a write that returned normally
-                                        // closes the dialog as a created playlist.
-                                        onConfirm(name)
-                                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                                        throw cancelled
-                                    } catch (_: Exception) {
-                                        // Previously swallowed: the dialog closed
-                                        // as if the playlist existed.
-                                        errorText = "Could not create the playlist. Check free space and try again."
-                                    } finally {
-                                        creating = false
-                                    }
-                                }
+    GlassDialog(onDismissRequest = { if (!creating) onDismiss() }) {
+        Text("New playlist", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
+        Spacer(modifier = Modifier.height(DhunSpacing.md))
+        // The DHUN input, not Material 3's outlined field: the same control
+        // the Add to playlist sheet uses. See `DhunTextField`.
+        DhunTextField(
+            value = name,
+            onValueChange = { name = it; errorText = null },
+            placeholder = "My playlist",
+            isError = errorText != null,
+        )
+        if (errorText != null) {
+            Spacer(modifier = Modifier.height(DhunSpacing.xs))
+            Text(
+                text = errorText.orEmpty(),
+                style = MaterialTheme.typography.bodySmall,
+                color = DhunColors.error,
+            )
+        }
+        Spacer(modifier = Modifier.height(DhunSpacing.md))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            DhunTextButton(onClick = onDismiss, enabled = !creating) { Text("Cancel") }
+            Spacer(modifier = Modifier.width(DhunSpacing.sm))
+            DhunButton(
+                onClick = {
+                    if (name.isNotBlank() && !creating) {
+                        creating = true
+                        errorText = null
+                        scope.launch {
+                            try {
+                                onCreate(name.trim())
+                                // Only a write that returned normally closes
+                                // the dialog as a created playlist.
+                                onConfirm(name)
+                            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                errorText = "Could not create the playlist. Check free space and try again."
+                            } finally {
+                                creating = false
                             }
-                        },
-                        enabled = name.isNotBlank() && !creating,
-                        loading = creating,
-                    ) { Text(if (errorText != null) "Try again" else "Create") }
-                }
-            }
+                        }
+                    }
+                },
+                enabled = name.isNotBlank() && !creating,
+                loading = creating,
+            ) { Text(if (errorText != null) "Try again" else "Create") }
         }
     }
 }
@@ -1421,33 +1407,16 @@ private fun DeleteSelectedConfirmDialog(
     isDeleting: Boolean,
     errorMessage: String?,
 ) {
-    Dialog(onDismissRequest = { if (!isDeleting) onDismiss() }) {
-        GlassCard(
-            modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
-            shape = DhunShapes.large,
-            // A dialog floats over a dimmed page — the opaque base is what
-            // keeps the list underneath from reading through its text.
-            opaqueBase = true,
-        ) {
-            Column(modifier = Modifier.padding(DhunSpacing.lg)) {
-                Text("Delete $count download${if (count == 1) "" else "s"}?", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
-                Spacer(modifier = Modifier.height(DhunSpacing.sm))
-                Text("Selected tracks and their downloaded files will be removed from this device. This can't be undone.", style = MaterialTheme.typography.bodySmall, color = DhunColors.textSecondary)
-                if (errorMessage != null) {
-                    Spacer(modifier = Modifier.height(DhunSpacing.sm))
-                    Text(errorMessage, style = MaterialTheme.typography.bodySmall, color = DhunColors.error)
-                }
-                Spacer(modifier = Modifier.height(DhunSpacing.md))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    DhunTextButton(onClick = onDismiss, enabled = !isDeleting) { Text("Cancel") }
-                    Spacer(modifier = Modifier.width(DhunSpacing.sm))
-                    DhunButton(onClick = onConfirm, enabled = !isDeleting) {
-                        Text(if (isDeleting) "Deleting…" else if (errorMessage != null) "Try again" else "Delete")
-                    }
-                }
-            }
-        }
-    }
+    DhunConfirmDialog(
+        title = "Delete $count download${if (count == 1) "" else "s"}?",
+        message = "Selected tracks and their downloaded files will be removed from this device. This can't be undone.",
+        confirmLabel = "Delete",
+        pendingLabel = "Deleting…",
+        isPending = isDeleting,
+        errorMessage = errorMessage,
+        onDismissRequest = onDismiss,
+        onConfirm = onConfirm,
+    )
 }
 
 @Composable
@@ -1458,33 +1427,16 @@ private fun ClearDownloadsConfirmDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    Dialog(onDismissRequest = { if (!isClearing) onDismiss() }) {
-        GlassCard(
-            modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
-            shape = DhunShapes.large,
-            // A dialog floats over a dimmed page — the opaque base is what
-            // keeps the list underneath from reading through its text.
-            opaqueBase = true,
-        ) {
-            Column(modifier = Modifier.padding(DhunSpacing.lg)) {
-                Text("Clear all downloads?", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
-                Spacer(modifier = Modifier.height(DhunSpacing.sm))
-                Text("This deletes all $count downloaded track${if (count == 1) "" else "s"} from this device. Offline playback will no longer work for them.", style = MaterialTheme.typography.bodySmall, color = DhunColors.textSecondary)
-                if (errorMessage != null) {
-                    Spacer(modifier = Modifier.height(DhunSpacing.sm))
-                    Text(errorMessage, style = MaterialTheme.typography.bodySmall, color = DhunColors.error)
-                }
-                Spacer(modifier = Modifier.height(DhunSpacing.md))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    DhunTextButton(onClick = onDismiss, enabled = !isClearing) { Text("Cancel") }
-                    Spacer(modifier = Modifier.width(DhunSpacing.sm))
-                    DhunButton(onClick = onConfirm, enabled = !isClearing) {
-                        Text(if (isClearing) "Clearing…" else if (errorMessage != null) "Try again" else "Clear")
-                    }
-                }
-            }
-        }
-    }
+    DhunConfirmDialog(
+        title = "Clear all downloads?",
+        message = "This deletes all $count downloaded track${if (count == 1) "" else "s"} from this device. Offline playback will no longer work for them.",
+        confirmLabel = "Clear",
+        pendingLabel = "Clearing…",
+        isPending = isClearing,
+        errorMessage = errorMessage,
+        onDismissRequest = onDismiss,
+        onConfirm = onConfirm,
+    )
 }
 
 private fun stateLabel(state: DownloadState): String = when (state) {
@@ -1655,31 +1607,14 @@ private fun ClearHistoryConfirmDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    Dialog(onDismissRequest = { if (!isClearing) onDismiss() }) {
-        GlassCard(
-            modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
-            shape = DhunShapes.large,
-            // A dialog floats over a dimmed page — the opaque base is what
-            // keeps the list underneath from reading through its text.
-            opaqueBase = true,
-        ) {
-            Column(modifier = Modifier.padding(DhunSpacing.lg)) {
-                Text("Clear history?", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
-                Spacer(modifier = Modifier.height(DhunSpacing.sm))
-                Text("This removes all playback history. Favorites and playlists stay.", style = MaterialTheme.typography.bodySmall, color = DhunColors.textSecondary)
-                if (errorMessage != null) {
-                    Spacer(modifier = Modifier.height(DhunSpacing.sm))
-                    Text(errorMessage, style = MaterialTheme.typography.bodySmall, color = DhunColors.error)
-                }
-                Spacer(modifier = Modifier.height(DhunSpacing.md))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    DhunTextButton(onClick = onDismiss, enabled = !isClearing) { Text("Cancel") }
-                    Spacer(modifier = Modifier.width(DhunSpacing.sm))
-                    DhunButton(onClick = onConfirm, enabled = !isClearing) {
-                        Text(if (isClearing) "Clearing…" else if (errorMessage != null) "Try again" else "Clear")
-                    }
-                }
-            }
-        }
-    }
+    DhunConfirmDialog(
+        title = "Clear history?",
+        message = "This removes all playback history. Favorites and playlists stay.",
+        confirmLabel = "Clear",
+        pendingLabel = "Clearing…",
+        isPending = isClearing,
+        errorMessage = errorMessage,
+        onDismissRequest = onDismiss,
+        onConfirm = onConfirm,
+    )
 }
