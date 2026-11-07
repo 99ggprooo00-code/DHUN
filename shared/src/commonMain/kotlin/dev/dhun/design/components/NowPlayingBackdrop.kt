@@ -59,7 +59,7 @@ fun NowPlayingBackdrop(
     var phase by remember(artworkUrl) { mutableStateOf(NowPlayingBackdropPhase.Idle) }
     val artworkAlpha by animateFloatAsState(
         targetValue = if (phase == NowPlayingBackdropPhase.Loaded) {
-            NowPlayingBackdropPolicy.loadedLayerAlpha(blurArtwork)
+            NowPlayingBackdropPolicy.loadedLayerAlpha(isLight = tokens.isLight, blurActive = blurArtwork)
         } else {
             0f
         },
@@ -145,7 +145,28 @@ object NowPlayingBackdropPolicy {
      */
     const val NON_BLUR_LAYER_ALPHA = 0.40f
 
-    fun loadedLayerAlpha(blurActive: Boolean): Float = if (blurActive) 1f else NON_BLUR_LAYER_ALPHA
+    /**
+     * Light theme keeps **more** of the sharp artwork in the blur-off fallback.
+     *
+     * [NON_BLUR_LAYER_ALPHA] was tuned against the dark theme, where 40% of a
+     * dark cover over the near-black base reads as a dimmed, intentional
+     * backdrop. Composited over the warm-white light base the same 40% reads as
+     * a pale smear — the artwork is neither visible nor clean, which is the
+     * reported "it doesn't work as expected on light mode". Light therefore
+     * keeps the cover at [LIGHT_NON_BLUR_LAYER_ALPHA] and lets the light veil
+     * (already the lighter palette stop) do the readability work.
+     */
+    const val LIGHT_NON_BLUR_LAYER_ALPHA = 0.58f
+
+    /** Theme-aware blur-off fallback. */
+    fun loadedLayerAlpha(isLight: Boolean, blurActive: Boolean): Float = when {
+        blurActive -> 1f
+        isLight -> LIGHT_NON_BLUR_LAYER_ALPHA
+        else -> NON_BLUR_LAYER_ALPHA
+    }
+
+    /** Dark-theme default, kept so existing callers and tests keep their meaning. */
+    fun loadedLayerAlpha(blurActive: Boolean): Float = loadedLayerAlpha(isLight = false, blurActive = blurActive)
 
     val artworkSizePx: Int get() = ArtworkUrls.LIST_SIZE_PX
 
@@ -175,8 +196,12 @@ object NowPlayingBackdropPolicy {
      */
     fun veilStops(isLight: Boolean, brightnessPercent: Int): List<Pair<Float, Float>> {
         val adjustment = (55 - brightnessPercent.coerceIn(0, 100)) / 100f * 0.30f
+        // Light carries a slightly heavier veil than before: the blur-off
+        // fallback now keeps more of the sharp cover (see
+        // [LIGHT_NON_BLUR_LAYER_ALPHA]), so the veil — not the layer alpha —
+        // is what keeps page text readable on a bright cover.
         val base = if (isLight) listOf(
-            0f to 0.72f, 0.35f to 0.51f, 0.72f to 0.54f, 1f to 0.62f,
+            0f to 0.78f, 0.35f to 0.60f, 0.72f to 0.63f, 1f to 0.70f,
         ) else listOf(
             0f to 0.75f, 0.35f to 0.52f, 0.72f to 0.55f, 1f to 0.65f,
         )

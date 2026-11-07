@@ -176,19 +176,28 @@ private fun parseBrowseSongRow(
     val parts = subtitle?.split("•")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
     val idsCol1 = browseIdsOf(item.searchColumn(1))
     val idsCol2 = browseIdsOf(item.searchColumn(2))
+    val artistName = parts.firstOrNull()?.takeIf { it.isNotBlank() }
+        ?: fallbackArtist
+        ?: "Unknown artist"
+    val artistId = idsCol1.first ?: idsCol2.first
     return Track(
         id = videoId,
         title = title,
-        artistName = parts.firstOrNull()?.takeIf { it.isNotBlank() }
-            ?: fallbackArtist
-            ?: "Unknown artist",
-        artistId = idsCol1.first ?: idsCol2.first,
+        artistName = artistName,
+        artistId = artistId,
         albumName = parts.getOrNull(1),
         albumId = idsCol2.second ?: idsCol1.second,
         durationSeconds = trailingDuration(item),
         // Row art wins; the page's own cover is the fallback (see KDoc).
         thumbnailUrl = thumbnailOf(item) ?: fallbackThumbnail,
         explicit = item.hasExplicitBadge(),
+        // A collaboration lists several linked channels in its byline; keep
+        // each of them separately navigable instead of collapsing to the first.
+        artists = ArtistCredits.resolve(
+            displayName = artistName,
+            linked = ArtistCredits.linkedCredits(item.searchColumn(1)),
+            fallbackId = artistId,
+        ),
     )
 }
 

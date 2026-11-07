@@ -6,7 +6,9 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -72,6 +74,7 @@ import dev.dhun.design.components.EmptyView
 import dev.dhun.design.components.ErrorView
 import dev.dhun.design.components.LoadingShimmer
 import dev.dhun.design.components.fadeVerticalEdges
+import dev.dhun.lyrics.LrcParser
 import dev.dhun.lyrics.LyricsTiming
 import dev.dhun.presentation.player.LyricsUiState
 import dev.dhun.presentation.player.PlayerViewModel
@@ -521,18 +524,32 @@ internal fun LyricsTabContent(
                                 ) {
                                     stanza.forEach { index ->
                                         val original = allLines[index]
+                                        // An unsynced line can still be bilingual
+                                        // ("primary / translation"). Split it so
+                                        // the translation becomes its own smaller
+                                        // line instead of riding the primary one.
+                                        val (primary, translation) = LrcParser.splitInlineTranslation(original)
                                         Text(
-                                            text = original,
+                                            text = primary,
                                             style = DhunTypographyTokens.lyricActiveStyle(textSize),
                                             color = DhunColors.textPrimary,
                                             textAlign = TextAlign.Center,
                                             modifier = Modifier.fillMaxWidth(),
                                         )
+                                        translation?.let { secondary ->
+                                            Text(
+                                                secondary,
+                                                style = DhunTypographyTokens.lyricSecondaryStyle(textSize),
+                                                color = DhunColors.textSecondary,
+                                                textAlign = TextAlign.Center,
+                                                modifier = Modifier.fillMaxWidth(),
+                                            )
+                                        }
                                         if (romanizationEnabled) {
                                             romanized.line(track.id, index, original)?.let { secondary ->
                                                 Text(
                                                     secondary,
-                                                    style = DhunTypographyTokens.lyricSecondaryStyle(textSize),
+                                                    style = DhunTypographyTokens.lyricTransliterationStyle(textSize),
                                                     color = DhunColors.textTertiary,
                                                     textAlign = TextAlign.Center,
                                                     modifier = Modifier.fillMaxWidth(),
@@ -811,10 +828,28 @@ private fun RelatedRow(track: Track, accent: Color, onClick: () -> Unit, onAddTo
             queued = false
         }
     }
+    // Same row surface as the Up-next queue rows. The Related tab used to draw
+    // bare rows straight onto the sheet veil, so its list read as a different,
+    // flatter surface than the queue beside it and its rows lost their edges
+    // over bright artwork — the reported "no background or border".
+    val rowFill = DhunVisualTuning.veilAlpha(VisualPart.QUEUE_ROWS, QUEUE_ROW_FILL_ALPHA)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.xs)
+            .clip(DhunShapes.large)
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        DhunColors.glassHighlight.copy(alpha = rowFill),
+                        DhunColors.glassDeep.copy(alpha = rowFill * 0.9f),
+                    ),
+                ),
+            )
+            .border(
+                BorderStroke(DhunSpacing.border, DhunColors.glassEdge),
+                DhunShapes.large,
+            )
             .clickable(role = Role.Button, onClickLabel = "Play ${track.title}", onClick = onClick)
             .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
@@ -875,3 +910,9 @@ private fun RelatedRow(track: Track, accent: Color, onClick: () -> Unit, onAddTo
 }
 
 private const val QUEUE_FEEDBACK_MS = 2_000L
+
+/**
+ * Base alpha for a Related row fill, before the beta tuning control scales it.
+ * Matches the queue rows so the two lists in the same sheet are one surface.
+ */
+private const val QUEUE_ROW_FILL_ALPHA = 0.45f

@@ -15,6 +15,41 @@ data class Track(
     val durationSeconds: Int? = null,
     val thumbnailUrl: String? = null,
     val explicit: Boolean = false,
+    /**
+     * Every credited artist, in source order, when the provider gave usable
+     * link targets. Empty means "not known" — callers then fall back to
+     * [artistCredits], which derives name-only credits from [artistName].
+     *
+     * Kept out of the primary constructor's required arguments so every
+     * existing call site (and persisted row) still constructs: the added
+     * column is nullable and a legacy `NULL` reads back as "unknown", which
+     * is exactly what it is.
+     */
+    val artists: List<ArtistCredit> = emptyList(),
+) {
+    /**
+     * The credits to *display and navigate*, never empty for a named track.
+     *
+     * Why this exists: `artistName` is a single provider string such as
+     * "A & B" or "A, B, C". The Full Player used to make that whole string one
+     * clickable target pointing at `artistId`, which is only the FIRST artist's
+     * channel — so a collaboration silently navigated to one artist and the
+     * rest were unreachable. Multi-artist credits carry a target per name.
+     */
+    val artistCredits: List<ArtistCredit>
+        get() = artists.ifEmpty {
+            val id = artistId
+            listOf(ArtistCredit(name = artistName, id = id))
+        }
+}
+
+/**
+ * One credited name plus the artist page it opens (when the provider gave one).
+ * [id] is a channel id (UC…); null means the name is known but not navigable.
+ */
+data class ArtistCredit(
+    val name: String,
+    val id: String? = null,
 )
 
 data class Artist(
@@ -206,6 +241,16 @@ data class LyricsLine(
     val agent: String? = null,
     /** Source explicitly marked this vocal part as background (ttm:role x-bg). */
     val isBackground: Boolean = false,
+    /**
+     * A translation the *source itself* shipped for this line, kept apart from
+     * [text] so it renders as its own smaller secondary line.
+     *
+     * Providers that carry bilingual lyrics (kugou's `content` next to
+     * `contentts`) used to be flattened into one string, which put the
+     * translation on the same visual line as the lyric. Null means "this
+     * source shipped no translation" — never an automatic machine translation.
+     */
+    val translation: String? = null,
 )
 
 /** UTF-16 ranges into the original line: never split/reorder joined scripts for rendering. */

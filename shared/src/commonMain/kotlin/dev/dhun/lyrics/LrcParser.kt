@@ -10,7 +10,37 @@ import dev.dhun.core.LyricsWord
 object LrcParser {
     private val timestampRegex = Regex("""\[(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?]""")
     private val wordTimingRegex = Regex("""<(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?>""")
-    private val metadataRegex = Regex("""^\[(?:ti|ar|al|by|offset|length):.*]$""", RegexOption.IGNORE_CASE)
+    private val metadataRegex = Regex("""^\[(?:ti|ar|al|by|offset|length|re|ve):.*]$""", RegexOption.IGNORE_CASE)
+
+    /**
+     * An inline secondary translation on ONE line: `[00:12.00]primary / 译文`
+     * or the `primary // 译文` variant some tools emit.
+     *
+     * This is the root cause of "translation is appended to the same line": a
+     * bilingual LRC line was rendered verbatim, so the translation sat on the
+     * lyric's own baseline instead of below it in the secondary style. The
+     * separator must be surrounded by spaces (a URL's `//` or a path's `/`
+     * must survive) and both sides must be non-blank, so ordinary lyrics are
+     * never split.
+     */
+    private val inlineTranslationRegex = Regex("""\s+/{1,2}\s+""")
+
+    /**
+     * Splits [text] into primary + optional translation. Pure, so the rule is
+     * pinned by tests rather than implied by rendering code.
+     *
+     * A translation is only recognised when the two halves differ — a line
+     * that is simply repeated ("la la // la la", a jammed chorus) is not a
+     * translation and stays whole.
+     */
+    fun splitInlineTranslation(text: String): Pair<String, String?> {
+        if (text.length > 4_000) return text to null
+        val match = inlineTranslationRegex.find(text) ?: return text to null
+        val primary = text.substring(0, match.range.first).trim()
+        val secondary = text.substring(match.range.last + 1).trim()
+        if (primary.isEmpty() || secondary.isEmpty() || primary == secondary) return text to null
+        return primary to secondary
+    }
 
     private fun time(match: MatchResult): Long? {
         val seconds = match.groupValues[2].toLongOrNull() ?: return null
@@ -27,20 +57,21 @@ object LrcParser {
             val stamps = timestampRegex.findAll(line).toList()
             if (stamps.isEmpty()) {
                 if (allowUnsyncedFallback) {
-                    val text = wordTimingRegex.replace(line, "").trim()
-                    if (text.isNotEmpty()) lines.add(LyricsLine(null, text))
+                    val (primary, translation) = splitInlineTranslation(wordTimingRegex.replace(line, "").trim())
+                    if (primary.isNotEmpty()) lines.add(LyricsLine(null, primary, translation = translation))
                 }
                 continue
             }
             val times = stamps.mapNotNull(::time)
             if (times.isEmpty()) continue
             val body = line.substring(stamps.last().range.last + 1)
-            val (text, words) = parseWords(body, times.first())
+            val (rawText, words) = parseWords(body, times.first())
+            val (text, translation) = splitInlineTranslation(rawText)
             for (start in times) {
                 val shift = start - times.first()
                 lines.add(LyricsLine(start, text, words.map {
                     it.copy(startTimeMs = it.startTimeMs + shift, endTimeMs = it.endTimeMs?.plus(shift))
-                }))
+                }, translation = translation))
             }
         }
         return lines.sortedBy { it.startTimeMs ?: Long.MAX_VALUE }

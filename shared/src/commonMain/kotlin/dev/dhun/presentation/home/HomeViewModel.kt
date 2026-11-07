@@ -71,6 +71,8 @@ class HomeViewModel(
         val pageError: String? = null,
         val completedTokens: Set<String> = emptySet(),
         val emptyPageCount: Int = 0,
+        /** Consecutive scroll-driven continuation failures absorbed automatically. */
+        val autoRetries: Int = 0,
     )
 
     private val state = MutableStateFlow(State())
@@ -243,11 +245,44 @@ class HomeViewModel(
         }
     }
 
+    /** The explicit "Load more" affordance and the footer's Retry. */
     fun loadMore() = requestMore(retry = false)
     fun retryLoadMore() = requestMore(retry = true)
 
+    /**
+     * Scroll-driven trigger, called when the user reaches the end of the list.
+     *
+     * This is deliberately NOT the same entry point as [loadMore], because the
+     * two have opposite obligations:
+     *
+     *  * [loadMore] is a **user command**. After a failure it must stay put —
+     *    hammering the service because a finger is on the screen is worse than
+     *    showing an honest footer, so it waits for [retryLoadMore].
+     *  * [onScrollNearEnd] is an **ambient signal**. It fires repeatedly while
+     *    the list sits at the bottom, so it has to be the thing that keeps the
+     *    feed alive. Before this existed, a single transient continuation
+     *    failure (a dropped mobile connection, one 5xx, a rate-limit blip) set
+     *    `pageError`, and every later scroll event was rejected by the
+     *    `pageError != null` guard *until the user found the footer button*.
+     *    On For You — whose feed is continuation-only, unlike the mood
+     *    categories that re-query Search — that is indistinguishable from
+     *    "endless scrolling does not work".
+     *
+     * The budget is what keeps it honest: after [MAX_AUTO_RETRIES] consecutive
+     * failures the footer error is left in place and the trigger stops, so a
+     * genuinely dead service produces one message instead of a request loop.
+     */
+    fun onScrollNearEnd() {
+        val before = state.value
+        val canRetryTransient = before.pageError != null && before.autoRetries < MAX_AUTO_RETRIES
+        if (before.ui !is HomeUiState.Success) return
+        if (before.refreshing || before.loadingMore) return
+        if (before.pageError != null && !canRetryTransient) return
+        requestMore(retry = canRetryTransient, fromScroll = true)
+    }
+
     /** One request at a time; failures wait for an explicit retry, not a recomposition loop. */
-    private fun requestMore(retry: Boolean) {
+    private fun requestMore(retry: Boolean, fromScroll: Boolean = false) {
         val before = state.value
         val current = (before.ui as? HomeUiState.Success)?.feed ?: return
         val token = current.continuationToken ?: return
@@ -256,6 +291,7 @@ class HomeViewModel(
             loadingMore = true,
             pageError = null,
             emptyPageCount = if (retry) 0 else before.emptyPageCount,
+            autoRetries = if (fromScroll) before.autoRetries else 0,
         )
         // Claim BEFORE coroutine dispatch. If refresh/another request won the
         // CAS, let its updated state trigger the next UI event instead.
@@ -272,23 +308,38 @@ class HomeViewModel(
                                 continuationToken = result.value.continuationToken?.takeUnless { it in used },
                             )
                             val emptyPages = if (feed.sections.size == current.sections.size) latest.emptyPageCount + 1 else 0
+                            // A page that actually grew the feed is proof the
+                            // scroll path is healthy again: clear the automatic
+                            // retry budget so the NEXT transient failure later in
+                            // the same session can still self-heal.
+                            val grew = feed.sections.size > current.sections.size
                             latest.copy(
                                 ui = HomeUiState.Success(feed),
                                 completedTokens = used,
                                 emptyPageCount = emptyPages,
+                                autoRetries = if (grew) 0 else latest.autoRetries,
                                 pageError = if (feed.continuationToken != null && emptyPages >= MAX_EMPTY_PAGES) {
                                     "No new recommendations arrived. Retry or refresh Home."
                                 } else null,
                             )
                         }
-                        is DhunResult.Failure -> latest.copy(pageError = result.error.toUserMessage())
+                        is DhunResult.Failure -> latest.copy(
+                            pageError = result.error.toUserMessage(),
+                            // Count one failure per request, not per wrapping
+                            // request: a retry that also fails moves the budget
+                            // forward exactly one step.
+                            autoRetries = latest.autoRetries + 1,
+                        )
                     }
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
                 state.update {
-                    if (it.generation != request.generation) it else it.copy(pageError = DhunError.Unknown().toUserMessage())
+                    if (it.generation != request.generation) it else it.copy(
+                        pageError = DhunError.Unknown().toUserMessage(),
+                        autoRetries = it.autoRetries + 1,
+                    )
                 }
             } finally {
                 state.update {
@@ -305,6 +356,14 @@ class HomeViewModel(
     private companion object {
         const val FAVORITE_FAILED = "Could not update Liked Songs. Try again."
         const val MAX_EMPTY_PAGES = 3
+
+        /**
+         * How many consecutive scroll-driven continuation failures the feed
+         * absorbs before it stops retrying on its own and leaves the footer
+         * error to the user. Two is enough to ride out a dropped connection or
+         * a rate-limit blip, small enough that a dead service is visible.
+         */
+        const val MAX_AUTO_RETRIES = 2
         /** Distinct recent plays that form the seed signal for recommendations. */
         const val RECOMMEND_SEED_SIGNAL = 10
     }

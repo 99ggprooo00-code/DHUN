@@ -21,7 +21,7 @@ internal object SyncedLyricsCodec {
     fun encode(lines: List<LyricsLine>): String {
         require(valid(lines)) { "Invalid or oversized timed lyrics" }
         val encoded = buildJsonObject {
-            put("dhunSyncedLyrics", 2)
+            put("dhunSyncedLyrics", 3)
             put("lines", buildJsonArray {
                 lines.forEach { line -> add(buildJsonObject {
                     put("start", line.startTimeMs)
@@ -29,6 +29,7 @@ internal object SyncedLyricsCodec {
                     line.endTimeMs?.let { put("end", it) }
                     line.agent?.let { put("agent", it) }
                     put("background", line.isBackground)
+                    line.translation?.let { put("translation", it) }
                     put("words", buildJsonArray {
                         line.words.forEach { word -> add(buildJsonObject {
                             put("from", word.startIndex); put("to", word.endIndex); put("start", word.startTimeMs)
@@ -52,7 +53,7 @@ internal object SyncedLyricsCodec {
             require(boundedLyricsJson(payload))
             val root = Json.parseToJsonElement(payload) as? JsonObject ?: error("Not an object")
             val version = root.value("dhunSyncedLyrics")
-            require(version in setOf("1", "2"))
+            require(version in setOf("1", "2", "3"))
             val array = root["lines"] as? JsonArray ?: error("Missing lines")
             require(array.size <= 2_000)
             val lines = array.map { item ->
@@ -73,12 +74,20 @@ internal object SyncedLyricsCodec {
                         else -> error("Invalid background flag")
                     }
                 } else false
+                // Version 3 added an optional secondary translation line. Older
+                // payloads and every payload without one decode to null, so a
+                // codec round trip can never invent text.
+                val translation = if (version == "3" && "translation" in line) {
+                    val ref = line["translation"] as? JsonPrimitive ?: error("Invalid translation")
+                    require(ref.isString)
+                    ref.content.takeIf { it.isNotBlank() }
+                } else null
                 LyricsLine(line.number("start"), line.value("text") ?: error("Missing text"), words.map {
                     val word = it as? JsonObject ?: error("Invalid word")
                     val from = word.number("from"); val to = word.number("to")
                     require(from in 0..Int.MAX_VALUE.toLong() && to in 0..Int.MAX_VALUE.toLong())
                     LyricsWord(from.toInt(), to.toInt(), word.number("start"), word.end())
-                }, line.end(), agent, background)
+                }, line.end(), agent, background, translation)
             }
             require(valid(lines))
             lines

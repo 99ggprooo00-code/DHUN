@@ -93,16 +93,22 @@ internal fun parseSearchResults(query: String, root: JsonObject): SearchResults 
             videoId != null -> {
                 val idsArtist = browseIdsOf(item.searchColumn(1))
                 val idsAlbum = browseIdsOf(item.searchColumn(2))
+                val artistName = parts.firstOrNull() ?: "Unknown artist"
                 songs += Track(
                     id = videoId,
                     title = title,
-                    artistName = parts.firstOrNull() ?: "Unknown artist",
+                    artistName = artistName,
                     artistId = idsArtist.first,
                     albumName = parts.getOrNull(1),
                     albumId = idsAlbum.second ?: idsArtist.second,
                     durationSeconds = trailingDuration(item),
                     thumbnailUrl = thumbnailOf(item),
                     explicit = item.hasExplicitBadge(),
+                    artists = ArtistCredits.resolve(
+                        displayName = artistName,
+                        linked = ArtistCredits.linkedCredits(item.searchColumn(1)),
+                        fallbackId = idsArtist.first,
+                    ),
                 )
             }
             browseId != null && browseId.startsWith("MPREb") -> albums += Album(
@@ -192,17 +198,23 @@ internal fun parseHomeSections(root: JsonObject): List<HomeSection> {
                         videoId != null -> {
                             val idsArtist = browseIdsOf(responsive.searchColumn(1))
                             val idsAlbum = browseIdsOf(responsive.searchColumn(2))
+                            val artistName = parts.firstOrNull() ?: "Unknown artist"
                             items += HomeItem.TrackItem(
                                 Track(
                                     id = videoId,
                                     title = trackTitle,
-                                    artistName = parts.firstOrNull() ?: "Unknown artist",
+                                    artistName = artistName,
                                     artistId = idsArtist.first,
                                     albumName = parts.getOrNull(1),
                                     albumId = idsAlbum.second ?: idsArtist.second,
                                     durationSeconds = trailingDuration(responsive),
                                     thumbnailUrl = thumb,
                                     explicit = responsive.hasExplicitBadge(),
+                                    artists = ArtistCredits.resolve(
+                                        displayName = artistName,
+                                        linked = ArtistCredits.linkedCredits(responsive.searchColumn(1)),
+                                        fallbackId = idsArtist.first,
+                                    ),
                                 )
                             )
                         }
@@ -249,16 +261,22 @@ internal fun parseHomeSections(root: JsonObject): List<HomeSection> {
                     when {
                         videoId != null -> {
                             val ids = browseIdsOf(twoRow.obj("subtitle"))
+                            val artistName = parts.firstOrNull() ?: "Unknown artist"
                             items += HomeItem.TrackItem(
                                 Track(
                                     id = videoId,
                                     title = itemTitle,
-                                    artistName = parts.firstOrNull() ?: "Unknown artist",
+                                    artistName = artistName,
                                     artistId = ids.first,
                                     albumName = parts.getOrNull(1),
                                     albumId = ids.second,
                                     thumbnailUrl = thumb,
                                     explicit = twoRow.hasExplicitBadge(),
+                                    artists = ArtistCredits.resolve(
+                                        displayName = artistName,
+                                        linked = ArtistCredits.linkedCredits(twoRow.obj("subtitle")),
+                                        fallbackId = ids.first,
+                                    ),
                                 )
                             )
                         }
@@ -319,11 +337,18 @@ internal fun parseRelatedTracks(root: JsonObject): List<Track> {
             ?.let { durationRegex.find(it)?.destructured }
             ?.let { (mm, ss) -> mm.toInt() * 60 + ss.toInt() }
         val bylineIds = browseIdsOf(descend(p, listOf("longBylineText", "runs")))
+        val bylineNode = descend(p, listOf("longBylineText", "runs"))
+        val artistName = byline?.firstOrNull() ?: "Unknown artist"
         Track(
             id = id,
             title = title,
-            artistName = byline?.firstOrNull() ?: "Unknown artist",
+            artistName = artistName,
             artistId = bylineIds.first,
+            artists = ArtistCredits.resolve(
+                displayName = byline?.firstOrNull() ?: "Unknown artist",
+                linked = ArtistCredits.linkedCredits(bylineNode),
+                fallbackId = bylineIds.first,
+            ),
             albumName = byline?.getOrNull(1),
             albumId = bylineIds.second,
             durationSeconds = duration,

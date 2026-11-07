@@ -512,12 +512,21 @@ class InnerTubeClient(
         body: JsonObject,
         continuationToken: String? = null,
     ): JsonObject {
-        val version = clientVersion()
-        val visitorData = cachedMusicVisitorData
-        // context() may have been built BEFORE the first version discovery.
-        // Keep body and X-YouTube-Client-Version aligned on the very first request.
-        val requestBody = bodyWithClientVersion(body, version)
+        // ONE bounded re-discovery of the served session values per call.
+        //
+        // `clientVersion`/`visitorData` are scraped from the homepage once and
+        // then reused for the whole process lifetime. YouTube rotates the
+        // WEB_REMIX client build every few weeks, and a *stale* version is
+        // rejected with a plain HTTP 400 rather than a helpful code — which on
+        // the Home feed surfaces as "the continuation failed", i.e. endless
+        // scrolling stopping while the first page still renders. Refreshing the
+        // session once and replaying the request turns a permanent, restart-only
+        // failure into a single wasted round trip. It is deliberately one extra
+        // attempt: a genuinely rejected request must still fail visibly.
+        var version = clientVersion()
+        var visitorData = cachedMusicVisitorData
         var lastError: DhunError = DhunError.Unknown()
+        var revalidated = false
         repeat(MAX_ATTEMPTS) { attempt ->
             globalRateGate.await() // Phase 14: 429 global backoff — all calls wait out a tripped gate
             if (attempt > 0) delay(backoffMillis(attempt, lastError))
@@ -535,12 +544,22 @@ class InnerTubeClient(
                         append(HttpHeaders.ContentType, "application/json")
                     }
                     timeout { requestTimeoutMillis = 20_000 }
-                    setBody(requestBody.toString())
+                    setBody(bodyWithClientVersion(body, version).toString())
                 }
                 val code = response.status.value
                 when {
                     code == 429 -> lastError = onRateLimited(response.headers["Retry-After"])
                     code in 500..599 -> lastError = DhunError.Network("HTTP $code from /$endpoint")
+                    // 400/404 from a metadata endpoint means the served session
+                    // values are stale (client build rotated) or the cursor has
+                    // expired. Refresh once, then replay with the new session.
+                    code in setOf(400, 404) && !revalidated -> {
+                        revalidated = true
+                        version = clientVersion(forceRefresh = true)
+                        visitorData = cachedMusicVisitorData
+                        lastError = DhunError.Parse("HTTP $code from /$endpoint")
+                        return@repeat
+                    }
                     code != 200 -> throw DhunException(DhunError.Parse("HTTP $code from /$endpoint"))
                     else -> return Json.parseToJsonElement(response.bodyAsText()).jsonObject
                 }
