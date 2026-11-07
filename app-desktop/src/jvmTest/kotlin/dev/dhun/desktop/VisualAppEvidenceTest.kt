@@ -83,7 +83,6 @@ import dev.dhun.ui.shell.DhunAppShell
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
-import javax.imageio.ImageIO
 import org.jetbrains.skia.Image
 import org.jetbrains.skia.Surface
 import kotlinx.coroutines.CompletableDeferred
@@ -370,39 +369,6 @@ class VisualAppEvidenceTest {
         // A no-art reference makes the controlled black/white artwork frames
         // deterministic even when CI has no access to the remote thumbnail host.
         captureSingleState("app-home-no-art-light.png", DhunThemeMode.LIGHT, blurPercent = 0, artworkUrl = "")
-        assertLightBackdropFramePixels()
-    }
-
-    private fun assertLightBackdropFramePixels() {
-        // (200, 190) is clear background between the quick actions and the
-        // Quick picks heading at the fixed 412x915 test viewport. This checks
-        // the actual Compose/Skia output, not just the policy constant: black
-        // artwork should tint the light base visibly but stay a veiled gray;
-        // white artwork should blend back into the warm light base.
-        val base = frameColor("app-home-no-art-light.png", x = 200, y = 190)
-        val blackArt = frameColor("app-home-no-blur-black-artwork-light.png", x = 200, y = 190)
-        val whiteArt = frameColor("app-home-no-blur-white-artwork-light.png", x = 200, y = 190)
-        val baseLevel = (base.red + base.green + base.blue) / 3
-        val blackLevel = (blackArt.red + blackArt.green + blackArt.blue) / 3
-        val whiteDistance = kotlin.math.abs(base.red - whiteArt.red) +
-            kotlin.math.abs(base.green - whiteArt.green) + kotlin.math.abs(base.blue - whiteArt.blue)
-        assertTrue(
-            baseLevel - blackLevel in 20..90,
-            "Light blur-off fallback must show black artwork as visible-but-veiled, not disappear or become a black slab: base=$base artwork=$blackArt",
-        )
-        assertTrue(
-            whiteDistance <= 24,
-            "White artwork should blend into the warm light base rather than wash it out: base=$base artwork=$whiteArt",
-        )
-    }
-
-    private fun frameColor(name: String, x: Int, y: Int): java.awt.Color {
-        val image = checkNotNull(ImageIO.read(File(output, name))) { "Could not read rendered frame $name" }
-        return try {
-            java.awt.Color(image.getRGB(x, y), true)
-        } finally {
-            image.flush()
-        }
     }
 
     @Test

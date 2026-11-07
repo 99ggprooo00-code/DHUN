@@ -3,6 +3,7 @@ package dev.dhun.design.components
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -13,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
@@ -67,15 +69,11 @@ fun NowPlayingBackdrop(
         label = "nowPlayingBackdrop",
     )
 
-    // Fade the already-composited artwork + veil as ONE layer. Applying the
-    // fallback alpha to each child separately would apply it twice to the
-    // artwork wherever the translucent veil overlaps it, and would also leave
-    // a different amount of theme base visible than the real-blur path.
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .clipToBounds()
-            .graphicsLayer { alpha = artworkAlpha },
+    NowPlayingBackdropLayer(
+        modifier = modifier,
+        artworkAlpha = artworkAlpha,
+        veilTint = veilTint,
+        veilStops = veilStops,
     ) {
         AsyncImage(
             model = ImageRequest.Builder(context)
@@ -106,6 +104,33 @@ fun NowPlayingBackdrop(
             },
             onError = { phase = NowPlayingBackdropPhase.Failed },
         )
+    }
+}
+
+/**
+ * Shared composition layer for the image and its single tonal veil. Exposed to
+ * this module's JVM pixel test so it can inject deterministic color artwork
+ * without depending on platform-specific Coil file loading.
+ */
+@Composable
+internal fun NowPlayingBackdropLayer(
+    artworkAlpha: Float,
+    veilTint: Color,
+    veilStops: List<Pair<Float, Float>>,
+    modifier: Modifier = Modifier,
+    artwork: @Composable BoxScope.() -> Unit,
+) {
+    // Fade the already-composited artwork + veil as ONE layer. Applying the
+    // fallback alpha to each child separately would apply it twice to the
+    // artwork wherever the translucent veil overlaps it, and would also leave
+    // a different amount of theme base visible than the real-blur path.
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .clipToBounds()
+            .graphicsLayer { alpha = artworkAlpha },
+    ) {
+        artwork()
         // One theme-aware veil, faded with the image. No permanent overlay on
         // the fallback background while a request is loading or has failed.
         Box(
