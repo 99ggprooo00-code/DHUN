@@ -515,12 +515,20 @@ class VisualAppEvidenceTest {
                 setContent { Shell(fixture, nav, DhunThemeMode.DARK, isDesktop = false) }
                 mainClock.advanceTimeBy(600)
                 onNodeWithContentDescription("More player actions").performClick()
+                mainClock.advanceTimeBy(100)
+                captureUiImage(
+                    "audit-21-03-01-full-player-track-actions-dark.png",
+                    renderCurrentFrame(this, 412, 915),
+                )
                 mainClock.advanceTimeBy(500)
                 onNodeWithText("Play next").assertIsDisplayed()
                 onNodeWithText("Add to queue").assertIsDisplayed()
+                onNodeWithText("Add to playlist").assertIsDisplayed()
+                onNodeWithText("Download").assertIsDisplayed()
+                onNodeWithText("Go to artist").assertIsDisplayed()
                 onNodeWithText("Go to album").assertIsDisplayed()
                 captureUiImage(
-                    "audit-21-03-01-full-player-track-actions-dark.png",
+                    "audit-21-03-04-track-menu-settled-dark.png",
                     renderCurrentFrame(this, 412, 915),
                 )
             }
@@ -573,7 +581,7 @@ class VisualAppEvidenceTest {
                 }
                 mainClock.advanceTimeBy(600)
                 onNodeWithText("Liked Songs").assertIsDisplayed()
-                captureAudit("21-03-04-liked-songs")
+                captureAudit("21-03-51-liked-songs")
 
                 runOnIdle { fixture.library.selectTab(LibraryTab.DOWNLOADS) }
                 mainClock.advanceTimeBy(300)
