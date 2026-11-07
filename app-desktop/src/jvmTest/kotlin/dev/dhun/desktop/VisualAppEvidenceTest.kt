@@ -373,6 +373,7 @@ class VisualAppEvidenceTest {
                     // The compact provider chip still opens the full existing
                     // choice list and writes the selected preference.
                     onNodeWithContentDescription("Lyrics provider: Auto (synced first)").performClick()
+                    mainClock.advanceTimeBy(400)
                     onNodeWithText("LRCLIB").performClick()
                     mainClock.advanceTimeBy(200)
                     onNodeWithContentDescription("Lyrics provider: LRCLIB").assertIsDisplayed()
@@ -530,6 +531,7 @@ class VisualAppEvidenceTest {
                     nav.selectTab(AppTab.LIBRARY)
                     fixture.library.openLikedSongs()
                 }
+                mainClock.advanceTimeBy(600)
                 onNodeWithText("Liked Songs").assertIsDisplayed()
                 captureAudit("21-03-04-liked-songs")
 
@@ -695,14 +697,15 @@ class VisualAppEvidenceTest {
                 }
                 mainClock.advanceTimeBy(500)
                 onNodeWithText("Close").assertIsDisplayed()
-                val closeBounds = onNodeWithText("Close").fetchSemanticsNode().boundsInRoot
+                val closeLabelBounds = onNodeWithText("Close", useUnmergedTree = true)
+                    .fetchSemanticsNode().boundsInRoot
                 assertTrue(
-                    closeBounds.left >= 0f && closeBounds.right <= 360f,
-                    "The catalogue's Close action must stay inside the phone viewport: $closeBounds",
+                    closeLabelBounds.left >= 0f && closeLabelBounds.right <= 360f,
+                    "The catalogue's Close label must stay inside the phone viewport: $closeLabelBounds",
                 )
                 assertTrue(
-                    closeBounds.height <= 24f,
-                    "The catalogue's Close label must remain on one line at phone width: $closeBounds",
+                    closeLabelBounds.height <= 24f,
+                    "The catalogue's Close label must remain on one line at phone width: $closeLabelBounds",
                 )
                 captureUiImage(
                     "component-catalog-header-phone-dark.png",
