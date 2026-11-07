@@ -73,6 +73,8 @@ class HomeViewModel(
         val ui: HomeUiState = HomeUiState.Loading,
         val refreshing: Boolean = false,
         val loadingMore: Boolean = false,
+        /** Monotonic pulse for each completed continuation, even if fast state changes are conflated. */
+        val paginationRevision: Long = 0L,
         val pageError: String? = null,
         /** Whether the last continuation error is transient enough for ambient retry. */
         val autoRetryEligible: Boolean = false,
@@ -91,6 +93,8 @@ class HomeViewModel(
         .stateIn(scope, SharingStarted.Eagerly, false)
     val isLoadingMore: StateFlow<Boolean> = state.map { it.loadingMore }
         .stateIn(scope, SharingStarted.Eagerly, false)
+    val paginationRevision: StateFlow<Long> = state.map { it.paginationRevision }
+        .stateIn(scope, SharingStarted.Eagerly, 0L)
     val loadMoreError: StateFlow<String?> = state.map { it.pageError }
         .stateIn(scope, SharingStarted.Eagerly, null)
     private var feedJob: Job? = null
@@ -216,6 +220,7 @@ class HomeViewModel(
                 mood = mood,
                 ui = if (refresh && it.ui is HomeUiState.Success) it.ui else HomeUiState.Loading,
                 refreshing = refresh,
+                paginationRevision = it.paginationRevision,
             )
         }
         feedJob?.cancel()
@@ -375,7 +380,10 @@ class HomeViewModel(
                 }
             } finally {
                 state.update {
-                    if (it.generation != request.generation) it else it.copy(loadingMore = false)
+                    if (it.generation != request.generation) it else it.copy(
+                        loadingMore = false,
+                        paginationRevision = it.paginationRevision + 1,
+                    )
                 }
             }
         }

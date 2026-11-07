@@ -120,6 +120,7 @@ fun HomeScreen(
     val selectedMood by viewModel.selectedMood.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val isLoadingMore by viewModel.isLoadingMore.collectAsState()
+    val paginationRevision by viewModel.paginationRevision.collectAsState()
     val loadMoreError by viewModel.loadMoreError.collectAsState()
     val recentlyPlayed by viewModel.recentlyPlayed.collectAsState()
     val recommendedSongs by viewModel.recommendedSongs.collectAsState()
@@ -213,6 +214,7 @@ fun HomeScreen(
                             isLoadingRecommended = selectedMood == HomeMood.FOR_YOU && isLoadingRecommended,
                             isRefreshing = isRefreshing,
                             isLoadingMore = isLoadingMore,
+                            paginationRevision = paginationRevision,
                             loadMoreError = loadMoreError,
                             onLoadMore = viewModel::loadMore,
                             onScrollNearEnd = viewModel::onScrollNearEnd,
@@ -245,6 +247,7 @@ private fun HomeFeedContent(
     isLoadingRecommended: Boolean,
     isRefreshing: Boolean,
     isLoadingMore: Boolean,
+    paginationRevision: Long,
     loadMoreError: String?,
     onLoadMore: () -> Unit,
     onScrollNearEnd: () -> Unit,
@@ -279,15 +282,25 @@ private fun HomeFeedContent(
     // end its Boolean result stays `true`; equal values are conflated. A failed
     // request does not change the continuation token or item count, so relying
     // on layout changes alone leaves the trigger disarmed after its first emit.
-    // Key on `isLoadingMore` and include it in the sampled condition: it turns
-    // false while a request is in flight, then re-arms the near-end event when
-    // the request completes. The ViewModel owns the bounded retry budget.
+    // Key on the ViewModel's monotonic completion revision as well as
+    // `isLoadingMore`: a fast failure can toggle loading true/false between
+    // frames, so Compose may never observe that Boolean edge. The revision still
+    // re-arms the near-end event after every completed request. The ViewModel
+    // owns error eligibility and the bounded retry budget.
     val canLoadMore = feed.continuationToken != null
-    LaunchedEffect(listState, canLoadMore, feed.continuationToken, isLoadingMore) {
+    LaunchedEffect(
+        listState,
+        canLoadMore,
+        feed.continuationToken,
+        isRefreshing,
+        isLoadingMore,
+        paginationRevision,
+    ) {
         snapshotFlow {
             val total = listState.layoutInfo.totalItemsCount
             val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
-            canLoadMore && !isLoadingMore && total > 0 && lastVisible >= total - SCROLL_TRIGGER_DISTANCE
+            canLoadMore && !isRefreshing && !isLoadingMore && total > 0 &&
+                lastVisible >= total - SCROLL_TRIGGER_DISTANCE
         }
             .distinctUntilChanged()
             .collect { nearEnd ->
