@@ -20,7 +20,6 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.InternalTestApi
 import androidx.compose.ui.test.SkikoComposeUiTest
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -393,7 +392,11 @@ class VisualAppEvidenceTest {
                     mainClock.advanceTimeBy(400)
                     onNodeWithText("Close").performClick()
                     mainClock.advanceTimeBy(400)
-                    onNodeWithText("Lyrics offset").assertDoesNotExist()
+                    onNodeWithContentDescription("Lyrics controls").performClick()
+                    mainClock.advanceTimeBy(400)
+                    onNodeWithText("Close").assertIsDisplayed()
+                    onNodeWithText("Close").performClick()
+                    mainClock.advanceTimeBy(400)
                 }
             }
         }
