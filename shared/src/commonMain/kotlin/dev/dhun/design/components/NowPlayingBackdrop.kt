@@ -196,12 +196,13 @@ object NowPlayingBackdropPolicy {
      */
     fun veilStops(isLight: Boolean, brightnessPercent: Int): List<Pair<Float, Float>> {
         val adjustment = (55 - brightnessPercent.coerceIn(0, 100)) / 100f * 0.30f
-        // Light carries a slightly heavier veil than before: the blur-off
-        // fallback now keeps more of the sharp cover (see
-        // [LIGHT_NON_BLUR_LAYER_ALPHA]), so the veil — not the layer alpha —
-        // is what keeps page text readable on a bright cover.
+        // Light keeps ONE translucent palette veil, lighter than dark — not a
+        // black dim under a white scrim, and never opaque enough to hide the
+        // artwork. The light-mode fix lives in the layer alpha
+        // ([LIGHT_NON_BLUR_LAYER_ALPHA]), not here: stacking a heavier veil on
+        // top of a heavier layer double-counts and buries the cover.
         val base = if (isLight) listOf(
-            0f to 0.78f, 0.35f to 0.60f, 0.72f to 0.63f, 1f to 0.70f,
+            0f to 0.72f, 0.35f to 0.51f, 0.72f to 0.54f, 1f to 0.62f,
         ) else listOf(
             0f to 0.75f, 0.35f to 0.52f, 0.72f to 0.55f, 1f to 0.65f,
         )

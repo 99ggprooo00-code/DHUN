@@ -274,11 +274,14 @@ class HomeViewModel(
      */
     fun onScrollNearEnd() {
         val before = state.value
-        val canRetryTransient = before.pageError != null && before.autoRetries < MAX_AUTO_RETRIES
         if (before.ui !is HomeUiState.Success) return
         if (before.refreshing || before.loadingMore) return
-        if (before.pageError != null && !canRetryTransient) return
-        requestMore(retry = canRetryTransient, fromScroll = true)
+        // Nothing to load and no failure to heal: the feed is simply finished.
+        if (before.pageError == null && (before.ui as HomeUiState.Success).feed.continuationToken == null) return
+        // A scroll event is always allowed to make progress: the failure it may
+        // be recovering from is the previous page's, and this attempt is itself
+        // counted, so the budget is spent by the attempt — not checked before it.
+        requestMore(retry = before.pageError != null, fromScroll = true)
     }
 
     /** One request at a time; failures wait for an explicit retry, not a recomposition loop. */
@@ -287,6 +290,12 @@ class HomeViewModel(
         val current = (before.ui as? HomeUiState.Success)?.feed ?: return
         val token = current.continuationToken ?: return
         if (before.refreshing || before.loadingMore || (!retry && before.pageError != null)) return
+        // The automatic budget: a scroll-driven retry stops once the feed has
+        // already failed this many times since it last grew. The gate lives
+        // here, not in [onScrollNearEnd], so EVERY scroll path is bounded —
+        // including the empty-page error, which is a failure to make progress
+        // even though no request errored.
+        if (fromScroll && before.pageError != null && before.autoRetries > MAX_AUTO_RETRIES) return
         val request = before.copy(
             loadingMore = true,
             pageError = null,
@@ -317,7 +326,13 @@ class HomeViewModel(
                                 ui = HomeUiState.Success(feed),
                                 completedTokens = used,
                                 emptyPageCount = emptyPages,
-                                autoRetries = if (grew) 0 else latest.autoRetries,
+                                // A page that grew the feed proves the scroll
+                                // path is healthy: reset the budget so a later
+                                // transient failure can still self-heal. A page
+                                // that returned nothing new spends budget too,
+                                // otherwise "no new recommendations" would let a
+                                // scroll retry run forever.
+                                autoRetries = if (grew) 0 else latest.autoRetries + 1,
                                 pageError = if (feed.continuationToken != null && emptyPages >= MAX_EMPTY_PAGES) {
                                     "No new recommendations arrived. Retry or refresh Home."
                                 } else null,

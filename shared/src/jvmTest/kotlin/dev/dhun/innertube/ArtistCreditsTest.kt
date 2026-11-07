@@ -89,6 +89,12 @@ class ArtistCreditsTest {
         assertEquals(listOf("Simon", "Garfunkel"), ArtistCredits.splitNames("Simon & Garfunkel"))
         // A name with no separator is one credit.
         assertEquals(listOf("Arijit Singh"), ArtistCredits.splitNames("Arijit Singh"))
+        // "ft"/"feat" only split as whole words: a real name containing them
+        // must not be torn in half, and the abbreviation may or may not end
+        // with a dot without leaving one glued to the next name.
+        assertEquals(listOf("Daft Punk"), ArtistCredits.splitNames("Daft Punk"))
+        assertEquals(listOf("A", "B"), ArtistCredits.splitNames("A feat B"))
+        assertEquals(listOf("A", "B"), ArtistCredits.splitNames("A,B"))
         assertTrue(ArtistCredits.splitNames("   ").isEmpty())
     }
 

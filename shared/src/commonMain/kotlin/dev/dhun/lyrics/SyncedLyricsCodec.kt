@@ -60,12 +60,16 @@ internal object SyncedLyricsCodec {
                 val line = item as? JsonObject ?: error("Invalid line")
                 val words = line["words"] as? JsonArray ?: error("Missing words")
                 require(words.size <= 10_000)
-                val agent = if (version == "2" && "agent" in line) {
+                // Roles were introduced in v2 and are still written in v3.
+                // Keying this off `version == "2"` alone silently dropped every
+                // vocal role and background flag on a v3 round trip, which the
+                // karaoke renderer reads to decide who is singing.
+                val agent = if (version in setOf("2", "3") && "agent" in line) {
                     val reference = line["agent"] as? JsonPrimitive ?: error("Invalid agent")
                     require(reference.isString)
                     reference.content
                 } else null
-                val background = if (version == "2" && "background" in line) {
+                val background = if (version in setOf("2", "3") && "background" in line) {
                     val flag = line["background"] as? JsonPrimitive ?: error("Invalid background flag")
                     require(!flag.isString)
                     when (flag.content) {

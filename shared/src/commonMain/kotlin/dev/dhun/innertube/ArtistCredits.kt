@@ -30,11 +30,24 @@ import kotlinx.serialization.json.JsonElement
  */
 internal object ArtistCredits {
 
-    /** Separators providers use between co-artists in one display string. */
+    /**
+     * Separators providers use between co-artists in one display string.
+     *
+     * Spaces are optional: MPRIS-style providers write `A,B`, and requiring
+     * `\s*` on both sides turned that into the single name `A` — the comma and
+     * the second artist were absorbed into a bogus token.
+     */
     private val separators = Regex(
-        """\s*(?:,|;|/|&|\+|\bfeat\.?\b|\bft\.?\b|\bfeaturing\b|\bwith\b|\bvs\.?\b|\bx\b)\s*""",
+        // `feat.`/`ft.` consume their dot WITHOUT a trailing `\b` — a dot is a
+        // non-word char, so `\bfeat\.?\b` matched only `feat` and left the
+        // stray `.` glued to the next name ("A ft. B" -> [A, . B]). A leading
+        // `\b` still stops a real word containing "ft" (Daft Punk) from splitting.
+        """(?:,|;|/|&|\+|\bfeaturing\b|\bfeat\.?|\bft\.?|\bwith\b|\bvs\.?|\bx\b)""",
         RegexOption.IGNORE_CASE,
     )
+
+    /** Leading/trailing punctuation a split token may carry and should drop. */
+    private val trimmedPunctuation = " ,;/-.\u2013\u2014"
 
     /**
      * Distinct channel ids in source order from a byline/subtitle subtree.
@@ -59,7 +72,7 @@ internal object ArtistCredits {
     /** Names in a display string, in order, without inventing any. */
     fun splitNames(displayName: String): List<String> =
         displayName.split(separators)
-            .map { it.trim().trim('-', '\u2013', '\u2014') }
+            .map { it.trim().trim { c -> c in trimmedPunctuation } }
             .filter { it.isNotEmpty() }
             .distinct()
 
@@ -79,11 +92,17 @@ internal object ArtistCredits {
         if (displayName.isBlank()) return emptyList()
         // Several distinct linked artists: trust the provider's own pairing.
         if (linked.size > 1) {
-            // Only adopt the linked list when it accounts for the whole credit
-            // string; a byline that links one name and mentions another in plain
-            // text must not silently drop the plain-text artist.
+            // Adopt the linked list only when it accounts for the WHOLE credit
+            // string. Testing just "every link appears in the display name"
+            // would drop a plain-text artist: "A, B & C" against links for A
+            // and B passes that test and silently loses C. Coverage — every
+            // displayed name is a link, and every link is a displayed name — is
+            // the property that actually protects against losing a credit.
             val names = splitNames(displayName)
-            val covered = linked.all { l -> names.any { it.equals(l.name, ignoreCase = true) || it.contains(l.name, ignoreCase = true) } }
+            val linkedNames = linked.map { it.name.trim() }
+            val covered = names.isNotEmpty() &&
+                names.all { name -> linkedNames.any { it.equals(name, ignoreCase = true) } } &&
+                linkedNames.all { link -> names.any { it.equals(link, ignoreCase = true) } }
             if (covered) return linked
         }
         // One credit: the joined display name, navigable when an id is known.

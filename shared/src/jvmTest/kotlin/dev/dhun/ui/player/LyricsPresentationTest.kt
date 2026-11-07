@@ -133,11 +133,16 @@ class LyricsPresentationTest {
                     "(${active.fontSize} > ${line.fontSize} > ${translation.fontSize} > ${transliteration.fontSize})",
             )
         }
-        // Transliteration never grows to compete with the translation.
-        assertTrue(
-            DhunTypographyTokens.lyricTransliterationStyle("large").fontSize <=
-                DhunTypographyTokens.lyricSecondaryStyle("small").fontSize,
-            "even the largest transliteration must stay at or under the smallest translation",
-        )
+        // Within ONE size setting the two secondary roles never tie — that is
+        // the guarantee the ladder makes. The rungs deliberately shift with the
+        // user's text-size setting, so comparing "large" transliteration with
+        // "small" translation would test the setting, not the hierarchy.
+        for (size in listOf("small", "default", "large")) {
+            assertTrue(
+                DhunTypographyTokens.lyricSecondaryStyle(size).fontSize >
+                    DhunTypographyTokens.lyricTransliterationStyle(size).fontSize,
+                "translation must stay above transliteration at size $size",
+            )
+        }
     }
 }

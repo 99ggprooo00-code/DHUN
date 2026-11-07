@@ -32,6 +32,18 @@ class StaleSessionRetryTest {
 
     private val jsonHeaders = headersOf(HttpHeaders.ContentType, "application/json")
 
+    /**
+     * A real homepage response, not a bare JSON document. The client scrapes
+     * `clientVersion` out of the served page, so a fixture that is only a JSON
+     * object is unparseable — the re-discovery would fail and the test would be
+     * asserting on an artifact of the fixture rather than on the recovery.
+     */
+    private fun homepage(version: String) = """
+        <!doctype html><html><head>
+        <script>window.WIZ_global_data = {"INNERTUBE_CLIENT_VERSION":"$version"};</script>
+        </head><body>music</body></html>
+    """.trimIndent()
+
     @Test
     fun aStaleSessionIsRefreshedOnceAndTheRequestIsReplayed() = runBlocking {
         var homeGet = 0
@@ -43,7 +55,7 @@ class StaleSessionRetryTest {
                     homeGet++
                     // The served build rotates between the two fetches.
                     respond(
-                        """{"INNERTUBE_CLIENT_VERSION":"1.${if (homeGet == 1) "OLD" else "NEW"}.0"}""",
+                        homepage("1.${if (homeGet == 1) "OLD" else "NEW"}.0"),
                         headers = jsonHeaders,
                     )
                 }
@@ -80,7 +92,7 @@ class StaleSessionRetryTest {
         var browsePosts = 0
         val engine = MockEngine { request ->
             when (request.url.encodedPath) {
-                "/" -> respond("""{"INNERTUBE_CLIENT_VERSION":"1.0.0"}""", headers = jsonHeaders)
+                "/" -> respond(homepage("1.0.0"), headers = jsonHeaders)
                 "/youtubei/v1/browse" -> {
                     browsePosts++
                     respond("""{"error":{"code":400}}""", HttpStatusCode.BadRequest, jsonHeaders)
@@ -103,7 +115,7 @@ class StaleSessionRetryTest {
         var browsePosts = 0
         val engine = MockEngine { request ->
             when (request.url.encodedPath) {
-                "/" -> respond("""{"INNERTUBE_CLIENT_VERSION":"1.0.0"}""", headers = jsonHeaders)
+                "/" -> respond(homepage("1.0.0"), headers = jsonHeaders)
                 "/youtubei/v1/browse" -> {
                     browsePosts++
                     respond(
@@ -134,7 +146,7 @@ class StaleSessionRetryTest {
             var posts = 0
             val engine = MockEngine { request ->
                 when (request.url.encodedPath) {
-                    "/" -> respond("""{"INNERTUBE_CLIENT_VERSION":"1.0.0"}""", headers = jsonHeaders)
+                    "/" -> respond(homepage("1.0.0"), headers = jsonHeaders)
                     "/youtubei/v1/browse" -> {
                         posts++
                         queryTokens += request.url.parameters["ctoken"]

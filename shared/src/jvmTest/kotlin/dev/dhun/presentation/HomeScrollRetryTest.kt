@@ -108,9 +108,10 @@ class HomeScrollRetryTest {
         // Keep scrolling through a service that never recovers.
         repeat(20) { vm.onScrollNearEnd(); runCurrent() }
 
-        // One initial request + exactly MAX_AUTO_RETRIES (2) automatic retries.
-        // The scroll trigger fires on every frame while the list stays at the
-        // bottom, so this is the assertion that a dead service is not hammered.
+        // One initial request + exactly MAX_AUTO_RETRIES (2) automatic
+        // retries, then silence. The scroll trigger fires on every frame while
+        // the list sits at the bottom, so this is the assertion that a dead
+        // service is not hammered, while a merely blippy one still recovers.
         assertEquals(3, provider.requests.size, "a dead service must not be hammered")
         assertNotNull(vm.loadMoreError.value, "and the failure must remain visible")
     }
