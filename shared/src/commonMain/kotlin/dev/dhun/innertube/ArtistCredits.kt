@@ -45,7 +45,7 @@ internal object ArtistCredits {
      * `VL…`) are filtered out.
      */
     fun linkedArtistIds(node: JsonElement?): List<String> =
-        linkedCredits(node).map { it.id }
+        linkedCredits(node).mapNotNull { it.id }
 
     fun linkedCredits(node: JsonElement?): List<ArtistCredit> {
         val runs = mutableListOf<Pair<String, String>>()
