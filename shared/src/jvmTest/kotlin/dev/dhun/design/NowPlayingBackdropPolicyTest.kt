@@ -130,7 +130,11 @@ class NowPlayingBackdropPolicyTest {
         assertEquals(1f, NowPlayingBackdropPolicy.loadedLayerAlpha(isLight = false, blurActive = true))
 
         // Still a fallback, never a full-strength sharp photo under live text.
-        assertTrue(light < 0.8f && light > 0.4f)
+        // The ceiling is not arbitrary: above 0.46 the tertiary text token loses
+        // its 3:1 gate over a pure-black cover, which is why the light fallback
+        // is a small, measured step above the dark one rather than a large one.
+        assertTrue(light > NowPlayingBackdropPolicy.NON_BLUR_LAYER_ALPHA, "light keeps more of the cover than dark")
+        assertTrue(light <= 0.46f, "and no more than the contrast gate allows")
     }
 
     @Test

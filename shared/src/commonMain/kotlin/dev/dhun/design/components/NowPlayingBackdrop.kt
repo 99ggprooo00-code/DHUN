@@ -146,17 +146,23 @@ object NowPlayingBackdropPolicy {
     const val NON_BLUR_LAYER_ALPHA = 0.40f
 
     /**
-     * Light theme keeps **more** of the sharp artwork in the blur-off fallback.
-     *
-     * [NON_BLUR_LAYER_ALPHA] was tuned against the dark theme, where 40% of a
-     * dark cover over the near-black base reads as a dimmed, intentional
+     * Light theme keeps a little **more** of the sharp artwork in the blur-off
+     * fallback. [NON_BLUR_LAYER_ALPHA] was tuned against the dark theme, where
+     * 40% of a dark cover over the near-black base reads as a dimmed, intentional
      * backdrop. Composited over the warm-white light base the same 40% reads as
      * a pale smear — the artwork is neither visible nor clean, which is the
-     * reported "it doesn't work as expected on light mode". Light therefore
-     * keeps the cover at [LIGHT_NON_BLUR_LAYER_ALPHA] and lets the light veil
-     * (already the lighter palette stop) do the readability work.
+     * reported "it doesn't work as expected on light mode".
+     *
+     * Why exactly 0.44: the cover has to stay visible while the tertiary text
+     * token — the faintest one drawn directly on the page — keeps its WCAG gate
+     * against the worst case (a pure-black cover at 100% brightness, where the
+     * veil thins to 0.375). With the light tokens that gate holds up to 0.46 and
+     * fails from 0.50 (tertiary drops to 2.92:1 against a 3:1 floor), so the fix
+     * is a targeted alpha change, not a heavier veil stacked on a heavier layer.
+     * Pinned by
+     * DhunThemeContrastTest.nonBlurBackdropProtectsDirectTextOverExtremeArtwork.
      */
-    const val LIGHT_NON_BLUR_LAYER_ALPHA = 0.58f
+    const val LIGHT_NON_BLUR_LAYER_ALPHA = 0.44f
 
     /** Theme-aware blur-off fallback. */
     fun loadedLayerAlpha(isLight: Boolean, blurActive: Boolean): Float = when {
