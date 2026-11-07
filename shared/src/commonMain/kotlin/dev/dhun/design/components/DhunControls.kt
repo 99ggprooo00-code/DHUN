@@ -98,6 +98,7 @@ fun DhunSlider(
     modifier: Modifier = Modifier,
     valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
     enabled: Boolean = true,
+    steps: Int = 0,
     onValueChangeFinished: (() -> Unit)? = null,
     accent: Color = DhunColors.accent,
     inactiveTrackColor: Color = DhunControlPolicy.sliderInactiveTrack(),
@@ -109,6 +110,7 @@ fun DhunSlider(
         modifier = modifier,
         enabled = enabled,
         valueRange = valueRange,
+        steps = steps,
         onValueChangeFinished = onValueChangeFinished,
         colors = SliderDefaults.colors(
             thumbColor = accent,

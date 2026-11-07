@@ -32,7 +32,10 @@ import dev.dhun.ui.components.MenuActionRow
 import dev.dhun.ui.components.TrackMenuSurface
 
 @Composable
-internal fun LyricsRomanizationControls(controller: LyricsRomanizationController) {
+internal fun LyricsRomanizationControls(
+    controller: LyricsRomanizationController,
+    showModeWhenDisabled: Boolean = false,
+) {
     val enabled by controller.enabled.collectAsState()
     val mode by controller.mode.collectAsState()
     val error by controller.error.collectAsState()
@@ -51,7 +54,7 @@ internal fun LyricsRomanizationControls(controller: LyricsRomanizationController
                 modifier = Modifier.semantics { contentDescription = "Show romanized lyrics below original" },
             )
         }
-        if (enabled) {
+        if (enabled || showModeWhenDisabled) {
             Box {
                 DhunTextButton(onClick = { menu = true }, modifier = Modifier.semantics {
                     contentDescription = "Romanization mode: ${mode.label}"
