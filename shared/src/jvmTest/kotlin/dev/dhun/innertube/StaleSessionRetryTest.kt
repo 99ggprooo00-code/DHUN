@@ -55,7 +55,10 @@ class StaleSessionRetryTest {
                     homeGet++
                     // The served build rotates between the two fetches.
                     respond(
-                        homepage("1.${if (homeGet == 1) "OLD" else "NEW"}.0"),
+                        // A version the scraper can actually read: it matches
+                        // [0-9.]+, so a placeholder like "1.OLD.0" parses as
+                        // no version at all and the recovery never starts.
+                        homepage(if (homeGet == 1) "1.0.0" else "2.0.0"),
                         headers = jsonHeaders,
                     )
                 }
@@ -80,7 +83,7 @@ class StaleSessionRetryTest {
             val result = client.homeFeedContinuation("token")
             assertTrue(result is DhunResult.Success, "a refreshed session must recover the page: $result")
             assertEquals(2, browsePosts, "exactly one replay")
-            assertEquals(listOf("1.OLD.0", "1.NEW.0"), versions, "the replay carries the NEW session")
+            assertEquals(listOf("1.0.0", "2.0.0"), versions, "the replay carries the NEW session")
             assertEquals(2, homeGet, "exactly one re-discovery, not one per attempt")
         } finally {
             http.close()

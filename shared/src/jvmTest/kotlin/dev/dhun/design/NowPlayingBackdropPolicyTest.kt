@@ -134,19 +134,21 @@ class NowPlayingBackdropPolicyTest {
     }
 
     @Test
-    fun theLightVeilStaysStrongerThanTheDarkOneAtEveryStop() {
-        // Because light now shows MORE sharp artwork in the blur-off path, its
-        // veil must carry more, not less, contrast — otherwise fixing one
-        // light-mode symptom would create a text-readability one.
+    fun theLightVeilIsLighterThanTheDarkOneAtEveryStop() {
+        // Light mode uses ONE translucent palette veil that is lighter than the
+        // dark one at every stop and every brightness — never a black dim under
+        // a white scrim, and never a heavier scrim than dark. Readability in the
+        // blur-off path is dealt with by the layer alpha and is pinned separately
+        // by the contrast test, not by stacking a heavier veil here.
         for (brightness in listOf(0, 25, 55, 75, 100)) {
             val light = NowPlayingBackdropPolicy.veilStops(isLight = true, brightnessPercent = brightness)
             val dark = NowPlayingBackdropPolicy.veilStops(isLight = false, brightnessPercent = brightness)
             light.indices.forEach { i ->
                 assertTrue(
-                    light[i].second >= dark[i].second,
-                    "light veil stop $i (${light[i].second}) must not be lighter than dark (${dark[i].second}) at brightness $brightness",
+                    light[i].second <= dark[i].second,
+                    "light veil stop $i (${light[i].second}) must not be heavier than dark (${dark[i].second}) at brightness $brightness",
                 )
-                assertTrue(light[i].second < 0.9f, "the veil must never become opaque")
+                assertTrue(light[i].second > 0.1f, "the veil must still veil something")
             }
         }
     }
