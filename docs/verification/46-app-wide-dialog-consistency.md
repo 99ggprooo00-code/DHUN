@@ -5,17 +5,18 @@ Date: 2026-11-07. Work branch: `arena/b3400d42-dhun`, based on current `main`
 
 ## Audit and prioritization
 
-The requester supplied 18 Android screenshots across player, queue/Related,
-menus, library, settings, dialogs, and the component catalogue. I compared the
-screens with the current Compose implementations and the merged Lyrics Controls
-surface. This is a targeted pass, not an attempt to restyle every screen.
+The request listed 17 Android screenshots across player, queue/Related, menus,
+library, settings, dialogs, and the component catalogue; two recovered captures
+bring the reviewed set to 19. The current one-to-one inventory and evidence map
+is in [47 — Screenshot-by-screenshot visual audit](47-screenshot-by-screenshot-visual-audit.md).
+This is a targeted pass, not an attempt to restyle every screen.
 
 | Priority | Evidence / inconsistency | Root cause | Decision |
 |---|---|---|---|
 | High — unreadable modal content | Requester captures `Screenshot_2026-11-07-20-52-48-617_dev.dhun.android.jpg` (Lyrics matches) and `Screenshot_2026-11-07-21-05-35-252_dev.dhun.android.jpg`, `21-05-44-921`, `21-05-47-493`, `21-06-07-650` (Settings confirmations) show dark default text over dark translucent dialog bodies. | Several callers painted a `GlassCard` inside a raw `Dialog` but did not establish `LocalContentColor`; some confirmation titles/messages also relied on default text style. `GlassDialog` existed but was not the shared path. | Fixed at the dialog foundation and migrated affected screens. Explicit primary/secondary/error text roles remain in specialized content. |
 | Medium — inconsistent confirmation hierarchy/footer | `Screenshot_2026-11-07-21-04-23-173_dev.dhun.android.jpg` (Reset settings) contrasts with `21-04-32-612` (Clear downloads): title/body contrast and Cancel/confirm alignment differ across equivalent actions. | Settings, Search, Library, and playlist mutations each owned their own repeated footer/layout; one footer pushed Cancel to the opposite edge while others grouped both actions on the right. | Added one `DhunConfirmDialog` for standard confirm/cancel mutations, with explicit title/body/error roles, right-grouped actions, and visible pending/retry states. Mutation ownership and result-driven close behavior remain in the callers. |
 | Medium — duplicate dialog shells | Lyrics match search, country selection, playlist create/rename, and confirmation flows each paired `Dialog` and `GlassCard` locally with their own width/inset behavior. | The existing canonical `GlassDialog` was not used consistently, so default text color and dialog sizing could drift. | Reused `GlassDialog` for tailored form/list dialogs; the country picker retains its wider cap and bounded list. Artwork-backed lyrics controls and menu surfaces stay on their dedicated materials. |
-| Low — narrow catalogue header | `Screenshot_2026-11-07-21-04-13-459_dev.dhun.android.jpg` shows “Close” wrapping beside the long test-build component-catalogue title. | The title competed for the same unbounded `Row` width as the close action. | Gave the title the remaining width with one-line ellipsis and kept “Close” on one line. |
+| Low — narrow catalogue header | `Screenshot_2026-11-07-21-04-04-853_dev.dhun.android.jpg` shows “Close” wrapping beside the long test-build component-catalogue title. | The title competed for the same unbounded `Row` width as the close action. | Gave the title the remaining width with one-line ellipsis and kept “Close” on one line. |
 
 Queue/Related, track overflow, and the full player already use their dedicated
 artwork-backed surfaces and were not changed. Sparse Library/Downloads content

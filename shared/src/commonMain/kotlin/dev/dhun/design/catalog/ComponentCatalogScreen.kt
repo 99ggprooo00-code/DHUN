@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -136,7 +137,12 @@ fun ComponentCatalogScreen(
                             overflow = TextOverflow.Ellipsis,
                         )
                         if (onClose != null) {
-                            DhunTextButton(onClick = onClose) { Text("Close", maxLines = 1) }
+                            DhunTextButton(
+                                onClick = onClose,
+                                modifier = Modifier.widthIn(min = DhunSpacing.huge + DhunSpacing.xl),
+                            ) {
+                                Text("Close", maxLines = 1, overflow = TextOverflow.Clip)
+                            }
                         }
                     }
                 }

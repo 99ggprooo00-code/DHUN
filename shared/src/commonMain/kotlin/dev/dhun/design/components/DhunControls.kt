@@ -90,7 +90,12 @@ fun DhunSwitch(
     )
 }
 
-/** Shared slider mechanics with caller-preservable accent/track colors. */
+/**
+ * Shared slider mechanics with caller-preservable accent/track colors.
+ * [thumbColor] changes only the Material thumb; the active track remains tied
+ * to [accent], so a caller can draw a custom thumb without replacing slider
+ * semantics, drag handling, or keyboard/accessibility actions.
+ */
 @Composable
 fun DhunSlider(
     value: Float,
@@ -102,6 +107,7 @@ fun DhunSlider(
     onValueChangeFinished: (() -> Unit)? = null,
     accent: Color = DhunColors.accent,
     inactiveTrackColor: Color = DhunControlPolicy.sliderInactiveTrack(),
+    thumbColor: Color = accent,
 ) {
     val activeTrackColor = DhunControlPolicy.sliderActiveTrack(accent)
     Slider(
@@ -113,12 +119,12 @@ fun DhunSlider(
         steps = steps,
         onValueChangeFinished = onValueChangeFinished,
         colors = SliderDefaults.colors(
-            thumbColor = accent,
+            thumbColor = thumbColor,
             activeTrackColor = activeTrackColor,
             inactiveTrackColor = inactiveTrackColor,
             activeTickColor = Color.Transparent,
             inactiveTickColor = Color.Transparent,
-            disabledThumbColor = DhunControlPolicy.disabled(accent),
+            disabledThumbColor = DhunControlPolicy.disabled(thumbColor),
             disabledActiveTrackColor = DhunControlPolicy.disabled(activeTrackColor),
             disabledInactiveTrackColor = DhunControlPolicy.disabled(inactiveTrackColor),
         ),
