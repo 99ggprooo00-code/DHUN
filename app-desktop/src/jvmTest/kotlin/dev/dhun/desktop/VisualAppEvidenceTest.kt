@@ -312,7 +312,7 @@ class VisualAppEvidenceTest {
                     onNodeWithText("From Queen").assertIsDisplayed()
                     onNodeWithText("Lyrics provider").assertIsDisplayed()
                     onNodeWithText("Auto (synced first)").assertIsDisplayed()
-                    onNodeWithContentDescription("Romanization mode: Auto").assertIsDisplayed()
+                    onNodeWithContentDescription("Romanization mode: Auto (conservative)").assertIsDisplayed()
                     onNodeWithText("Lyrics offset").assertIsDisplayed()
                     onNodeWithText("0 ms").assertIsDisplayed()
                     onNodeWithText("Reset").assertIsDisplayed()
