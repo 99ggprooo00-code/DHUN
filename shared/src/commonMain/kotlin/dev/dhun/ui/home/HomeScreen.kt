@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -24,7 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -81,6 +82,7 @@ import dev.dhun.presentation.home.HomeViewModel
 import dev.dhun.presentation.library.currentUtcOffsetMs
 import dev.dhun.ui.components.TrackDownloadRowActions
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 /**
  * Home — DHUN glass, deep scroll (not a 3-row stub).
@@ -118,6 +120,7 @@ fun HomeScreen(
     val selectedMood by viewModel.selectedMood.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     val isLoadingMore by viewModel.isLoadingMore.collectAsState()
+    val paginationRevision by viewModel.paginationRevision.collectAsState()
     val loadMoreError by viewModel.loadMoreError.collectAsState()
     val recentlyPlayed by viewModel.recentlyPlayed.collectAsState()
     val recommendedSongs by viewModel.recommendedSongs.collectAsState()
@@ -197,15 +200,24 @@ fun HomeScreen(
                 }
                 is HomeUiState.Success -> {
                     key(selectedMood) {
+                        // Per-category scroll position and in-flight trigger: a
+                        // mood switch starts a NEW list at its own top instead
+                        // of inheriting the previous category's offset, and a
+                        // finished list for one mood can never suppress the
+                        // next page for another.
+                        val categoryListState = rememberLazyListState()
                         HomeFeedContent(
+                            listState = categoryListState,
                             feed = state.feed,
                             recentlyPlayed = if (selectedMood == HomeMood.FOR_YOU) recentlyPlayed else emptyList(),
                             recommendedSongs = if (selectedMood == HomeMood.FOR_YOU) recommendedSongs else emptyList(),
                             isLoadingRecommended = selectedMood == HomeMood.FOR_YOU && isLoadingRecommended,
                             isRefreshing = isRefreshing,
                             isLoadingMore = isLoadingMore,
+                            paginationRevision = paginationRevision,
                             loadMoreError = loadMoreError,
                             onLoadMore = viewModel::loadMore,
+                            onScrollNearEnd = viewModel::onScrollNearEnd,
                             onRetryMore = viewModel::retryLoadMore,
                             onRefresh = { viewModel.refresh() },
                             onTrackClick = onTrackClick,
@@ -228,14 +240,17 @@ fun HomeScreen(
 
 @Composable
 private fun HomeFeedContent(
+    listState: LazyListState,
     feed: HomeFeed,
     recentlyPlayed: List<Track>,
     recommendedSongs: List<Track>,
     isLoadingRecommended: Boolean,
     isRefreshing: Boolean,
     isLoadingMore: Boolean,
+    paginationRevision: Long,
     loadMoreError: String?,
     onLoadMore: () -> Unit,
+    onScrollNearEnd: () -> Unit,
     onRetryMore: () -> Unit,
     onRefresh: () -> Unit,
     onTrackClick: (track: Track, contextQueue: List<Track>, index: Int) -> Unit,
@@ -259,23 +274,41 @@ private fun HomeFeedContent(
         remainingHomeSections(feed)
     }
 
-    val listState = rememberLazyListState()
-
-    // Endless scroll: ask for the next page of shelves once the user gets
-    // near the end of what we already have. `feed.continuationToken == null`
-    // means InnerTube has no more shelves, so nothing is requested.
-    val shouldLoadMore by remember {
-        derivedStateOf {
-            val total = listState.layoutInfo.totalItemsCount
-            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            total > 0 && lastVisible >= total - 3
-        }
-    }
+    // Endless scroll: ask for the next page of shelves once the user gets near
+    // the end of what we already have. `feed.continuationToken == null` means
+    // InnerTube has no more shelves, so nothing is requested.
+    //
+    // [snapshotFlow] tracks the viewport, but while the list remains near its
+    // end its Boolean result stays `true`; equal values are conflated. A failed
+    // request does not change the continuation token or item count, so relying
+    // on layout changes alone leaves the trigger disarmed after its first emit.
+    // Key on the ViewModel's monotonic completion revision as well as
+    // `isLoadingMore`: a fast failure can toggle loading true/false between
+    // frames, so Compose may never observe that Boolean edge. The revision still
+    // re-arms the near-end event after every completed request. The ViewModel
+    // owns error eligibility and the bounded retry budget.
     val canLoadMore = feed.continuationToken != null
-    LaunchedEffect(shouldLoadMore, feed.continuationToken, isLoadingMore, isRefreshing, loadMoreError) {
-        if (shouldLoadMore && canLoadMore && !isLoadingMore && !isRefreshing && loadMoreError == null) {
-            onLoadMore()
+    LaunchedEffect(
+        listState,
+        canLoadMore,
+        feed.continuationToken,
+        isRefreshing,
+        isLoadingMore,
+        paginationRevision,
+    ) {
+        snapshotFlow {
+            val total = listState.layoutInfo.totalItemsCount
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+            canLoadMore && !isRefreshing && !isLoadingMore && total > 0 &&
+                lastVisible >= total - SCROLL_TRIGGER_DISTANCE
         }
+            .distinctUntilChanged()
+            .collect { nearEnd ->
+                // The ViewModel owns every guard that matters (in flight,
+                // refreshing, retry budget); duplicating them here is what made
+                // a transient failure look like the end of the feed.
+                if (nearEnd) onScrollNearEnd()
+            }
     }
 
     LazyColumn(
@@ -493,7 +526,7 @@ private fun HomeFeedContent(
                         Text(loadMoreError, color = DhunColors.textSecondary)
                         DhunTextButton(onClick = onRetryMore, enabled = !isRefreshing) { Text("Retry loading more") }
                     }
-                    canLoadMore -> DhunTextButton(onClick = onLoadMore, enabled = !isRefreshing) { Text("Load more music") }
+                    canLoadMore -> DhunTextButton(onClick = onRetryMore, enabled = !isRefreshing) { Text("Load more music") }
                     else -> {
                         Text("You're all caught up", color = DhunColors.textTertiary)
                     }
@@ -688,3 +721,9 @@ internal fun remainingHomeSections(feed: HomeFeed): List<HomeSection> = feed.sec
         else -> false
     }
 }
+
+/**
+ * How many items from the end trigger the next page. Small enough to feel
+ * seamless, large enough that one page usually arrives before the user does.
+ */
+private const val SCROLL_TRIGGER_DISTANCE = 3

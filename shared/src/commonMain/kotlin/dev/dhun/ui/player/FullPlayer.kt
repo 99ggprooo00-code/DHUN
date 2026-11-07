@@ -18,6 +18,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
@@ -34,6 +35,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -755,17 +757,9 @@ private fun PlayerControlCluster(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.basicMarquee(),
                     )
-                    Text(
-                        text = t?.artistName.orEmpty(),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = DhunColors.textSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.clickable(
-                            enabled = t != null,
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) { t?.let(onOpenArtist) },
+                    ArtistCreditLine(
+                        track = t,
+                        onOpenArtist = onOpenArtist,
                     )
                 }
                 PlayerChipButton(
@@ -1930,6 +1924,74 @@ private fun ImmersivePlayButton(
                     .size(iconSize)
                     .graphicsLayer { scaleX = scale; scaleY = scale },
                 tint = if (enabled) DhunColors.textPrimary else DhunColors.textDisabled,
+            )
+        }
+    }
+}
+
+/**
+ * The artist line in the Full Player: **one clickable target per credited
+ * artist**, separated by a low-contrast bullet.
+ *
+ * Why not one `Text` with one click handler (what shipped through PR #219):
+ * `Track.artistName` is the provider's joined string ("A & B"), while
+ * `Track.artistId` is only the FIRST artist's channel. Making the whole string
+ * clickable meant a collaboration silently opened one artist and the other
+ * credit was dead text. [Track.artistCredits] carries a target per name, so
+ * every credited artist is reachable; a credit with no known channel id is
+ * rendered as plain, non-clickable text rather than a link that goes nowhere.
+ *
+ * A single-artist track is unchanged: one name, one target, same typography
+ * and the same vertical position as before.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ArtistCreditLine(
+    track: Track?,
+    onOpenArtist: (Track) -> Unit,
+) {
+    val credits = track?.artistCredits.orEmpty().filter { it.name.isNotBlank() }
+    if (track == null || credits.isEmpty()) return
+    FlowRow(
+        modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = false) {},
+        horizontalArrangement = Arrangement.spacedBy(DhunSpacing.xs),
+        verticalArrangement = Arrangement.spacedBy(DhunSpacing.zero),
+    ) {
+        credits.forEachIndexed { index, credit ->
+            if (index > 0) {
+                Text(
+                    text = "\u2022",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = DhunColors.textTertiary,
+                )
+            }
+            val navigable = credit.id != null
+            Text(
+                text = credit.name,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (navigable) DhunColors.textSecondary else DhunColors.textTertiary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = if (navigable) {
+                    Modifier
+                        .clickable(
+                            role = Role.Button,
+                            onClickLabel = "Open ${credit.name}",
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) {
+                            onOpenArtist(
+                                track.copy(
+                                    artistId = credit.id,
+                                    artistName = credit.name,
+                                    artists = listOf(credit),
+                                ),
+                            )
+                        }
+                        .semantics { contentDescription = "Artist: ${credit.name}" }
+                } else {
+                    Modifier.semantics { contentDescription = "Artist: ${credit.name}" }
+                },
             )
         }
     }

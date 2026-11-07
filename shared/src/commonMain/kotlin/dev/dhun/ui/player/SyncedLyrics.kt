@@ -237,10 +237,26 @@ internal fun SyncedLyricsContent(
                                 ),
                         )
                     }
+                    // Secondary text under the primary line, in one fixed
+                    // hierarchy: the source's own translation (a real meaning of
+                    // the lyric) first, then transliteration (a pronunciation
+                    // aid). Both are smaller and dimmer than the primary line and
+                    // hug it — the group is what the stanza spacing separates.
+                    line.translation?.takeIf { it.isNotBlank() }?.let { translation ->
+                        Text(
+                            translation,
+                            style = DhunTypographyTokens.lyricSecondaryStyle(textSize),
+                            color = translationColor(active),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                     romanizedLines.getOrNull(index)?.let { romanized ->
                         Text(
                             romanized,
-                            style = DhunTypographyTokens.lyricSecondaryStyle(textSize),
+                            // Transliteration is the last rung: explicitly
+                            // smaller and fainter than the translation above it.
+                            style = DhunTypographyTokens.lyricTransliterationStyle(textSize),
                             color = DhunColors.textTertiary,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth(),
@@ -269,6 +285,14 @@ internal fun SyncedLyricsContent(
  * device; higher values flattened the hierarchy the active line needs.
  */
 internal const val INACTIVE_LYRIC_ALPHA = 0.62f
+
+/**
+ * Secondary (translation) text alpha. A translation must stay *readable* — it
+ * is the whole point of showing one — so it sits above the transliteration
+ * rung and only slightly under the inactive primary line.
+ */
+internal fun translationColor(active: Boolean): Color =
+    DhunColors.textSecondary.let { if (active) it else it.copy(alpha = 0.72f) }
 
 private val lyricScrollKeys = setOf(
     Key.DirectionUp, Key.DirectionDown, Key.PageUp, Key.PageDown, Key.MoveHome, Key.MoveEnd,

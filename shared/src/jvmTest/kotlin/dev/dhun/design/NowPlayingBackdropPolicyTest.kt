@@ -111,4 +111,59 @@ class NowPlayingBackdropPolicyTest {
         assertTrue(fallback > 0f, "zero/unsupported blur must retain visible sharp artwork")
         assertTrue(fallback < 1f, "the non-blur layer must be dimmed over the theme base")
     }
+
+    @Test
+    fun theBlurOffFallbackIsTunedPerThemeInsteadOfReusingTheDarkNumber() {
+        // The reported light-mode defect: the dark-tuned 40% layer, composited
+        // over the warm-white base, left the cover as a pale smear — the artwork
+        // was neither visible nor clean. Light keeps more of the sharp cover and
+        // lets the (already lighter) light veil carry readability.
+        val light = NowPlayingBackdropPolicy.loadedLayerAlpha(isLight = true, blurActive = false)
+        val dark = NowPlayingBackdropPolicy.loadedLayerAlpha(isLight = false, blurActive = false)
+        assertEquals(NowPlayingBackdropPolicy.LIGHT_NON_BLUR_LAYER_ALPHA, light)
+        assertEquals(NowPlayingBackdropPolicy.NON_BLUR_LAYER_ALPHA, dark)
+        assertTrue(light > dark, "light must keep at least as much sharp artwork as dark")
+
+        // Blur ON is identical in both themes: the artwork is fully visible and
+        // the veil does the readability work.
+        assertEquals(1f, NowPlayingBackdropPolicy.loadedLayerAlpha(isLight = true, blurActive = true))
+        assertEquals(1f, NowPlayingBackdropPolicy.loadedLayerAlpha(isLight = false, blurActive = true))
+
+        // Still a fallback, never a full-strength sharp photo under live text.
+        // The ceiling is not arbitrary: above 0.46 the tertiary text token loses
+        // its 3:1 gate over a pure-black cover, which is why the light fallback
+        // is a small, measured step above the dark one rather than a large one.
+        assertTrue(light > NowPlayingBackdropPolicy.NON_BLUR_LAYER_ALPHA, "light keeps more of the cover than dark")
+        assertTrue(light <= 0.46f, "and no more than the contrast gate allows")
+    }
+
+    @Test
+    fun theLightVeilIsLighterThanTheDarkOneAtEveryStop() {
+        // Light mode uses ONE translucent palette veil that is lighter than the
+        // dark one at every stop and every brightness — never a black dim under
+        // a white scrim, and never a heavier scrim than dark. Readability in the
+        // blur-off path is dealt with by the layer alpha and is pinned separately
+        // by the contrast test, not by stacking a heavier veil here.
+        for (brightness in listOf(0, 25, 55, 75, 100)) {
+            val light = NowPlayingBackdropPolicy.veilStops(isLight = true, brightnessPercent = brightness)
+            val dark = NowPlayingBackdropPolicy.veilStops(isLight = false, brightnessPercent = brightness)
+            light.indices.forEach { i ->
+                assertTrue(
+                    light[i].second <= dark[i].second,
+                    "light veil stop $i (${light[i].second}) must not be heavier than dark (${dark[i].second}) at brightness $brightness",
+                )
+                assertTrue(light[i].second > 0.1f, "the veil must still veil something")
+            }
+        }
+    }
+
+    @Test
+    fun themeAwareAndLegacyLoadedLayerAlphaAgreeForDark() {
+        // The single-argument overload is the historical dark-theme API; it must
+        // keep its old numbers so no existing call site silently changes theme.
+        assertEquals(
+            NowPlayingBackdropPolicy.loadedLayerAlpha(blurActive = false),
+            NowPlayingBackdropPolicy.loadedLayerAlpha(isLight = false, blurActive = false),
+        )
+    }
 }

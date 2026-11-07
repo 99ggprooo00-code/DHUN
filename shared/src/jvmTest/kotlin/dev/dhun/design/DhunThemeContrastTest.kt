@@ -268,7 +268,13 @@ class DhunThemeContrastTest {
     @Test
     fun nonBlurBackdropProtectsDirectTextOverExtremeArtwork() {
         eachMode { mode, tokens ->
-            val layerAlpha = NowPlayingBackdropPolicy.loadedLayerAlpha(blurActive = false)
+            // Theme-aware: the light theme composites a different layer alpha,
+            // so measuring light text over the dark-tuned 40% layer would test a
+            // combination the app never renders.
+            val layerAlpha = NowPlayingBackdropPolicy.loadedLayerAlpha(
+                isLight = tokens.isLight,
+                blurActive = false,
+            )
             listOf(Color.Black, Color.White).forEach { artwork ->
                 listOf(0, 55, 100).forEach { brightness ->
                     val veilTint = NowPlayingBackdropPolicy.veilTint(tokens)

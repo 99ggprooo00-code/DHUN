@@ -114,6 +114,13 @@ object DhunTypographyTokens {
     val lyricSecondary = TextStyle(fontFamily = ui, fontSize = 13.sp, lineHeight = 20.sp, fontWeight = FontWeight.W400, letterSpacing = 0.2.sp)
     val lyricSecondarySmall = TextStyle(fontFamily = ui, fontSize = 12.sp, lineHeight = 18.sp, fontWeight = FontWeight.W400, letterSpacing = 0.2.sp)
     val lyricSecondaryLarge = TextStyle(fontFamily = ui, fontSize = 14.sp, lineHeight = 22.sp, fontWeight = FontWeight.W400, letterSpacing = 0.2.sp)
+    /* Transliteration is the last rung under a primary line: always a step
+     * smaller and lighter than the translation above it, so a line carrying
+     * both reads as primary → translation → transliteration rather than as
+     * two competing secondaries. */
+    val lyricTransliteration = TextStyle(fontFamily = ui, fontSize = 12.sp, lineHeight = 18.sp, fontWeight = FontWeight.W400, letterSpacing = 0.2.sp)
+    val lyricTransliterationSmall = TextStyle(fontFamily = ui, fontSize = 11.sp, lineHeight = 16.sp, fontWeight = FontWeight.W400, letterSpacing = 0.2.sp)
+    val lyricTransliterationLarge = TextStyle(fontFamily = ui, fontSize = 13.sp, lineHeight = 20.sp, fontWeight = FontWeight.W400, letterSpacing = 0.2.sp)
     /** Attribution / status caption above the lyrics ("Lyrics from YouTube Music"). */
     val lyricCaption = TextStyle(fontFamily = ui, fontSize = 11.sp, lineHeight = 16.sp, fontWeight = FontWeight.W600, letterSpacing = 1.2.sp)
 
@@ -131,11 +138,18 @@ object DhunTypographyTokens {
         else -> lyricLine
     }
 
-    /** Translation / transliteration under a primary line. */
+    /** Translation under a primary line. */
     fun lyricSecondaryStyle(textSize: String): TextStyle = when (textSize) {
         "small" -> lyricSecondarySmall
         "large" -> lyricSecondaryLarge
         else -> lyricSecondary
+    }
+
+    /** Transliteration under the translation (or directly under the line). */
+    fun lyricTransliterationStyle(textSize: String): TextStyle = when (textSize) {
+        "small" -> lyricTransliterationSmall
+        "large" -> lyricTransliterationLarge
+        else -> lyricTransliteration
     }
 }
 

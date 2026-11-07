@@ -74,6 +74,8 @@ import dev.dhun.design.components.DhunNavigationRailItem
 import dev.dhun.design.components.GlassCard
 import dev.dhun.design.components.GlassDock
 import dev.dhun.design.components.LocalTextInputFocusRegistry
+import dev.dhun.ui.search.DismissSearchKeyboard
+import dev.dhun.ui.search.SearchKeyboardPolicy
 import dev.dhun.design.components.NowPlayingBackdrop
 import dev.dhun.design.components.TextInputFocusRegistry
 import dev.dhun.design.components.acrylicGlass
@@ -403,6 +405,19 @@ fun DhunAppShell(
             val horizontalInsets = innerPadding.calculateLeftPadding(direction) +
                 innerPadding.calculateRightPadding(direction)
             val detailRoute = nav.detailStack.lastOrNull()
+            // One place decides whether the Search field may keep IME focus.
+            // Search stays in the composition while other destinations are
+            // shown (that is how its query and results survive), so without an
+            // explicit release the keyboard followed the user into the player
+            // and into detail pages. The rule itself is pure and unit-tested
+            // (SearchKeyboardPolicy); this only applies it.
+            DismissSearchKeyboard(
+                SearchKeyboardPolicy.dismissalTrigger(
+                    searchVisible = nav.selectedTab == AppTab.SEARCH,
+                    playerExpanded = nav.playerExpanded,
+                    detailDepth = nav.detailStack.size,
+                ),
+            )
             val showDetailPane = DhunShellPolicy.detailPaneVisible(
                 layout = layout,
                 detailDepth = nav.detailStack.size,

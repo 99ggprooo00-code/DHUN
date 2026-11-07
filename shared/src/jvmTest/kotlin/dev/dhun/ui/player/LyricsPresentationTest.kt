@@ -113,4 +113,36 @@ class LyricsPresentationTest {
         assertTrue(open.all { it < LyricsMaterialPolicy.QUEUE_VEIL_TOP }, "open veil must stay under the queue sheet")
         assertTrue(open.maxOrNull()!! >= 0.15f, "the centred column still needs a readability top-up")
     }
+
+    @Test
+    fun theSecondaryLadderIsPrimaryThenTranslationThenTransliteration() {
+        // The reported defect was a translation sharing the primary line's
+        // baseline. Once separated, the two secondary roles must not tie either:
+        // a line carrying both has to read primary → translation →
+        // transliteration, top to bottom and largest to smallest.
+        for (size in listOf("small", "default", "large")) {
+            val active = DhunTypographyTokens.lyricActiveStyle(size)
+            val line = DhunTypographyTokens.lyricLineStyle(size)
+            val translation = DhunTypographyTokens.lyricSecondaryStyle(size)
+            val transliteration = DhunTypographyTokens.lyricTransliterationStyle(size)
+            assertTrue(
+                active.fontSize.value > line.fontSize.value &&
+                    line.fontSize.value > translation.fontSize.value &&
+                    translation.fontSize.value > transliteration.fontSize.value,
+                "the lyric type ladder must strictly descend at size $size " +
+                    "(${active.fontSize} > ${line.fontSize} > ${translation.fontSize} > ${transliteration.fontSize})",
+            )
+        }
+        // Within ONE size setting the two secondary roles never tie — that is
+        // the guarantee the ladder makes. The rungs deliberately shift with the
+        // user's text-size setting, so comparing "large" transliteration with
+        // "small" translation would test the setting, not the hierarchy.
+        for (size in listOf("small", "default", "large")) {
+            assertTrue(
+                DhunTypographyTokens.lyricSecondaryStyle(size).fontSize >
+                    DhunTypographyTokens.lyricTransliterationStyle(size).fontSize,
+                "translation must stay above transliteration at size $size",
+            )
+        }
+    }
 }

@@ -98,6 +98,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
@@ -364,6 +365,67 @@ class VisualAppEvidenceTest {
         captureSingleState("app-home-large-text-dark.png", DhunThemeMode.DARK, fontScale = 1.3f)
         captureSingleState("app-settings-large-text-dark.png", DhunThemeMode.DARK, fontScale = 1.3f) {
             it.push(DetailRoute.SettingsPage)
+        }
+        // A no-art reference makes the controlled black/white artwork frames
+        // deterministic even when CI has no access to the remote thumbnail host.
+        captureSingleState("app-home-no-art-light.png", DhunThemeMode.LIGHT, blurPercent = 0, artworkUrl = "")
+    }
+
+    @Test
+    fun `home scroll trigger re-arms after a failed continuation without leaving the end`() {
+        var attempts = 0
+        val provider = RecordedProvider(
+            firstContinuationToken = "next-page",
+            continuationResult = {
+                attempts++
+                if (attempts <= 2) {
+                    DhunResult.Failure(DhunError.Network("recorded transient continuation failure $attempts"))
+                } else {
+                    DhunResult.Success(
+                        HomeFeedPage(
+                            sections = listOf(
+                                HomeSection(
+                                    "Recovered after retry",
+                                    items = listOf(HomeItem.TrackItem(RECORDED_TRACKS.last())),
+                                ),
+                            ),
+                            continuationToken = null,
+                        ),
+                    )
+                }
+            },
+        )
+        withFixture(DhunThemeMode.DARK, provider) { fixture ->
+            scene(width = 412, height = 915) {
+                DhunTheme(mode = DhunThemeMode.DARK) {
+                    Box(Modifier.fillMaxSize().background(DhunColors.background))
+                    HomeScreen(viewModel = fixture.home, onTrackClick = { _, _, _ -> })
+                }
+            }.use { composeScene ->
+                val driver = SceneDriver(composeScene)
+                driver.settle(32)
+                // Drive the real LazyColumn to its end. Further input while it
+                // remains there must not be needed to re-arm pagination after
+                // either of the first two continuation attempts returns an error.
+                var scrolls = 0
+                while (scrolls < 8 && provider.continuationRequests.size < 3) {
+                    driver.scroll(200f, 800f, 500f)
+                    scrolls++
+                }
+                val deadline = System.nanoTime() + 8_000_000_000L
+                while (provider.continuationRequests.size < 3 && System.nanoTime() < deadline) {
+                    driver.settle(2)
+                }
+                driver.capture("app-home-pagination-recovered-dark.png", settleFrames = 12)
+                assertEquals(
+                    listOf("next-page", "next-page", "next-page"),
+                    provider.continuationRequests.toList(),
+                    "Two transient errors should consume the bounded self-heal budget, then recover on the third page request",
+                )
+                assertNull(fixture.home.loadMoreError.value, "the recovered continuation must clear the footer error")
+                val feed = (fixture.home.uiState.value as? HomeUiState.Success)?.feed
+                assertTrue(feed?.sections?.any { it.title == "Recovered after retry" } == true)
+            }
         }
     }
 
@@ -720,7 +782,12 @@ class VisualAppEvidenceTest {
     private class RecordedProvider(
         val homeMode: StateMode = StateMode.POPULATED,
         val searchMode: StateMode = StateMode.POPULATED,
+        private val firstContinuationToken: String? = null,
+        private val continuationResult: suspend (String) -> DhunResult<HomeFeedPage> = {
+            DhunResult.Success(HomeFeedPage())
+        },
     ) : MusicProvider {
+        val continuationRequests = CopyOnWriteArrayList<String>()
         override suspend fun search(query: String, filter: SearchFilter): DhunResult<SearchResults> = when (searchMode) {
             StateMode.POPULATED -> DhunResult.Success(
                 SearchResults(
@@ -754,6 +821,7 @@ class VisualAppEvidenceTest {
                         HomeSection("Classic rock", items = listOf(HomeItem.PlaylistItem(REMOTE_PLAYLIST))),
                         HomeSection("Artists", items = listOf(HomeItem.ArtistItem(QUEEN))),
                     ),
+                    continuationToken = firstContinuationToken,
                 ),
             )
             StateMode.EMPTY -> DhunResult.Success(HomeFeedPage())
@@ -764,8 +832,10 @@ class VisualAppEvidenceTest {
             }
         }
 
-        override suspend fun homeFeedContinuation(continuationToken: String): DhunResult<HomeFeedPage> =
-            DhunResult.Success(HomeFeedPage())
+        override suspend fun homeFeedContinuation(continuationToken: String): DhunResult<HomeFeedPage> {
+            continuationRequests += continuationToken
+            return continuationResult(continuationToken)
+        }
 
         override suspend fun homeFeed(): DhunResult<List<HomeSection>> =
             when (val result = homeFeedPage()) {

@@ -3,6 +3,7 @@ package dev.dhun.design.components
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -13,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
@@ -59,7 +61,7 @@ fun NowPlayingBackdrop(
     var phase by remember(artworkUrl) { mutableStateOf(NowPlayingBackdropPhase.Idle) }
     val artworkAlpha by animateFloatAsState(
         targetValue = if (phase == NowPlayingBackdropPhase.Loaded) {
-            NowPlayingBackdropPolicy.loadedLayerAlpha(blurArtwork)
+            NowPlayingBackdropPolicy.loadedLayerAlpha(isLight = tokens.isLight, blurActive = blurArtwork)
         } else {
             0f
         },
@@ -67,15 +69,11 @@ fun NowPlayingBackdrop(
         label = "nowPlayingBackdrop",
     )
 
-    // Fade the already-composited artwork + veil as ONE layer. Applying the
-    // fallback alpha to each child separately would apply it twice to the
-    // artwork wherever the translucent veil overlaps it, and would also leave
-    // a different amount of theme base visible than the real-blur path.
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .clipToBounds()
-            .graphicsLayer { alpha = artworkAlpha },
+    NowPlayingBackdropLayer(
+        modifier = modifier,
+        artworkAlpha = artworkAlpha,
+        veilTint = veilTint,
+        veilStops = veilStops,
     ) {
         AsyncImage(
             model = ImageRequest.Builder(context)
@@ -106,6 +104,33 @@ fun NowPlayingBackdrop(
             },
             onError = { phase = NowPlayingBackdropPhase.Failed },
         )
+    }
+}
+
+/**
+ * Shared composition layer for the image and its single tonal veil. Exposed to
+ * this module's JVM pixel test so it can inject deterministic color artwork
+ * without depending on platform-specific Coil file loading.
+ */
+@Composable
+internal fun NowPlayingBackdropLayer(
+    artworkAlpha: Float,
+    veilTint: Color,
+    veilStops: List<Pair<Float, Float>>,
+    modifier: Modifier = Modifier,
+    artwork: @Composable BoxScope.() -> Unit,
+) {
+    // Fade the already-composited artwork + veil as ONE layer. Applying the
+    // fallback alpha to each child separately would apply it twice to the
+    // artwork wherever the translucent veil overlaps it, and would also leave
+    // a different amount of theme base visible than the real-blur path.
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .clipToBounds()
+            .graphicsLayer { alpha = artworkAlpha },
+    ) {
+        artwork()
         // One theme-aware veil, faded with the image. No permanent overlay on
         // the fallback background while a request is loading or has failed.
         Box(
@@ -145,7 +170,34 @@ object NowPlayingBackdropPolicy {
      */
     const val NON_BLUR_LAYER_ALPHA = 0.40f
 
-    fun loadedLayerAlpha(blurActive: Boolean): Float = if (blurActive) 1f else NON_BLUR_LAYER_ALPHA
+    /**
+     * Light theme keeps a little **more** of the sharp artwork in the blur-off
+     * fallback. [NON_BLUR_LAYER_ALPHA] was tuned against the dark theme, where
+     * 40% of a dark cover over the near-black base reads as a dimmed, intentional
+     * backdrop. Composited over the warm-white light base the same 40% reads as
+     * a pale smear — the artwork is neither visible nor clean, which is the
+     * reported "it doesn't work as expected on light mode".
+     *
+     * Why exactly 0.44: the cover has to stay visible while the tertiary text
+     * token — the faintest one drawn directly on the page — keeps its WCAG gate
+     * against the worst case (a pure-black cover at 100% brightness, where the
+     * veil thins to 0.375). With the light tokens that gate holds up to 0.46 and
+     * fails from 0.50 (tertiary drops to 2.92:1 against a 3:1 floor), so the fix
+     * is a targeted alpha change, not a heavier veil stacked on a heavier layer.
+     * Pinned by
+     * DhunThemeContrastTest.nonBlurBackdropProtectsDirectTextOverExtremeArtwork.
+     */
+    const val LIGHT_NON_BLUR_LAYER_ALPHA = 0.44f
+
+    /** Theme-aware blur-off fallback. */
+    fun loadedLayerAlpha(isLight: Boolean, blurActive: Boolean): Float = when {
+        blurActive -> 1f
+        isLight -> LIGHT_NON_BLUR_LAYER_ALPHA
+        else -> NON_BLUR_LAYER_ALPHA
+    }
+
+    /** Dark-theme default, kept so existing callers and tests keep their meaning. */
+    fun loadedLayerAlpha(blurActive: Boolean): Float = loadedLayerAlpha(isLight = false, blurActive = blurActive)
 
     val artworkSizePx: Int get() = ArtworkUrls.LIST_SIZE_PX
 
@@ -175,6 +227,11 @@ object NowPlayingBackdropPolicy {
      */
     fun veilStops(isLight: Boolean, brightnessPercent: Int): List<Pair<Float, Float>> {
         val adjustment = (55 - brightnessPercent.coerceIn(0, 100)) / 100f * 0.30f
+        // Light keeps ONE translucent palette veil, lighter than dark — not a
+        // black dim under a white scrim, and never opaque enough to hide the
+        // artwork. The light-mode fix lives in the layer alpha
+        // ([LIGHT_NON_BLUR_LAYER_ALPHA]), not here: stacking a heavier veil on
+        // top of a heavier layer double-counts and buries the cover.
         val base = if (isLight) listOf(
             0f to 0.72f, 0.35f to 0.51f, 0.72f to 0.54f, 1f to 0.62f,
         ) else listOf(
