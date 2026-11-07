@@ -261,6 +261,9 @@ fun FullPlayer(
     val lyricsDominant = selectedTab == LYRICS_TAB_INDEX
     var showLyricsControls by remember(current?.id) { mutableStateOf(false) }
     var showLyricsMatches by remember(current?.id) { mutableStateOf(false) }
+    var lyricsMatchPickerStartMode by remember(current?.id) {
+        mutableStateOf(LyricsMatchPickerStartMode.DEFAULT)
+    }
     LaunchedEffect(lyricsDominant) {
         if (!lyricsDominant) {
             showLyricsControls = false
@@ -274,8 +277,23 @@ fun FullPlayer(
             track = current,
             preferredProvider = preferredLyricsProvider,
             onPreferredProviderChange = onPreferredLyricsProviderChange,
+            onEdit = viewModel.lyricsMatches?.let {
+                {
+                    lyricsMatchPickerStartMode = LyricsMatchPickerStartMode.EDIT
+                    showLyricsControls = false
+                    showLyricsMatches = true
+                }
+            },
+            onSearch = viewModel.lyricsMatches?.let {
+                {
+                    lyricsMatchPickerStartMode = LyricsMatchPickerStartMode.SEARCH
+                    showLyricsControls = false
+                    showLyricsMatches = true
+                }
+            },
             onFindMatches = viewModel.lyricsMatches?.let {
                 {
+                    lyricsMatchPickerStartMode = LyricsMatchPickerStartMode.DEFAULT
                     showLyricsControls = false
                     showLyricsMatches = true
                 }
@@ -283,7 +301,7 @@ fun FullPlayer(
             onDismiss = { showLyricsControls = false },
         )
         if (showLyricsMatches) viewModel.lyricsMatches?.let { controller ->
-            LyricsMatchPicker(current, controller) {
+            LyricsMatchPicker(current, controller, startMode = lyricsMatchPickerStartMode) {
                 controller.cancelSearch()
                 showLyricsMatches = false
             }

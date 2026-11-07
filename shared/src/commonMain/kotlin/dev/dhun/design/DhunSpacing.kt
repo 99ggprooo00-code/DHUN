@@ -143,6 +143,8 @@ object DhunSpacing {
     val quickPickWidth = 260.dp
     val dialogMinWidth = 280.dp
     val dialogMaxWidth = 380.dp
+    /** Compact ceiling for the lyrics-controls dialog; its body adapts below this on narrow windows. */
+    val lyricsControlsDialogMaxWidth = 340.dp
     /**
      * Ceiling for tall dialog bodies (lyrics match picker, country picker).
      * One token for every scrollable dialog column so a phone keeps the scrim

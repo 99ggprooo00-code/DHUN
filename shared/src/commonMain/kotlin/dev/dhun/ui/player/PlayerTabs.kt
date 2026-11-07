@@ -644,8 +644,14 @@ internal fun LyricsProviderPicker(
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs)) {
         Text("Lyrics provider", style = MaterialTheme.typography.labelMedium, color = DhunColors.textSecondary)
         Box {
-            DhunTonalButton(onClick = { expanded = true }) {
-                Text(selectedLabel, color = accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            DhunTonalButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    selectedLabel,
+                    modifier = Modifier.weight(1f),
+                    color = accent,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 Spacer(modifier = Modifier.width(DhunSpacing.xs))
                 DhunIconView(
                     icon = DhunIcon.ChevronDown,

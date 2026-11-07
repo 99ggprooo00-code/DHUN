@@ -24,6 +24,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runSkikoComposeUiTest
 import androidx.compose.ui.use
 import androidx.compose.ui.unit.Density
@@ -62,6 +63,8 @@ import dev.dhun.domain.GetHomeFeedUseCase
 import dev.dhun.domain.GetRecommendationsUseCase
 import dev.dhun.innertube.SearchFilter
 import dev.dhun.legal.DhunAppInfo
+import dev.dhun.lyrics.LyricsRepository
+import dev.dhun.lyrics.LyricsSource
 import dev.dhun.player.DhunPlayer
 import dev.dhun.presentation.home.HomeUiState
 import dev.dhun.presentation.home.HomeViewModel
@@ -262,6 +265,138 @@ class VisualAppEvidenceTest {
                     onNode(hasText("4 tracks"), useUnmergedTree = true).assertIsDisplayed()
                     mainClock.advanceTimeBy(500)
                     captureUiImage("app-add-playlist-${mode.id}.png", renderCurrentFrame(this, 412, 915))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun renderLyricsControlsDialogInBothThemesAndExerciseItsActions() {
+        for (mode in listOf(DhunThemeMode.DARK, DhunThemeMode.LIGHT)) {
+            val provider = RecordedProvider()
+            withFixture(mode, provider = provider, withLyricsMatches = true) { fixture ->
+                fixture.player.useArtwork(
+                    extremeArtwork(
+                        "lyrics-controls-${mode.id}",
+                        if (mode == DhunThemeMode.DARK) 0x775A86 else 0x3F7881,
+                    ),
+                )
+                if (mode == DhunThemeMode.LIGHT) {
+                    fixture.playerVm.lyricsRomanization.setEnabled(true)
+                    val romanizationDeadline = System.nanoTime() + 5_000_000_000L
+                    while (!fixture.playerVm.lyricsRomanization.enabled.value && System.nanoTime() < romanizationDeadline) {
+                        Thread.sleep(20)
+                    }
+                    assertTrue(
+                        fixture.playerVm.lyricsRomanization.enabled.value,
+                        "Romanization setting should persist before capture",
+                    )
+                }
+                // A forced Refetch must bypass the normal cache path and reach
+                // the recorded provider once, just as the production action does.
+                runBlocking { fixture.data.lyricsCache.clear() }
+                val nav = AppNavState().apply { playerExpanded = true }
+
+                runSkikoComposeUiTest(size = Size(412f, 915f)) {
+                    mainClock.autoAdvance = false
+                    setContent { Shell(fixture, nav, mode, isDesktop = false) }
+                    mainClock.advanceTimeBy(600)
+                    onNodeWithContentDescription("Lyrics view").performClick()
+                    mainClock.advanceTimeBy(500)
+                    onNodeWithContentDescription("Lyrics controls").assertIsDisplayed()
+                    onNodeWithContentDescription("Lyrics controls").performClick()
+                    mainClock.advanceTimeBy(500)
+
+                    onNodeWithText("Lyrics controls").assertIsDisplayed()
+                    onNodeWithContentDescription("Current song title: Bohemian Rhapsody").assertIsDisplayed()
+                    onNodeWithText("From Queen").assertIsDisplayed()
+                    onNodeWithText("Lyrics provider").assertIsDisplayed()
+                    onNodeWithText("Auto (synced first)").assertIsDisplayed()
+                    onNodeWithContentDescription("Romanization mode: Auto (conservative)").assertIsDisplayed()
+                    onNodeWithText("Lyrics offset").assertIsDisplayed()
+                    onNodeWithText("0 ms").assertIsDisplayed()
+                    onNodeWithText("Reset").assertIsDisplayed()
+                    onNodeWithContentDescription("Offset marker: minus five seconds").assertIsDisplayed()
+                    onNodeWithContentDescription("Offset marker: zero seconds").assertIsDisplayed()
+                    onNodeWithContentDescription("Offset marker: plus five seconds").assertIsDisplayed()
+                    onNodeWithContentDescription("Find lyrics matches").assertIsDisplayed()
+                    onNodeWithText("Close").assertIsDisplayed()
+                    onNodeWithContentDescription("Edit lyrics using local TTML").assertIsDisplayed()
+                    onNodeWithContentDescription("Refetch current lyrics").assertIsDisplayed()
+                    onNodeWithContentDescription("Search lyrics matches").assertIsDisplayed()
+                    captureUiImage(
+                        "lyrics-controls-${mode.id}.png",
+                        renderCurrentFrame(this, 412, 915),
+                    )
+
+                    val beforeRefetch = provider.lyricsFetchRequests.get()
+                    onNodeWithContentDescription("Refetch current lyrics").performClick()
+                    val refetchDeadline = System.nanoTime() + 5_000_000_000L
+                    while (provider.lyricsFetchRequests.get() <= beforeRefetch && System.nanoTime() < refetchDeadline) {
+                        mainClock.advanceTimeBy(50)
+                        Thread.sleep(20)
+                    }
+                    assertTrue(
+                        provider.lyricsFetchRequests.get() > beforeRefetch,
+                        "Refetch should bypass the lyrics cache and call the configured provider",
+                    )
+
+                    onNodeWithContentDescription("Edit lyrics using local TTML").performClick()
+                    mainClock.advanceTimeBy(500)
+                    onNodeWithText("Paste local TTML lyrics").assertIsDisplayed()
+                    onNodeWithText("Preview local TTML").assertIsDisplayed()
+                    onNodeWithText("Close").performClick()
+                    mainClock.advanceTimeBy(400)
+
+                    onNodeWithContentDescription("Lyrics controls").performClick()
+                    mainClock.advanceTimeBy(400)
+                    val beforeSearch = provider.lyricsFetchRequests.get()
+                    onNodeWithContentDescription("Search lyrics matches").performClick()
+                    val searchDeadline = System.nanoTime() + 5_000_000_000L
+                    while (provider.lyricsFetchRequests.get() < beforeSearch + 2 && System.nanoTime() < searchDeadline) {
+                        mainClock.advanceTimeBy(50)
+                        Thread.sleep(20)
+                    }
+                    assertTrue(
+                        provider.lyricsFetchRequests.get() >= beforeSearch + 2,
+                        "Search should run the existing match controller against its enabled sources",
+                    )
+                    val searchCompleteDeadline = System.nanoTime() + 5_000_000_000L
+                    while (fixture.playerVm.lyricsMatches?.state?.value?.loading == true &&
+                        System.nanoTime() < searchCompleteDeadline
+                    ) {
+                        mainClock.advanceTimeBy(50)
+                        Thread.sleep(20)
+                    }
+                    onNodeWithText("Lyrics matches for this song").assertIsDisplayed()
+                    onNodeWithText("Search / Retry").assertIsDisplayed()
+                    onNodeWithText("Close").performClick()
+                    mainClock.advanceTimeBy(400)
+
+                    onNodeWithContentDescription("Lyrics controls").performClick()
+                    mainClock.advanceTimeBy(400)
+                    val beforeFindMatches = provider.lyricsFetchRequests.get()
+                    onNodeWithContentDescription("Find lyrics matches").performClick()
+                    mainClock.advanceTimeBy(400)
+                    Thread.sleep(100)
+                    assertEquals(
+                        beforeFindMatches,
+                        provider.lyricsFetchRequests.get(),
+                        "Find lyrics matches should open the existing picker without auto-searching",
+                    )
+                    onNodeWithText("Lyrics matches for this song").assertIsDisplayed()
+                    onNodeWithText("Close").performClick()
+                    mainClock.advanceTimeBy(400)
+
+                    onNodeWithContentDescription("Lyrics controls").performClick()
+                    mainClock.advanceTimeBy(400)
+                    onNodeWithText("Close").performClick()
+                    mainClock.advanceTimeBy(400)
+                    onNodeWithContentDescription("Lyrics controls").performClick()
+                    mainClock.advanceTimeBy(400)
+                    onNodeWithText("Close").assertIsDisplayed()
+                    onNodeWithText("Close").performClick()
+                    mainClock.advanceTimeBy(400)
                 }
             }
         }
@@ -484,11 +619,12 @@ class VisualAppEvidenceTest {
         mode: DhunThemeMode,
         provider: RecordedProvider = RecordedProvider(),
         online: Boolean = true,
+        withLyricsMatches: Boolean = false,
         block: (AppFixture) -> Unit,
     ) {
         DhunAppearance.reset()
         DhunAppearance.setAppearance(nextMode = mode)
-        val fixture = AppFixture(provider, online)
+        val fixture = AppFixture(provider, online, withLyricsMatches)
         try {
             runBlocking { fixture.data.settings.putString(SettingsKeys.THEME, mode.id) }
             block(fixture)
@@ -622,6 +758,7 @@ class VisualAppEvidenceTest {
     private class AppFixture(
         val provider: RecordedProvider,
         online: Boolean,
+        withLyricsMatches: Boolean = false,
     ) {
         private val driver = DatabaseDriverFactory.inMemory().createDriver()
         val data = DataLayer(DatabaseFactory.create(driver))
@@ -658,7 +795,26 @@ class VisualAppEvidenceTest {
                 settings = data.settings,
             )
             search = SearchViewModel(provider, data.search, data.library, data.playlists, scope)
-            playerVm = PlayerViewModel(player, provider, scope, settings = data.settings)
+            val lyricsRepository = if (withLyricsMatches) {
+                val source = object : LyricsSource {
+                    override suspend fun fetch(track: Track): DhunResult<Lyrics> = provider.getLyrics(track.id)
+                }
+                LyricsRepository(
+                    cache = data.lyricsCache,
+                    ytm = source,
+                    lrcLib = source,
+                    settings = data.settings,
+                )
+            } else {
+                null
+            }
+            playerVm = PlayerViewModel(
+                player,
+                provider,
+                scope,
+                lyricsRepository = lyricsRepository,
+                settings = data.settings,
+            )
             library = LibraryViewModel(data, player, scope)
             search.onQueryChange("Bohemian Rhapsody")
             search.onSearchSubmitted()
@@ -788,6 +944,7 @@ class VisualAppEvidenceTest {
         },
     ) : MusicProvider {
         val continuationRequests = CopyOnWriteArrayList<String>()
+        val lyricsFetchRequests = AtomicInteger()
         override suspend fun search(query: String, filter: SearchFilter): DhunResult<SearchResults> = when (searchMode) {
             StateMode.POPULATED -> DhunResult.Success(
                 SearchResults(
@@ -849,16 +1006,19 @@ class VisualAppEvidenceTest {
         override suspend fun getStreamInfo(videoId: String): DhunResult<StreamInfo> =
             DhunResult.Failure(DhunError.Unavailable("Visual evidence does not resolve audio"))
 
-        override suspend fun getLyrics(videoId: String): DhunResult<Lyrics> = DhunResult.Success(
-            Lyrics.Synced(
-                listOf(
-                    LyricsLine(0, "First line"),
-                    LyricsLine(30_000, "Second line"),
-                    LyricsLine(60_000, "Third line"),
-                    LyricsLine(90_000, "Last line"),
+        override suspend fun getLyrics(videoId: String): DhunResult<Lyrics> {
+            lyricsFetchRequests.incrementAndGet()
+            return DhunResult.Success(
+                Lyrics.Synced(
+                    listOf(
+                        LyricsLine(0, "First line"),
+                        LyricsLine(30_000, "Second line"),
+                        LyricsLine(60_000, "Third line"),
+                        LyricsLine(90_000, "Last line"),
+                    ),
                 ),
-            ),
-        )
+            )
+        }
 
         override suspend fun artistPage(browseId: String): DhunResult<ArtistPage> = DhunResult.Success(
             ArtistPage(

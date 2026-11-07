@@ -12,6 +12,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,13 +29,28 @@ import dev.dhun.design.components.GlassCard
 import dev.dhun.lyrics.TtmlParser
 import dev.dhun.presentation.player.LyricsMatchController
 
+/** First screen presented when the existing match picker is opened from a lyrics action. */
+internal enum class LyricsMatchPickerStartMode { DEFAULT, SEARCH, EDIT }
+
 /** UI dispatches state-machine actions only; no HTTP/client/repository calls here. */
 @Composable
-internal fun LyricsMatchPicker(track: Track, controller: LyricsMatchController, onDismiss: () -> Unit) {
+internal fun LyricsMatchPicker(
+    track: Track,
+    controller: LyricsMatchController,
+    startMode: LyricsMatchPickerStartMode = LyricsMatchPickerStartMode.DEFAULT,
+    onDismiss: () -> Unit,
+) {
     val state by controller.state.collectAsState()
-    var query by remember(track.id) { mutableStateOf("${track.artistName} ${track.title}".take(240)) }
-    var showLocalImport by remember(track.id) { mutableStateOf(false) }
-    var ttml by remember(track.id) { mutableStateOf("") }
+    var query by remember(track.id, startMode) { mutableStateOf("${track.artistName} ${track.title}".take(240)) }
+    var showLocalImport by remember(track.id, startMode) {
+        mutableStateOf(startMode == LyricsMatchPickerStartMode.EDIT)
+    }
+    var ttml by remember(track.id, startMode) { mutableStateOf("") }
+    LaunchedEffect(track.id, startMode) {
+        if (startMode == LyricsMatchPickerStartMode.SEARCH && query.isNotBlank()) {
+            controller.search(track.id, query)
+        }
+    }
     Dialog(onDismissRequest = onDismiss) {
         GlassCard(modifier = Modifier.fillMaxWidth(), opaqueBase = true) {
             Column(

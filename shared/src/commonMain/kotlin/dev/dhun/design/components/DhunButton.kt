@@ -66,6 +66,7 @@ fun DhunTonalButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     loading: Boolean = false,
+    contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     content: @Composable RowScope.() -> Unit,
 ) {
     FilledTonalButton(
@@ -73,6 +74,7 @@ fun DhunTonalButton(
         modifier = modifier,
         enabled = enabled && !loading,
         shape = DhunShapes.button,
+        contentPadding = contentPadding,
         colors = ButtonDefaults.filledTonalButtonColors(
             containerColor = DhunColors.accentContainer,
             contentColor = DhunColors.onAccentContainer,
