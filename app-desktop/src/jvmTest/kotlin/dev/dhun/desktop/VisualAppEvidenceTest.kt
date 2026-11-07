@@ -606,6 +606,9 @@ class VisualAppEvidenceTest {
                 onNodeWithText("Clear all").performClick()
                 mainClock.advanceTimeBy(300)
                 onNodeWithText("Clear all downloads?").assertIsDisplayed()
+                onNodeWithText(
+                    "This deletes the only downloaded track from this device. Offline playback will no longer work for it.",
+                ).assertIsDisplayed()
                 captureAudit("21-04-32-clear-downloads-confirm")
                 onNodeWithText("Cancel").performClick()
                 mainClock.advanceTimeBy(300)

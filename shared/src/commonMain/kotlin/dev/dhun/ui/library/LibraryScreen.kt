@@ -34,9 +34,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import dev.dhun.core.DownloadState
@@ -1445,7 +1445,11 @@ private fun ClearDownloadsConfirmDialog(
 ) {
     DhunConfirmDialog(
         title = "Clear all downloads?",
-        message = "This deletes all $count downloaded track${if (count == 1) "" else "s"} from this device. Offline playback will no longer work for them.",
+        message = if (count == 1) {
+            "This deletes the only downloaded track from this device. Offline playback will no longer work for it."
+        } else {
+            "This deletes all $count downloaded tracks from this device. Offline playback will no longer work for them."
+        },
         confirmLabel = "Clear",
         pendingLabel = "Clearing…",
         isPending = isClearing,
