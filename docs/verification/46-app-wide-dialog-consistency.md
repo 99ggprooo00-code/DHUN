@@ -56,10 +56,10 @@ inert, then verifies Cancel and retry/confirm callbacks after pending ends.
 
 Before evidence is the requester-supplied Android captures listed above (not
 agent-captured device evidence and not redistributed in the repository). The
-Compose/Skia after evidence was rendered by [Visual evidence run 42388109719](https://github.com/99ggprooo00-code/DHUN/actions/runs/42388109719):
+Compose/Skia after evidence was rendered by [Visual evidence run 42389829010](https://github.com/99ggprooo00-code/DHUN/actions/runs/42389829010):
 10 visual tests passed, with 73 PNG frames and zero failures/errors. Its
 inspectable manifest is Git blob
-[`e0d59a33f4faf3118592e80e178ebe2bfbcf492f`](https://api.github.com/repos/99ggprooo00-code/DHUN/git/blobs/e0d59a33f4faf3118592e80e178ebe2bfbcf492f).
+[`d93e4cbbfed16329e38b801f4c8a35ae1fef9379`](https://api.github.com/repos/99ggprooo00-code/DHUN/git/blobs/d93e4cbbfed16329e38b801f4c8a35ae1fef9379).
 The `compose-visual-evidence` workflow artifact contains the PNGs and test
 reports; dark/light dialog and Lyrics Match frames, the 1.3x text captures, and
 the narrow catalogue header were retrieved through the manifest and inspected.
@@ -81,8 +81,8 @@ These are renderer frames, not proof of physical-device rendering.
 |---|---|---|
 | `git diff --check` | PASS | Clean after the source/test changes. |
 | `python3 -m unittest discover -s scripts -p 'test_*.py'` | PASS | 521 tests passed, including design-system source guards. |
-| Compose/Skia visual and interaction suite | PASS | Run 42388109719: 10 tests passed, 0 failures/errors; 73 PNG frames. Includes both-theme dialog frames, actual Lyrics Match flows, pending/retry callbacks, 1.3x large-text captures, and narrow catalogue close action. |
-| Shared/Desktop JVM and Android Robolectric CI | PARTIAL | PR checks `build`, `build-and-test`, and `compose` passed. The [APK job](https://github.com/99ggprooo00-code/DHUN/actions/runs/42388109855/job/128449754126) reached `:app-android:testDebugUnitTest` but could not fetch Robolectric artifact `org.robolectric:android-all-instrumented:12-robolectric-7732740-i7`; Android unit tests therefore have no result in this run. No tests were removed or weakened. |
+| Compose/Skia visual and interaction suite | PASS | Run 42389829010: 10 tests passed, 0 failures/errors; 73 PNG frames. Includes both-theme dialog frames, actual Lyrics Match flows, pending/retry callbacks, 1.3x large-text captures, and narrow catalogue close action. |
+| Shared/Desktop JVM and Android Robolectric CI | PASS | `build`, `build-and-test`, `compose`, and the [APK job](https://github.com/99ggprooo00-code/DHUN/actions/runs/42389829062/job/128454914345) passed. The first APK attempt hit a transient Robolectric artifact-fetch failure; the later run resolved it and completed Android unit tests. No tests were removed or weakened. |
 | Local Gradle compile/tests | NOT RUN | Installed and verified Temurin JDK 17.0.9 under `~/.cache/toolchain/jdk4py`. Gradle 8.14.2 is not cached and its wrapper download host is outside the allowed outbound-host set; GitHub Actions is the validation path for Kotlin/Compose. |
 | Android emulator | NOT TESTED | No emulator validation is claimed. |
 | Physical Android device | NOT TESTED | User screenshots are the before reference; no after-device capture was made. |
