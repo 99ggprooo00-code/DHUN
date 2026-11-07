@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.asComposeCanvas
 import androidx.compose.ui.graphics.asSkiaBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerButtons
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -32,6 +33,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.runSkikoComposeUiTest
 import androidx.compose.ui.use
 import androidx.compose.ui.unit.Density
@@ -349,8 +351,10 @@ class VisualAppEvidenceTest {
 
                     // Timing persistence and the conditional reset affordance
                     // remain tied to the existing repository callbacks.
-                    val trackId = requireNotNull(fixture.playerVm.currentTrack.value).id
-                    fixture.playerVm.adjustLyricsTiming(trackId, 700)
+                    onNodeWithContentDescription("Lyrics offset")
+                        .performSemanticsAction(SemanticsActions.SetProgress) { setProgress ->
+                            assertTrue(setProgress(700f), "Lyrics offset must retain its accessible SetProgress action")
+                        }
                     val offsetDeadline = System.nanoTime() + 5_000_000_000L
                     while (fixture.playerVm.lyricsTiming.value.offsetMs != 700 &&
                         System.nanoTime() < offsetDeadline
