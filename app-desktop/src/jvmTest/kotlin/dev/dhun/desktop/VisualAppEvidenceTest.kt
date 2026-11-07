@@ -23,10 +23,11 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.InternalTestApi
 import androidx.compose.ui.test.SkikoComposeUiTest
-import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -331,7 +332,7 @@ class VisualAppEvidenceTest {
                     onNodeWithContentDescription("Romanization mode: Auto (conservative)").assertIsDisplayed()
                     onNodeWithText("Lyrics offset").assertIsDisplayed()
                     onNodeWithText("0 ms").assertIsDisplayed()
-                    onNodeWithContentDescription("Reset lyrics offset").assertDoesNotExist()
+                    onAllNodesWithContentDescription("Reset lyrics offset").assertCountEquals(0)
                     onNodeWithContentDescription("Offset marker: minus five seconds").assertIsDisplayed()
                     onNodeWithContentDescription("Offset marker: zero seconds").assertIsDisplayed()
                     onNodeWithContentDescription("Offset marker: plus five seconds").assertIsDisplayed()
@@ -367,7 +368,7 @@ class VisualAppEvidenceTest {
                         Thread.sleep(20)
                     }
                     onNodeWithText("0 ms").assertIsDisplayed()
-                    onNodeWithContentDescription("Reset lyrics offset").assertDoesNotExist()
+                    onAllNodesWithContentDescription("Reset lyrics offset").assertCountEquals(0)
 
                     // The compact provider chip still opens the full existing
                     // choice list and writes the selected preference.
