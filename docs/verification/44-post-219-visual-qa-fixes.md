@@ -1,92 +1,76 @@
-# 44 — Post-#219 visual QA: confirmed defects, root causes, fixes
+# 44 — Post-#219 visual QA: reported defects, root causes, fixes
 
 Baseline: `7840e9d372e7114eee9a7ca64bdc85250557df36` (merge of PR #219).
 Fix PR: **#221**, branch `arena/957ea001-dhun`.
 
-## What could be tested, and from where
+## Environment and visual evidence
 
-| Environment | Available | Notes |
+| Environment | Result | Notes |
 |---|---|---|
-| Physical Android device | **No** | No device attached to this run; the observations below are the reported ones. |
-| Android emulator | **No** | No SDK, no `/dev/kvm` in the CI/agent environment. |
-| Windows desktop app (interactive) | **No** | Built and packaged by CI, not launched or driven. |
-| CI-rendered Compose frames | **Yes, indirectly** | `visual-evidence` renders 62 frames / 5 tests, 0 failures. The PNGs live on the Actions artifact host (`productionresultssa*.blob.core.windows.net`), which this environment cannot reach, so **no frame was visually inspected** — only its pass/fail result is reported. |
-| JVM unit tests | **Yes** | `:shared:jvmTest`, `app-android` Robolectric, desktop JVM. |
-| Code inspection | **Yes** | Used for every root cause below. |
+| Physical Android device | **NOT TESTED** | No device was available to me. The initial defect observations came from the user's report, not my device run. |
+| Android emulator | **NOT TESTED** | No SDK or `/dev/kvm` in this environment. |
+| Interactive Windows app | **NOT TESTED** | CI builds an MSI, but I did not launch or drive the installed app. |
+| CI Compose/Skia frames | **TESTED — renderer only** | Frames are real Compose `ImageComposeScene` renders, not fabricated or hand-edited captures. The signed Actions artifact host is blocked, but the workflow publishes a Git-blob manifest; I fetched the PNG blobs through `api.github.com` and verified their SHA-256 hashes. |
+| JVM/Robolectric tests | **CI only** | No local JDK/Gradle, so no tests were run locally. |
+| Code inspection | **TESTED** | Used to trace each defect to its root cause. |
 
-Final CI on `93a9c8f`+ (PR #221 head): `shared_jvm 843 tests / 0 failures`,
-`android_robolectric 169 / 0`, `desktop_jvm 51 / 0`, `playback_probe 4 / 0`.
+On commit `7dc878a`, Visual evidence run `42351926126` rendered **64 images, 6 tests, 0 failures**; manifest blob `a8bc24a8c19c981a6fb461644ab51e88ce0779c5`. I inspected these frames directly:
 
-## The QA matrix
+- `app-home-no-blur-bright-light.png` — artwork is visible as a soft backdrop; headings and controls remain legible. The 0.44 layer looks subdued, but not like a flat, pale smear.
+- `app-home-no-blur-black-artwork-light.png` / `app-home-no-blur-white-artwork-light.png` — black artwork becomes veiled warm gray; white artwork blends into the light base. A clear-point sample in an earlier same-code Compose render was base `(246,244,241)`, black `(198,195,192)`, white `(243,241,238)`.
+- `app-player-related-light.png` — the Related rows have a distinguishable fill and hairline on the sheet without a second blur/card layer.
+- `app-home-pagination-recovered-dark.png` — the recovered shelf is visible after two transient failures, without scrolling away from the end.
 
-Statuses are restricted to PASS / FAIL / PARTIAL / NOT TESTED / FIXED.
-"Environment" distinguishes device, emulator, CI-rendered frame, JVM test and code inspection.
+These are CI-renderer observations, **not Android-device acceptance**. At `09b418c`, the fresh run caught a second test-fixture issue described below: the isolated scene selected a light Material palette but left the global token source on the default dark palette. The test now explicitly sets DHUN's light appearance before rendering and asserts that the sampled base is warm-white; this fix is on the next pushed head and must pass CI before merge.
+
+## QA matrix
+
+Statuses are restricted to PASS / FAIL / PARTIAL / NOT TESTED / FIXED. Environments are named explicitly; CI Compose/Skia is not a device.
 
 | Area | Environment tested | Expected result | Actual result | Status | Evidence |
 |---|---|---|---|---|---|
-| Home / For You endless scrolling | Code inspection + JVM test (`HomeScrollRetryTest`, 7 cases) | Scrolling past the end keeps loading; a transient failure self-heals | One transient continuation failure latched `pageError` and every later scroll event was refused until the footer button was used; For You is continuation-only so this reads as "endless scrolling is broken" | FIXED | `HomeViewModel.onScrollNearEnd`, `MAX_AUTO_RETRIES = 2`, reset on growth; `HomeScreen` `snapshotFlow` trigger; `HomeScrollRetryTest` |
-| Home: stale served session | Code inspection + JVM test (`StaleSessionRetryTest`, 4 cases) | A rotated WEB_REMIX build recovers without an app restart | Stale scraped `clientVersion` ⇒ bare HTTP 400 ⇒ continuations fail permanently while page 1 still renders | FIXED | one forced re-discovery + replay in `InnerTubeClient.postJson`, still-rejected requests still fail |
-| Home: per-category scroll position | Code inspection | Switching mood starts at the top | Filter chips inside one `LazyColumn`, so a mood switch inherited the previous category's offset | FIXED | per-mood `LazyListState` under `key(selectedMood)` |
-| Search keyboard after navigation | Code inspection + JVM test (`SearchKeyboardPolicyTest`) | IME closes when the user leaves Search | Search is never disposed (its query must survive) and the Full Player is an overlay, so focus — and the IME — stayed on a screen no longer visible | FIXED | `SearchKeyboardPolicy` + `DismissSearchKeyboard` in `DhunAppShell` on tab change / detail push / player expand |
-| Multi-artist byline | Code inspection + JVM test (`ArtistCreditsTest`) | Each credited artist opens its own page | `artistName` is one joined string, `artistId` only the first channel ⇒ a collaboration always opened one artist | FIXED | `Track.artists` + `ArtistCredits.resolve`; one clickable credit per linked channel; refuses to split when fewer than two channels are linked |
-| Inline translations | Code inspection + JVM test (`LyricsTranslationTest`) | Translation sits on its own line under the lyric | Secondary text was rendered on the lyric's own baseline | FIXED | `LrcParser.splitInlineTranslation`, `LyricsLine.translation`, kugou `contentts` overlay, codec v3, 3-rung type ladder |
-| Translation survives cache | JVM test (`RepositoriesTest`, `TtmlRolesTest`) | A saved-then-loaded lyric is identical | **Regression introduced by the first version of this fix**: v3 decode gated `agent`/`background` on `version == "2"` and silently dropped every vocal role | FIXED | decode now accepts roles for v2 **and** v3 |
-| Related Songs surface | Code inspection + CI-rendered frames | Rows read as part of the sheet | Bare rows on the sheet veil, unlike the queue rows beside them | FIXED | queue-row translucent fill + `glassEdge` hairline on `RelatedRow` |
-| Light-mode backdrop (blur off) | Code inspection + contrast math + JVM test | Artwork visible and text readable | The dark-tuned 40% layer over the warm-white base reads as a pale smear | FIXED | `LIGHT_NON_BLUR_LAYER_ALPHA = 0.44`, derived from the tertiary-text gate (holds to 0.46, fails from 0.50); pinned by `DhunThemeContrastTest` |
-| Light mode, rest of the app | — | — | — | NOT TESTED | out of scope by instruction (targeted backdrop fix only) |
-| Whole-playlist saving | — | — | — | NOT TESTED | out of scope by instruction |
-| Per-surface colour customisation | — | — | — | NOT TESTED | out of scope by instruction |
-| Artwork fallback | — | — | — | NOT TESTED | out of scope by instruction |
-| Lyrics manual scrolling | — | — | — | NOT TESTED | out of scope by instruction |
-| Queue | JVM test (pre-existing, green) | Works | Works | PASS | existing suite, untouched |
-| Every row above, on a real screen | Physical device | — | — | NOT TESTED | no device or emulator available; CI frames rendered but the artifact host is unreachable from the agent |
+| Home / For You endless scrolling | Code inspection; `HomeScrollRetryTest`; Compose `HomeScreen` integration in CI | Near-end scrolling keeps paginating; transient continuation failures self-heal without an endless request loop | The scroll and footer paths originally shared an error guard. After the first fix, the near-end `snapshotFlow` still emitted `true` only once; fast state transitions could be conflated. A completion revision now re-arms it. CI integration rendered two transient failures followed by a successful continuation while still at the end. | FIXED | `HomeViewModel.paginationRevision`; `HomeScreen` trigger; `HomeScrollRetryTest`; frame `app-home-pagination-recovered-dark.png` on run `42351926126` |
+| Home: stale served session | Code inspection + JVM test (`StaleSessionRetryTest`) | Rotated WEB_REMIX build recovers without app restart | A stale scraped `clientVersion` caused HTTP 400 for continuations while page 1 still rendered. One forced re-discovery + replay now recovers; still-rejected requests remain visible. | FIXED | `InnerTubeClient.postJson`; `StaleSessionRetryTest` |
+| Home: retry budget | JVM test + Compose integration | Recover from transient outages but stop when service is dead | Two automatic retries after the initial page request (three page requests total) are bounded. Only `Network`, `RateLimited` and `Unknown` failures are ambient-retry eligible; `Parse`, `AuthRequired` and `Unavailable` stay explicit. This is a conservative default, not a field-measured optimum. | FIXED | `MAX_AUTO_RETRIES = 2`; `HomeScrollRetryTest.theAutomaticRetryBudgetIsBounded`; `nonTransientContinuationErrorsWaitForAnExplicitRetry` |
+| Home: stale/repeated category scroll position | Code inspection | Switching mood starts at the top | Each mood has its own keyed `LazyListState`. | FIXED | `HomeScreen` `key(selectedMood)` |
+| Search keyboard after navigation | Code inspection + JVM test (`SearchKeyboardPolicyTest`) | IME closes when user leaves Search | Search is deliberately retained; previously nothing released its text-input focus when tab/detail/player navigation hid it. Focus is now dismissed on those transitions. | FIXED | `SearchKeyboardPolicy`; `DismissSearchKeyboard` in `DhunAppShell` |
+| Multi-artist byline | Code inspection + JVM test (`ArtistCreditsTest`) | Each credited artist opens their own page | `artistName` was joined text paired with only the first `artistId`. The model/UI now keeps a destination per linked credit and refuses unsafe partial splits. | FIXED | `Track.artists`; `ArtistCredits.resolve`; player artist row |
+| Inline lyric translations | Code inspection + JVM test (`LyricsTranslationTest`) | Translation is on its own secondary line | Inline bilingual LRC and Kugou's separate `contentts` document now populate `LyricsLine.translation`; player renders a separate type rung. | FIXED | `LrcParser.splitInlineTranslation`; `KuGouLyricsSource`; codec v3; `SyncedLyrics` |
+| Translation survives cache | JVM test (`RepositoriesTest`, `TtmlRolesTest`) | Save/load preserves vocal roles and background flags | The first codec-v3 implementation gated `agent`/`background` on v2 and dropped roles. Decode now accepts both v2 and v3. | FIXED | `SyncedLyricsCodec` regression tests |
+| Related Songs surface | Code inspection + CI-rendered Compose frame, visually inspected | Rows read as part of the sheet | Previously bare rows on the sheet veil; now match the queue-row translucent fill and hairline edge. The light Related frame reads as a distinct surface in CI. | FIXED | `RelatedRow`; `app-player-related-light.png` |
+| Light-mode backdrop, blur off | Contrast math + JVM test + CI Compose/Skia frame, visually inspected | Artwork visible while direct text stays readable | 0.44 looks like a soft, visible backdrop in the inspected bright-light frame. The extreme black cover renders as veiled gray, and white art blends into the base. Device-specific rendering remains unverified. | FIXED | `LIGHT_NON_BLUR_LAYER_ALPHA = 0.44`; `DhunThemeContrastTest`; `NowPlayingBackdropRenderTest`; frames named above |
+| Light mode, rest of app | — | — | — | NOT TESTED | Out of scope; targeted backdrop fix only. |
+| Whole-playlist saving | — | — | — | NOT TESTED | Explicitly out of scope. |
+| Per-surface colour customisation | — | — | — | NOT TESTED | Explicitly out of scope. |
+| Artwork fallback | — | — | — | NOT TESTED | Explicitly out of scope. |
+| Lyrics manual scrolling | — | — | — | NOT TESTED | Explicitly out of scope. |
+| Queue | Existing JVM suite; untouched | Queue works | Existing suite passed; queue was not changed. | PASS | Existing queue tests |
+| All pixel-dependent behavior on physical Android | Physical device | Verify final pixels and layout on device | No device was available. Compose frames do not substitute for this. | NOT TESTED | No fabricated device evidence. |
 
-## Root causes
+## Root causes and fixes
 
-1. **Home** — the scroll trigger and the footer retry shared one guard, so a
-   single transient failure was latched indefinitely; on For You (continuation-only)
-   that is indistinguishable from broken pagination. Separately, a rotated
-   `clientVersion` produced HTTP 400 for every continuation until restart.
-2. **Search keyboard** — `TextInputFocusRegistry` records focus but nothing ever
-   released it, and Search is deliberately never disposed.
-3. **Artists** — a joined display string with a single id target.
-4. **Translations** — no translation concept existed in the model, codec or UI.
-5. **Related rows** — they simply never had a surface.
-6. **Light mode** — a dark-tuned constant applied to a light base.
+1. **Home pagination had three layers.** The initial transient error latched `pageError`, and the scroll path refused further calls. A stale cached `clientVersion` could independently make every continuation fail with HTTP 400 until restart. The first `snapshotFlow` rewrite still had a gap: its near-end Boolean remained `true` and was conflated after the first event, and Compose could skip a fast loading `true → false` transition. The current implementation increments `paginationRevision` on each completed page request and keys the trigger on it, so the near-end event is re-armed even for fast failures. Ambient retries are restricted to transient errors and bounded at two retries after the initial request.
+2. **Search keyboard** — `TextInputFocusRegistry` recorded focus but navigation never released it; Search is retained so its query survives.
+3. **Artists** — one joined display string was paired with one target id.
+4. **Translations** — lyrics had no translation field, cache representation, or separate rendering concept.
+5. **Related rows** — no row surface existed.
+6. **Light backdrop** — a dark-tuned blur-off alpha was applied over a warm-white base. The light value is bounded by the real contrast gate and the same production artwork/veil layer now has a deterministic color-input pixel test.
+
+A first version of the pixel test used Coil to load local file URIs in the app-shell scene. Linux rendered the fixture, but the Windows MSI JVM test did not; it returned the base color for the black-cover sample and caused the downstream MSI install-evidence job to lack its expected artifact. That was a **test-fixture portability failure**, not evidence of a product MSI defect. The test now renders the production `NowPlayingBackdropLayer` with deterministic Compose colors, avoiding platform-dependent image loading. The next run on `09b418c` found a different test-only error: setting `DhunTheme(mode = LIGHT)` changes Material3's local scheme but not `DhunAppearance.tokens`, which `DhunColors.background` reads. The supposed light sample therefore used the process-default dark base `(22,22,22)` on both Linux and Windows; the veil pixel `(73,71,70)` exposed the mismatch. The fixture now also calls `DhunAppearance.setThemePreference("light", systemDark = false)` and asserts the base is warm-white before evaluating the artwork pixels. The correction is queued for CI; no production alpha or veil change was made in response to this fixture failure.
 
 ## Files changed
 
-`core/Entities.kt`, `design/DhunTypography.kt`,
-`design/components/NowPlayingBackdrop.kt`, `innertube/ArtistCredits.kt` (new),
-`innertube/BrowseParsers.kt`, `innertube/InnerTubeClient.kt`, `innertube/Parsers.kt`,
-`lyrics/KuGouLyricsSource.kt`, `lyrics/LrcParser.kt`, `lyrics/SyncedLyricsCodec.kt`,
-`presentation/home/HomeViewModel.kt`, `ui/home/HomeScreen.kt`,
-`ui/player/FullPlayer.kt`, `ui/player/PlayerTabs.kt`, `ui/player/SyncedLyrics.kt`,
-`ui/search/SearchKeyboardPolicy.kt` (new), `ui/shell/DhunAppShell.kt`,
-plus tests: `ArtistCreditsTest`, `LyricsTranslationTest`, `HomeScrollRetryTest`,
-`SearchKeyboardPolicyTest`, `StaleSessionRetryTest`, `NowPlayingBackdropPolicyTest`,
-`LyricsPresentationTest`, `DhunThemeContrastTest`.
+Production: `core/Entities.kt`, `design/DhunTypography.kt`, `design/components/NowPlayingBackdrop.kt`, `innertube/ArtistCredits.kt` (new), `BrowseParsers.kt`, `InnerTubeClient.kt`, `Parsers.kt`, `lyrics/KuGouLyricsSource.kt`, `LrcParser.kt`, `SyncedLyricsCodec.kt`, `presentation/home/HomeViewModel.kt`, `ui/home/HomeScreen.kt`, `ui/player/FullPlayer.kt`, `PlayerTabs.kt`, `SyncedLyrics.kt`, `ui/search/SearchKeyboardPolicy.kt` (new), `ui/shell/DhunAppShell.kt`.
 
-No database migration was added: `Track.artists` is an in-memory field re-derived
-from the provider response, and the legacy `artistName`/`artistId` columns are
-unchanged.
+Tests: `ArtistCreditsTest`, `StaleSessionRetryTest`, `LyricsTranslationTest`, `HomeScrollRetryTest`, `SearchKeyboardPolicyTest`, `NowPlayingBackdropRenderTest` (new), `NowPlayingBackdropPolicyTest`, `DhunThemeContrastTest`, `LyricsPresentationTest`, plus `VisualAppEvidenceTest` and `VisualEvidenceTest`.
 
-## Tests actually run
+No database migration was added: `Track.artists` is in-memory and re-derived from provider data; the legacy `artistName` / `artistId` storage is unchanged.
 
-CI only (no local JDK). The five failures CI reported during development were all
-real and are recorded here because they shaped the fix:
+## Verification history and remaining unknowns
 
-1. `ArtistCredits.linkedArtistIds` returned `List<String>` from nullable ids — compile error.
-2. `assertEquals` could not infer `T` over a nullable token list — test compile error.
-3. Codec v3 dropped vocal roles (regression, above).
-4. Light layer at 0.58 broke the tertiary-text gate (`secondary 4.11:1`).
-5. Two test premises were wrong: a JSON-only "homepage" fixture the scraper cannot
-   read, and an inverted light/dark veil assertion.
-
-## Remaining unverified
-
-- Every visual judgement on a real screen: whether the Related fill reads right
-  over bright artwork, whether 0.44 looks correct as well as measuring correct,
-  whether the artist credit row wraps acceptably at large font sizes, and whether
-  inline translation splitting produces good text on real bilingual catalogues.
-- Whether the Home self-heal budget of 2 is the right number in the field.
+- Earlier green head `b71bc4d`: shared JVM 843 / 0 failures, Android Robolectric 169 / 0, desktop JVM 51 / 0, playback probe 4 / 0; visual evidence 62 images / 5 tests / 0 failures.
+- Head `5ef5fd3`: the Compose integration test caught that fast failure only caused one request; fixed by the completion revision in `7dc878a`.
+- Head `7dc878a`: Visual evidence passed at 64 images / 6 tests / 0 failures. Its Windows run exposed the Coil file-URI test portability issue above; the deterministic in-memory pixel test followed.
+- Head `09b418c`: CI run `42352635315` failed on the new `NowPlayingBackdropRenderTest` fixture on Linux (shared JVM: 845 tests, 1 failure); the Windows MSI test failed on the same assertion with the same dark-base evidence. APK build passed, while the visual-evidence run was still running at the time of this report edit. `release_plan` passed; installed-evidence failed downstream because MSI did not complete. The failure is diagnosed above and the fixture correction is in the working tree, not yet pushed. Do not merge until the next head passes the affected Linux and Windows suites and the required PR checks are green.
+- No local tests were run (no JDK). No Android device, emulator, or interactive Windows app was used.
+- Still unverified on a real screen: OEM blur/compositing, actual field retry outcomes, large-font artist wrapping, and inline translation quality across real bilingual catalogues. Two scroll retries remains a bounded default; field telemetry is needed to optimize it.

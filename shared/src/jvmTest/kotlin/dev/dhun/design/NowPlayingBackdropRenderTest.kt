@@ -35,6 +35,10 @@ class NowPlayingBackdropRenderTest {
             kotlin.math.abs(base.green - whiteCover.green) + kotlin.math.abs(base.blue - whiteCover.blue)
 
         assertTrue(
+            base.red > 220 && base.green > 220 && base.blue > 210,
+            "The probe must use the warm light-theme base, not the process default: $base",
+        )
+        assertTrue(
             baseLevel - blackLevel in 20..90,
             "Black artwork should remain visible but veiled, not disappear or become a black slab: base=$base cover=$blackCover",
         )
@@ -46,6 +50,7 @@ class NowPlayingBackdropRenderTest {
 
     private fun renderPixel(artwork: Color?): java.awt.Color {
         DhunAppearance.reset()
+        DhunAppearance.setThemePreference("light", systemDark = false)
         DhunVisualTuning.restore(emptyMap(), enabled = false)
         try {
             ImageComposeScene(
