@@ -160,7 +160,7 @@ class StaleSessionRetryTest {
             } finally {
                 http.close()
             }
-            assertEquals(listOf("cursor-1", "cursor-1"), queryTokens)
+            assertEquals(listOf<String?>("cursor-1", "cursor-1"), queryTokens)
             assertTrue(bodyHasContinuation.none { it }, "the cursor must never move into the JSON body")
         }
     }
