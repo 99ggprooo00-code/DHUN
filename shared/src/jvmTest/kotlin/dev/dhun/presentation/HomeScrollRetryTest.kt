@@ -162,6 +162,27 @@ class HomeScrollRetryTest {
     }
 
     @Test
+    fun nonTransientContinuationErrorsWaitForAnExplicitRetry() = runTest {
+        val provider = PagingProvider(DhunResult.Success(page("a", "p2"))).apply {
+            more = { DhunResult.Failure(DhunError.Parse("same malformed response")) }
+        }
+        val vm = model(provider, backgroundScope)
+        runCurrent()
+
+        vm.onScrollNearEnd()
+        runCurrent()
+        repeat(20) { vm.onScrollNearEnd(); runCurrent() }
+        assertEquals(1, provider.requests.size, "a parse error must not be replayed automatically")
+        assertNotNull(vm.loadMoreError.value)
+
+        vm.retryLoadMore()
+        runCurrent()
+        assertEquals(2, provider.requests.size, "the visible Retry action must still send one request")
+        repeat(20) { vm.onScrollNearEnd(); runCurrent() }
+        assertEquals(2, provider.requests.size, "an explicit retry that fails still stays bounded")
+    }
+
+    @Test
     fun scrollEventsAreIgnoredWhileAPageIsInFlight() = runTest {
         // A finger resting at the bottom fires the trigger every frame; the
         // in-flight guard must collapse those into one request.

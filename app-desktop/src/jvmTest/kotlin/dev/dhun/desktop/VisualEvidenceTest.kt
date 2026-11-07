@@ -35,8 +35,8 @@ import kotlin.test.assertTrue
  * Real Compose/Skia frames for visual acceptance, not a second design mockup.
  * CI uploads the PNGs as ordinary artifacts and emits a small Git-blob manifest
  * so environments that cannot download Actions artifacts can still inspect the
- * exact rendered output. These initial frames prove the evidence path; the
- * screen/state matrix is added only after that path is known to work.
+ * exact rendered output. This covers shared primitives; the broader app-shell
+ * and state matrix, including pixel probes, lives in VisualAppEvidenceTest.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 class VisualEvidenceTest {

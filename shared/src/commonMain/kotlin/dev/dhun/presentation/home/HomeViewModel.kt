@@ -38,6 +38,11 @@ sealed interface HomeUiState {
     data object Empty : HomeUiState
 }
 
+private fun DhunError.isTransientForAutoRetry(): Boolean = when (this) {
+    is DhunError.Network, is DhunError.RateLimited, is DhunError.Unknown -> true
+    is DhunError.Parse, is DhunError.Unavailable, is DhunError.AuthRequired -> false
+}
+
 class HomeViewModel(
     private val getHomeFeed: GetHomeFeedUseCase,
     private val getRecommendations: GetRecommendationsUseCase,
@@ -69,9 +74,11 @@ class HomeViewModel(
         val refreshing: Boolean = false,
         val loadingMore: Boolean = false,
         val pageError: String? = null,
+        /** Whether the last continuation error is transient enough for ambient retry. */
+        val autoRetryEligible: Boolean = false,
         val completedTokens: Set<String> = emptySet(),
         val emptyPageCount: Int = 0,
-        /** Consecutive scroll-driven continuation failures absorbed automatically. */
+        /** Consecutive scroll-driven transient continuation failures absorbed automatically. */
         val autoRetries: Int = 0,
     )
 
@@ -278,27 +285,34 @@ class HomeViewModel(
         if (before.refreshing || before.loadingMore) return
         // Nothing to load and no failure to heal: the feed is simply finished.
         if (before.pageError == null && (before.ui as HomeUiState.Success).feed.continuationToken == null) return
-        // A scroll event is always allowed to make progress: the failure it may
-        // be recovering from is the previous page's, and this attempt is itself
-        // counted, so the budget is spent by the attempt — not checked before it.
+        // Only transient failures are candidates for ambient retry. Parse,
+        // unavailable and auth errors cannot be repaired by replaying the same
+        // continuation; keep their footer action explicit.
+        if (before.pageError != null && !before.autoRetryEligible) return
+        // For a retryable failure, the prior error belongs to the previous
+        // request; this attempt is itself counted, so the budget is spent by the
+        // attempt — not checked before it.
         requestMore(retry = before.pageError != null, fromScroll = true)
     }
 
-    /** One request at a time; failures wait for an explicit retry, not a recomposition loop. */
+    /** One continuation at a time; scroll-triggered recovery is separately bounded. */
     private fun requestMore(retry: Boolean, fromScroll: Boolean = false) {
         val before = state.value
         val current = (before.ui as? HomeUiState.Success)?.feed ?: return
         val token = current.continuationToken ?: return
         if (before.refreshing || before.loadingMore || (!retry && before.pageError != null)) return
         // The automatic budget: a scroll-driven retry stops once the feed has
-        // already failed this many times since it last grew. The gate lives
-        // here, not in [onScrollNearEnd], so EVERY scroll path is bounded —
-        // including the empty-page error, which is a failure to make progress
-        // even though no request errored.
-        if (fromScroll && before.pageError != null && before.autoRetries > MAX_AUTO_RETRIES) return
+        // already failed this many times since it last grew. Non-transient
+        // errors stay explicit. The gate lives here, not only in
+        // [onScrollNearEnd], so EVERY scroll path is bounded — including the
+        // empty-page case, which fails to make progress without a request error.
+        if (fromScroll && before.pageError != null &&
+            (!before.autoRetryEligible || before.autoRetries > MAX_AUTO_RETRIES)
+        ) return
         val request = before.copy(
             loadingMore = true,
             pageError = null,
+            autoRetryEligible = false,
             emptyPageCount = if (retry) 0 else before.emptyPageCount,
             autoRetries = if (fromScroll) before.autoRetries else 0,
         )
@@ -326,6 +340,7 @@ class HomeViewModel(
                                 ui = HomeUiState.Success(feed),
                                 completedTokens = used,
                                 emptyPageCount = emptyPages,
+                                autoRetryEligible = false,
                                 // A page that grew the feed proves the scroll
                                 // path is healthy: reset the budget so a later
                                 // transient failure can still self-heal. A page
@@ -340,6 +355,7 @@ class HomeViewModel(
                         }
                         is DhunResult.Failure -> latest.copy(
                             pageError = result.error.toUserMessage(),
+                            autoRetryEligible = fromScroll && result.error.isTransientForAutoRetry(),
                             // Count one failure per request, not per wrapping
                             // request: a retry that also fails moves the budget
                             // forward exactly one step.
@@ -353,6 +369,7 @@ class HomeViewModel(
                 state.update {
                     if (it.generation != request.generation) it else it.copy(
                         pageError = DhunError.Unknown().toUserMessage(),
+                        autoRetryEligible = fromScroll,
                         autoRetries = it.autoRetries + 1,
                     )
                 }
@@ -373,10 +390,11 @@ class HomeViewModel(
         const val MAX_EMPTY_PAGES = 3
 
         /**
-         * How many consecutive scroll-driven continuation failures the feed
-         * absorbs before it stops retrying on its own and leaves the footer
-         * error to the user. Two is enough to ride out a dropped connection or
-         * a rate-limit blip, small enough that a dead service is visible.
+         * Upper-layer retry budget after the initial continuation request:
+         * at most three page requests total for a transient failure streak.
+         * This is a bounded default, not a field-measured optimum; Network and
+         * RateLimited errors already receive transport-level backoff, while
+         * Parse/Auth/Unavailable errors remain explicit rather than replaying.
          */
         const val MAX_AUTO_RETRIES = 2
         /** Distinct recent plays that form the seed signal for recommendations. */

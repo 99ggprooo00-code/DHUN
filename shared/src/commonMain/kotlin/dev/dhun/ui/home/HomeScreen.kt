@@ -275,19 +275,19 @@ private fun HomeFeedContent(
     // the end of what we already have. `feed.continuationToken == null` means
     // InnerTube has no more shelves, so nothing is requested.
     //
-    // [snapshotFlow] is used instead of a `LaunchedEffect` keyed on a
-    // `derivedStateOf`: the keyed effect only runs when one of its keys
-    // *changes*, so an emitted `onLoadMore()` that produced no visible change
-    // (a failed page that was still reported, a page that added no rows) could
-    // leave the trigger permanently un-armed while the finger kept scrolling —
-    // the list had to be scrolled away from the end and back before it fired
-    // again. A flow re-evaluates on every layout change instead.
+    // [snapshotFlow] tracks the viewport, but while the list remains near its
+    // end its Boolean result stays `true`; equal values are conflated. A failed
+    // request does not change the continuation token or item count, so relying
+    // on layout changes alone leaves the trigger disarmed after its first emit.
+    // Key on `isLoadingMore` and include it in the sampled condition: it turns
+    // false while a request is in flight, then re-arms the near-end event when
+    // the request completes. The ViewModel owns the bounded retry budget.
     val canLoadMore = feed.continuationToken != null
-    LaunchedEffect(listState, canLoadMore, feed.continuationToken) {
+    LaunchedEffect(listState, canLoadMore, feed.continuationToken, isLoadingMore) {
         snapshotFlow {
             val total = listState.layoutInfo.totalItemsCount
             val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
-            total > 0 && lastVisible >= total - SCROLL_TRIGGER_DISTANCE
+            canLoadMore && !isLoadingMore && total > 0 && lastVisible >= total - SCROLL_TRIGGER_DISTANCE
         }
             .distinctUntilChanged()
             .collect { nearEnd ->
