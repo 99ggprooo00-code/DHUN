@@ -418,10 +418,19 @@ class VisualAppEvidenceTest {
                         provider.lyricsFetchRequests.get() > beforeRefetch,
                         "Refetch should invoke the existing lyrics callback and reach the configured provider",
                     )
+                    val refetchResultDeadline = System.nanoTime() + 5_000_000_000L
+                    while (fixture.playerVm.lyricsState.value !is LyricsUiState.Synced &&
+                        System.nanoTime() < refetchResultDeadline
+                    ) {
+                        mainClock.advanceTimeBy(50)
+                        Thread.sleep(20)
+                    }
+                    seedSavedLyricsChoice(fixture)
 
                     onNodeWithContentDescription("Edit lyrics using local TTML").performClick()
                     mainClock.advanceTimeBy(500)
                     onNodeWithText("Lyrics matches for this song").assertIsDisplayed()
+                    onNodeWithText("Saved choice: lrclib · Bohemian Rhapsody").assertIsDisplayed()
                     onNodeWithText("Paste local TTML lyrics").assertIsDisplayed()
                     onNodeWithText("Preview local TTML").assertIsDisplayed()
                     captureUiImage(
@@ -447,6 +456,8 @@ class VisualAppEvidenceTest {
                         "Search should run the existing match controller against its enabled sources",
                     )
                     mainClock.advanceTimeBy(100)
+                    onNodeWithText("Searching / parsing / saving…").assertIsDisplayed()
+                    onNodeWithText("Saved choice: lrclib · Bohemian Rhapsody").assertIsDisplayed()
                     captureUiImage(
                         "lyrics-match-searching-${mode.id}.png",
                         renderCurrentFrame(this, 412, 915),
@@ -567,7 +578,7 @@ class VisualAppEvidenceTest {
                 runOnIdle { fixture.library.selectTab(LibraryTab.DOWNLOADS) }
                 mainClock.advanceTimeBy(300)
                 onNodeWithText("Clear all").assertIsDisplayed()
-                captureAudit("21-04-02-downloads")
+                captureAudit("21-04-04-downloads")
                 onNodeWithText("Clear all").performClick()
                 mainClock.advanceTimeBy(300)
                 onNodeWithText("Clear all downloads?").assertIsDisplayed()
@@ -578,7 +589,7 @@ class VisualAppEvidenceTest {
                 runOnIdle { fixture.library.selectTab(LibraryTab.HISTORY) }
                 mainClock.advanceTimeBy(300)
                 onNodeWithText("Clear all").assertIsDisplayed()
-                captureAudit("21-04-13-history")
+                captureAudit("21-04-02-history")
                 onNodeWithText("Clear all").performClick()
                 mainClock.advanceTimeBy(300)
                 onNodeWithText("Clear history?").assertIsDisplayed()
@@ -979,6 +990,21 @@ class VisualAppEvidenceTest {
                 clearAudioCache = { 2_700_000L },
             )
         }
+    }
+
+    private fun seedSavedLyricsChoice(fixture: AppFixture) {
+        val track = requireNotNull(fixture.playerVm.currentTrack.value)
+        val controller = requireNotNull(fixture.playerVm.lyricsMatches)
+        controller.search(track.id, "${track.artistName} ${track.title}")
+        val searchDeadline = System.nanoTime() + 5_000_000_000L
+        while (controller.state.value.loading && System.nanoTime() < searchDeadline) Thread.sleep(20)
+        val matches = controller.state.value.matches
+        assertTrue(matches.isNotEmpty(), "The deterministic lyrics fixture should return a saved-choice candidate")
+        val selected = matches.firstOrNull { it.provider == "lrclib" } ?: matches.first()
+        controller.choose(track.id, selected)
+        val saveDeadline = System.nanoTime() + 5_000_000_000L
+        while (controller.state.value.loading && System.nanoTime() < saveDeadline) Thread.sleep(20)
+        assertEquals(selected, controller.state.value.selected, "The in-memory saved choice should be durable before capture")
     }
 
     private fun withFixture(
