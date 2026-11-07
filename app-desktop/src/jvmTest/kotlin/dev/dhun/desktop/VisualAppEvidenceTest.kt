@@ -362,6 +362,12 @@ class VisualAppEvidenceTest {
                         mainClock.advanceTimeBy(50)
                         Thread.sleep(20)
                     }
+                    assertEquals(
+                        700,
+                        fixture.playerVm.lyricsTiming.value.offsetMs,
+                        "The accessible slider action must persist the selected offset",
+                    )
+                    mainClock.advanceTimeBy(50)
                     onNodeWithText("+700 ms").assertIsDisplayed()
                     onNodeWithContentDescription("Reset lyrics offset").performClick()
                     val resetDeadline = System.nanoTime() + 5_000_000_000L
@@ -371,6 +377,12 @@ class VisualAppEvidenceTest {
                         mainClock.advanceTimeBy(50)
                         Thread.sleep(20)
                     }
+                    assertEquals(
+                        0,
+                        fixture.playerVm.lyricsTiming.value.offsetMs,
+                        "Reset must persist the zero offset",
+                    )
+                    mainClock.advanceTimeBy(50)
                     onNodeWithText("0 ms").assertIsDisplayed()
                     onAllNodesWithContentDescription("Reset lyrics offset").assertCountEquals(0)
 
@@ -507,7 +519,7 @@ class VisualAppEvidenceTest {
 
     @Test
     fun `capture full player track action overlay over artwork`() {
-        withFixture(DhunThemeMode.DARK) { fixture ->
+        withFixture(DhunThemeMode.DARK, includeDownloads = true) { fixture ->
             fixture.player.useArtwork(extremeArtwork("audit-player-actions", 0x6D4C82))
             val nav = AppNavState().apply { playerExpanded = true }
             runSkikoComposeUiTest(size = Size(412f, 915f)) {
@@ -586,6 +598,10 @@ class VisualAppEvidenceTest {
                 runOnIdle { fixture.library.selectTab(LibraryTab.DOWNLOADS) }
                 mainClock.advanceTimeBy(300)
                 onNodeWithText("Clear all").assertIsDisplayed()
+                onNodeWithText("On this device").assertIsDisplayed()
+                if (fixture.library.storageSummary.value.device != null) {
+                    onNodeWithContentDescription("Total device storage", substring = true).assertIsDisplayed()
+                }
                 captureAudit("21-04-04-downloads")
                 onNodeWithText("Clear all").performClick()
                 mainClock.advanceTimeBy(300)
@@ -621,17 +637,6 @@ class VisualAppEvidenceTest {
                 captureAudit("21-05-23-clear-lyrics-cache-confirm")
                 onNodeWithText("Cancel").performClick()
 
-                openSettingsCategory(SettingsCategory.CONTENT)
-                onNodeWithText("United States (US)").performClick()
-                mainClock.advanceTimeBy(300)
-                onNodeWithText("Choose a country or region").assertIsDisplayed()
-                captureAudit("21-05-35-country-region-picker")
-                // Select the already-active country to close the picker without
-                // changing the screenshot's setting before continuing.
-                onNodeWithText("United States").performScrollTo()
-                onNodeWithText("United States").performClick()
-                mainClock.advanceTimeBy(300)
-
                 openSettingsCategory(SettingsCategory.PRIVACY)
                 onNodeWithText("Clear search history").performScrollTo()
                 onNodeWithText("Clear search history").performClick()
@@ -653,6 +658,16 @@ class VisualAppEvidenceTest {
                 mainClock.advanceTimeBy(300)
                 onNodeWithText("Clear audio cache?").assertIsDisplayed()
                 captureAudit("21-06-07-clear-audio-cache-confirm")
+                onNodeWithText("Cancel").performClick()
+                mainClock.advanceTimeBy(300)
+
+                // Leave the non-destructive country picker open for its capture;
+                // the fixture is disposed immediately after this final state.
+                openSettingsCategory(SettingsCategory.CONTENT)
+                onNodeWithText("United States (US)").performClick()
+                mainClock.advanceTimeBy(300)
+                onNodeWithText("Choose a country or region").assertIsDisplayed()
+                captureAudit("21-05-35-country-region-picker")
             }
         }
     }

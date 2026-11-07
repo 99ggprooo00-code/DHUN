@@ -34,6 +34,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -990,12 +992,33 @@ private fun StorageSummaryCard(
                 )
                 Spacer(modifier = Modifier.width(DhunSpacing.md))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "On this device",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = DhunColors.textPrimary,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "On this device",
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = DhunColors.textPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        storage.device?.let { device ->
+                            val totalLabel = formatBytes(device.totalBytes)
+                            Text(
+                                totalLabel,
+                                modifier = Modifier.semantics {
+                                    contentDescription = "Total device storage: $totalLabel"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = DhunColors.textTertiary,
+                                maxLines = 1,
+                            )
+                        }
+                    }
                     Text(
                         if (storage.device != null) {
                             "${formatBytes(storage.usedByDownloadsBytes)} of downloads • ${formatBytes(storage.device.freeBytes)} free"
@@ -1006,13 +1029,6 @@ private fun StorageSummaryCard(
                         color = DhunColors.textSecondary,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (storage.device != null) {
-                    Text(
-                        "${formatBytes(storage.device.totalBytes)}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = DhunColors.textTertiary,
                     )
                 }
             }
