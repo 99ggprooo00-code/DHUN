@@ -44,13 +44,15 @@ PR #223's existing shared-glass and mutation work.
 
 ## Baseline evidence and implementation checklist
 
-The current PR #223 visual-evidence run `42432357921` has 13 Compose/Skia tests
-and 89 PNG frames. The initially reviewed popup frames are in the workspace
-cache `.cache/popup-baseline-424323/` (not a tracked deliverable). It includes
-confirmations, Lyrics Match, country/region, add-to-playlist, track overflow,
-and Queue/Related. Direct create-playlist, rename-playlist, and playback-error
-baseline frames are still needed before those surfaces change. Capture them in
-both themes, then retain a stable before/after evidence map in this document.
+The refreshed **pre-redesign** PR #223 Visual Evidence run `42441448532`
+completed successfully at baseline commit `858b911`: 15 Compose/Skia tests,
+101 PNG frames, zero failures and zero errors. Its inspectable manifest is Git
+blob `ef56268ee0b4822c80315d995c6fb8c0a6ae282a`. Selected baseline images are
+cached under `.cache/popup-baseline-424414/` (not a tracked deliverable),
+including confirmation, playlist create/rename, add-to-playlist, playback-error,
+battery-rationale, Lyrics Match, country/region, and dark/light provider and
+romanization-menu captures. This is baseline evidence only; it does not validate
+the redesign that follows.
 
 | Work item | Baseline / responsive coverage to retain | Interaction guard |
 |---|---|---|
@@ -67,11 +69,18 @@ both themes, then retain a stable before/after evidence map in this document.
 ## Current validation state
 
 - Audit: complete; the concrete redesign/preservation decisions are listed above.
-- Missing baseline captures: create playlist, rename playlist, playback error.
-- Production redesign: not started in this baseline phase.
+- Pre-redesign capture set: complete and passing in run `42441448532` (manifest
+  and image count above); the refreshed provider/romanization menu captures are
+  visible and the dark/light battery rationale frames are distinct.
+- Production redesign and interaction/evidence tests: implemented in the
+  workspace and restored to the visual suite; pending compilation and
+  post-redesign remote validation. Do not mark those outcomes as passing yet.
+- Local Gradle compilation is unavailable in this sandbox because no Java
+  runtime is installed; use the repository CI and Visual Evidence workflows.
 - Android emulator/physical-device verification: not yet performed; do not infer
   device behavior from Skia output.
 
 The final PR record will replace this status with the exact changed files,
-visual evidence run/manifest, regression results, known limitations, and APK
-instructions. PR #223 must remain open; no merge or release is part of this work.
+post-redesign visual evidence run/manifest, regression results, known
+limitations, and APK instructions. PR #223 must remain open; no merge or release
+is part of this work.

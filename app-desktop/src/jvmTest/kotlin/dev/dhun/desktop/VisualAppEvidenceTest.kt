@@ -44,6 +44,9 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.runSkikoComposeUiTest
 import androidx.compose.ui.use
@@ -109,6 +112,7 @@ import dev.dhun.provider.MusicProvider
 import dev.dhun.ui.components.AddToPlaylistDialog
 import dev.dhun.ui.components.TrackOverflowDialog
 import dev.dhun.ui.home.HomeScreen
+import dev.dhun.ui.settings.BatteryPlaybackRationaleDialog
 import dev.dhun.ui.shell.AppNavState
 import dev.dhun.ui.shell.AppTab
 import dev.dhun.ui.shell.DetailRoute
@@ -116,6 +120,7 @@ import dev.dhun.ui.shell.DhunAppShell
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import org.jetbrains.skia.Image
 import org.jetbrains.skia.Surface
 import kotlinx.coroutines.CompletableDeferred
@@ -132,6 +137,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -215,6 +221,92 @@ class VisualAppEvidenceTest {
     }
 
     @Test
+    fun `playlist create and rename popups retain labels submit and persistence`() {
+        for (mode in listOf(DhunThemeMode.DARK, DhunThemeMode.LIGHT)) {
+            withFixture(mode) { fixture ->
+                val nav = AppNavState().apply { selectedTab = AppTab.LIBRARY }
+                runSkikoComposeUiTest(size = Size(412f, 915f)) {
+                    mainClock.autoAdvance = false
+                    setContent { Shell(fixture, nav, mode, isDesktop = false) }
+                    mainClock.advanceTimeBy(600)
+
+                    onNodeWithText("New playlist").performClick()
+                    onNodeWithContentDescription("Playlist name").assertIsDisplayed()
+                    onNodeWithText("Save a personal collection in your local library.").assertIsDisplayed()
+                    captureUiImage(
+                        "popup-after-playlist-create-${mode.id}.png",
+                        renderCurrentFrame(this, 412, 915),
+                    )
+                    onNodeWithContentDescription("Playlist name").performTextInput("Keyboard Created")
+                    onNodeWithContentDescription("Playlist name").performImeAction()
+                    val createDeadline = System.nanoTime() + 5_000_000_000L
+                    while (fixture.library.playlistsFlow.value.none { it.name == "Keyboard Created" } &&
+                        System.nanoTime() < createDeadline
+                    ) {
+                        mainClock.advanceTimeBy(50)
+                        Thread.sleep(20)
+                    }
+                    assertTrue(
+                        fixture.library.playlistsFlow.value.any { it.name == "Keyboard Created" },
+                        "Done must use the existing playlist-create callback and persist the name",
+                    )
+                    onAllNodesWithContentDescription("Playlist name").assertCountEquals(0)
+
+                    onNodeWithContentDescription("Manage Visual QA").performScrollTo().performClick()
+                    onNodeWithText("Rename").performClick()
+                    onNodeWithText("Rename playlist").assertIsDisplayed()
+                    onNodeWithText("Current name").assertIsDisplayed()
+                    onNodeWithContentDescription("New playlist name").assertIsDisplayed()
+                    captureUiImage(
+                        "popup-after-playlist-rename-${mode.id}.png",
+                        renderCurrentFrame(this, 412, 915),
+                    )
+                    onNodeWithContentDescription("New playlist name").performTextClearance()
+                    onNodeWithContentDescription("New playlist name").performTextInput("Renamed QA")
+                    onNodeWithContentDescription("New playlist name").performImeAction()
+                    val renameDeadline = System.nanoTime() + 5_000_000_000L
+                    while (fixture.library.playlistsFlow.value.none { it.name == "Renamed QA" } &&
+                        System.nanoTime() < renameDeadline
+                    ) {
+                        mainClock.advanceTimeBy(50)
+                        Thread.sleep(20)
+                    }
+                    assertTrue(
+                        fixture.library.playlistsFlow.value.any { it.name == "Renamed QA" },
+                        "Save must preserve the existing rename callback and persisted result",
+                    )
+                }
+
+                runSkikoComposeUiTest(size = Size(360f, 760f)) {
+                    mainClock.autoAdvance = false
+                    setContent {
+                        CompositionLocalProvider(LocalDensity provides Density(1f, 1.3f)) {
+                            Shell(fixture, nav, mode, isDesktop = false)
+                        }
+                    }
+                    mainClock.advanceTimeBy(600)
+                    onNodeWithText("New playlist").performClick()
+                    onNodeWithContentDescription("Playlist name").assertIsDisplayed()
+                    onNodeWithText("Create").assertIsDisplayed()
+                    captureUiImage(
+                        "popup-after-playlist-create-narrow-large-text-${mode.id}.png",
+                        renderCurrentFrame(this, 360, 760),
+                    )
+                    onNodeWithText("Cancel").performClick()
+                    onNodeWithContentDescription("Manage Renamed QA").performScrollTo().performClick()
+                    onNodeWithText("Rename").performClick()
+                    onNodeWithContentDescription("New playlist name").assertIsDisplayed()
+                    onNodeWithText("Save").assertIsDisplayed()
+                    captureUiImage(
+                        "popup-after-playlist-rename-narrow-large-text-${mode.id}.png",
+                        renderCurrentFrame(this, 360, 760),
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
     fun `capture pre-redesign playlist and playback error popup baselines in the app shell`() {
         for (mode in listOf(DhunThemeMode.DARK, DhunThemeMode.LIGHT)) {
             withFixture(mode) { fixture ->
@@ -237,7 +329,7 @@ class VisualAppEvidenceTest {
                     onNodeWithText("Cancel").performClick()
                     mainClock.advanceTimeBy(300)
 
-                    onNodeWithContentDescription("Manage Visual QA").performClick()
+                    onNodeWithContentDescription("Manage Visual QA").performScrollTo().performClick()
                     mainClock.advanceTimeBy(250)
                     onNodeWithText("Rename").performClick()
                     mainClock.advanceTimeBy(400)
@@ -304,6 +396,160 @@ class VisualAppEvidenceTest {
             }
         } finally {
             DhunAppearance.reset()
+        }
+    }
+
+    @Test
+    fun `battery playback rationale has an accessible primary allow action in both themes`() {
+        DhunAppearance.reset()
+        try {
+            for (mode in listOf(DhunThemeMode.DARK, DhunThemeMode.LIGHT)) {
+                DhunAppearance.setAppearance(nextMode = mode)
+                val dismissals = AtomicInteger()
+                val allows = AtomicInteger()
+                runSkikoComposeUiTest(size = Size(412f, 915f)) {
+                    mainClock.autoAdvance = false
+                    setContent {
+                        DhunTheme(mode = mode) {
+                            Box(Modifier.fillMaxSize().background(DhunColors.background))
+                            BatteryPlaybackRationaleDialog(
+                                onDismiss = { dismissals.incrementAndGet() },
+                                onAllow = { allows.incrementAndGet() },
+                            )
+                        }
+                    }
+                    mainClock.advanceTimeBy(500)
+                    onNodeWithText("Background playback").assertIsDisplayed()
+                    onNodeWithText("Keep playback reliable").assertIsDisplayed()
+                    onNodeWithText("Not now").assertIsDisplayed()
+                    onNodeWithText("Allow").assertIsDisplayed()
+                    captureUiImage(
+                        "popup-after-battery-rationale-${mode.id}.png",
+                        renderCurrentFrame(this, 412, 915),
+                    )
+                    onNodeWithText("Not now").performClick()
+                    onNodeWithText("Allow").performClick()
+                    assertEquals(1, dismissals.get(), "Not now remains a dismiss-only callback")
+                    assertEquals(1, allows.get(), "Allow remains a separate settings handoff callback")
+                }
+
+                runSkikoComposeUiTest(size = Size(360f, 760f)) {
+                    mainClock.autoAdvance = false
+                    setContent {
+                        CompositionLocalProvider(LocalDensity provides Density(1f, 1.3f)) {
+                            DhunTheme(mode = mode) {
+                                Box(Modifier.fillMaxSize().background(DhunColors.background))
+                                BatteryPlaybackRationaleDialog(onDismiss = {}, onAllow = {})
+                            }
+                        }
+                    }
+                    mainClock.advanceTimeBy(500)
+                    onNodeWithText("Allow").assertIsDisplayed()
+                    captureUiImage(
+                        "popup-after-battery-rationale-narrow-large-text-${mode.id}.png",
+                        renderCurrentFrame(this, 360, 760),
+                    )
+                }
+            }
+        } finally {
+            DhunAppearance.reset()
+        }
+    }
+
+    @Test
+    fun `lyrics match remains usable at narrow large text and local import expands`() {
+        withFixture(DhunThemeMode.DARK, withLyricsMatches = true) { fixture ->
+            val nav = AppNavState().apply { playerExpanded = true }
+            runSkikoComposeUiTest(size = Size(360f, 760f)) {
+                mainClock.autoAdvance = false
+                setContent {
+                    CompositionLocalProvider(LocalDensity provides Density(1f, 1.3f)) {
+                        Shell(fixture, nav, DhunThemeMode.DARK, isDesktop = false)
+                    }
+                }
+                mainClock.advanceTimeBy(600)
+                onNodeWithContentDescription("Lyrics view").performClick()
+                mainClock.advanceTimeBy(500)
+                onNodeWithContentDescription("Lyrics controls").performClick()
+                mainClock.advanceTimeBy(500)
+                onNodeWithContentDescription("Find lyrics matches").performScrollTo().performClick()
+                mainClock.advanceTimeBy(500)
+                onNodeWithText("Lyrics matches for this song").assertIsDisplayed()
+                onNodeWithContentDescription("Search lyrics matches").assertIsDisplayed()
+                onNodeWithText("Close").assertIsDisplayed()
+                captureUiImage(
+                    "popup-after-lyrics-match-narrow-large-text-dark.png",
+                    renderCurrentFrame(this, 360, 760),
+                )
+                onNodeWithText("Paste local TTML lyrics").performClick()
+                onNodeWithText("TTML document").assertIsDisplayed()
+                onNodeWithContentDescription("TTML document").assertIsDisplayed()
+                onNodeWithText("Preview local TTML").assertIsDisplayed()
+                val localTtml = """<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1s" end="5s">Local preview line</p></div></body></tt>"""
+                onNodeWithContentDescription("TTML document").performScrollTo().performTextInput(localTtml)
+                onNodeWithText("Preview local TTML").performScrollTo().performClick()
+                val previewDeadline = System.nanoTime() + 5_000_000_000L
+                while (fixture.playerVm.lyricsMatches?.state?.value?.matches?.none { it.provider == "local_ttml" } != false &&
+                    System.nanoTime() < previewDeadline
+                ) {
+                    mainClock.advanceTimeBy(50)
+                    Thread.sleep(20)
+                }
+                val previewState = requireNotNull(fixture.playerVm.lyricsMatches).state.value
+                assertTrue(previewState.matches.any { it.provider == "local_ttml" })
+                assertEquals(
+                    "Local TTML preview ready. Choose this match to save it for this song; nothing was sent to a provider.",
+                    previewState.message,
+                )
+                onNodeWithText("Choose this match").performScrollTo().assertIsDisplayed()
+                captureUiImage(
+                    "popup-after-lyrics-local-import-narrow-large-text-dark.png",
+                    renderCurrentFrame(this, 360, 760),
+                )
+                onNodeWithText("Choose this match").performScrollTo().performClick()
+                val saveDeadline = System.nanoTime() + 5_000_000_000L
+                while (fixture.playerVm.lyricsMatches?.state?.value?.loading == true &&
+                    System.nanoTime() < saveDeadline
+                ) {
+                    mainClock.advanceTimeBy(50)
+                    Thread.sleep(20)
+                }
+                assertEquals("local_ttml", fixture.playerVm.lyricsMatches?.state?.value?.selected?.provider)
+                val savedChoice = runBlocking {
+                    fixture.data.settings.getString(
+                        SettingsKeys.lyricsMatchKey(requireNotNull(fixture.player.currentTrack.value).id),
+                    )
+                }
+                assertTrue(
+                    savedChoice?.contains("\"provider\":\"local_ttml\"") == true,
+                    "Choosing the preview must persist the per-track local-TTML choice",
+                )
+                val requestsBeforeImeSearch = fixture.provider.lyricsFetchRequests.get()
+                onNodeWithContentDescription("Search lyrics matches")
+                    .performScrollTo()
+                    .performTextClearance()
+                    .performTextInput("manual query")
+                    .performImeAction()
+                val imeSearchDeadline = System.nanoTime() + 5_000_000_000L
+                while (fixture.provider.lyricsFetchRequests.get() <= requestsBeforeImeSearch &&
+                    System.nanoTime() < imeSearchDeadline
+                ) {
+                    mainClock.advanceTimeBy(50)
+                    Thread.sleep(20)
+                }
+                assertTrue(
+                    fixture.provider.lyricsFetchRequests.get() > requestsBeforeImeSearch,
+                    "The Search IME action must invoke the same lyrics-match search callback",
+                )
+                val imeSearchCompleteDeadline = System.nanoTime() + 5_000_000_000L
+                while (fixture.playerVm.lyricsMatches?.state?.value?.loading == true &&
+                    System.nanoTime() < imeSearchCompleteDeadline
+                ) {
+                    mainClock.advanceTimeBy(50)
+                    Thread.sleep(20)
+                }
+                assertFalse(fixture.playerVm.lyricsMatches?.state?.value?.loading == true)
+            }
         }
     }
 
@@ -396,6 +642,280 @@ class VisualAppEvidenceTest {
     }
 
     @Test
+    fun `playlist destination actions preserve add duplicate open and retry behavior`() {
+        for (mode in listOf(DhunThemeMode.DARK, DhunThemeMode.LIGHT)) {
+            withFixture(mode) { fixture ->
+                val repository = fixture.data.playlists
+                val createdId = AtomicReference<String?>()
+                val addedName = AtomicReference<String?>()
+                val openedId = AtomicReference<String?>()
+                val dismissals = AtomicInteger()
+                val createCalls = AtomicInteger()
+                val addAttempts = AtomicInteger()
+                val firstMembershipStarted = CompletableDeferred<Unit>()
+                val releaseFirstMembership = CompletableDeferred<Unit>()
+                val diagnosticRepository = object : PlaylistRepository by repository {
+                    override suspend fun create(name: String, description: String?): LocalPlaylist {
+                        createCalls.incrementAndGet()
+                        return repository.create(name, description).also { created ->
+                            if (name == "Retry QA") createdId.set(created.id)
+                        }
+                    }
+
+                    override suspend fun addTrack(playlistId: String, track: Track): Boolean {
+                        if (playlistId == createdId.get()) {
+                            if (addAttempts.incrementAndGet() == 1) {
+                                firstMembershipStarted.complete(Unit)
+                                releaseFirstMembership.await()
+                                throw IllegalStateException("injected membership failure")
+                            }
+                        }
+                        return repository.addTrack(playlistId, track)
+                    }
+                }
+
+                runSkikoComposeUiTest(size = Size(412f, 915f)) {
+                    mainClock.autoAdvance = false
+                    setContent {
+                        DhunTheme(mode = mode) {
+                            Box(Modifier.fillMaxSize().background(DhunColors.background))
+                            AddToPlaylistDialog(
+                                track = RECORDED_TRACKS.first(),
+                                playlistRepository = diagnosticRepository,
+                                onDismiss = { dismissals.incrementAndGet() },
+                                onAdded = { addedName.set(it) },
+                                onOpenPlaylist = { openedId.set(it) },
+                            )
+                        }
+                    }
+                    mainClock.advanceTimeBy(600)
+                    val rowsDeadline = System.nanoTime() + 5_000_000_000L
+                    while (onAllNodes(hasText("Visual QA"), useUnmergedTree = true)
+                            .fetchSemanticsNodes().isEmpty() && System.nanoTime() < rowsDeadline
+                    ) {
+                        mainClock.advanceTimeBy(50)
+                        Thread.sleep(20)
+                    }
+                    onNodeWithContentDescription("Open Visual QA").assertIsDisplayed()
+                    captureUiImage(
+                        "popup-after-playlist-destinations-${mode.id}.png",
+                        renderCurrentFrame(this, 412, 915),
+                    )
+
+                    onNodeWithContentDescription("Open Visual QA").performClick()
+                    assertEquals(fixture.localPlaylistId, openedId.get(), "Open stays a separate navigation action")
+                    onNodeWithContentDescription("Add this song to Visual QA").performClick()
+                    val duplicateDeadline = System.nanoTime() + 5_000_000_000L
+                    while (onAllNodes(hasText("Already in \"Visual QA\"."), useUnmergedTree = true)
+                            .fetchSemanticsNodes().isEmpty() && System.nanoTime() < duplicateDeadline
+                    ) {
+                        mainClock.advanceTimeBy(50)
+                        Thread.sleep(20)
+                    }
+                    onNodeWithText("Already in \"Visual QA\".").assertIsDisplayed()
+                    assertNull(addedName.get(), "A duplicate is not reported as a successful add")
+                    assertEquals(0, dismissals.get(), "Duplicate selection keeps the picker open")
+                    captureUiImage(
+                        "popup-after-playlist-duplicate-${mode.id}.png",
+                        renderCurrentFrame(this, 412, 915),
+                    )
+
+                    onNodeWithText("Create new playlist").performClick()
+                    onNodeWithContentDescription("New playlist name").performTextInput("Retry QA")
+                    captureUiImage(
+                        "popup-after-playlist-create-form-${mode.id}.png",
+                        renderCurrentFrame(this, 412, 915),
+                    )
+                    onNodeWithText("Create & add").performClick()
+                    val pendingDeadline = System.nanoTime() + 5_000_000_000L
+                    while (!firstMembershipStarted.isCompleted && System.nanoTime() < pendingDeadline) {
+                        mainClock.advanceTimeBy(50)
+                        Thread.sleep(20)
+                    }
+                    val enteredPending = firstMembershipStarted.isCompleted
+                    if (!enteredPending) releaseFirstMembership.complete(Unit)
+                    assertTrue(enteredPending, "The membership write should enter its pending state")
+                    onNodeWithText("Create & add").assertIsNotEnabled()
+                    onNodeWithText("Back").assertIsNotEnabled()
+                    onNodeWithContentDescription("New playlist name").assertIsNotEnabled()
+                    releaseFirstMembership.complete(Unit)
+
+                    val failureDeadline = System.nanoTime() + 5_000_000_000L
+                    while (onAllNodes(hasText("Could not finish the new playlist and add this song. Try again."))
+                            .fetchSemanticsNodes().isEmpty() && System.nanoTime() < failureDeadline
+                    ) {
+                        mainClock.advanceTimeBy(50)
+                        Thread.sleep(20)
+                    }
+                    onNodeWithText("Could not finish the new playlist and add this song. Try again.").assertIsDisplayed()
+                    onNodeWithText("Playlist created. Retrying will add this song to that same playlist.").assertIsDisplayed()
+                    onNodeWithContentDescription("New playlist name").assertIsNotEnabled()
+                    assertNull(addedName.get(), "The failed membership write cannot report success")
+                    assertEquals(0, dismissals.get(), "Failure keeps the form open for retry")
+                    val failedPlaylistId = requireNotNull(createdId.get())
+                    assertEquals(1, createCalls.get(), "The failed first attempt creates exactly one playlist")
+                    assertFalse(runBlocking { repository.contains(failedPlaylistId, RECORDED_TRACKS.first().id) })
+                    captureUiImage(
+                        "popup-after-playlist-add-failure-${mode.id}.png",
+                        renderCurrentFrame(this, 412, 915),
+                    )
+
+                    onNodeWithText("Try again").performClick()
+                    val successDeadline = System.nanoTime() + 5_000_000_000L
+                    while (addedName.get() == null && System.nanoTime() < successDeadline) {
+                        mainClock.advanceTimeBy(50)
+                        Thread.sleep(20)
+                    }
+                    assertEquals("Retry QA", addedName.get())
+                    assertEquals(1, dismissals.get(), "A committed add preserves the original close callback")
+                    assertEquals(1, createCalls.get(), "Retry reuses the pending playlist instead of duplicating it")
+                    assertEquals(2, addAttempts.get(), "Retry repeats membership only")
+                    assertTrue(runBlocking { repository.contains(failedPlaylistId, RECORDED_TRACKS.first().id) })
+                    val matchingPlaylists = runBlocking {
+                        repository.observePlaylists().first().filter { it.name == "Retry QA" }
+                    }
+                    assertEquals(1, matchingPlaylists.size)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `playback error prioritizes retry and keeps complete selectable diagnostics`() {
+        for (mode in listOf(DhunThemeMode.DARK, DhunThemeMode.LIGHT)) {
+            withFixture(mode) { fixture ->
+                val track = requireNotNull(fixture.player.currentTrack.value)
+                val diagnostic = "web_embedded=AUTH_REQUIRED(provider returned no playable stream); " +
+                    "resolver=UNAVAILABLE(network request timed out); " +
+                    "requestId=visual-evidence-2026-11-07; retryable=true"
+                fixture.player.state.value = PlaybackState.Error(
+                    track = track,
+                    message = "Could not start playback. Check the connection and try again.",
+                    detail = diagnostic,
+                )
+                val nav = AppNavState().apply { selectedTab = AppTab.LIBRARY }
+                runSkikoComposeUiTest(size = Size(412f, 915f)) {
+                    mainClock.autoAdvance = false
+                    setContent { Shell(fixture, nav, mode, isDesktop = false) }
+                    mainClock.advanceTimeBy(600)
+                    onNodeWithContentDescription("Show playback details").performClick()
+                    onNodeWithText("Playback details").assertIsDisplayed()
+                    onNodeWithText("Show diagnostics").assertIsDisplayed()
+                    onNodeWithText("Could not start playback. Check the connection and try again.")
+                        .assertIsDisplayed()
+                    captureUiImage(
+                        "popup-after-playback-error-collapsed-${mode.id}.png",
+                        renderCurrentFrame(this, 412, 915),
+                    )
+                    onNodeWithText("Show diagnostics").performClick()
+                    onNodeWithText("Hide diagnostics").assertIsDisplayed()
+                    onNodeWithText("Track ID: ${track.id}").assertIsDisplayed()
+                    onNodeWithText("web_embedded=AUTH_REQUIRED", substring = true).assertIsDisplayed()
+                    captureUiImage(
+                        "popup-after-playback-error-expanded-${mode.id}.png",
+                        renderCurrentFrame(this, 412, 915),
+                    )
+                    onNodeWithText("Close").performClick()
+                    assertEquals(0, fixture.player.retryRequests.get(), "Close only dismisses")
+                    assertEquals(0, onAllNodes(hasText("Playback details")).fetchSemanticsNodes().size)
+
+                    onNodeWithContentDescription("Show playback details").performClick()
+                    onNodeWithText("Retry").performClick()
+                    assertEquals(1, fixture.player.retryRequests.get(), "Retry retains the original player callback")
+                    assertEquals(0, onAllNodes(hasText("Playback details")).fetchSemanticsNodes().size)
+                }
+
+                runSkikoComposeUiTest(size = Size(360f, 760f)) {
+                    mainClock.autoAdvance = false
+                    setContent {
+                        CompositionLocalProvider(LocalDensity provides Density(1f, 1.3f)) {
+                            Shell(fixture, nav, mode, isDesktop = false)
+                        }
+                    }
+                    mainClock.advanceTimeBy(600)
+                    onNodeWithContentDescription("Show playback details").performClick()
+                    captureUiImage(
+                        "popup-after-playback-error-narrow-large-text-collapsed-${mode.id}.png",
+                        renderCurrentFrame(this, 360, 760),
+                    )
+                    onNodeWithText("Show diagnostics").performClick()
+                    onNodeWithText("Retry").performScrollTo()
+                    onNodeWithText("Retry").assertIsDisplayed()
+                    captureUiImage(
+                        "popup-after-playback-error-narrow-large-text-${mode.id}.png",
+                        renderCurrentFrame(this, 360, 760),
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `country picker search selection and persistence work in both themes`() {
+        for (mode in listOf(DhunThemeMode.DARK, DhunThemeMode.LIGHT)) {
+            withFixture(mode) { fixture ->
+                val nav = AppNavState().apply {
+                    detailStack.clear()
+                    push(DetailRoute.SettingsCategoryPage(SettingsCategory.CONTENT))
+                }
+                runSkikoComposeUiTest(size = Size(412f, 915f)) {
+                    mainClock.autoAdvance = false
+                    setContent { Shell(fixture, nav, mode, isDesktop = false) }
+                    mainClock.advanceTimeBy(600)
+                    onNodeWithText("United States (US)").performClick()
+                    onNodeWithText("Choose a country or region").assertIsDisplayed()
+                    onNodeWithText("Current selection").assertIsDisplayed()
+                    onNodeWithText("United States · US").assertIsDisplayed()
+                    onNodeWithContentDescription("Search country or region by name or code")
+                        .performTextInput("Nepal")
+                    onNodeWithContentDescription("Nepal (NP)").assertIsDisplayed()
+                    onNodeWithText("United States · US").assertIsDisplayed()
+                    captureUiImage(
+                        "popup-after-country-picker-search-${mode.id}.png",
+                        renderCurrentFrame(this, 412, 915),
+                    )
+                    onNodeWithContentDescription("Clear country search").performClick()
+                    onNodeWithContentDescription("Search country or region by name or code")
+                        .performTextInput("Nepal")
+                    onNodeWithContentDescription("Nepal (NP)").performClick()
+                    onNodeWithText("Nepal (NP)").assertIsDisplayed()
+                    val persistenceDeadline = System.nanoTime() + 5_000_000_000L
+                    var persistedCountry: String? = null
+                    while (persistedCountry != "NP" && System.nanoTime() < persistenceDeadline) {
+                        mainClock.advanceTimeBy(50)
+                        persistedCountry = runBlocking {
+                            fixture.data.settings.getString(SettingsKeys.COUNTRY_CODE)
+                        }
+                        if (persistedCountry != "NP") Thread.sleep(20)
+                    }
+                    assertEquals("NP", persistedCountry, "Selection must persist through the existing settings repository")
+                    onNodeWithText("Nepal (NP)").performClick()
+                    onNodeWithText("Nepal · NP").assertIsDisplayed()
+                    onNodeWithContentDescription("Nepal (NP)").performClick()
+                }
+
+                runSkikoComposeUiTest(size = Size(360f, 760f)) {
+                    mainClock.autoAdvance = false
+                    setContent {
+                        CompositionLocalProvider(LocalDensity provides Density(1f, 1.3f)) {
+                            Shell(fixture, nav, mode, isDesktop = false)
+                        }
+                    }
+                    mainClock.advanceTimeBy(600)
+                    onNodeWithText("Nepal (NP)").performClick()
+                    onNodeWithText("Choose a country or region").assertIsDisplayed()
+                    onNodeWithText("Nepal · NP").assertIsDisplayed()
+                    onNodeWithContentDescription("Search country or region by name or code").assertIsDisplayed()
+                    captureUiImage(
+                        "popup-after-country-picker-narrow-large-text-${mode.id}.png",
+                        renderCurrentFrame(this, 360, 760),
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
     fun renderLyricsControlsDialogInBothThemesAndExerciseItsActions() {
         for (mode in listOf(DhunThemeMode.DARK, DhunThemeMode.LIGHT)) {
             val provider = RecordedProvider()
@@ -452,12 +972,13 @@ class VisualAppEvidenceTest {
                     onNodeWithContentDescription("Refetch current lyrics").assertIsDisplayed()
                     onNodeWithContentDescription("Search lyrics matches").assertIsDisplayed()
 
-                    // Capture the real anchored choice menus over the player artwork
-                    // before their selected-row treatment changes.
+                    // Capture the real anchored choice menus with the selected row
+                    // treatment visible, then activate the selected rows to dismiss.
                     onNodeWithContentDescription("Lyrics provider: Auto (synced first)").performClick()
                     mainClock.advanceTimeBy(300)
+                    onNode(isSelected() and hasText("Auto (synced first)")).assertIsDisplayed()
                     captureUiImage(
-                        "popup-before-lyrics-provider-${mode.id}.png",
+                        "popup-after-lyrics-provider-${mode.id}.png",
                         renderCurrentFrame(this, 412, 915),
                     )
                     onNode(isSelected() and hasText("Auto (synced first)")).performClick()
@@ -465,15 +986,16 @@ class VisualAppEvidenceTest {
 
                     onNodeWithContentDescription("Romanization mode: Auto (conservative)").performClick()
                     mainClock.advanceTimeBy(300)
+                    onNode(isSelected() and hasText("Auto (conservative)")).assertIsDisplayed()
                     captureUiImage(
-                        "popup-before-romanization-mode-${mode.id}.png",
+                        "popup-after-romanization-mode-${mode.id}.png",
                         renderCurrentFrame(this, 412, 915),
                     )
                     onNode(isSelected() and hasText("Auto (conservative)")).performClick()
                     mainClock.advanceTimeBy(300)
 
                     captureUiImage(
-                        "lyrics-controls-${mode.id}.png",
+                        "popup-after-lyrics-controls-${mode.id}.png",
                         renderCurrentFrame(this, 412, 915),
                     )
 

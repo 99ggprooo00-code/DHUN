@@ -3,6 +3,7 @@ package dev.dhun.design.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -12,9 +13,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.stateDescription
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
@@ -34,14 +36,61 @@ fun DhunButton(
     contentPadding: PaddingValues = PaddingValues(horizontal = DhunSpacing.lg, vertical = DhunSpacing.sm),
     content: @Composable RowScope.() -> Unit,
 ) {
-    Button(
+    DhunButtonImpl(
         onClick = onClick,
         modifier = modifier,
+        enabled = enabled,
+        loading = loading,
+        contentPadding = contentPadding,
+        containerColor = DhunColors.accent,
+        contentColor = DhunColors.onAccent,
+        content = content,
+    )
+}
+
+/** Destructive confirmation's filled action without changing [DhunButton]'s public call signature. */
+@Composable
+internal fun DhunDestructiveButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    loading: Boolean = false,
+    contentPadding: PaddingValues = PaddingValues(horizontal = DhunSpacing.lg, vertical = DhunSpacing.sm),
+    content: @Composable RowScope.() -> Unit,
+) {
+    DhunButtonImpl(
+        onClick = onClick,
+        modifier = modifier,
+        enabled = enabled,
+        loading = loading,
+        contentPadding = contentPadding,
+        containerColor = DhunColors.error,
+        contentColor = DhunColors.onError,
+        content = content,
+    )
+}
+
+@Composable
+private fun DhunButtonImpl(
+    onClick: () -> Unit,
+    modifier: Modifier,
+    enabled: Boolean,
+    loading: Boolean,
+    contentPadding: PaddingValues,
+    containerColor: Color,
+    contentColor: Color,
+    content: @Composable RowScope.() -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.semantics {
+            if (loading) stateDescription = "In progress"
+        },
         enabled = enabled && !loading,
         shape = DhunShapes.button,
         colors = ButtonDefaults.buttonColors(
-            containerColor = DhunColors.accent,
-            contentColor = DhunColors.onAccent,
+            containerColor = containerColor,
+            contentColor = contentColor,
             disabledContainerColor = DhunColors.surfaceElevated,
             disabledContentColor = DhunColors.textDisabled,
         ),
@@ -49,13 +98,13 @@ fun DhunButton(
         content = {
             if (loading) {
                 DhunSpinner(
-                    modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp,
-                    color = DhunColors.onAccent,
+                    modifier = Modifier.size(DhunSpacing.buttonSpinnerSize),
+                    strokeWidth = DhunSpacing.iconStroke,
+                    color = contentColor,
                 )
-            } else {
-                content()
+                Spacer(modifier = Modifier.size(DhunSpacing.xs))
             }
+            content()
         },
     )
 }
@@ -71,7 +120,9 @@ fun DhunTonalButton(
 ) {
     FilledTonalButton(
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.semantics {
+            if (loading) stateDescription = "In progress"
+        },
         enabled = enabled && !loading,
         shape = DhunShapes.button,
         contentPadding = contentPadding,
@@ -80,8 +131,11 @@ fun DhunTonalButton(
             contentColor = DhunColors.onAccentContainer,
         ),
         content = {
-            if (loading) DhunSpinner(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-            else content()
+            if (loading) {
+                DhunSpinner(modifier = Modifier.size(DhunSpacing.buttonSpinnerSize), strokeWidth = DhunSpacing.iconStroke)
+                Spacer(modifier = Modifier.size(DhunSpacing.xs))
+            }
+            content()
         },
     )
 }

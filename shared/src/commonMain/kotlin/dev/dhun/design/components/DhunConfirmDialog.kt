@@ -1,30 +1,43 @@
 package dev.dhun.design.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
+import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 
 /**
- * Compact, theme-safe confirmation pattern for destructive or consequential
- * actions. Callers own their mutation state and callbacks; this component owns
- * only the shared glass surface, type hierarchy, spacing, and action alignment.
+ * Consequence-first confirmation surface for destructive or consequential
+ * mutations. Callers still own their copy, mutation state, and callbacks; this
+ * component only gives the user a clearer consequence / recovery hierarchy.
  *
  * [onDismissRequest] is ignored while [isPending], so Back, outside tap, and
- * Cancel all preserve the existing result-driven mutation behavior.
+ * Cancel preserve the result-driven mutation behavior.
  */
 @Composable
 fun DhunConfirmDialog(
@@ -42,52 +55,113 @@ fun DhunConfirmDialog(
 ) {
     GlassDialog(
         onDismissRequest = { if (!isPending) onDismissRequest() },
-        modifier = modifier,
+        modifier = modifier.heightIn(max = DhunSpacing.dialogBodyMaxHeight),
+        maxWidth = DhunSpacing.dialogWideMaxWidth,
+        contentPadding = PaddingValues(
+            horizontal = DhunSpacing.dialogContentHorizontalPadding,
+            vertical = DhunSpacing.dialogContentVerticalPadding,
+        ),
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = DhunColors.textPrimary,
-        )
-        Text(
-            text = message,
-            modifier = Modifier.padding(top = DhunSpacing.sm),
-            style = MaterialTheme.typography.bodyMedium,
-            color = DhunColors.textSecondary,
-        )
-        if (errorMessage != null) {
-            Text(
-                text = errorMessage,
-                modifier = Modifier.padding(top = DhunSpacing.sm).semantics {
-                    liveRegion = LiveRegionMode.Polite
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = DhunColors.error,
-            )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = DhunSpacing.md),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier.fillMaxWidth()
+                .heightIn(max = DhunSpacing.dialogBodyMaxHeight)
+                .verticalScroll(rememberScrollState()),
         ) {
-            DhunTextButton(onClick = onDismissRequest, enabled = !isPending) {
-                Text(dismissLabel, maxLines = 1)
-            }
-            Spacer(modifier = Modifier.width(DhunSpacing.sm))
-            DhunButton(
-                onClick = onConfirm,
-                enabled = !isPending,
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
+                verticalAlignment = Alignment.Top,
             ) {
-                if (isPending) {
-                    DhunSpinner(
+                Box(
+                    modifier = Modifier.size(DhunSpacing.dialogIconBadgeSize)
+                        .clip(CircleShape)
+                        .background(DhunColors.errorContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    DhunIconView(
+                        icon = DhunIcon.Error,
+                        contentDescription = null,
                         modifier = Modifier.size(DhunSpacing.iconSizeSm),
-                        strokeWidth = DhunSpacing.iconStroke,
-                        color = DhunColors.textDisabled,
+                        tint = DhunColors.error,
                     )
-                    Spacer(modifier = Modifier.width(DhunSpacing.xs))
-                    Text(pendingLabel, maxLines = 1)
-                } else {
-                    Text(if (errorMessage != null) retryLabel else confirmLabel, maxLines = 1)
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs),
+                ) {
+                    Text(
+                        text = "Confirm action",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = DhunColors.error,
+                    )
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = DhunColors.textPrimary,
+                        modifier = Modifier.semantics { heading() },
+                    )
+                }
+            }
+            Text(
+                text = message,
+                modifier = Modifier.padding(top = DhunSpacing.md),
+                style = MaterialTheme.typography.bodyMedium,
+                color = DhunColors.textSecondary,
+            )
+            if (errorMessage != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = DhunSpacing.sm)
+                        .clip(DhunShapes.medium)
+                        .background(DhunColors.errorContainer)
+                        .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.sm),
+                    horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    DhunIconView(
+                        icon = DhunIcon.Error,
+                        contentDescription = null,
+                        modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                        tint = DhunColors.error,
+                    )
+                    Text(
+                        text = errorMessage,
+                        modifier = Modifier.weight(1f).semantics {
+                            liveRegion = LiveRegionMode.Polite
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DhunColors.error,
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = DhunSpacing.lg),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs),
+            ) {
+                DhunTextButton(onClick = onDismissRequest, enabled = !isPending) {
+                    Text(dismissLabel, maxLines = 1)
+                }
+                DhunDestructiveButton(
+                    onClick = onConfirm,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isPending,
+                    contentPadding = PaddingValues(
+                        horizontal = DhunSpacing.dialogActionHorizontalPadding,
+                        vertical = DhunSpacing.dialogActionVerticalPadding,
+                    ),
+                ) {
+                    if (isPending) {
+                        DhunSpinner(
+                            modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                            strokeWidth = DhunSpacing.iconStroke,
+                            color = DhunColors.textDisabled,
+                        )
+                        Spacer(modifier = Modifier.width(DhunSpacing.xs))
+                        Text(pendingLabel, maxLines = 1)
+                    } else {
+                        Text(if (errorMessage != null) retryLabel else confirmLabel, maxLines = 1)
+                    }
                 }
             }
         }

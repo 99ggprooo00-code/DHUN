@@ -109,6 +109,7 @@ fun GlassDialog(
     modifier: Modifier = Modifier,
     minWidth: Dp = DhunSpacing.dialogMinWidth,
     maxWidth: Dp = DhunSpacing.dialogMaxWidth,
+    contentPadding: PaddingValues = PaddingValues(DhunSpacing.lg),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Dialog(onDismissRequest = onDismissRequest) {
@@ -121,7 +122,7 @@ fun GlassDialog(
                 LocalContentColor provides DhunColors.textPrimary,
                 LocalTextStyle provides MaterialTheme.typography.bodyMedium,
             ) {
-                Column(modifier = Modifier.fillMaxWidth().padding(DhunSpacing.lg), content = content)
+                Column(modifier = Modifier.fillMaxWidth().padding(contentPadding), content = content)
             }
         }
     }

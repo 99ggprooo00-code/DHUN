@@ -1,9 +1,12 @@
 package dev.dhun.ui.settings
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -37,15 +40,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import dev.dhun.design.DhunAccent
 import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
 import dev.dhun.design.DhunIconView
+import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunThemeMode
 import dev.dhun.design.DhunVisualTuning
@@ -453,6 +457,10 @@ private fun CountryRegionPicker(viewModel: SettingsViewModel) {
         onDismissRequest = { showPicker = false },
         modifier = Modifier.fillMaxWidth().heightIn(max = DhunSpacing.dialogBodyMaxHeight),
         maxWidth = DhunSpacing.dialogWideMaxWidth,
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+            horizontal = DhunSpacing.dialogContentHorizontalPadding,
+            vertical = DhunSpacing.lg,
+        ),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -462,12 +470,75 @@ private fun CountryRegionPicker(viewModel: SettingsViewModel) {
                 "Choose a country or region",
                 style = MaterialTheme.typography.titleMedium,
                 color = DhunColors.textPrimary,
+                modifier = Modifier.semantics { heading() },
             )
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .clip(DhunShapes.medium)
+                    .background(DhunColors.accentContainer)
+                    .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.sm),
+                horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                DhunIconView(
+                    icon = DhunIcon.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                    tint = DhunColors.accent,
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Current selection",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = DhunColors.textSecondary,
+                    )
+                    Text(
+                        "${selected.name} · ${selected.code}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = DhunColors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
             DhunTextField(
                 value = query,
                 onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth()
+                    .semantics { contentDescription = "Search country or region by name or code" },
                 placeholder = "Search by name or code",
+                leadingContent = {
+                    DhunIconView(
+                        icon = DhunIcon.Search,
+                        contentDescription = null,
+                        modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                        tint = DhunColors.textTertiary,
+                    )
+                    Spacer(modifier = Modifier.width(DhunSpacing.sm))
+                },
+                trailingContent = if (query.isNotEmpty()) {
+                    {
+                        DhunIconButton(
+                            onClick = { query = "" },
+                            contentDescription = "Clear country search",
+                        ) {
+                            DhunIconView(
+                                icon = DhunIcon.Close,
+                                contentDescription = null,
+                                modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                                tint = DhunColors.textSecondary,
+                            )
+                        }
+                    }
+                } else {
+                    null
+                },
+            )
+            Text(
+                text = if (matches.size == 1) "1 matching region" else "${matches.size} matching regions",
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                style = MaterialTheme.typography.labelSmall,
+                color = DhunColors.textTertiary,
             )
             if (matches.isEmpty()) {
                 Text(
@@ -477,31 +548,52 @@ private fun CountryRegionPicker(viewModel: SettingsViewModel) {
                     modifier = Modifier.padding(vertical = DhunSpacing.md),
                 )
             } else {
-                LazyColumn(modifier = Modifier.weight(1f, fill = false)) {
+                LazyColumn(
+                    modifier = Modifier.weight(1f, fill = false),
+                    verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs),
+                ) {
                     items(matches, key = { it.code }) { region ->
+                        val isSelected = region.code == selected.code
                         Row(
                             modifier = Modifier.fillMaxWidth()
-                                .clickable(role = Role.Button) {
-                                    viewModel.setCountryCode(region.code)
-                                    showPicker = false
-                                }
-                                .padding(horizontal = DhunSpacing.sm, vertical = DhunSpacing.md),
+                                .clip(DhunShapes.medium)
+                                .background(
+                                    if (isSelected) DhunColors.accentContainer else DhunColors.surfaceContainerLow,
+                                )
+                                .selectable(
+                                    selected = isSelected,
+                                    role = Role.RadioButton,
+                                    onClick = {
+                                        viewModel.setCountryCode(region.code)
+                                        showPicker = false
+                                    },
+                                )
+                                .semantics { contentDescription = "${region.name} (${region.code})" }
+                                .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.smPlus),
+                            horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
                                 text = region.name,
                                 modifier = Modifier.weight(1f),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = if (region.code == selected.code) DhunColors.accent else DhunColors.textPrimary,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (isSelected) DhunColors.accent else DhunColors.textPrimary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            Spacer(modifier = Modifier.width(DhunSpacing.md))
                             Text(
                                 text = region.code,
                                 style = MaterialTheme.typography.labelMedium,
                                 color = DhunColors.textSecondary,
                             )
+                            if (isSelected) {
+                                DhunIconView(
+                                    icon = DhunIcon.Check,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                                    tint = DhunColors.accent,
+                                )
+                            }
                         }
                     }
                 }

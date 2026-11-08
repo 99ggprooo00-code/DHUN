@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,10 +17,12 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.MaterialTheme
@@ -35,7 +38,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -712,53 +718,106 @@ internal fun CreatePlaylistDialog(
     var creating by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    GlassDialog(onDismissRequest = { if (!creating) onDismiss() }) {
-        Text("New playlist", style = MaterialTheme.typography.titleMedium, color = DhunColors.textPrimary)
-        Spacer(modifier = Modifier.height(DhunSpacing.md))
-        // The DHUN input, not Material 3's outlined field: the same control
-        // the Add to playlist sheet uses. See `DhunTextField`.
-        DhunTextField(
-            value = name,
-            onValueChange = { name = it; errorText = null },
-            placeholder = "My playlist",
-            isError = errorText != null,
-        )
-        if (errorText != null) {
-            Spacer(modifier = Modifier.height(DhunSpacing.xs))
-            Text(
-                text = errorText.orEmpty(),
-                style = MaterialTheme.typography.bodySmall,
-                color = DhunColors.error,
-            )
+    val submit: () -> Unit = {
+        if (name.isNotBlank() && !creating) {
+            creating = true
+            errorText = null
+            scope.launch {
+                try {
+                    onCreate(name.trim())
+                    // Only a write that returned normally closes the dialog.
+                    onConfirm(name)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    errorText = "Could not create the playlist. Check free space and try again."
+                } finally {
+                    creating = false
+                }
+            }
         }
-        Spacer(modifier = Modifier.height(DhunSpacing.md))
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            DhunTextButton(onClick = onDismiss, enabled = !creating) { Text("Cancel") }
-            Spacer(modifier = Modifier.width(DhunSpacing.sm))
-            DhunButton(
-                onClick = {
-                    if (name.isNotBlank() && !creating) {
-                        creating = true
-                        errorText = null
-                        scope.launch {
-                            try {
-                                onCreate(name.trim())
-                                // Only a write that returned normally closes
-                                // the dialog as a created playlist.
-                                onConfirm(name)
-                            } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                                throw cancelled
-                            } catch (_: Exception) {
-                                errorText = "Could not create the playlist. Check free space and try again."
-                            } finally {
-                                creating = false
-                            }
-                        }
-                    }
-                },
-                enabled = name.isNotBlank() && !creating,
-                loading = creating,
-            ) { Text(if (errorText != null) "Try again" else "Create") }
+    }
+    GlassDialog(
+        onDismissRequest = { if (!creating) onDismiss() },
+        modifier = Modifier.heightIn(max = DhunSpacing.dialogBodyMaxHeight),
+        maxWidth = DhunSpacing.dialogWideMaxWidth,
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+            horizontal = DhunSpacing.dialogContentHorizontalPadding,
+            vertical = DhunSpacing.dialogContentVerticalPadding,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth()
+                .heightIn(max = DhunSpacing.dialogBodyMaxHeight)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier.size(DhunSpacing.dialogIconBadgeSize)
+                        .clip(CircleShape)
+                        .background(DhunColors.accentContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    DhunIconView(
+                        icon = DhunIcon.QueueMusic,
+                        contentDescription = null,
+                        modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                        tint = DhunColors.accent,
+                    )
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs)) {
+                    Text(
+                        "New playlist",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = DhunColors.textPrimary,
+                        modifier = Modifier.semantics { heading() },
+                    )
+                    Text(
+                        "Save a personal collection in your local library.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DhunColors.textSecondary,
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = DhunSpacing.md),
+                verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs),
+            ) {
+                Text("Playlist name", style = MaterialTheme.typography.labelMedium, color = DhunColors.textPrimary)
+                DhunTextField(
+                    value = name,
+                    onValueChange = { name = it; errorText = null },
+                    modifier = Modifier.semantics { contentDescription = "Playlist name" },
+                    placeholder = "My playlist",
+                    isError = errorText != null,
+                    enabled = !creating,
+                    onSubmit = submit,
+                )
+                errorText?.let {
+                    Text(
+                        text = it,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DhunColors.error,
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = DhunSpacing.lg),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs),
+            ) {
+                DhunTextButton(onClick = onDismiss, enabled = !creating) { Text("Cancel") }
+                DhunButton(
+                    onClick = submit,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = name.isNotBlank() && !creating,
+                    loading = creating,
+                ) { Text(if (errorText != null) "Try again" else "Create") }
+            }
         }
     }
 }

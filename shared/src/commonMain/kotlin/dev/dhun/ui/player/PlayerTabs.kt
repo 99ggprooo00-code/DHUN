@@ -689,6 +689,7 @@ internal fun LyricsProviderPicker(
                     lyricsProviderOptions.forEach { (id, label) ->
                         MenuActionRow(
                             label = label,
+                            selected = id == selectedProvider,
                             modifier = Modifier.semantics { selected = id == selectedProvider },
                             onClick = {
                                 expanded = false
