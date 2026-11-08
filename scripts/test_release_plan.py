@@ -9,6 +9,14 @@ from release_plan import INTENT, MAIN, PRESERVE_BETA, newly_added_intent, plan
 
 
 class ReleasePlanTest(unittest.TestCase):
+    def test_popup_merge_uses_a_fresh_preservation_marker(self):
+        repository = Path(__file__).resolve().parents[1]
+        legacy = ".github/release-intent/preserve-rolling-test-draft"
+        self.assertEqual(".github/release-intent/preserve-rolling-beta-pr223", PRESERVE_BETA)
+        self.assertNotEqual(legacy, PRESERVE_BETA)
+        self.assertTrue((repository / PRESERVE_BETA).is_file())
+        self.assertTrue((repository / legacy).is_file())
+
     def test_dispatch_and_nonmain_can_never_become_public_accidentally(self):
         repository = Path(".")
         sha = "unused"

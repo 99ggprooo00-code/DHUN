@@ -1,6 +1,6 @@
 # 48 — Purpose-specific popup redesign
 
-Date: 2026-11-07. Work branch: `arena/b3400d42-dhun`; PR #223 remains open.
+Date: 2026-11-07. Work branch: `arena/b3400d42-dhun`; PR #223.
 The workspace is pinned to this branch and the review is based on current `main`
 `da2199650a37fd66abb903dca3a583fcffaf78b3`, including merged PR #222 (Lyrics
 Controls). This is a popup inventory and redesign record, not a replacement for
@@ -68,8 +68,10 @@ the redesign that follows.
 
 ## Post-redesign validation
 
-The audit and implementation are complete on `arena/b3400d42-dhun`, head
-`02502dcf0f47c50fc8a29286490a2a557a14993d`; PR #223 remains open.
+The popup implementation and main visual evidence were completed at source
+revision `02502dcf0f47c50fc8a29286490a2a557a14993d`. PR #223 also includes a
+one-shot build-only merge safeguard so completing the review does not publish
+the rolling beta.
 
 ### Rendered evidence
 
@@ -108,8 +110,8 @@ The audit and implementation are complete on `arena/b3400d42-dhun`, head
   passed. The repeated WiX release download HTTP 504 prompted a narrowly scoped
   three-attempt retry for that exact transient failure in
   `.github/workflows/beta-release.yml`; other Gradle failures remain immediate.
-  On this PR, `publish_beta` and `publish` were skipped; no release or
-  publication occurred.
+  On this PR, `publish_beta` and `publish` were skipped; no GitHub release,
+  public tag, or installer-set publication occurred.
 - `python3 -m unittest discover -s scripts -p 'test_*.py'`: 524 tests passed.
   `git diff --check`: passed.
 - Local Gradle compilation remains unavailable because this sandbox has no
@@ -161,6 +163,23 @@ claim visual review or audible playback. For manual Android testing, download
 `debug-apk` from the Build APK run above; it is a debug-signed test artifact,
 not a store-ready release.
 
-No merge, release, or publication was performed. Merging this PR to `main`
-would activate the rolling public DHUN beta publication path, so the existing
-no-release/no-publish constraint remains in force while PR #223 stays open.
+PR-triggered validation did not publish a release or installer set; run-scoped
+artifacts and immutable Windows evidence remain attached to their workflow run.
+The active no-release/no-publish constraint is protected at merge time by the
+one-shot marker `.github/release-intent/preserve-rolling-beta-pr223`. Its
+first-parent addition selects `channel=beta, build_only=true` on the resulting
+`main` push; the main-branch workflow builds and verifies, while `publish_beta`
+and `publish` are gated off, preserving the current public beta release/tag.
+The marker is inert on later commits because it is no longer newly added.
+
+### Merge-safety follow-up
+
+- A synthetic merge commit using `origin/main` as its first parent and the
+  current PR tree produced `channel=beta, build_only=true` through the actual
+  `scripts/release_plan.py`. Both public-release jobs require
+  `build_only=false`; the current rolling beta therefore remains untouched.
+- `python3 -m unittest discover -s scripts -p 'test_*.py'`: 526 tests passed;
+  `npm run check`: icon checks, web build, 340 Node tests, and web-player docs
+  all passed; `git diff --check`: passed.
+- Kotlin/Compose Gradle tasks cannot run locally because Java is not installed;
+  current-head remote CI, APK, beta MSI, and visual-evidence workflows passed.

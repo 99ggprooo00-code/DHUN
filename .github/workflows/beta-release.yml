@@ -1,10 +1,11 @@
 name: DHUN beta
 
 # The rolling `beta` tag is a public prerelease titled "DHUN beta". Successful
-# main builds replace it after Android/Desktop/shared verification. PRs and
-# non-main refs only upload run-scoped artifacts. The fixed public prerelease
-# remains separate and can be requested by manual dispatch or by adding its
-# reviewed, one-shot release-intent file (see scripts/release_plan.py).
+# main builds replace it after Android/Desktop/shared verification unless a
+# newly added one-shot preserve marker selects build-only. PRs and non-main refs
+# only upload run-scoped artifacts. The fixed public prerelease remains separate
+# and can be requested by manual dispatch or by adding its reviewed one-shot
+# release-intent file (see scripts/release_plan.py).
 on:
   workflow_dispatch:
     inputs:
@@ -40,6 +41,8 @@ on:
       - 'scripts/**'
       - '.github/workflows/beta-release.yml'
       - '.github/release-intent/v1.00.002'
+      # PR #223 uses a fresh one-shot build-only intent to preserve the rolling beta.
+      - '.github/release-intent/preserve-rolling-beta-pr223'
       # Legacy internal filename retained so the migration is not itself
       # interpreted as a new build-only intent.
       - '.github/release-intent/preserve-rolling-test-draft'

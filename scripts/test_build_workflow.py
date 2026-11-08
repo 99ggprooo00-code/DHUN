@@ -34,6 +34,16 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn("python scripts/release_plan.py", self.text)
         self.assertIn("- '.github/release-intent/v1.00.002'", self.text)
 
+    def test_popup_merge_preserves_rolling_beta_with_one_shot_build_only_intent(self):
+        marker = ".github/release-intent/preserve-rolling-beta-pr223"
+        repository = WORKFLOW.parents[2]
+        self.assertIn(f"- '{marker}'", self.text)
+        self.assertTrue((repository / marker).is_file())
+        release_plan = (repository / "scripts/release_plan.py").read_text()
+        self.assertIn(f'PRESERVE_BETA = "{marker}"', release_plan)
+        self.assertIn("needs.release_plan.outputs.build_only == 'false'", self.publish_beta)
+        self.assertIn("needs.release_plan.outputs.build_only == 'false'", self.publish)
+
     def test_ordinary_app_code_merge_updates_only_the_public_rolling_beta_release(self):
         push = self.text.split("  push:\n", 1)[1].split("\n\npermissions:", 1)[0]
         self.assertIn("branches: [main]", push)
