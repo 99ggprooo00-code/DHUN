@@ -1,11 +1,19 @@
 package dev.dhun.desktop
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.InternalComposeUiApi
@@ -18,6 +26,8 @@ import androidx.compose.ui.graphics.asSkiaBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.input.pointer.PointerButton
 import androidx.compose.ui.input.pointer.PointerButtons
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -29,6 +39,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -70,10 +81,13 @@ import dev.dhun.download.DownloadManager
 import dev.dhun.download.DownloadProgress
 import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunSpacing
 import dev.dhun.design.DhunTheme
 import dev.dhun.design.DhunThemeMode
 import dev.dhun.design.catalog.ComponentCatalogScreen
 import dev.dhun.design.components.DhunConfirmDialog
+import dev.dhun.design.components.DhunTextButton
+import dev.dhun.design.components.GlassDialog
 import dev.dhun.domain.GetHomeFeedUseCase
 import dev.dhun.domain.GetRecommendationsUseCase
 import dev.dhun.innertube.SearchFilter
@@ -257,6 +271,37 @@ class VisualAppEvidenceTest {
     }
 
     @Test
+    fun `capture pre-redesign background playback rationale baseline`() {
+        for (mode in listOf(DhunThemeMode.DARK, DhunThemeMode.LIGHT)) {
+            val dismissals = AtomicInteger()
+            val allows = AtomicInteger()
+            runSkikoComposeUiTest(size = Size(412f, 915f)) {
+                mainClock.autoAdvance = false
+                setContent {
+                    DhunTheme(mode = mode) {
+                        Box(Modifier.fillMaxSize().background(DhunColors.background))
+                        PreRedesignBatteryPlaybackRationale(
+                            onDismiss = { dismissals.incrementAndGet() },
+                            onAllow = { allows.incrementAndGet() },
+                        )
+                    }
+                }
+                mainClock.advanceTimeBy(500)
+                onNodeWithText("Keep playback reliable").assertIsDisplayed()
+                onNodeWithText("Not now").assertIsDisplayed()
+                onNodeWithText("Allow").assertIsDisplayed()
+                captureUiImage(
+                    "popup-before-battery-rationale-${mode.id}.png",
+                    renderCurrentFrame(this, 412, 915),
+                )
+                onNodeWithText("Allow").performClick()
+                assertEquals(1, allows.get(), "The baseline Allow action must remain an explicit callback")
+                assertEquals(0, dismissals.get(), "Allow is not the Not now dismissal action")
+            }
+        }
+    }
+
+    @Test
     fun `render existing track menus and add-to-playlist dialogs`() {
         for (mode in listOf(DhunThemeMode.DARK, DhunThemeMode.LIGHT)) {
             withFixture(mode) { fixture ->
@@ -400,6 +445,27 @@ class VisualAppEvidenceTest {
                     onNodeWithContentDescription("Edit lyrics using local TTML").assertIsDisplayed()
                     onNodeWithContentDescription("Refetch current lyrics").assertIsDisplayed()
                     onNodeWithContentDescription("Search lyrics matches").assertIsDisplayed()
+
+                    // Capture the real anchored choice menus over the player artwork
+                    // before their selected-row treatment changes.
+                    onNodeWithContentDescription("Lyrics provider: Auto (synced first)").performClick()
+                    mainClock.advanceTimeBy(300)
+                    captureUiImage(
+                        "popup-before-lyrics-provider-${mode.id}.png",
+                        renderCurrentFrame(this, 412, 915),
+                    )
+                    onAllNodesWithText("Auto (synced first)").onLast().performClick()
+                    mainClock.advanceTimeBy(300)
+
+                    onNodeWithContentDescription("Romanization mode: Auto (conservative)").performClick()
+                    mainClock.advanceTimeBy(300)
+                    captureUiImage(
+                        "popup-before-romanization-mode-${mode.id}.png",
+                        renderCurrentFrame(this, 412, 915),
+                    )
+                    onAllNodesWithText("Auto (conservative)").onLast().performClick()
+                    mainClock.advanceTimeBy(300)
+
                     captureUiImage(
                         "lyrics-controls-${mode.id}.png",
                         renderCurrentFrame(this, 412, 915),
@@ -1049,6 +1115,32 @@ class VisualAppEvidenceTest {
                 Shell(fixture, nav, mode, isDesktop = false)
             }.use { composeScene ->
                 SceneDriver(composeScene).capture(name, settleFrames = 24)
+            }
+        }
+    }
+
+    @Composable
+    private fun PreRedesignBatteryPlaybackRationale(onDismiss: () -> Unit, onAllow: () -> Unit) {
+        GlassDialog(onDismissRequest = onDismiss) {
+            Text(
+                "Keep playback reliable",
+                style = MaterialTheme.typography.titleMedium,
+                color = DhunColors.textPrimary,
+                modifier = Modifier.semantics { heading() },
+            )
+            Spacer(modifier = Modifier.height(DhunSpacing.sm))
+            Text(
+                "Android battery optimization can stop background music " +
+                    "on some phones. Allow DHUN to keep the playback service " +
+                    "available when the screen is off?",
+                style = MaterialTheme.typography.bodyMedium,
+                color = DhunColors.textSecondary,
+            )
+            Spacer(modifier = Modifier.height(DhunSpacing.lg))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                DhunTextButton(onClick = onDismiss) { Text("Not now") }
+                Spacer(modifier = Modifier.width(DhunSpacing.sm))
+                DhunTextButton(onClick = onAllow) { Text("Allow") }
             }
         }
     }
