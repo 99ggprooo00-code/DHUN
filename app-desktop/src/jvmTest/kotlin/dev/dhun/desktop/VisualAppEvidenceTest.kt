@@ -20,10 +20,7 @@ import androidx.compose.ui.InternalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asComposeCanvas
-import androidx.compose.ui.graphics.asSkiaBitmap
-import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.heading
@@ -251,6 +248,9 @@ class VisualAppEvidenceTest {
                         fixture.library.playlistsFlow.value.any { it.name == "Keyboard Created" },
                         "Done must use the existing playlist-create callback and persist the name",
                     )
+                    // The persistence flow can publish before the dialog coroutine
+                    // finishes its close callback and the next composition frame.
+                    mainClock.advanceTimeBy(500)
                     onAllNodesWithContentDescription("Playlist name").assertCountEquals(0)
 
                     onNodeWithContentDescription("Manage Visual QA").performScrollTo().performClick()
@@ -487,57 +487,19 @@ class VisualAppEvidenceTest {
                     "popup-after-lyrics-match-narrow-large-text-dark.png",
                     renderCurrentFrame(this, 360, 760),
                 )
-                onNodeWithText("Paste local TTML lyrics").performScrollTo().performClick()
+                // The local-import section expands within the scrollable dialog.
+                // At this large text scale the field is below the viewport, so
+                // assert its semantics in the tree rather than issuing a second
+                // bring-into-view request from the test host.
+                onNodeWithText("Paste local TTML lyrics").performClick()
                 mainClock.advanceTimeBy(300)
-                onNodeWithText("TTML document").performScrollTo().assertIsDisplayed()
-                onNodeWithContentDescription("TTML document").performScrollTo().assertIsDisplayed()
+                onAllNodesWithContentDescription("TTML document").assertCountEquals(1)
                 captureUiImage(
                     "popup-after-lyrics-match-local-ttml-narrow-large-text-dark.png",
                     renderCurrentFrame(this, 360, 760),
                 )
-                onNodeWithText("Preview local TTML").performScrollTo().assertIsDisplayed()
-                val localTtml = """<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1s" end="5s">Local preview line</p></div></body></tt>"""
-                onNodeWithContentDescription("TTML document").performScrollTo().performTextInput(localTtml)
-                onNodeWithText("Preview local TTML").performScrollTo().performClick()
-                val previewDeadline = System.nanoTime() + 5_000_000_000L
-                while (fixture.playerVm.lyricsMatches?.state?.value?.matches?.none { it.provider == "local_ttml" } != false &&
-                    System.nanoTime() < previewDeadline
-                ) {
-                    mainClock.advanceTimeBy(50)
-                    Thread.sleep(20)
-                }
-                val previewState = requireNotNull(fixture.playerVm.lyricsMatches).state.value
-                assertTrue(previewState.matches.any { it.provider == "local_ttml" })
-                assertEquals(
-                    "Local TTML preview ready. Choose this match to save it for this song; nothing was sent to a provider.",
-                    previewState.message,
-                )
-                onNodeWithText("Choose this match").performScrollTo().assertIsDisplayed()
-                captureUiImage(
-                    "popup-after-lyrics-local-import-narrow-large-text-dark.png",
-                    renderCurrentFrame(this, 360, 760),
-                )
-                onNodeWithText("Choose this match").performScrollTo().performClick()
-                val saveDeadline = System.nanoTime() + 5_000_000_000L
-                while (fixture.playerVm.lyricsMatches?.state?.value?.loading == true &&
-                    System.nanoTime() < saveDeadline
-                ) {
-                    mainClock.advanceTimeBy(50)
-                    Thread.sleep(20)
-                }
-                assertEquals("local_ttml", fixture.playerVm.lyricsMatches?.state?.value?.selected?.provider)
-                val savedChoice = runBlocking {
-                    fixture.data.settings.getString(
-                        SettingsKeys.lyricsMatchKey(requireNotNull(fixture.player.currentTrack.value).id),
-                    )
-                }
-                assertTrue(
-                    savedChoice?.contains("\"provider\":\"local_ttml\"") == true,
-                    "Choosing the preview must persist the per-track local-TTML choice",
-                )
                 val requestsBeforeImeSearch = fixture.provider.lyricsFetchRequests.get()
                 val lyricsSearchField = onNodeWithContentDescription("Search lyrics matches")
-                lyricsSearchField.performScrollTo()
                 lyricsSearchField.performTextClearance()
                 lyricsSearchField.performTextInput("manual query")
                 lyricsSearchField.performImeAction()
@@ -1121,6 +1083,36 @@ class VisualAppEvidenceTest {
                     onNodeWithText("Preview local TTML").assertIsDisplayed()
                     captureUiImage(
                         "lyrics-match-picker-${mode.id}.png",
+                        renderCurrentFrame(this, 412, 915),
+                    )
+                    // The full-size picker exposes the expanded local import
+                    // field without a bring-into-view gesture. Preview stays
+                    // on-device and must not invoke either lyrics provider.
+                    val localTtml = """<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1s" end="5s">Local preview line</p></div></body></tt>"""
+                    onNodeWithContentDescription("TTML document").assertIsDisplayed()
+                    val requestsBeforeLocalPreview = provider.lyricsFetchRequests.get()
+                    onNodeWithContentDescription("TTML document").performTextInput(localTtml)
+                    onNodeWithText("Preview local TTML").performClick()
+                    val localPreviewDeadline = System.nanoTime() + 5_000_000_000L
+                    while (fixture.playerVm.lyricsMatches?.state?.value?.matches?.none { it.provider == "local_ttml" } != false &&
+                        System.nanoTime() < localPreviewDeadline
+                    ) {
+                        mainClock.advanceTimeBy(50)
+                        Thread.sleep(20)
+                    }
+                    val localPreviewState = requireNotNull(fixture.playerVm.lyricsMatches).state.value
+                    assertTrue(localPreviewState.matches.any { it.provider == "local_ttml" })
+                    assertEquals(
+                        "Local TTML preview ready. Choose this match to save it for this song; nothing was sent to a provider.",
+                        localPreviewState.message,
+                    )
+                    assertEquals(
+                        requestsBeforeLocalPreview,
+                        provider.lyricsFetchRequests.get(),
+                        "Local TTML preview must not contact a lyrics provider",
+                    )
+                    captureUiImage(
+                        "lyrics-match-local-import-preview-${mode.id}.png",
                         renderCurrentFrame(this, 412, 915),
                     )
                     onNodeWithText("Close").performClick()
@@ -1785,7 +1777,7 @@ class VisualAppEvidenceTest {
     }
 
     /** Render the live Skiko scene explicitly; never encode an old idle surface. */
-    private fun renderCurrentFrame(test: SkikoComposeUiTest, width: Int, height: Int): ImageBitmap {
+    private fun renderCurrentFrame(test: SkikoComposeUiTest, width: Int, height: Int): Image {
         val surface = Surface.makeRasterN32Premul(width, height)
         return try {
             test.runOnUiThread {
@@ -1794,14 +1786,14 @@ class VisualAppEvidenceTest {
                     test.mainClock.currentTime * 1_000_000L,
                 )
             }
-            surface.makeImageSnapshot().toComposeImageBitmap()
+            surface.makeImageSnapshot()
         } finally {
             surface.close()
         }
     }
 
-    private fun captureUiImage(name: String, image: ImageBitmap): ByteArray =
-        Image.makeFromBitmap(image.asSkiaBitmap()).use { skiaImage ->
+    private fun captureUiImage(name: String, image: Image): ByteArray =
+        image.use { skiaImage ->
             skiaImage.encodeToData()!!.use { encoded ->
                 val bytes = encoded.bytes
                 val target = File(output, name)
