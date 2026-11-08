@@ -225,26 +225,20 @@ class DeployJob(WorkflowText):
 
 
 class CanonicalUrlIsReported(WorkflowText):
-    """The URL a reader visits first is not the site yet, and every run says so.
+    """Every site run reports the live Pages source and what it serves.
 
-    The deploy job has always skipped its publish steps with a warning while
-    Pages' source is the branch (`build_type: legacy`), which is right — but it
-    only runs on a push to main, so a pull request, a visitor and the run summary
-    all saw nothing. Meanwhile the canonical URL renders the repository README
-    through legacy Jekyll, and README.md advertised it as the marketing site: the
-    defect was not the behaviour, it was the silence.
-
-    These tests pin the three things that make the fact survive: it is reported
-    in the *build* job (which runs on every trigger and fails nothing), it names
-    the exact setting and the runbook, and it stays a warning rather than an
-    error — a misconfiguration an agent cannot fix must never redden a build that
-    is otherwise green.
+    With `build_type: workflow`, a checked `website/dist` is published by the
+    Actions deploy job. If Pages falls back to `legacy`, the same URL renders
+    the repository README instead and deploy is skipped. This status must be
+    visible in the build summary on every trigger, without turning a setting
+    that requires maintainer access into an unrelated site-build failure.
     """
 
     def test_build_job_reports_the_pages_source_on_every_run(self):
         job = self.job("build")
         self.assertIn("build_type", job)
         self.assertIn("GITHUB_STEP_SUMMARY", job)
+        self.assertRegex(job, r"::notice title=Pages source")
         self.assertRegex(job, r"::warning title=The canonical URL is not this site yet")
 
     def test_the_report_names_the_setting_and_the_runbook(self):
@@ -271,14 +265,15 @@ class PublishingRunbook(unittest.TestCase):
         for phrase in ("Build and deployment", "GitHub Actions", "build_type", "website/dist"):
             self.assertIn(phrase, text)
 
-    def test_every_doc_that_promises_the_url_is_the_site_says_when_it_is_not(self):
-        """A doc may call the URL the site only if it also says what gates that."""
+    def test_readme_distinguishes_the_repository_quick_start_from_the_live_site(self):
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
         section = readme.split("## Website", 1)[1].split("\n## ", 1)[0]
-        if "99ggprooo00-code.github.io/DHUN" in section:
-            self.assertIn("build_type: workflow", section)
-            self.assertIn("legacy", section.lower())
-            self.assertIn("docs/runbooks/publishing-the-site.md", section)
+        self.assertIn("repository quick start", section)
+        self.assertIn("99ggprooo00-code.github.io/DHUN", section)
+        self.assertIn("GitHub Actions", section)
+        self.assertIn("build_type: workflow", section)
+        self.assertIn("docs/runbooks/publishing-the-site.md", section)
+        self.assertNotIn("currently renders this README", section)
 
 
 class BrowserHarnessSurvivesAndDiagnoses(unittest.TestCase):

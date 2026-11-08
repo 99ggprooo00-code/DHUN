@@ -43,4 +43,4 @@ DHUN has no DHUN-hosted account or cloud library. Library data is stored locally
 
 ## Website
 
-The project Pages root currently renders this README through the legacy branch configuration; the built marketing site is not served there. See the [site publishing runbook](docs/runbooks/publishing-the-site.md).
+This README is the repository quick start. The [DHUN project website](https://99ggprooo00-code.github.io/DHUN/) is a separate build published from `website/` by GitHub Actions (`build_type: workflow`); see the [site publishing runbook](docs/runbooks/publishing-the-site.md).
