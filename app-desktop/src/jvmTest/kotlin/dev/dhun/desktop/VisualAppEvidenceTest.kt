@@ -34,6 +34,7 @@ import androidx.compose.ui.test.SkikoComposeUiTest
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -896,6 +897,15 @@ class VisualAppEvidenceTest {
                     onNodeWithText("Nepal (NP)").performClick()
                     mainClock.advanceTimeBy(400)
                     onNodeWithText("Nepal · NP").assertIsDisplayed()
+                    onNodeWithContentDescription("Search country or region by name or code")
+                        .performTextInput("Nepal")
+                    mainClock.advanceTimeBy(300)
+                    onNodeWithContentDescription("Nepal (NP)").assertIsDisplayed()
+                    onNodeWithContentDescription("Nepal (NP)").assertIsSelected()
+                    captureUiImage(
+                        "popup-after-country-picker-selected-${mode.id}.png",
+                        renderCurrentFrame(this, 412, 915),
+                    )
                     onNodeWithContentDescription("Nepal (NP)").performClick()
                     mainClock.advanceTimeBy(400)
                 }
