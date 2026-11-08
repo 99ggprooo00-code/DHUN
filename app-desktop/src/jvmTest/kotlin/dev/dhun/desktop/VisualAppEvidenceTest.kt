@@ -34,7 +34,6 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.InternalTestApi
 import androidx.compose.ui.test.SkikoComposeUiTest
-import androidx.compose.ui.test.and
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
