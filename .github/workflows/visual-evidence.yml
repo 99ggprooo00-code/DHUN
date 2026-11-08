@@ -22,8 +22,8 @@ jobs:
   compose:
     runs-on: ubuntu-latest
     # The expanded popup suite renders many real Compose frames and exercises
-    # multi-step interactions; leave room for the complete matrix on hosted CI.
-    timeout-minutes: 45
+    # multi-step interactions; allow the full matrix to finish on hosted CI.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v5
 
