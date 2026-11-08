@@ -9,7 +9,8 @@ Gradle task as its own step, before assembleDebug.
 The desktop suite had the mirror-image gap: the jvmTest source set existed
 but no workflow step executed it — compileKotlinJvm only compiles jvmMain.
 ci.yml must name :app-desktop:jvmTest as its own step, after the compile
-step so each failure keeps an honest name.
+step so each failure keeps an honest name. The large Compose/Skia visual
+matrix must remain in its dedicated workflow, not be run a second time here.
 
 The minSdk-24 floor has the same shape of gap, twice over. Android Lint
 analyses only the module it runs in, so PR #134's `:app-android:lintDebug`
@@ -60,6 +61,22 @@ class CiWorkflowTest(unittest.TestCase):
     def test_desktop_unit_suite_is_a_named_step(self):
         self.assertIn("./gradlew :app-desktop:jvmTest", self.text)
         self.assertIn("Unit tests — Desktop (JVM)", self.text)
+
+    def test_ci_excludes_visual_evidence_run_by_dedicated_workflow(self):
+        desktop_step = self.text.split('Unit tests — Desktop (JVM)', 1)[1].split("\n      #", 1)[0]
+        self.assertIn("-PexcludeVisualEvidence=true", desktop_step)
+        self.assertIn("Visual evidence", self.text)
+
+        desktop_build = (ROOT / "app-desktop" / "build.gradle.kts").read_text()
+        self.assertIn('providers.gradleProperty("excludeVisualEvidence")', desktop_build)
+        self.assertIn(
+            'excludeTestsMatching("dev.dhun.desktop.VisualAppEvidenceTest")',
+            desktop_build,
+        )
+        self.assertIn(
+            'excludeTestsMatching("dev.dhun.desktop.VisualEvidenceTest")',
+            desktop_build,
+        )
 
     def test_desktop_unit_suite_runs_after_desktop_compile(self):
         compile_at = self.text.index("./gradlew :app-desktop:compileKotlinJvm")
