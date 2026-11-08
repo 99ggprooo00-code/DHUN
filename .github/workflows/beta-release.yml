@@ -161,7 +161,9 @@ jobs:
       BUILD_ONLY: ${{ needs.release_plan.outputs.build_only }}
       DHUN_RELEASE_CHANNEL: ${{ needs.release_plan.outputs.channel }}
     runs-on: windows-latest
-    timeout-minutes: 25
+    # The real Compose/Skia evidence suite takes about 12 minutes on Linux;
+    # leave Windows enough time for its slower Skiko render plus MSI/install checks.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v5
 
@@ -175,12 +177,13 @@ jobs:
         with:
           python-version: '3.x'
 
-      # Exercise the shared recomposer and desktop snapshot regression on the
-      # same Windows JVM/Skiko runtime as the packaged application, not just
-      # the Linux CI runner.
+      # Full shared-domain and desktop suites already run in the canonical CI
+      # job. On Windows, keep this runtime check focused on the actual theme,
+      # shared-composable, and Skiko evidence regressions instead of repeating
+      # 848 OS-independent shared-domain tests before MSI packaging.
       - name: Live theme regression — Windows JVM
         shell: pwsh
-        run: ./gradlew :shared:jvmTest :app-desktop:jvmTest --no-daemon
+        run: ./gradlew :app-desktop:jvmTest --tests "dev.dhun.desktop.Visual*EvidenceTest" --tests "dev.dhun.desktop.LiveAppearanceTest" --no-daemon
 
       - name: Build MSI (jpackage)
         id: msi_build
