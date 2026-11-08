@@ -76,9 +76,11 @@ references are cited by their original filenames and are not copied into Git.
 
 ## Validation status
 
-- Final Visual evidence run `42427116676` completed for commit `a60b880`:
+- Final Visual evidence run `42432357921` completed for commit `e1ddab8`:
   13 tests, zero failures/errors, 89 PNGs. Manifest blob
-  `acd6cbe5a437d7d8d8eed057860270bfc36ec9ca` records the run and all frames.
+  `02cf6e510fe0112495c1a409e5beb3128b6d3489` records the run and all frames.
+  All 89 image SHA-256 values match the previously reviewed run `42427116676`
+  for `a60b880`; no rendered frame changed in the Windows workflow fixes.
 - All 19 tracker rows map to 22 expected after-frame names in that manifest.
   Twenty-one files are byte-identical to the already SHA-verified and visually
   reviewed `4f733b4` frames; the changed row-13 confirmation frame was fetched,
@@ -87,14 +89,36 @@ references are cited by their original filenames and are not copied into Git.
   `e0b6bc7fc4203eb90e74f8664a67cb928480aa9c157b730e5c133ae9a0e6dabc`). All 22
   final mapped frames have therefore been reviewed. The earlier failed run
   `42403809166` is superseded.
-- Final-commit CI run `42427116683` passed 1,080 tests (848 shared JVM, 169
-  Android Robolectric, 4 playback-probe, 59 desktop JVM; zero failures/errors).
-  Windows beta run `42427116702` was canceled at the MSI job's 25-minute maximum
+- The full CI run for application commit `a60b880`, `42427116683`, passed
+  1,080 tests (848 shared JVM, 169 Android Robolectric, 4 playback-probe, 59
+  desktop JVM; zero failures/errors). Windows beta run `42427116702` for the same
+  commit was canceled at the MSI job's 25-minute maximum
   execution time while `Live theme regression — Windows JVM` was still running;
   no Windows regression result was produced, and MSI packaging/install checks
   were skipped. The beta release-plan and APK jobs passed; AAB was skipped by
   workflow configuration.
-- Local `python3 -m unittest discover -s scripts -p 'test_*.py'`: 521 passed.
+- Root cause of the Windows timeout was an over-broad platform run: after the
+  full app-state visual-evidence suite (89 frames overall) was added, Windows
+  Skiko remained in that matrix for more than 34 minutes before MSI packaging.
+  The `f2f7928` attempt removed redundant shared tests but still included this
+  heavy app matrix; run `42429755177` was superseded while that test step was
+  still active, not because of a failing assertion.
+- Follow-up `e1ddab8` limits the Windows-specific regression to
+  `VisualEvidenceTest` (a small real Skiko primitive render) and
+  `LiveAppearanceTest` (live palette observers/concurrent reads). The complete
+  app state/screenshot matrix and full shared/desktop tests remain covered by
+  canonical Linux CI. The Windows job returns to its 25-minute budget, leaving
+  time for MSI packaging and install checks. A workflow-contract test guards
+  the focused selection; the local Python suite passes 522 tests.
+- On `e1ddab8`, CI run `42432357898` passed 1,080 tests (848 shared JVM, 169
+  Android Robolectric, 4 playback-probe, 59 desktop JVM; zero failures/errors).
+  Build APK run `42432357893` also passed.
+- Windows beta run `42432357981` passed the release plan and APK jobs, focused
+  Windows regression (1m25s), MSI packaging/identity, and disposable
+  install/userdata verification. The installed Windows evidence job also passed
+  and published its artifact. AAB and release publication were skipped by
+  workflow configuration. All required checks for `e1ddab8` are green.
+- Local `python3 -m unittest discover -s scripts -p 'test_*.py'`: 522 passed.
   `git diff --check` passed. Local Kotlin/Compose tests are unavailable because
   Gradle 8.14.2 is not cached and `services.gradle.org` is blocked by the
   sandbox's outbound-host policy; GitHub Actions is the Kotlin/Compose path.
