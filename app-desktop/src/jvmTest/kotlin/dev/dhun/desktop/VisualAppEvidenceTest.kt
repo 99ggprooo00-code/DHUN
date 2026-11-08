@@ -525,11 +525,11 @@ class VisualAppEvidenceTest {
                     "Choosing the preview must persist the per-track local-TTML choice",
                 )
                 val requestsBeforeImeSearch = fixture.provider.lyricsFetchRequests.get()
-                onNodeWithContentDescription("Search lyrics matches")
-                    .performScrollTo()
-                    .performTextClearance()
-                    .performTextInput("manual query")
-                    .performImeAction()
+                val lyricsSearchField = onNodeWithContentDescription("Search lyrics matches")
+                lyricsSearchField.performScrollTo()
+                lyricsSearchField.performTextClearance()
+                lyricsSearchField.performTextInput("manual query")
+                lyricsSearchField.performImeAction()
                 val imeSearchDeadline = System.nanoTime() + 5_000_000_000L
                 while (fixture.provider.lyricsFetchRequests.get() <= requestsBeforeImeSearch &&
                     System.nanoTime() < imeSearchDeadline
