@@ -312,8 +312,13 @@ private fun LyricsLocalImportSection(
                 tint = DhunColors.accent,
             )
             Spacer(modifier = Modifier.width(DhunSpacing.xs))
-            Text("Paste local TTML lyrics", maxLines = 1)
-            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                "Paste local TTML lyrics",
+                modifier = Modifier.weight(1f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(modifier = Modifier.width(DhunSpacing.xs))
             Text(if (expanded) "Hide" else "Show", style = MaterialTheme.typography.labelSmall)
             Spacer(modifier = Modifier.width(DhunSpacing.xs))
             DhunIconView(

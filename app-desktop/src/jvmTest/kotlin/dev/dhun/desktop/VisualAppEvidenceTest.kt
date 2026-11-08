@@ -254,6 +254,7 @@ class VisualAppEvidenceTest {
                     onAllNodesWithContentDescription("Playlist name").assertCountEquals(0)
 
                     onNodeWithContentDescription("Manage Visual QA").performScrollTo().performClick()
+                    mainClock.advanceTimeBy(300)
                     onNodeWithText("Rename").performClick()
                     mainClock.advanceTimeBy(500)
                     onNodeWithText("Rename playlist").assertIsDisplayed()
@@ -486,12 +487,16 @@ class VisualAppEvidenceTest {
                     "popup-after-lyrics-match-narrow-large-text-dark.png",
                     renderCurrentFrame(this, 360, 760),
                 )
-                onNodeWithText("Paste local TTML lyrics").performClick()
+                onNodeWithText("Paste local TTML lyrics").performScrollTo().performClick()
                 mainClock.advanceTimeBy(300)
-                onNodeWithText("TTML document").assertIsDisplayed()
-                onNodeWithContentDescription("TTML document").assertIsDisplayed()
-                onNodeWithText("Preview local TTML").assertIsDisplayed()
-                val localTtml = """<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1s" end="5s">Local preview line</p></div></body></tt>"""
+                onNodeWithText("TTML document").performScrollTo().assertIsDisplayed()
+                onNodeWithContentDescription("TTML document").performScrollTo().assertIsDisplayed()
+                captureUiImage(
+                    "popup-after-lyrics-match-local-ttml-narrow-large-text-dark.png",
+                    renderCurrentFrame(this, 360, 760),
+                )
+                onNodeWithText("Preview local TTML").performScrollTo().assertIsDisplayed()
+                val localTtml = """<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1s" end="5s">Local preview line</p></div></body></ttml>"""
                 onNodeWithContentDescription("TTML document").performScrollTo().performTextInput(localTtml)
                 onNodeWithText("Preview local TTML").performScrollTo().performClick()
                 val previewDeadline = System.nanoTime() + 5_000_000_000L
