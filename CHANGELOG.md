@@ -24,6 +24,10 @@ rots; when it breaks, DHUN ships a patch release fast (see README and
 
 ## [Unreleased]
 
+### Clearer, task-specific dialogs (2026-11-07, PR #223)
+
+- Reworked shared popups and confirmations with clearer contrast and action hierarchy for playlist management, lyrics matching, region selection and playback recovery.
+
 ### Immersive player artwork + modern lyrics presentation (2026-11-01, session `arena/6b3931dd-dhun`)
 
 - Full-player artwork is no longer a small rounded card floating over the

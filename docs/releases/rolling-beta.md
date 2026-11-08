@@ -1,81 +1,28 @@
 ## DHUN beta
 
-> **Public rolling prerelease.** DHUN beta is experimental, not stable, store-ready,
-> or a fixed release archive. Every successful beta publication replaces the previous
-> `beta` release and tag after the Android and Windows package gates pass. The release
-> is public (`isDraft=false`) and remains marked as a prerelease.
+**Public rolling prerelease — experimental, not stable or store-ready.** The `beta` tag always points to the newest successfully verified beta. A new beta replaces the previous rolling beta; fixed releases such as [`v1.00.002`](https://github.com/99ggprooo00-code/DHUN/releases/tag/v1.00.002) are not changed.
 
-> **Current scope (2026-11-01):** this rolling channel contains native builds of the
-> [multi-source DHUN product](../PRD.md#1-product-definition-and-source-of-truth), currently using
-> YouTube Music. Spotify is planned and deferred, not included. Browser JioSaavn is a separate
-> static build; native features here do not imply browser parity. Provider permissions remain unresolved.
+## What’s new
 
-A successful `main` app/source/build publication updates DHUN beta automatically.
-Documentation-only merges do not publish a new artifact, and PR builds remain run-scoped
-Actions artifacts. Superseded `main` builds are cancelled and the publisher refuses to
-replace beta from a commit that is no longer the tip of `main`.
+- Clearer, more consistent popups and confirmations, with task-specific actions for playlist management, lyrics matching, region selection and playback recovery.
+- Improved contrast and action hierarchy make key choices and destructive actions easier to distinguish.
 
-This beta-only channel includes **Settings → Beta tools → Theme catalogue**. Ordinary
-development and fixed public builds do not show the entry, and a fixed public Android
-build discards a restored catalogue route. These previews are experimental and are not
-a hardware-acceptance claim.
+## Downloads
 
-### Assets
+- Android 7.0+ (API 24): [universal APK](https://github.com/99ggprooo00-code/DHUN/releases/download/beta/dhun-beta.apk) is recommended for most devices.
+- Optional Android splits: [64-bit ARM](https://github.com/99ggprooo00-code/DHUN/releases/download/beta/dhun-beta-arm64-v8a.apk) · [32-bit ARM](https://github.com/99ggprooo00-code/DHUN/releases/download/beta/dhun-beta-armeabi-v7a.apk).
+- Windows: [per-user MSI](https://github.com/99ggprooo00-code/DHUN/releases/download/beta/dhun-beta.msi). Install VLC separately for desktop audio.
 
-DHUN beta exposes exactly four installers and no text sidecars:
+The Android splits are alternatives from the same build. The Windows MSI is unsigned, so SmartScreen may warn. Beta downloads do not include separate `.sha256` or provenance sidecars. GitHub records SHA-256 digests in release-asset metadata; the build workflow retains the full checksum and provenance records.
 
-- `dhun-beta.apk` — universal Android APK (Android 7.0 / API 24 or newer; preferred install).
-- `dhun-beta-arm64-v8a.apk` — optional 64-bit ARM APK from the same build.
-- `dhun-beta-armeabi-v7a.apk` — optional 32-bit ARM APK from the same build.
-- `dhun-beta.msi` — Windows per-user installer. VLC is required separately for audio.
+## Install and update
 
-Checksums and revision provenance remain in the internal workflow artifacts for build
-verification and promotion. They are not uploaded as `.sha256` or `.provenance.txt`
-release assets. Do not expect the fixed-release checksum-sidecar instructions to work
-for these four beta downloads.
+On Android, open the APK and allow your browser or file manager to install apps if prompted. On Windows, run the MSI. Install a newer beta over the existing one; do not uninstall or clear data to update. Uninstalling Android removes app-private library data and downloads. Read the full [installation guide](https://github.com/99ggprooo00-code/DHUN/blob/main/docs/INSTALL.md) before changing or removing an install.
 
-### Install and update
+## Scope and limits
 
-On Android, enable installation from your file manager/browser when prompted, then open
-the universal APK unless you specifically need an ABI split. On Windows, run the MSI;
-SmartScreen can warn because it is unsigned. See the
-[installation guide](https://github.com/99ggprooo00-code/DHUN/blob/main/docs/INSTALL.md)
-for platform details and uninstall/data warnings.
+DHUN is a free, open-source, cross-platform, multi-source client. YouTube / YouTube Music is the first implementation priority; the native Android and Windows builds currently use it through unofficial access. Spotify is planned, not implemented, and deferred pending technical, account/Premium, policy, legal, playback, privacy and cost review.
 
-Android keeps application ID `dev.dhun.android` and the existing signing identity; Windows
-keeps the existing MSI UpgradeCode. Install a newer beta over the old one **without clearing
-app data or uninstalling first**. Update recovery must not erase playlists, favourites,
-settings, downloads, queues or history. Uninstalling Android removes app-private data;
-back up anything you cannot replace before any uninstall.
+The experimental browser client is separate and uses JioSaavn through community-run wrappers. It is not feature-equivalent to the native apps; live catalogue access and audible playback remain unverified. Provider changes can interrupt playback, and CI is not a substitute for device acceptance. DHUN is not affiliated with or endorsed by YouTube, Google, JioSaavn or Spotify.
 
-The Android APK uses a public throwaway test signing key, so its signature does not prove
-who built a file. The Windows MSI is not Authenticode-signed. YouTube can change the
-endpoints used for playback. CI, emulator checks and a single install report do not replace
-the full device, audible-playback, accessibility or performance acceptance matrix.
-
-### Increasing versions
-
-Every beta/development APK records Android `1.00.<run>-beta.<attempt>` as its readable
-versionName. Its integer versionCode is the package job's allocation time in Unix seconds.
-Build APK and DHUN beta workflow runs have independent run counters, so the shared clock —
-not either run number — orders their packages and prevents a newer PR artifact from becoming
-an accidental downgrade. Later allocations increase the code; same-second jobs can share
-one, which Android accepts as a reinstall. Bad clocks and values above Android's
-2,100,000,000 limit fail rather than wrap.
-
-The old `test-release` workflow ended at run 867. The renamed beta workflow therefore adds
-an explicit 867 offset to its raw GitHub run number for readable Android and Windows package
-identities. If GitHub resets the counter, the first effective beta run is 868; if it continues
-the counter, the sequence jumps forward safely instead of becoming a downgrade. Build APK
-leaves this offset unset because its Android versionCode is time-ordered. Invalid or exhausted
-sequences fail rather than wrap.
-
-Windows keeps its separate, increasing offset-aware workflow run/attempt MSI ProductVersion sequence.
-The rolling tag name stays `beta`, the title stays **DHUN beta**, and the four asset names
-stay stable while each publication deletes and recreates the release/tag at the new commit.
-Fixed public releases, including `v1.00.002`, are separate and are not rewritten.
-
-A rolling beta has a much higher Android versionCode than the fixed public build. Android
-will reject installing that lower-versionCode fixed APK directly over a newer beta. Do not
-use clearing data as a downgrade or recovery step; back up app-private data before any
-uninstall.
+Read the [quick-start README](https://github.com/99ggprooo00-code/DHUN/blob/main/README.md), [privacy description (draft)](https://github.com/99ggprooo00-code/DHUN/blob/main/legal/privacy.md), [terms (draft)](https://github.com/99ggprooo00-code/DHUN/blob/main/legal/terms.md), and [third-party notices](https://github.com/99ggprooo00-code/DHUN/blob/main/THIRD_PARTY.md). [Report a bug](https://github.com/99ggprooo00-code/DHUN/issues/new/choose).
