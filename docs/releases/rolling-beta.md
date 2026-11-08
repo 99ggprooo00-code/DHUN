@@ -2,7 +2,7 @@
 
 **Public rolling prerelease — experimental, not stable or store-ready.** The `beta` tag always points to the newest successfully verified beta. A new beta replaces the previous rolling beta; fixed releases such as [`v1.00.002`](https://github.com/99ggprooo00-code/DHUN/releases/tag/v1.00.002) are not changed.
 
-## What’s new
+## Highlights
 
 - Clearer, more consistent popups and confirmations, with task-specific actions for playlist management, lyrics matching, region selection and playback recovery.
 - Improved contrast and action hierarchy make key choices and destructive actions easier to distinguish.
