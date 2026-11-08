@@ -1,10 +1,14 @@
-# Installing DHUN 1.00.002
+# Installing DHUN
+
+> **Choosing a build:** For current testing, use the public rolling [DHUN beta](https://github.com/99ggprooo00-code/DHUN/releases/tag/beta). Its package names and update guidance are in [Rolling DHUN beta](#rolling-dhun-beta). The first table below describes the separate fixed `v1.00.002` prerelease.
 
 > **Product/build distinction (2026-10-28):** DHUN's [multi-source direction](PRD.md#1-product-definition-and-source-of-truth)
 > prioritises YouTube / YouTube Music; these native packages currently implement that source only.
 > Spotify is planned, not available. The [separate browser client](web-player/USER-GUIDE.md) currently
 > uses JioSaavn and has no offline audio. Native downloads and extraction have unresolved
 > [permissions/policy risks](research/03-youtube-youtube-music.md); installation does not establish approval.
+
+## Fixed public prerelease: v1.00.002
 
 DHUN 1.00.002 is an **experimental public build for testing**, not a stable, store-signed, or hardware-accepted release. GitHub currently marks the published release as a prerelease; that label is not hardware acceptance. Use it only if you are comfortable with experimental software and possible playback breakage. The release is built from this repository; DHUN is not affiliated with YouTube or Google.
 

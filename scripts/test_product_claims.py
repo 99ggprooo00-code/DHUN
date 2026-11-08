@@ -118,19 +118,39 @@ class AuthorityAndPrivacy(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertTrue((ROOT / path.split(" (")[0]).exists(), "stale implementation citation")
 
-    def test_native_gallery_does_not_offer_browser_native_only_features(self):
+    def test_user_readme_is_concise_and_scopes_native_and_browser_features(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertLess(len(readme.splitlines()), 80)
+        self.assertLess(len(readme.split()), 700)
+        self.assertIn("YouTube / YouTube Music is the first implementation priority", readme)
+        self.assertIn("Native Android and Windows builds currently use YouTube Music", readme)
+        self.assertIn("Spotify is planned, not implemented", readme)
+        self.assertIn("technical, account/Premium, policy, legal, playback, privacy and cost review", readme)
+        self.assertIn("browser client uses JioSaavn", readme)
+        self.assertIn("offline audio", readme)
+        self.assertIn("equalizer or lyrics", readme)
         self.assertNotIn("/app/#/library/downloads", readme)
         self.assertNotIn("/app/#/player/lyrics", readme)
         self.assertNotIn("Open Desktop view in", readme)
-        self.assertIn("historical native captures", readme)
-        self.assertIn("Browser lyrics unavailable", readme)
-        self.assertIn("Browser audio downloads unavailable", readme)
+        expected_assets = {"dhun-beta.apk", "dhun-beta-arm64-v8a.apk", "dhun-beta-armeabi-v7a.apk", "dhun-beta.msi"}
+        self.assertEqual(expected_assets, set(re.findall(r"/releases/download/beta/([^/)]+)", readme)))
         ui = (ROOT / "website/src/ui.njk").read_text(encoding="utf-8")
         data = (ROOT / "website/src/_data/site.js").read_text(encoding="utf-8")
         self.assertNotIn("direct link into that exact screen", ui)
         self.assertNotIn("Open Desktop layout in the app", data)
         self.assertNotIn("so no unpermitted copyrighted art", data)
+
+    def test_user_readme_local_links_resolve(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        targets = re.findall(r"\[[^\]]+\]\(([^)\s]+)", readme)
+        self.assertGreater(len(targets), 10)
+        for target in targets:
+            if target.startswith(("https://", "http://", "mailto:")):
+                continue
+            relative_path = target.split("#", 1)[0]
+            if relative_path:
+                with self.subTest(target=target):
+                    self.assertTrue((ROOT / relative_path).exists(), f"broken README link: {target}")
 
     def test_inactive_spotify_is_not_silently_added_as_a_runtime_dependency(self):
         # Comments/research/plans are allowed. A real SDK/import needs review and

@@ -1,5 +1,6 @@
 """Safety contracts for the release workflow without a third-party YAML parser."""
 
+import re
 import shutil
 import subprocess
 import unittest
@@ -43,6 +44,29 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn(f'PRESERVE_BETA = "{marker}"', release_plan)
         self.assertIn("needs.release_plan.outputs.build_only == 'false'", self.publish_beta)
         self.assertIn("needs.release_plan.outputs.build_only == 'false'", self.publish)
+
+    def test_release_facing_docs_trigger_beta_without_broad_docs_triggers(self):
+        push = self.text.split("  push:\n", 1)[1].split("\n\npermissions:", 1)[0]
+        self.assertIn("- 'README.md'", push)
+        self.assertIn("- 'docs/INSTALL.md'", push)
+        self.assertIn("- 'docs/releases/rolling-beta.md'", push)
+        self.assertNotIn("- 'docs/**'", push)
+        self.assertIn("--notes-file docs/releases/rolling-beta.md", self.publish_beta)
+
+    def test_rolling_beta_notes_link_only_current_assets_and_existing_docs(self):
+        repository = WORKFLOW.parents[2]
+        notes = (repository / "docs/releases/rolling-beta.md").read_text()
+        expected_assets = {
+            "dhun-beta.apk", "dhun-beta-arm64-v8a.apk",
+            "dhun-beta-armeabi-v7a.apk", "dhun-beta.msi",
+        }
+        assets = set(re.findall(r"/releases/download/beta/([^/)]+)", notes))
+        self.assertEqual(expected_assets, assets)
+        paths = re.findall(r"github\.com/99ggprooo00-code/DHUN/blob/main/([^)]*)", notes)
+        self.assertGreater(len(paths), 3)
+        for path in paths:
+            with self.subTest(path=path):
+                self.assertTrue((repository / path).is_file(), f"release note link does not resolve: {path}")
 
     def test_ordinary_app_code_merge_updates_only_the_public_rolling_beta_release(self):
         push = self.text.split("  push:\n", 1)[1].split("\n\npermissions:", 1)[0]
