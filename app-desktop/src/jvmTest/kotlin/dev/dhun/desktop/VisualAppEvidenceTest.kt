@@ -496,7 +496,7 @@ class VisualAppEvidenceTest {
                     renderCurrentFrame(this, 360, 760),
                 )
                 onNodeWithText("Preview local TTML").performScrollTo().assertIsDisplayed()
-                val localTtml = """<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1s" end="5s">Local preview line</p></div></body></ttml>"""
+                val localTtml = """<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="1s" end="5s">Local preview line</p></div></body></tt>"""
                 onNodeWithContentDescription("TTML document").performScrollTo().performTextInput(localTtml)
                 onNodeWithText("Preview local TTML").performScrollTo().performClick()
                 val previewDeadline = System.nanoTime() + 5_000_000_000L
