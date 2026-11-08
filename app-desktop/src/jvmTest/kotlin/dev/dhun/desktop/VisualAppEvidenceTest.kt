@@ -322,7 +322,7 @@ class VisualAppEvidenceTest {
 
                     onNodeWithText("New playlist").performClick()
                     mainClock.advanceTimeBy(400)
-                    onNodeWithText("Playlist name").assertIsDisplayed()
+                    onNodeWithText("My playlist").assertIsDisplayed()
                     captureUiImage(
                         "popup-before-playlist-create-${mode.id}.png",
                         renderCurrentFrame(this, 412, 915),
