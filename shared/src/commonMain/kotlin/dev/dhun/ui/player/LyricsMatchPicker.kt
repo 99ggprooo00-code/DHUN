@@ -1,7 +1,9 @@
 package dev.dhun.ui.player
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -88,19 +91,30 @@ internal fun LyricsMatchPicker(
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         BoxWithConstraints(
-            modifier = Modifier.fillMaxSize().padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.lg),
+            modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center,
         ) {
-            val surfaceMaxWidth = minOf(DhunSpacing.lyricsMatchDialogMaxWidth, maxWidth)
-            val compactActions = maxWidth < DhunSpacing.lyricsMatchCompactActionBreakpoint
-            val surfaceMaxHeight = (maxHeight - DhunSpacing.md).coerceAtLeast(DhunSpacing.zero)
+            val sideInset = DhunSpacing.md
+            val verticalInset = DhunSpacing.lg
+            val availableWidth = (maxWidth - sideInset * 2).coerceAtLeast(DhunSpacing.zero)
+            val surfaceMaxWidth = minOf(DhunSpacing.lyricsMatchDialogMaxWidth, availableWidth)
+            val compactActions = availableWidth < DhunSpacing.lyricsMatchCompactActionBreakpoint
+            val surfaceMaxHeight =
+                (maxHeight - verticalInset * 2 - DhunSpacing.md).coerceAtLeast(DhunSpacing.zero)
             val bodyMaxHeight = (surfaceMaxHeight - DhunSpacing.smPlus * 2).coerceAtLeast(DhunSpacing.zero)
+            Box(
+                modifier = Modifier.fillMaxSize().pointerInput(onDismiss) {
+                    detectTapGestures(onTap = { onDismiss() })
+                },
+            )
             TrackMenuSurface(
                 artworkUrl = track.thumbnailUrl,
                 modifier = Modifier
+                    .padding(horizontal = sideInset, vertical = verticalInset)
                     .widthIn(max = surfaceMaxWidth)
                     .fillMaxWidth()
-                    .heightIn(max = surfaceMaxHeight),
+                    .heightIn(max = surfaceMaxHeight)
+                    .pointerInput(Unit) { detectTapGestures(onTap = {}) },
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth().heightIn(max = bodyMaxHeight)

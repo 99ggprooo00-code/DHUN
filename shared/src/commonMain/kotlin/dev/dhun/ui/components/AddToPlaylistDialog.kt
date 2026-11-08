@@ -2,6 +2,7 @@ package dev.dhun.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -94,6 +96,12 @@ fun AddToPlaylistDialog(
     var newPlaylistName by remember { mutableStateOf("") }
     var errorText by remember { mutableStateOf<String?>(null) }
     val failureText = mutation.errorMessage ?: errorText
+    val requestDismiss = {
+        if (!tracker.state.value.isBusy) {
+            newPlaylistAction.abandonPendingCreation()
+            onDismiss()
+        }
+    }
 
     val addToPlaylist: (String, String) -> Unit = add@{ playlistId, name ->
         // Read the tracker directly as well as its Compose snapshot: two
@@ -135,27 +143,35 @@ fun AddToPlaylistDialog(
     }
 
     Dialog(
-        onDismissRequest = {
-            if (!tracker.state.value.isBusy) {
-                newPlaylistAction.abandonPendingCreation()
-                onDismiss()
-            }
-        },
+        onDismissRequest = requestDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         BoxWithConstraints(
-            modifier = Modifier.fillMaxSize().padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.lg),
+            modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center,
         ) {
-            val surfaceMaxWidth = minOf(DhunSpacing.dialogWideMaxWidth, maxWidth)
-            val surfaceMaxHeight = (maxHeight - DhunSpacing.md).coerceAtLeast(DhunSpacing.zero)
+            val sideInset = DhunSpacing.md
+            val verticalInset = DhunSpacing.lg
+            val surfaceMaxWidth = minOf(
+                DhunSpacing.dialogWideMaxWidth,
+                (maxWidth - sideInset * 2).coerceAtLeast(DhunSpacing.zero),
+            )
+            val surfaceMaxHeight =
+                (maxHeight - verticalInset * 2 - DhunSpacing.md).coerceAtLeast(DhunSpacing.zero)
             val trackHeaderHeight = DhunSpacing.menuArtwork + DhunSpacing.sm * 3 + DhunSpacing.smPlus * 2
+            Box(
+                modifier = Modifier.fillMaxSize().pointerInput(requestDismiss) {
+                    detectTapGestures(onTap = { requestDismiss() })
+                },
+            )
             TrackMenuSurface(
                 artworkUrl = track.thumbnailUrl,
                 modifier = Modifier
+                    .padding(horizontal = sideInset, vertical = verticalInset)
                     .widthIn(min = minOf(DhunSpacing.menuMinWidth, surfaceMaxWidth), max = surfaceMaxWidth)
                     .fillMaxWidth()
-                    .heightIn(max = surfaceMaxHeight),
+                    .heightIn(max = surfaceMaxHeight)
+                    .pointerInput(Unit) { detectTapGestures(onTap = {}) },
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),

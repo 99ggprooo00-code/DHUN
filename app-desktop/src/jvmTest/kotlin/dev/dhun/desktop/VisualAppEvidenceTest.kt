@@ -231,6 +231,7 @@ class VisualAppEvidenceTest {
                     mainClock.advanceTimeBy(600)
 
                     onNodeWithText("New playlist").performClick()
+                    mainClock.advanceTimeBy(500)
                     onNodeWithContentDescription("Playlist name").assertIsDisplayed()
                     onNodeWithText("Save a personal collection in your local library.").assertIsDisplayed()
                     captureUiImage(
@@ -254,6 +255,7 @@ class VisualAppEvidenceTest {
 
                     onNodeWithContentDescription("Manage Visual QA").performScrollTo().performClick()
                     onNodeWithText("Rename").performClick()
+                    mainClock.advanceTimeBy(500)
                     onNodeWithText("Rename playlist").assertIsDisplayed()
                     onNodeWithText("Current name").assertIsDisplayed()
                     onNodeWithContentDescription("New playlist name").assertIsDisplayed()
@@ -286,6 +288,7 @@ class VisualAppEvidenceTest {
                     }
                     mainClock.advanceTimeBy(600)
                     onNodeWithText("New playlist").performClick()
+                    mainClock.advanceTimeBy(500)
                     onNodeWithContentDescription("Playlist name").assertIsDisplayed()
                     onNodeWithText("Create").assertIsDisplayed()
                     captureUiImage(
@@ -293,8 +296,10 @@ class VisualAppEvidenceTest {
                         renderCurrentFrame(this, 360, 760),
                     )
                     onNodeWithText("Cancel").performClick()
+                    mainClock.advanceTimeBy(350)
                     onNodeWithContentDescription("Manage Renamed QA").performScrollTo().performClick()
                     onNodeWithText("Rename").performClick()
+                    mainClock.advanceTimeBy(500)
                     onNodeWithContentDescription("New playlist name").assertIsDisplayed()
                     onNodeWithText("Save").assertIsDisplayed()
                     captureUiImage(
@@ -482,6 +487,7 @@ class VisualAppEvidenceTest {
                     renderCurrentFrame(this, 360, 760),
                 )
                 onNodeWithText("Paste local TTML lyrics").performClick()
+                mainClock.advanceTimeBy(300)
                 onNodeWithText("TTML document").assertIsDisplayed()
                 onNodeWithContentDescription("TTML document").assertIsDisplayed()
                 onNodeWithText("Preview local TTML").assertIsDisplayed()
@@ -721,6 +727,7 @@ class VisualAppEvidenceTest {
                     )
 
                     onNodeWithText("Create new playlist").performClick()
+                    mainClock.advanceTimeBy(300)
                     onNodeWithContentDescription("New playlist name").performTextInput("Retry QA")
                     captureUiImage(
                         "popup-after-playlist-create-form-${mode.id}.png",
@@ -799,6 +806,7 @@ class VisualAppEvidenceTest {
                     setContent { Shell(fixture, nav, mode, isDesktop = false) }
                     mainClock.advanceTimeBy(600)
                     onNodeWithContentDescription("Show playback details").performClick()
+                    mainClock.advanceTimeBy(400)
                     onNodeWithText("Playback details").assertIsDisplayed()
                     onNodeWithText("Show diagnostics").assertIsDisplayed()
                     onNodeWithText("Could not start playback. Check the connection and try again.")
@@ -808,6 +816,7 @@ class VisualAppEvidenceTest {
                         renderCurrentFrame(this, 412, 915),
                     )
                     onNodeWithText("Show diagnostics").performClick()
+                    mainClock.advanceTimeBy(250)
                     onNodeWithText("Hide diagnostics").assertIsDisplayed()
                     onNodeWithText("Track ID: ${track.id}").assertIsDisplayed()
                     onNodeWithText("web_embedded=AUTH_REQUIRED", substring = true).assertIsDisplayed()
@@ -816,11 +825,14 @@ class VisualAppEvidenceTest {
                         renderCurrentFrame(this, 412, 915),
                     )
                     onNodeWithText("Close").performClick()
+                    mainClock.advanceTimeBy(400)
                     assertEquals(0, fixture.player.retryRequests.get(), "Close only dismisses")
                     assertEquals(0, onAllNodes(hasText("Playback details")).fetchSemanticsNodes().size)
 
                     onNodeWithContentDescription("Show playback details").performClick()
+                    mainClock.advanceTimeBy(400)
                     onNodeWithText("Retry").performClick()
+                    mainClock.advanceTimeBy(400)
                     assertEquals(1, fixture.player.retryRequests.get(), "Retry retains the original player callback")
                     assertEquals(0, onAllNodes(hasText("Playback details")).fetchSemanticsNodes().size)
                 }
@@ -834,11 +846,13 @@ class VisualAppEvidenceTest {
                     }
                     mainClock.advanceTimeBy(600)
                     onNodeWithContentDescription("Show playback details").performClick()
+                    mainClock.advanceTimeBy(400)
                     captureUiImage(
                         "popup-after-playback-error-narrow-large-text-collapsed-${mode.id}.png",
                         renderCurrentFrame(this, 360, 760),
                     )
                     onNodeWithText("Show diagnostics").performClick()
+                    mainClock.advanceTimeBy(250)
                     onNodeWithText("Retry").performScrollTo()
                     onNodeWithText("Retry").assertIsDisplayed()
                     captureUiImage(
@@ -863,6 +877,7 @@ class VisualAppEvidenceTest {
                     setContent { Shell(fixture, nav, mode, isDesktop = false) }
                     mainClock.advanceTimeBy(600)
                     onNodeWithText("United States (US)").performClick()
+                    mainClock.advanceTimeBy(400)
                     onNodeWithText("Choose a country or region").assertIsDisplayed()
                     onNodeWithText("Current selection").assertIsDisplayed()
                     onNodeWithText("United States · US").assertIsDisplayed()
@@ -878,6 +893,7 @@ class VisualAppEvidenceTest {
                     onNodeWithContentDescription("Search country or region by name or code")
                         .performTextInput("Nepal")
                     onNodeWithContentDescription("Nepal (NP)").performClick()
+                    mainClock.advanceTimeBy(400)
                     onNodeWithText("Nepal (NP)").assertIsDisplayed()
                     val persistenceDeadline = System.nanoTime() + 5_000_000_000L
                     var persistedCountry: String? = null
@@ -890,8 +906,10 @@ class VisualAppEvidenceTest {
                     }
                     assertEquals("NP", persistedCountry, "Selection must persist through the existing settings repository")
                     onNodeWithText("Nepal (NP)").performClick()
+                    mainClock.advanceTimeBy(400)
                     onNodeWithText("Nepal · NP").assertIsDisplayed()
                     onNodeWithContentDescription("Nepal (NP)").performClick()
+                    mainClock.advanceTimeBy(400)
                 }
 
                 runSkikoComposeUiTest(size = Size(360f, 760f)) {
@@ -903,6 +921,7 @@ class VisualAppEvidenceTest {
                     }
                     mainClock.advanceTimeBy(600)
                     onNodeWithText("Nepal (NP)").performClick()
+                    mainClock.advanceTimeBy(400)
                     onNodeWithText("Choose a country or region").assertIsDisplayed()
                     onNodeWithText("Nepal · NP").assertIsDisplayed()
                     onNodeWithContentDescription("Search country or region by name or code").assertIsDisplayed()
