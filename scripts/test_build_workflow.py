@@ -288,19 +288,21 @@ class BuildWorkflowTest(unittest.TestCase):
         for block in self.text.split("uses: actions/upload-artifact@v6")[1:]:
             self.assertNotIn(".json", block.split("\n      - ", 1)[0])
 
-    def test_windows_theme_regression_is_focused_and_has_time_for_packaging(self):
+    def test_windows_theme_regression_uses_smoke_tests_before_msi(self):
         msi = self.text.split("\n  msi:\n", 1)[1].split("\n  aab:\n", 1)[0]
         regression = msi.split(
             "      - name: Live theme regression — Windows JVM\n", 1
         )[1].split("\n      - name: Build MSI", 1)[0]
 
-        # The platform-independent shared and full desktop suites already run
-        # in CI. Windows specifically validates the real Compose/Skia theme
-        # evidence and live theme observers before packaging and installer checks.
-        self.assertIn("timeout-minutes: 40", msi)
+        # Canonical Linux CI covers full shared/desktop tests and the app-state
+        # screenshot matrix. Windows still exercises Skiko plus live appearance
+        # without rerendering all 89 audit frames before installer validation.
+        self.assertIn("timeout-minutes: 25", msi)
         self.assertIn(":app-desktop:jvmTest", regression)
-        self.assertIn('--tests "dev.dhun.desktop.Visual*EvidenceTest"', regression)
+        self.assertIn('--tests "dev.dhun.desktop.VisualEvidenceTest"', regression)
         self.assertIn('--tests "dev.dhun.desktop.LiveAppearanceTest"', regression)
+        self.assertNotIn("VisualAppEvidenceTest", regression)
+        self.assertNotIn("Visual*EvidenceTest", regression)
         self.assertNotIn(":shared:jvmTest", regression)
 
     def test_install_over_is_required_for_main_and_a_skip_is_not_green_there(self):
