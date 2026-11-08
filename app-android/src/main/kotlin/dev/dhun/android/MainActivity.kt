@@ -18,19 +18,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -39,7 +33,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.core.content.ContextCompat
@@ -62,9 +55,7 @@ import dev.dhun.data.SettingsKeys
 import dev.dhun.design.DhunAppearance
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunTheme
-import dev.dhun.design.components.DhunTextButton
 import dev.dhun.design.components.GlassCard
-import dev.dhun.design.components.GlassDialog
 import dev.dhun.legal.DhunAppInfo
 import dev.dhun.player.NowPlayingPersistence
 import dev.dhun.presentation.home.HomeViewModel
@@ -72,6 +63,7 @@ import dev.dhun.presentation.player.PlayerViewModel
 import dev.dhun.presentation.search.SearchViewModel
 import dev.dhun.lyrics.LyricsRepository
 import dev.dhun.provider.MusicProvider
+import dev.dhun.ui.settings.BatteryPlaybackRationaleDialog
 import dev.dhun.ui.shell.AppNavState
 import dev.dhun.ui.shell.AppTab
 import dev.dhun.ui.shell.DhunAppShell
@@ -308,37 +300,13 @@ class MainActivity : ComponentActivity() {
                 }
 
                 if (showBatteryRationale) {
-                    GlassDialog(onDismissRequest = { batteryRationaleVisible.value = false }) {
-                        Text(
-                            "Keep playback reliable",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = DhunColors.textPrimary,
-                            modifier = Modifier.semantics { heading() },
-                        )
-                        Spacer(modifier = Modifier.height(DhunSpacing.sm))
-                        Text(
-                            "Android battery optimization can stop background music " +
-                                "on some phones. Allow DHUN to keep the playback service " +
-                                "available when the screen is off?",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = DhunColors.textSecondary,
-                        )
-                        Spacer(modifier = Modifier.height(DhunSpacing.lg))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                            DhunTextButton(onClick = { batteryRationaleVisible.value = false }) {
-                                Text("Not now")
-                            }
-                            Spacer(modifier = Modifier.width(DhunSpacing.sm))
-                            DhunTextButton(
-                                onClick = {
-                                    batteryRationaleVisible.value = false
-                                    openBatteryOptimizationSettings()
-                                },
-                            ) {
-                                Text("Allow")
-                            }
-                        }
-                    }
+                    BatteryPlaybackRationaleDialog(
+                        onDismiss = { batteryRationaleVisible.value = false },
+                        onAllow = {
+                            batteryRationaleVisible.value = false
+                            openBatteryOptimizationSettings()
+                        },
+                    )
                 }
             }
         }

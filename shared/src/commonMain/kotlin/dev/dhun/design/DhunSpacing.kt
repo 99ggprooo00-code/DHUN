@@ -143,8 +143,20 @@ object DhunSpacing {
     val quickPickWidth = 260.dp
     val dialogMinWidth = 280.dp
     val dialogMaxWidth = 380.dp
+    val dialogContentHorizontalPadding = 20.dp
+    val dialogContentVerticalPadding = 18.dp
+    val dialogIconBadgeSize = 38.dp
+    val dialogActionHorizontalPadding = 16.dp
+    val dialogActionVerticalPadding = 10.dp
     /** Compact ceiling for the lyrics-controls dialog; its body adapts below this on narrow windows. */
     val lyricsControlsDialogMaxWidth = 340.dp
+    /** Wider reading/list panel for result-heavy Lyrics Match content. */
+    val lyricsMatchDialogMaxWidth = 520.dp
+    val lyricsMatchCompactActionBreakpoint = 360.dp
+    val playlistDestinationListMaxHeight = 288.dp
+    val playlistDestinationRowHeight = 72.dp
+    val playlistDestinationRowMinHeight = 64.dp
+    val playlistDestinationActionMinHeight = 52.dp
     /**
      * Ceiling for tall dialog bodies (lyrics match picker, country picker).
      * One token for every scrollable dialog column so a phone keeps the scrim
@@ -158,6 +170,7 @@ object DhunSpacing {
     val iconSize = 24.dp
     val iconSizeSm = 18.dp
     val iconSizeLg = 32.dp
+    val buttonSpinnerSize = 16.dp
     /**
      * List-row thumbnail. 2026-09-21 UI polish: 56 → 64dp. Borderless —
      * [dev.dhun.design.components.ArtworkImage] draws no stroke. Wrapping rows

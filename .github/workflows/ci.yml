@@ -77,10 +77,11 @@ jobs:
 
       # The desktop jvmTest source set (jump-list/tray pure cores) exists
       # since candidate 27 but was never executed by CI — compileKotlinJvm
-      # only compiles jvmMain. It runs after the compile step so a compile
-      # break and a red test fail different, honestly-named steps.
+      # only compiles jvmMain. Keep the full app-shell Compose/Skia evidence
+      # matrix in the dedicated Visual evidence workflow rather than running
+      # that memory-heavy screenshot suite twice on every PR.
       - name: "Unit tests — Desktop (JVM)"
-        run: ./gradlew :app-desktop:jvmTest --no-daemon
+        run: ./gradlew :app-desktop:jvmTest -PexcludeVisualEvidence=true --no-daemon
 
       # Logs/artifacts are not downloadable in every development environment.
       # Read the executed JUnit XML, never the number of @Test annotations, and
@@ -136,3 +137,4 @@ jobs:
             app-android/build/test-results/testDebugUnitTest/*.xml
             tools/playback-probe/build/test-results/test/*.xml
             app-desktop/build/test-results/jvmTest/*.xml
+            app-desktop/build/outputs/visual-evidence/*.png

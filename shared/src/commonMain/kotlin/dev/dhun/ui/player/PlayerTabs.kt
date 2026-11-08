@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -48,6 +49,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.selected
@@ -71,6 +73,7 @@ import dev.dhun.design.components.DhunIconButton
 import dev.dhun.design.components.LyricsMaterial
 import dev.dhun.design.components.DhunTonalButton
 import dev.dhun.design.components.EmptyView
+import dev.dhun.design.components.FrostedChipSurface
 import dev.dhun.design.components.ErrorView
 import dev.dhun.design.components.LoadingShimmer
 import dev.dhun.design.components.fadeVerticalEdges
@@ -641,24 +644,38 @@ internal fun LyricsProviderPicker(
     val selectedLabel = lyricsProviderOptions.firstOrNull { it.first == selectedProvider }?.second
         ?: lyricsProviderOptions.first().second
 
-    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs)) {
+    Column(verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs)) {
         Text("Lyrics provider", style = MaterialTheme.typography.labelMedium, color = DhunColors.textSecondary)
         Box {
-            DhunTonalButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    selectedLabel,
-                    modifier = Modifier.weight(1f),
-                    color = accent,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(modifier = Modifier.width(DhunSpacing.xs))
-                DhunIconView(
-                    icon = DhunIcon.ChevronDown,
-                    contentDescription = null,
-                    modifier = Modifier.size(DhunSpacing.iconSizeSm),
-                    tint = accent,
-                )
+            FrostedChipSurface(
+                modifier = Modifier.heightIn(min = DhunSpacing.compactTarget)
+                    .clickable(
+                        role = Role.Button,
+                        onClickLabel = "Choose lyrics provider",
+                        onClick = { expanded = true },
+                    )
+                    .semantics { contentDescription = "Lyrics provider: $selectedLabel" },
+                shape = DhunShapes.button,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = DhunSpacing.mdPlus),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        selectedLabel,
+                        color = accent,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(modifier = Modifier.width(DhunSpacing.sm))
+                    DhunIconView(
+                        icon = DhunIcon.ChevronDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                        tint = accent,
+                    )
+                }
             }
             DropdownMenu(
                 expanded = expanded,
@@ -672,6 +689,7 @@ internal fun LyricsProviderPicker(
                     lyricsProviderOptions.forEach { (id, label) ->
                         MenuActionRow(
                             label = label,
+                            selected = id == selectedProvider,
                             modifier = Modifier.semantics { selected = id == selectedProvider },
                             onClick = {
                                 expanded = false

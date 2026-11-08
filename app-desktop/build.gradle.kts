@@ -1,5 +1,6 @@
 import org.jetbrains.compose.ExperimentalComposeLibrary
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.gradle.api.tasks.testing.Test
 
 plugins {
     kotlin("multiplatform")
@@ -57,6 +58,22 @@ kotlin {
                 @OptIn(ExperimentalComposeLibrary::class)
                 implementation(compose.uiTest)
             }
+        }
+    }
+}
+
+// Full Compose/Skia evidence is run by the dedicated Visual Evidence workflow;
+// don't repeat its large app-shell capture matrix in the general Desktop unit step.
+val excludeVisualEvidence = providers.gradleProperty("excludeVisualEvidence").getOrNull()?.toBoolean() == true
+
+tasks.withType<Test>().configureEach {
+    // The dedicated evidence run renders many complete shell states in one JVM.
+    // Keep enough headroom for deterministic CI captures without changing app runtime.
+    maxHeapSize = "2g"
+    if (excludeVisualEvidence) {
+        filter {
+            excludeTestsMatching("dev.dhun.desktop.VisualAppEvidenceTest")
+            excludeTestsMatching("dev.dhun.desktop.VisualEvidenceTest")
         }
     }
 }

@@ -1,14 +1,26 @@
 package dev.dhun.ui.components
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,49 +32,40 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import dev.dhun.core.Track
 import dev.dhun.data.LocalPlaylist
 import dev.dhun.data.PlaylistRepository
 import dev.dhun.design.DhunColors
 import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
+import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.DhunButton
+import dev.dhun.design.components.DhunOutlinedButton
 import dev.dhun.design.components.DhunTextField
 import dev.dhun.design.components.DhunTextButton
 import dev.dhun.presentation.MutationTracker
 
 /**
- * Local-playlist picker for one track.
+ * Destination picker for adding one track to a local playlist.
  *
- * **This is part of the ⋮ menu family, not a second dialog system.** It used to
- * be the last old-Material surface left in the app: a `GlassCard` at 280–400dp
- * with double padding, an M3 `titleLarge` header, a **fixed 180dp-tall** list box
- * (empty space under two playlists, a scroll box for a two-row list), an M3
- * `OutlinedTextField` for the new-playlist name, and a Close/Cancel button row —
- * none of which matched the compact frosted menus the rest of the app moved to.
- * The device report ("still the old Material 3 interface… an unusually
- * long/oversized box") is that surface.
- *
- * What it draws now, using the shared pieces rather than new ones:
- *
- * - [TrackMenuSurface] — the track's own blurred artwork under the lyrics veil,
- *   on an opaque base, sized to its content (the surface that fixed the same
- *   stretch bug for the ⋮ menu);
- * - [TrackMenuHeader] — the identical "which track is this" header as the ⋮
- *   menu, so the two surfaces read as one family;
- * - one caption line saying what this surface does, then one [MenuActionRow] per
- *   playlist (name + track count + the "Open" breadcrumb) and an "New playlist"
- *   row — no divider, no Close button, no M3 button row;
- * - a **content-sized** picker list ([AddToPlaylistPolicy.listMaxHeight]): it
- *   reserves nothing for rows that do not exist, and scrolls only past four;
- * - a DHUN-styled single-line input instead of M3's outlined field.
- *
- * The repository flow and `onAdded` / `onOpenPlaylist` navigation are preserved.
- * Writes are result-driven: duplicate submissions are gated, failures stay in
- * the sheet, and tap-outside / Back cannot dismiss an in-flight write.
+ * It shares the artwork-aware track header/material with the compact overflow
+ * menu so the song remains identifiable, but the body is a destination list,
+ * not another list of track actions: each playlist is its own add target,
+ * opening a playlist is a distinct secondary action, and creation has a
+ * separate full-width affordance/form. The repository flow and all mutation,
+ * duplicate, retry, and dismissal rules below remain result-driven.
  */
 @Composable
 fun AddToPlaylistDialog(
@@ -93,6 +96,12 @@ fun AddToPlaylistDialog(
     var newPlaylistName by remember { mutableStateOf("") }
     var errorText by remember { mutableStateOf<String?>(null) }
     val failureText = mutation.errorMessage ?: errorText
+    val requestDismiss = {
+        if (!tracker.state.value.isBusy) {
+            newPlaylistAction.abandonPendingCreation()
+            onDismiss()
+        }
+    }
 
     val addToPlaylist: (String, String) -> Unit = add@{ playlistId, name ->
         // Read the tracker directly as well as its Compose snapshot: two
@@ -133,165 +142,300 @@ fun AddToPlaylistDialog(
         }
     }
 
-    Dialog(onDismissRequest = {
-        if (!tracker.state.value.isBusy) {
-            newPlaylistAction.abandonPendingCreation()
-            onDismiss()
-        }
-    }) {
-        TrackMenuSurface(
-            artworkUrl = track.thumbnailUrl,
-            modifier = Modifier
-                // A dialog window clips at its content bounds, so the surface
-                // keeps a margin for its own shadow. The width budget comes
-                // after it: the same menu ceiling as the ⋮ menu.
-                .padding(DhunSpacing.sm)
-                .widthIn(
-                    min = DhunSpacing.menuMinWidth,
-                    max = DhunSpacing.menuMaxWidth,
-                ),
+    Dialog(
+        onDismissRequest = requestDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
         ) {
-            TrackMenuHeader(track = track)
-            Text(
-                text = if (isCreatingNew) "New playlist" else "Add to playlist",
-                style = MaterialTheme.typography.labelSmall,
-                color = DhunColors.accent,
-                modifier = Modifier.padding(
-                    start = DhunSpacing.mdPlus,
-                    end = DhunSpacing.mdPlus,
-                    bottom = DhunSpacing.xs,
-                ),
+            val sideInset = DhunSpacing.md
+            val verticalInset = DhunSpacing.lg
+            val surfaceMaxWidth = minOf(
+                DhunSpacing.dialogWideMaxWidth,
+                (maxWidth - sideInset * 2).coerceAtLeast(DhunSpacing.zero),
             )
-
-            if (isCreatingNew) {
-                DhunTextField(
-                    value = newPlaylistName,
-                    onValueChange = {
-                        // Once the playlist row exists, a retry keeps its name
-                        // and ID; editing must not turn that retry into a create.
-                        if (!newPlaylistAction.hasPendingCreation && !mutation.isBusy) {
-                            newPlaylistName = it
-                            errorText = null
-                        }
-                    },
-                    modifier = Modifier.padding(horizontal = DhunSpacing.mdPlus),
-                    placeholder = "Playlist name",
-                    isError = failureText != null,
-                    onSubmit = createAndAdd,
-                )
-                failureText?.let {
-                    Text(
-                        text = it,
-                        color = DhunColors.error,
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(
-                            start = DhunSpacing.mdPlus,
-                            top = DhunSpacing.xs,
-                        ),
-                    )
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = DhunSpacing.mdPlus, vertical = DhunSpacing.smPlus),
-                    verticalAlignment = Alignment.CenterVertically,
+            val surfaceMaxHeight =
+                (maxHeight - verticalInset * 2 - DhunSpacing.md).coerceAtLeast(DhunSpacing.zero)
+            val trackHeaderHeight = DhunSpacing.menuArtwork + DhunSpacing.sm * 3 + DhunSpacing.smPlus * 2
+            Box(
+                modifier = Modifier.fillMaxSize().pointerInput(requestDismiss) {
+                    detectTapGestures(onTap = { requestDismiss() })
+                },
+            )
+            TrackMenuSurface(
+                artworkUrl = track.thumbnailUrl,
+                modifier = Modifier
+                    .padding(horizontal = sideInset, vertical = verticalInset)
+                    .widthIn(min = minOf(DhunSpacing.menuMinWidth, surfaceMaxWidth), max = surfaceMaxWidth)
+                    .fillMaxWidth()
+                    .heightIn(max = surfaceMaxHeight)
+                    .pointerInput(Unit) { detectTapGestures(onTap = {}) },
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
                 ) {
-                    Spacer(modifier = Modifier.weight(1f))
-                    DhunTextButton(
-                        onClick = {
-                            newPlaylistAction.abandonPendingCreation()
-                            tracker.dismissError()
-                            isCreatingNew = false
-                            newPlaylistName = ""
-                            errorText = null
-                        },
-                        enabled = !mutation.isBusy,
-                    ) {
-                        Text("Back")
-                    }
-                    Spacer(modifier = Modifier.size(DhunSpacing.sm))
-                    DhunButton(
-                        onClick = createAndAdd,
-                        enabled = newPlaylistName.isNotBlank() && !mutation.isBusy,
-                        loading = mutation.isRunning(NewPlaylistAddAction.KEY),
-                    ) {
-                        Text(if (failureText != null) "Try again" else "Create & add")
-                    }
-                }
-            } else {
-                // A failure from a playlist row (not the "new playlist" input).
-                if (playlists.isNotEmpty()) {
-                    failureText?.let {
-                        Text(
-                            text = it,
-                            color = DhunColors.error,
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(
-                                start = DhunSpacing.mdPlus,
-                                end = DhunSpacing.mdPlus,
-                                bottom = DhunSpacing.xs,
-                            ),
-                        )
-                    }
-                }
-                if (playlists.isEmpty()) {
-                    Text(
-                        text = "No playlists yet — create one below.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = DhunColors.textTertiary,
-                        modifier = Modifier.padding(
-                            horizontal = DhunSpacing.mdPlus,
-                            vertical = DhunSpacing.sm,
-                        ),
-                    )
-                } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            // Sized to the rows it actually has: the old sheet
-                            // reserved a fixed 180dp box whether it held one
-                            // playlist or ten.
-                            .heightIn(max = AddToPlaylistPolicy.listMaxHeight(playlists.size)),
-                    ) {
-                        items(playlists, key = { it.id }) { playlist ->
-                            // Local copy: the breadcrumb needs a smart-castable
-                            // reference to build its click lambda.
-                            val openPlaylist = onOpenPlaylist
-                            MenuActionRow(
-                                label = playlist.name,
-                                icon = DhunIcon.QueueMusic,
-                                supportingText = "${playlist.trackCount} tracks",
-                                onClick = { addToPlaylist(playlist.id, playlist.name) },
-                                trailingLabel = if (openPlaylist != null) "Open" else null,
-                                onTrailingClick = openPlaylist?.let { open ->
-                                    { if (!tracker.state.value.isBusy) open(playlist.id) }
-                                },
+                    TrackMenuHeader(track = track)
+                    val formScrollModifier = if (isCreatingNew) {
+                        Modifier
+                            .heightIn(
+                                max = (surfaceMaxHeight - trackHeaderHeight).coerceAtLeast(DhunSpacing.zero),
                             )
+                            .verticalScroll(rememberScrollState())
+                    } else {
+                        Modifier
+                    }
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = DhunSpacing.mdPlus)
+                            .then(formScrollModifier),
+                        verticalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
+                    ) {
+                        Text(
+                            text = if (isCreatingNew) "New playlist" else "Add to playlist",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = DhunColors.textPrimary,
+                        )
+                        Text(
+                            text = if (isCreatingNew) {
+                                "This song will be added after the playlist is created."
+                            } else {
+                                "Choose a destination for this song."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = DhunColors.textSecondary,
+                        )
+
+                        if (isCreatingNew) {
+                            Text(
+                                text = "Playlist name",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = DhunColors.textSecondary,
+                            )
+                            DhunTextField(
+                                value = newPlaylistName,
+                                onValueChange = {
+                                    // Once the playlist row exists, a retry keeps its name
+                                    // and ID; editing must not turn that retry into a create.
+                                    if (!newPlaylistAction.hasPendingCreation && !mutation.isBusy) {
+                                        newPlaylistName = it
+                                        errorText = null
+                                    }
+                                },
+                                modifier = Modifier.semantics { contentDescription = "New playlist name" },
+                                placeholder = "Playlist name",
+                                isError = failureText != null,
+                                enabled = !newPlaylistAction.hasPendingCreation && !mutation.isBusy,
+                                onSubmit = createAndAdd,
+                            )
+                            if (newPlaylistAction.hasPendingCreation) {
+                                Text(
+                                    "Playlist created. Retrying will add this song to that same playlist.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = DhunColors.textSecondary,
+                                )
+                            }
+                            failureText?.let {
+                                PlaylistPickerError(text = it)
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = DhunSpacing.xs, bottom = DhunSpacing.sm),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.End,
+                            ) {
+                                DhunTextButton(
+                                    onClick = {
+                                        newPlaylistAction.abandonPendingCreation()
+                                        tracker.dismissError()
+                                        isCreatingNew = false
+                                        newPlaylistName = ""
+                                        errorText = null
+                                    },
+                                    enabled = !mutation.isBusy,
+                                ) {
+                                    Text("Back")
+                                }
+                                Spacer(modifier = Modifier.size(DhunSpacing.sm))
+                                DhunButton(
+                                    onClick = createAndAdd,
+                                    enabled = newPlaylistName.isNotBlank() && !mutation.isBusy,
+                                    loading = mutation.isRunning(NewPlaylistAddAction.KEY),
+                                ) {
+                                    Text(if (failureText != null) "Try again" else "Create & add")
+                                }
+                            }
+                        } else {
+                            failureText?.let { PlaylistPickerError(text = it) }
+                            if (playlists.isEmpty()) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth()
+                                        .clip(DhunShapes.medium)
+                                        .background(DhunColors.surfaceContainerLow)
+                                        .padding(DhunSpacing.md),
+                                    horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    DhunIconView(
+                                        icon = DhunIcon.QueueMusic,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                                        tint = DhunColors.textTertiary,
+                                    )
+                                    Text(
+                                        text = "No playlists yet — create one below.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = DhunColors.textSecondary,
+                                    )
+                                }
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(
+                                            max = AddToPlaylistPolicy.listMaxHeight(
+                                                rowCount = playlists.size,
+                                                rowHeight = DhunSpacing.playlistDestinationRowHeight,
+                                                ceiling = DhunSpacing.playlistDestinationListMaxHeight,
+                                            ),
+                                        ),
+                                    verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs),
+                                ) {
+                                    items(playlists, key = { it.id }) { playlist ->
+                                        val openPlaylist = onOpenPlaylist
+                                        PlaylistDestinationRow(
+                                            playlist = playlist,
+                                            enabled = !mutation.isBusy,
+                                            onAdd = { addToPlaylist(playlist.id, playlist.name) },
+                                            onOpen = openPlaylist?.let { open -> { open(playlist.id) } },
+                                        )
+                                    }
+                                }
+                            }
+                            HorizontalDivider(color = DhunColors.border)
+                            DhunOutlinedButton(
+                                onClick = {
+                                    errorText = null
+                                    isCreatingNew = true
+                                },
+                                enabled = !mutation.isBusy,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                DhunIconView(
+                                    icon = DhunIcon.Add,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                                    tint = DhunColors.accent,
+                                )
+                                Spacer(modifier = Modifier.width(DhunSpacing.sm))
+                                Text("Create new playlist")
+                            }
+                            Spacer(modifier = Modifier.size(DhunSpacing.xs))
                         }
                     }
                 }
-                MenuActionRow(
-                    label = "New playlist",
-                    icon = DhunIcon.Add,
-                    onClick = {
-                        if (!tracker.state.value.isBusy) {
-                            errorText = null
-                            isCreatingNew = true
-                        }
-                    },
-                )
             }
         }
     }
 }
 
-/**
- * The picker's height budget, as numbers — so the "it reserved a box it did not
- * need" defect stays fixed in CI instead of in a screenshot.
- *
- * The list is measured to its rows up to [VISIBLE_ROWS]; past that it scrolls.
- * The row height is the menu row's, because these rows *are* menu rows.
- */
+@Composable
+private fun PlaylistDestinationRow(
+    playlist: LocalPlaylist,
+    enabled: Boolean,
+    onAdd: () -> Unit,
+    onOpen: (() -> Unit)?,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .heightIn(min = DhunSpacing.playlistDestinationRowMinHeight)
+            .clip(DhunShapes.medium)
+            .background(DhunColors.surfaceContainerLow)
+            .padding(horizontal = DhunSpacing.smPlus, vertical = DhunSpacing.xs),
+        horizontalArrangement = Arrangement.spacedBy(DhunSpacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            modifier = Modifier.weight(1f)
+                .heightIn(min = DhunSpacing.playlistDestinationActionMinHeight)
+                .clip(DhunShapes.small)
+                .clickable(
+                    enabled = enabled,
+                    onClickLabel = "Add to ${playlist.name}",
+                    role = Role.Button,
+                    onClick = onAdd,
+                )
+                .semantics { contentDescription = "Add this song to ${playlist.name}" }
+                .padding(horizontal = DhunSpacing.xs),
+            horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier.size(DhunSpacing.menuArtwork)
+                    .clip(DhunShapes.small)
+                    .background(DhunColors.accentContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                DhunIconView(
+                    icon = DhunIcon.QueueMusic,
+                    contentDescription = null,
+                    modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                    tint = DhunColors.accent,
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = playlist.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = DhunColors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "${playlist.trackCount} ${if (playlist.trackCount == 1) "track" else "tracks"}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = DhunColors.textTertiary,
+                    maxLines = 1,
+                )
+            }
+        }
+        onOpen?.let { open ->
+            DhunTextButton(
+                onClick = open,
+                enabled = enabled,
+                modifier = Modifier.semantics { contentDescription = "Open ${playlist.name}" },
+            ) {
+                Text("Open", maxLines = 1)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaylistPickerError(text: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .clip(DhunShapes.medium)
+            .background(DhunColors.errorContainer)
+            .padding(horizontal = DhunSpacing.md, vertical = DhunSpacing.sm),
+        horizontalArrangement = Arrangement.spacedBy(DhunSpacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        DhunIconView(
+            icon = DhunIcon.Error,
+            contentDescription = null,
+            modifier = Modifier.size(DhunSpacing.iconSizeSm),
+            tint = DhunColors.error,
+        )
+        Text(
+            text = text,
+            modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
+            style = MaterialTheme.typography.bodySmall,
+            color = DhunColors.error,
+        )
+    }
+}
+
 /**
  * Operation-specific state for Create & add. If playlist creation succeeds but
  * the membership write fails, a retry reuses that row instead of creating a
@@ -337,20 +481,18 @@ internal object AddToPlaylistPolicy {
     const val VISIBLE_ROWS = 4
 
     /**
-     * Tallest the picker list may be for [rowCount] playlists.
-     *
-     * Zero playlists means no list at all (`0.dp`) — the empty case draws a
-     * sentence, not an empty box. The result never exceeds
-     * [DhunSpacing.dialogListHeight], the fixed box this replaced.
+     * Height budget for the destination rows. Zero playlists means no list at
+     * all (`DhunSpacing.zero`) — the empty case draws a sentence, not an empty box. Past
+     * [VISIBLE_ROWS] items, the list scrolls within the supplied ceiling.
      */
     fun listMaxHeight(
         rowCount: Int,
         rowHeight: Dp = DhunSpacing.menuRowHeight,
         ceiling: Dp = DhunSpacing.dialogListHeight,
     ): Dp {
-        if (rowCount <= 0) return 0.dp
-        if (!rowHeight.value.isFinite() || rowHeight <= 0.dp) return 0.dp
+        if (rowCount <= 0) return DhunSpacing.zero
+        if (!rowHeight.value.isFinite() || rowHeight <= DhunSpacing.zero) return DhunSpacing.zero
         val rows = rowCount.coerceAtMost(VISIBLE_ROWS)
-        return (rowHeight * rows).coerceAtMost(if (ceiling > 0.dp) ceiling else rowHeight * rows)
+        return (rowHeight * rows).coerceAtMost(if (ceiling > DhunSpacing.zero) ceiling else rowHeight * rows)
     }
 }

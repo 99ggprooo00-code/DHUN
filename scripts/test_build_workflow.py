@@ -34,6 +34,16 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn("python scripts/release_plan.py", self.text)
         self.assertIn("- '.github/release-intent/v1.00.002'", self.text)
 
+    def test_popup_merge_preserves_rolling_beta_with_one_shot_build_only_intent(self):
+        marker = ".github/release-intent/preserve-rolling-beta-pr223"
+        repository = WORKFLOW.parents[2]
+        self.assertIn(f"- '{marker}'", self.text)
+        self.assertTrue((repository / marker).is_file())
+        release_plan = (repository / "scripts/release_plan.py").read_text()
+        self.assertIn(f'PRESERVE_BETA = "{marker}"', release_plan)
+        self.assertIn("needs.release_plan.outputs.build_only == 'false'", self.publish_beta)
+        self.assertIn("needs.release_plan.outputs.build_only == 'false'", self.publish)
+
     def test_ordinary_app_code_merge_updates_only_the_public_rolling_beta_release(self):
         push = self.text.split("  push:\n", 1)[1].split("\n\npermissions:", 1)[0]
         self.assertIn("branches: [main]", push)
@@ -105,6 +115,22 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn("needs.msi.result == 'failure'", self.text)
         self.assertIn("safeLaunchDiagnostics", self.text)
         self.assertIn("    needs: [release_plan, apk, msi]", self.publish)
+
+    def test_msi_build_retries_only_transient_wix_gateway_timeouts(self):
+        msi = self.text.split("\n  msi:\n", 1)[1].split("\n  aab:\n", 1)[0]
+        build = msi.split("      - name: Build MSI (jpackage)\n", 1)[1].split(
+            "\n      - name: Verify MSI identity", 1,
+        )[0]
+        self.assertIn("$maxAttempts = 3", build)
+        self.assertIn('Contains("downloadWix")', build)
+        self.assertIn("HTTP status code: 504", build)
+        self.assertIn("wixtoolset/wix3/releases/download/", build)
+        self.assertIn("if ($gradleExitCode -eq 0) { break }", build)
+        self.assertIn(
+            "if (-not $transientWixGatewayTimeout -or $attempt -eq $maxAttempts)",
+            build,
+        )
+        self.assertIn("exit $gradleExitCode", build)
 
     def test_unsigned_msi_is_finalized_before_checksum_and_upload(self):
         scripts = WORKFLOW.parents[2] / "scripts"
@@ -287,6 +313,23 @@ class BuildWorkflowTest(unittest.TestCase):
                 self.assertNotIn(".json", line)
         for block in self.text.split("uses: actions/upload-artifact@v6")[1:]:
             self.assertNotIn(".json", block.split("\n      - ", 1)[0])
+
+    def test_windows_theme_regression_uses_smoke_tests_before_msi(self):
+        msi = self.text.split("\n  msi:\n", 1)[1].split("\n  aab:\n", 1)[0]
+        regression = msi.split(
+            "      - name: Live theme regression — Windows JVM\n", 1
+        )[1].split("\n      - name: Build MSI", 1)[0]
+
+        # Canonical Linux CI covers full shared/desktop tests and the app-state
+        # screenshot matrix. Windows still exercises Skiko plus live appearance
+        # without rerendering all 89 audit frames before installer validation.
+        self.assertIn("timeout-minutes: 25", msi)
+        self.assertIn(":app-desktop:jvmTest", regression)
+        self.assertIn('--tests "dev.dhun.desktop.VisualEvidenceTest"', regression)
+        self.assertIn('--tests "dev.dhun.desktop.LiveAppearanceTest"', regression)
+        self.assertNotIn("VisualAppEvidenceTest", regression)
+        self.assertNotIn("Visual*EvidenceTest", regression)
+        self.assertNotIn(":shared:jvmTest", regression)
 
     def test_install_over_is_required_for_main_and_a_skip_is_not_green_there(self):
         msi = self.text.split("\n  msi:\n", 1)[1].split("\n  aab:\n", 1)[0]

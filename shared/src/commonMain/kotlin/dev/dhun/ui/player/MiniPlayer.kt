@@ -132,6 +132,9 @@ fun MiniPlayer(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(DhunSpacing.miniPlayerHeight)
+                        .semantics {
+                            contentDescription = if (errorState != null) "Show playback details" else "Open player"
+                        }
                         // Lift feedback while the expansion swipe is in flight:
                         // a bounded quarter-parallax, never enough to detach a
                         // row from its committed threshold. Offset-only, so the

@@ -1,6 +1,12 @@
-# 45 — Lyrics Controls dialog refresh
+# 45 — Lyrics Controls dialog refresh (PR #222 baseline)
 
-Date: 2026-11-07. Work branch: `arena/c0cc2714-dhun`. Review PR: #222.
+Date: 2026-11-07. Historical work branch: `arena/c0cc2714-dhun`. Review PR: #222.
+
+> This is the merged PR #222 implementation/evidence record, not the current
+> visual acceptance claim. PR #222 preserved timing behavior but did not match
+> the supplied compact Lyrics Controls reference. The follow-up layout, all 19
+> screenshot-by-screenshot decisions, and current evidence status are recorded
+> in [47 — Screenshot-by-screenshot visual audit](47-screenshot-by-screenshot-visual-audit.md).
 
 ## Scope and behavior
 

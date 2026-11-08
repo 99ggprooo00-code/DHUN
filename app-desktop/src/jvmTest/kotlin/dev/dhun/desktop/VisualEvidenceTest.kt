@@ -7,9 +7,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.use
@@ -22,6 +24,7 @@ import dev.dhun.design.DhunTheme
 import dev.dhun.design.DhunThemeMode
 import dev.dhun.design.DhunTypographyTokens
 import dev.dhun.design.components.DhunButton
+import dev.dhun.design.components.DhunConfirmDialog
 import dev.dhun.design.components.DhunNavigationBar
 import dev.dhun.design.components.DhunNavigationBarItem
 import dev.dhun.design.components.DhunTextButton
@@ -29,6 +32,7 @@ import dev.dhun.design.components.GlassCard
 import dev.dhun.design.components.GlassDialog
 import java.io.File
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
@@ -54,19 +58,25 @@ class VisualEvidenceTest {
                         ComponentFrame()
                     }
                 }
+                var inheritedContentColor: Color? = null
                 render("dialog-$suffix.png", width = 600, height = 500) {
                     DhunTheme(mode = mode, accent = DhunAccent.BRAND) {
                         Box(Modifier.fillMaxSize().background(DhunColors.background))
                         GlassDialog(onDismissRequest = {}) {
+                            inheritedContentColor = LocalContentColor.current
                             Text(
                                 "Playlist changes",
                                 style = DhunTypographyTokens.titleLarge,
                                 color = DhunColors.textPrimary,
                             )
                             Text(
-                                "The existing dialog keeps its actions and dismissal behavior while using DHUN glass.",
-                                color = DhunColors.textSecondary,
+                                "This body text inherits DHUN's readable foreground automatically.",
                                 modifier = Modifier.padding(top = DhunSpacing.md),
+                            )
+                            Text(
+                                "The existing actions and dismissal behavior are unchanged.",
+                                color = DhunColors.textSecondary,
+                                modifier = Modifier.padding(top = DhunSpacing.sm),
                             )
                             DhunButton(
                                 onClick = {},
@@ -81,6 +91,24 @@ class VisualEvidenceTest {
                                 Text("Cancel")
                             }
                         }
+                    }
+                }
+                assertEquals(
+                    DhunColors.textPrimary,
+                    inheritedContentColor,
+                    "$suffix GlassDialog should provide the active DHUN foreground by default",
+                )
+                render("confirm-dialog-$suffix.png", width = 412, height = 915) {
+                    DhunTheme(mode = mode, accent = DhunAccent.BRAND) {
+                        Box(Modifier.fillMaxSize().background(DhunColors.background))
+                        DhunConfirmDialog(
+                            title = "Clear lyrics cache?",
+                            message = "Automatic lyrics will be fetched again. Saved per-song choices remain; use Use automatic in the lyrics match picker to reset one.",
+                            confirmLabel = "Clear",
+                            pendingLabel = "Clearing…",
+                            onConfirm = {},
+                            onDismissRequest = {},
+                        )
                     }
                 }
             }

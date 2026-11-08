@@ -10,7 +10,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -92,23 +96,34 @@ fun GlassCard(
     }
 }
 
-/** One high-opacity DHUN dialog container; callers retain their own actions. */
+/**
+ * One high-opacity DHUN dialog foundation. Besides the shared surface, width
+ * and inset, it establishes the dialog's default content color and body type
+ * rung; plain [androidx.compose.material3.Text] therefore remains legible on
+ * both the dark and light glass instead of inheriting the platform default.
+ * Callers retain their own content, actions and dismissal rules.
+ */
 @Composable
 fun GlassDialog(
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
+    minWidth: Dp = DhunSpacing.dialogMinWidth,
+    maxWidth: Dp = DhunSpacing.dialogMaxWidth,
+    contentPadding: PaddingValues = PaddingValues(DhunSpacing.lg),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Dialog(onDismissRequest = onDismissRequest) {
         GlassCard(
-            modifier = modifier.widthIn(
-                min = DhunSpacing.dialogMinWidth,
-                max = DhunSpacing.dialogMaxWidth,
-            ),
+            modifier = modifier.widthIn(min = minWidth, max = maxWidth),
             shape = DhunShapes.large,
             opaqueBase = true,
         ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(DhunSpacing.lg), content = content)
+            CompositionLocalProvider(
+                LocalContentColor provides DhunColors.textPrimary,
+                LocalTextStyle provides MaterialTheme.typography.bodyMedium,
+            ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(contentPadding), content = content)
+            }
         }
     }
 }

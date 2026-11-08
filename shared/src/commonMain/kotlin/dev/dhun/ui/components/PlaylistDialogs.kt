@@ -1,29 +1,45 @@
 package dev.dhun.ui.components
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import dev.dhun.design.DhunColors
+import dev.dhun.design.DhunIcon
+import dev.dhun.design.DhunIconView
 import dev.dhun.design.DhunShapes
 import dev.dhun.design.DhunSpacing
 import dev.dhun.design.components.DhunButton
+import dev.dhun.design.components.DhunConfirmDialog
 import dev.dhun.design.components.DhunTextButton
 import dev.dhun.design.components.DhunTextField
-import dev.dhun.design.components.GlassCard
+import dev.dhun.design.components.GlassDialog
 
 /**
  * The two playlist-management dialogs, shared by every place a saved playlist
@@ -53,44 +69,99 @@ internal fun PlaylistRenameDialog(
     errorMessage: String? = null,
 ) {
     var name by remember(current) { mutableStateOf(current) }
-    Dialog(onDismissRequest = { if (!isSaving) onDismiss() }) {
-        GlassCard(
-            modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
-            shape = DhunShapes.large,
-            // A dialog floats over a dimmed page — the opaque base is what
-            // keeps the list underneath from reading through its text.
-            opaqueBase = true,
+    GlassDialog(
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        modifier = Modifier.heightIn(max = DhunSpacing.dialogBodyMaxHeight),
+        maxWidth = DhunSpacing.dialogWideMaxWidth,
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+            horizontal = DhunSpacing.dialogContentHorizontalPadding,
+            vertical = DhunSpacing.dialogContentVerticalPadding,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth()
+                .heightIn(max = DhunSpacing.dialogBodyMaxHeight)
+                .verticalScroll(rememberScrollState()),
         ) {
-            Column(modifier = Modifier.padding(DhunSpacing.lg)) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(DhunSpacing.md),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier.size(DhunSpacing.dialogIconBadgeSize)
+                        .clip(CircleShape)
+                        .background(DhunColors.accentContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    DhunIconView(
+                        icon = DhunIcon.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                        tint = DhunColors.accent,
+                    )
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs)) {
+                    Text(
+                        "Rename playlist",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = DhunColors.textPrimary,
+                        modifier = Modifier.semantics { heading() },
+                    )
+                    Text(
+                        "Change the name without changing its songs.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DhunColors.textSecondary,
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = DhunSpacing.md),
+                verticalArrangement = Arrangement.spacedBy(DhunSpacing.xs),
+            ) {
+                Text("Current name", style = MaterialTheme.typography.labelSmall, color = DhunColors.textTertiary)
                 Text(
-                    "Rename playlist",
-                    style = MaterialTheme.typography.titleMedium,
+                    current,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DhunColors.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "New name",
+                    modifier = Modifier.padding(top = DhunSpacing.xs),
+                    style = MaterialTheme.typography.labelMedium,
                     color = DhunColors.textPrimary,
                 )
-                Spacer(modifier = Modifier.height(DhunSpacing.md))
                 DhunTextField(
                     value = name,
                     onValueChange = { name = it },
+                    modifier = Modifier.semantics { contentDescription = "New playlist name" },
+                    placeholder = "Playlist name",
                     isError = errorMessage != null,
+                    enabled = !isSaving,
+                    onSubmit = { if (name.isNotBlank() && !isSaving) onConfirm(name) },
                 )
-                if (errorMessage != null) {
-                    Spacer(modifier = Modifier.height(DhunSpacing.xs))
+                errorMessage?.let {
                     Text(
-                        text = errorMessage,
+                        text = it,
+                        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
                         style = MaterialTheme.typography.bodySmall,
                         color = DhunColors.error,
                     )
                 }
-                Spacer(modifier = Modifier.height(DhunSpacing.md))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    DhunTextButton(onClick = onDismiss, enabled = !isSaving) { Text("Cancel") }
-                    Spacer(modifier = Modifier.weight(1f))
-                    DhunButton(
-                        onClick = { onConfirm(name) },
-                        enabled = name.isNotBlank() && !isSaving,
-                        loading = isSaving,
-                    ) { Text(if (errorMessage != null) "Try again" else "Save") }
-                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = DhunSpacing.lg),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                DhunTextButton(onClick = onDismiss, enabled = !isSaving) { Text("Cancel") }
+                Spacer(modifier = Modifier.width(DhunSpacing.sm))
+                DhunButton(
+                    onClick = { onConfirm(name) },
+                    enabled = name.isNotBlank() && !isSaving,
+                    loading = isSaving,
+                ) { Text(if (errorMessage != null) "Try again" else "Save") }
             }
         }
     }
@@ -110,39 +181,15 @@ internal fun PlaylistDeleteDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    Dialog(onDismissRequest = { if (!isDeleting) onDismiss() }) {
-        GlassCard(
-            modifier = Modifier.widthIn(min = DhunSpacing.dialogMinWidth, max = DhunSpacing.dialogMaxWidth),
-            shape = DhunShapes.large,
-            // A dialog floats over a dimmed page — the opaque base is what
-            // keeps the list underneath from reading through its text.
-            opaqueBase = true,
-        ) {
-            Column(modifier = Modifier.padding(DhunSpacing.lg)) {
-                Text(
-                    "Delete \"$playlistName\"?",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = DhunColors.textPrimary,
-                )
-                Spacer(modifier = Modifier.height(DhunSpacing.sm))
-                Text(
-                    "This removes the playlist from your local library. Songs, downloads, favorites and history are not deleted. Backups or device storage may retain copies; this is not secure erasure.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = DhunColors.textSecondary,
-                )
-                if (errorMessage != null) {
-                    Spacer(modifier = Modifier.height(DhunSpacing.sm))
-                    Text(errorMessage, style = MaterialTheme.typography.bodySmall, color = DhunColors.error)
-                }
-                Spacer(modifier = Modifier.height(DhunSpacing.md))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    DhunTextButton(onClick = onDismiss, enabled = !isDeleting) { Text("Cancel") }
-                    Spacer(modifier = Modifier.weight(1f))
-                    DhunButton(onClick = onConfirm, enabled = !isDeleting, loading = isDeleting) {
-                        Text(if (errorMessage == null) "Delete" else "Retry deletion")
-                    }
-                }
-            }
-        }
-    }
+    DhunConfirmDialog(
+        title = "Delete \"$playlistName\"?",
+        message = "This removes the playlist from your local library. Songs, downloads, favorites and history are not deleted. Backups or device storage may retain copies; this is not secure erasure.",
+        confirmLabel = "Delete",
+        retryLabel = "Retry deletion",
+        pendingLabel = "Deleting…",
+        isPending = isDeleting,
+        errorMessage = errorMessage,
+        onDismissRequest = onDismiss,
+        onConfirm = onConfirm,
+    )
 }

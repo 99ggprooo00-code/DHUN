@@ -53,6 +53,8 @@ fun DhunTextField(
     singleLine: Boolean = true,
     minLines: Int = 1,
     maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
+    /** False prevents editing and removes the field from keyboard focus. */
+    enabled: Boolean = true,
 ) {
     val focusRegistry = LocalTextInputFocusRegistry.current
     val focusToken = remember { Any() }
@@ -68,7 +70,10 @@ fun DhunTextField(
         singleLine = singleLine,
         minLines = minLines,
         maxLines = maxLines,
-        textStyle = MaterialTheme.typography.bodyMedium.copy(color = DhunColors.textPrimary),
+        enabled = enabled,
+        textStyle = MaterialTheme.typography.bodyMedium.copy(
+            color = if (enabled) DhunColors.textPrimary else DhunColors.textDisabled,
+        ),
         cursorBrush = SolidColor(DhunColors.accent),
         keyboardOptions = KeyboardOptions(
             imeAction = if (onSubmit != null) imeAction else ImeAction.Default,
@@ -97,7 +102,11 @@ fun DhunTextField(
                     .border(
                         BorderStroke(
                             DhunSpacing.border,
-                            if (isError) DhunColors.borderError else DhunColors.borderStrong,
+                            when {
+                                isError -> DhunColors.borderError
+                                enabled -> DhunColors.borderStrong
+                                else -> DhunColors.border
+                            },
                         ),
                         shape,
                     )
@@ -120,7 +129,7 @@ fun DhunTextField(
                             Text(
                                 text = placeholder,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = DhunColors.textTertiary,
+                                color = if (enabled) DhunColors.textTertiary else DhunColors.textDisabled,
                             )
                         }
                         innerTextField()

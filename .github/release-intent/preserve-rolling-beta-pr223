@@ -1,0 +1,6 @@
+One-shot build-only intent for PR #223 (purpose-specific popup redesign).
+
+The merge that first adds this path preserves the existing rolling DHUN beta:
+run the build and verification jobs with BUILD_ONLY=true and skip all release
+publication jobs. Keeping this file in later commits is inert; the intent is
+recognized only on the main-branch commit where the path is newly added.

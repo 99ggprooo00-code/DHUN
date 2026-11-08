@@ -12,9 +12,9 @@ import subprocess
 from pathlib import Path
 
 INTENT = ".github/release-intent/v1.00.002"
-# Keep the legacy internal marker path: renaming it would look like a newly
-# added build-only intent on the beta migration merge itself.
-PRESERVE_BETA = ".github/release-intent/preserve-rolling-test-draft"
+# Fresh, PR-specific marker for the popup-redesign merge. Its addition selects
+# one build-only main run; retaining it on later commits is intentionally inert.
+PRESERVE_BETA = ".github/release-intent/preserve-rolling-beta-pr223"
 MAIN = "refs/heads/main"
 
 

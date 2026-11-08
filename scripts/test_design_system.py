@@ -147,7 +147,8 @@ class DesignSystemSourceTest(unittest.TestCase):
         self.assertIn("controller.choose(track.id, match)", picker)
 
         error = source("ui/player/PlaybackErrorDialog.kt")
-        self.assertIn("GlassDialog(onDismissRequest = onDismiss)", error)
+        self.assertIn("GlassDialog(\n", error)
+        self.assertIn("onDismissRequest = onDismiss", error)
         self.assertIn("diagnosticText(it, 4_000)", error)
         self.assertIn("onDismiss(); onRetry()", error)
 
@@ -168,11 +169,20 @@ class DesignSystemSourceTest(unittest.TestCase):
         self.assertIn("nav.selectTab(tab, keepDetailOnTabChange = false)", shell)
         self.assertIn("nav.selectTab(tab, keepDetailOnTabChange = layout.showsDetailPane)", shell)
 
+        battery_rationale = source("ui/settings/BatteryPlaybackRationaleDialog.kt")
+        self.assertIn("GlassDialog(\n", battery_rationale)
+        self.assertIn("onDismissRequest = onDismiss", battery_rationale)
+        self.assertIn("DhunButton(onClick = onAllow)", battery_rationale)
+
         activity = (ROOT / "app-android/src/main/kotlin/dev/dhun/android/MainActivity.kt").read_text(
             encoding="utf-8"
         )
-        self.assertIn("GlassDialog(onDismissRequest", activity)
-        self.assertIn("openBatteryOptimizationSettings()", activity)
+        self.assertIn("BatteryPlaybackRationaleDialog(", activity)
+        allow_callback = activity.split("onAllow = {", 1)[1].split("\n                        },", 1)[0]
+        self.assertLess(
+            allow_callback.index("batteryRationaleVisible.value = false"),
+            allow_callback.index("openBatteryOptimizationSettings()"),
+        )
 
     def test_active_guidance_matches_the_simple_background_model(self):
         active_documents = (

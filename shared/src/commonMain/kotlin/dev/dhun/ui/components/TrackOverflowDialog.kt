@@ -287,11 +287,11 @@ internal fun TrackMenuHeader(track: Track) {
  * [destructive] is the queue's "Remove from queue"; [enabled] greys out a row
  * that cannot run (the first row's "Move up", the last row's "Move down").
  *
- * [supportingText] and the [trailingLabel]/[onTrailingClick] pair are used by
- * the playlist picker only — the same row, with the playlist's track count
- * under its name and the "Open" breadcrumb at the end. A row with either one
- * is measured to its content (`heightIn`, never a stretched box); a plain menu
- * row keeps the exact fixed 44dp height the ⋮ menu is sized by.
+ * [supportingText] and the [trailingLabel]/[onTrailingClick] pair are optional
+ * secondary row content. [selected] is used by provider/romanization pickers to
+ * show the current choice as well as exposing it through caller semantics. A
+ * row with supporting or trailing content is measured to its content; a plain
+ * menu row keeps the exact fixed 44dp height the ⋮ menu is sized by.
  */
 @Composable
 internal fun MenuActionRow(
@@ -301,6 +301,7 @@ internal fun MenuActionRow(
     icon: DhunIcon? = null,
     enabled: Boolean = true,
     destructive: Boolean = false,
+    selected: Boolean = false,
     supportingText: String? = null,
     trailingLabel: String? = null,
     onTrailingClick: (() -> Unit)? = null,
@@ -308,11 +309,13 @@ internal fun MenuActionRow(
     val labelColor = when {
         !enabled -> DhunColors.textDisabled
         destructive -> DhunColors.error
+        selected -> DhunColors.accent
         else -> DhunColors.textPrimary
     }
     val iconColor = when {
         !enabled -> DhunColors.textDisabled
         destructive -> DhunColors.error
+        selected -> DhunColors.accent
         else -> DhunColors.textSecondary
     }
     val hasTrailing = trailingLabel != null && onTrailingClick != null
@@ -327,6 +330,7 @@ internal fun MenuActionRow(
                     Modifier.height(DhunSpacing.menuRowHeight)
                 },
             )
+            .then(if (selected) Modifier.background(DhunColors.accentContainer, DhunShapes.medium) else Modifier)
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
             .padding(horizontal = DhunSpacing.mdPlus, vertical = if (wrapsContent) DhunSpacing.xs else DhunSpacing.zero),
         verticalAlignment = Alignment.CenterVertically,
@@ -344,7 +348,7 @@ internal fun MenuActionRow(
             // A trailing affordance needs the label column to take the room
             // left over, or "Open" would sit right beside the name instead of
             // at the end of the row.
-            modifier = if (hasTrailing) Modifier.weight(1f) else Modifier,
+            modifier = if (hasTrailing || selected) Modifier.weight(1f) else Modifier,
         ) {
             Text(
                 text = label,
@@ -369,6 +373,14 @@ internal fun MenuActionRow(
             DhunTextButton(onClick = trailingClick) {
                 Text(text = trailingText, fontSize = DhunTypographyTokens.bodySmall.fontSize)
             }
+        }
+        if (selected) {
+            DhunIconView(
+                icon = DhunIcon.Check,
+                contentDescription = null,
+                modifier = Modifier.size(DhunSpacing.iconSizeSm),
+                tint = DhunColors.accent,
+            )
         }
     }
 }
