@@ -106,6 +106,22 @@ class BuildWorkflowTest(unittest.TestCase):
         self.assertIn("safeLaunchDiagnostics", self.text)
         self.assertIn("    needs: [release_plan, apk, msi]", self.publish)
 
+    def test_msi_build_retries_only_transient_wix_gateway_timeouts(self):
+        msi = self.text.split("\n  msi:\n", 1)[1].split("\n  aab:\n", 1)[0]
+        build = msi.split("      - name: Build MSI (jpackage)\n", 1)[1].split(
+            "\n      - name: Verify MSI identity", 1,
+        )[0]
+        self.assertIn("$maxAttempts = 3", build)
+        self.assertIn('Contains("downloadWix")', build)
+        self.assertIn("HTTP status code: 504", build)
+        self.assertIn("wixtoolset/wix3/releases/download/", build)
+        self.assertIn("if ($gradleExitCode -eq 0) { break }", build)
+        self.assertIn(
+            "if (-not $transientWixGatewayTimeout -or $attempt -eq $maxAttempts)",
+            build,
+        )
+        self.assertIn("exit $gradleExitCode", build)
+
     def test_unsigned_msi_is_finalized_before_checksum_and_upload(self):
         scripts = WORKFLOW.parents[2] / "scripts"
         stage = (scripts / "stage_msi.ps1").read_text()

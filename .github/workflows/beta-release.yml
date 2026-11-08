@@ -195,7 +195,37 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Could not allocate MSI ProductVersion" }
           "installer_version=$version" >> $env:GITHUB_OUTPUT
           Write-Host "MSI ProductVersion: $version"
-          ./gradlew :app-desktop:packageMsi "-PdhunInstallerVersion=$version" "-PdhunReleaseChannel=$env:DHUN_RELEASE_CHANNEL" --no-daemon
+          # Compose downloads WiX from a GitHub release during MSI packaging.
+          # Retry only its transient 504 response; other build failures should
+          # remain immediate and actionable rather than being retried blindly.
+          $gradleLog = Join-Path $env:RUNNER_TEMP "dhun-package-msi.log"
+          $gradleArgs = @(
+            ":app-desktop:packageMsi",
+            "-PdhunInstallerVersion=$version",
+            "-PdhunReleaseChannel=$env:DHUN_RELEASE_CHANNEL",
+            "--no-daemon"
+          )
+          $maxAttempts = 3
+          for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+            Remove-Item $gradleLog -Force -ErrorAction SilentlyContinue
+            Write-Host "Build MSI attempt $attempt of $maxAttempts"
+            & ./gradlew @gradleArgs 2>&1 | Tee-Object -FilePath $gradleLog
+            $gradleExitCode = $LASTEXITCODE
+            if ($gradleExitCode -eq 0) { break }
+
+            $gradleOutput = Get-Content -Raw -Path $gradleLog
+            $transientWixGatewayTimeout = (
+              $gradleOutput.Contains("downloadWix") -and
+              $gradleOutput.Contains("HTTP status code: 504") -and
+              $gradleOutput.Contains("wixtoolset/wix3/releases/download/")
+            )
+            if (-not $transientWixGatewayTimeout -or $attempt -eq $maxAttempts) {
+              exit $gradleExitCode
+            }
+            $delaySeconds = 15 * $attempt
+            Write-Warning "WiX download returned HTTP 504; retrying in $delaySeconds seconds."
+            Start-Sleep -Seconds $delaySeconds
+          }
 
       - name: Verify MSI identity and stage checksum/provenance
         shell: pwsh
