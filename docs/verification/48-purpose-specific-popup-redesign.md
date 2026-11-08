@@ -66,21 +66,101 @@ the redesign that follows.
 | Battery rationale | Android Compose/Skia-compatible component in both themes; narrow width | “Not now” dismisses only; “Allow” closes then opens the same Android battery-settings route |
 | Preserved menus/sheet | Existing track menu, queue/Related, and Lyrics Controls frames | Existing queue, navigation, and provider/timing interactions continue to pass |
 
-## Current validation state
+## Post-redesign validation
 
-- Audit: complete; the concrete redesign/preservation decisions are listed above.
-- Pre-redesign capture set: complete and passing in run `42441448532` (manifest
-  and image count above); the refreshed provider/romanization menu captures are
-  visible and the dark/light battery rationale frames are distinct.
-- Production redesign and interaction/evidence tests: implemented in the
-  workspace and restored to the visual suite; pending compilation and
-  post-redesign remote validation. Do not mark those outcomes as passing yet.
-- Local Gradle compilation is unavailable in this sandbox because no Java
-  runtime is installed; use the repository CI and Visual Evidence workflows.
-- Android emulator/physical-device verification: not yet performed; do not infer
-  device behavior from Skia output.
+The audit and implementation are complete on `arena/b3400d42-dhun`, head
+`02502dcf0f47c50fc8a29286490a2a557a14993d`; PR #223 remains open.
 
-The final PR record will replace this status with the exact changed files,
-post-redesign visual evidence run/manifest, regression results, known
-limitations, and APK instructions. PR #223 must remain open; no merge or release
-is part of this work.
+### Rendered evidence
+
+- Visual Evidence run [`42468911818`](https://github.com/99ggprooo00-code/DHUN/actions/runs/42468911818)
+  passed on the head above in 18m05s: 21 tests (20 `VisualAppEvidenceTest`
+  tests and one `VisualEvidenceTest`), 139 real Compose/Skia PNG frames, zero
+  failures, errors, or skips.
+- Inspectable manifest: Git blob
+  `88648a2293e6e91bd183a54a0ac877280c4b30e4`. The normal
+  `compose-visual-evidence` Actions artifact contains the frames and JUnit
+  reports.
+- Reviewed the dark/light selected-country captures
+  `popup-after-country-picker-selected-dark.png` and
+  `popup-after-country-picker-selected-light.png`: the current-region summary,
+  selected row, and check mark are visible. The narrow, large-text playback
+  error frames also show Retry after scrolling while retaining selectable
+  diagnostics.
+- The playback-error test now uses an upward touch gesture from “Hide
+  diagnostics” and advances the manual Compose clock, rather than waiting on a
+  bring-into-view animation. The country-picker test waits for the cleared query
+  to recompose, refocuses before the second search, and searches again before
+  asserting the selected row in the reopened picker.
+
+### CI, packaging, and regression results
+
+- CI run [`42468911805`](https://github.com/99ggprooo00-code/DHUN/actions/runs/42468911805)
+  passed: shared JVM 848, Android Robolectric 169, playback probe 4, Desktop
+  JVM 46; zero failures, errors, or skips in each group.
+- Build APK run [`42468911813`](https://github.com/99ggprooo00-code/DHUN/actions/runs/42468911813)
+  passed and uploaded the `debug-apk` artifact (universal, arm64-v8a, and
+  armeabi-v7a). Verified package identity: `1.00.781-beta.1`, version code
+  `1794131483`.
+- DHUN beta run [`42468911795`](https://github.com/99ggprooo00-code/DHUN/actions/runs/42468911795)
+  passed after rerunning the failed Windows job. MSI identity, install-over,
+  userdata/cache preservation, uninstall cleanup, and installed-app launch
+  passed. The repeated WiX release download HTTP 504 prompted a narrowly scoped
+  three-attempt retry for that exact transient failure in
+  `.github/workflows/beta-release.yml`; other Gradle failures remain immediate.
+  On this PR, `publish_beta` and `publish` were skipped; no release or
+  publication occurred.
+- `python3 -m unittest discover -s scripts -p 'test_*.py'`: 524 tests passed.
+  `git diff --check`: passed.
+- Local Gradle compilation remains unavailable because this sandbox has no
+  Java runtime; the remote CI, APK, Windows MSI, and Visual Evidence workflows
+  provide the build/test results above.
+
+### Files changed
+
+- Workflows and workflow contracts: `.github/workflows/beta-release.yml`,
+  `.github/workflows/ci.yml`, `.github/workflows/visual-evidence.yml`,
+  `scripts/test_build_workflow.py`, `scripts/test_ci_workflow.py`,
+  `scripts/test_design_system.py`.
+- Platform and evidence tests: `app-android/src/main/kotlin/dev/dhun/android/MainActivity.kt`,
+  `app-desktop/build.gradle.kts`,
+  `app-desktop/src/jvmTest/kotlin/dev/dhun/desktop/VisualAppEvidenceTest.kt`,
+  `app-desktop/src/jvmTest/kotlin/dev/dhun/desktop/VisualEvidenceTest.kt`.
+- Shared design and popup composition: `shared/src/commonMain/kotlin/dev/dhun/design/DhunSpacing.kt`,
+  `shared/src/commonMain/kotlin/dev/dhun/design/catalog/ComponentCatalogScreen.kt`,
+  `shared/src/commonMain/kotlin/dev/dhun/design/components/DhunButton.kt`,
+  `shared/src/commonMain/kotlin/dev/dhun/design/components/DhunConfirmDialog.kt`,
+  `shared/src/commonMain/kotlin/dev/dhun/design/components/DhunControls.kt`,
+  `shared/src/commonMain/kotlin/dev/dhun/design/components/DhunTextField.kt`,
+  `shared/src/commonMain/kotlin/dev/dhun/design/components/GlassCard.kt`,
+  `shared/src/commonMain/kotlin/dev/dhun/ui/components/AddToPlaylistDialog.kt`,
+  `shared/src/commonMain/kotlin/dev/dhun/ui/components/PlaylistDialogs.kt`,
+  `shared/src/commonMain/kotlin/dev/dhun/ui/components/TrackOverflowDialog.kt`,
+  `shared/src/commonMain/kotlin/dev/dhun/ui/library/LibraryScreen.kt`,
+  `shared/src/commonMain/kotlin/dev/dhun/ui/player/LyricsControlsDialog.kt`,
+  `shared/src/commonMain/kotlin/dev/dhun/ui/player/LyricsMatchPicker.kt`,
+  `shared/src/commonMain/kotlin/dev/dhun/ui/player/LyricsRomanizationControls.kt`,
+  `shared/src/commonMain/kotlin/dev/dhun/ui/player/MiniPlayer.kt`,
+  `shared/src/commonMain/kotlin/dev/dhun/ui/player/PlaybackErrorDialog.kt`,
+  `shared/src/commonMain/kotlin/dev/dhun/ui/player/PlayerTabs.kt`,
+  `shared/src/commonMain/kotlin/dev/dhun/ui/search/SearchScreen.kt`,
+  `shared/src/commonMain/kotlin/dev/dhun/ui/settings/BatteryPlaybackRationaleDialog.kt`,
+  `shared/src/commonMain/kotlin/dev/dhun/ui/settings/SettingsScreen.kt`.
+- Supporting records and repository hygiene: `.gitignore`,
+  `docs/design/glass-system.md`,
+  `docs/verification/45-lyrics-controls-dialog.md`,
+  `docs/verification/46-app-wide-dialog-consistency.md`,
+  `docs/verification/47-screenshot-by-screenshot-visual-audit.md`,
+  `docs/verification/48-purpose-specific-popup-redesign.md`.
+
+### Limitations and release scope
+
+Compose/Skia output is renderer evidence, not Android-device or audible-playback
+acceptance. The Windows install evidence records a window capture but does not
+claim visual review or audible playback. For manual Android testing, download
+`debug-apk` from the Build APK run above; it is a debug-signed test artifact,
+not a store-ready release.
+
+No merge, release, or publication was performed. Merging this PR to `main`
+would activate the rolling public DHUN beta publication path, so the existing
+no-release/no-publish constraint remains in force while PR #223 stays open.
