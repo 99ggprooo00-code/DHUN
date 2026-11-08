@@ -859,6 +859,8 @@ class VisualAppEvidenceTest {
                     onNodeWithContentDescription("Clear country search").performClick()
                     onNodeWithContentDescription("Search country or region by name or code")
                         .performTextInput("Nepal")
+                    mainClock.advanceTimeBy(300)
+                    onNodeWithContentDescription("Nepal (NP)").assertIsDisplayed()
                     onNodeWithContentDescription("Nepal (NP)").performClick()
                     mainClock.advanceTimeBy(400)
                     onNodeWithText("Nepal (NP)").assertIsDisplayed()
