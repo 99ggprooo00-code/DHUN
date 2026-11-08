@@ -871,6 +871,11 @@ class VisualAppEvidenceTest {
                         renderCurrentFrame(this, 412, 915),
                     )
                     onNodeWithContentDescription("Clear country search").performClick()
+                    // The manual Compose clock does not auto-apply the clear
+                    // before the next input action; recompose the empty query,
+                    // then focus the field before typing the second search.
+                    mainClock.advanceTimeBy(300)
+                    onNodeWithContentDescription("Search country or region by name or code").performClick()
                     onNodeWithContentDescription("Search country or region by name or code")
                         .performTextInput("Nepal")
                     mainClock.advanceTimeBy(300)
