@@ -1,5 +1,6 @@
 import org.jetbrains.compose.ExperimentalComposeLibrary
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.gradle.api.tasks.testing.Test
 
 plugins {
     kotlin("multiplatform")
@@ -59,6 +60,12 @@ kotlin {
             }
         }
     }
+}
+
+// Full Compose/Skia app evidence renders many complete shell states in one JVM.
+// Keep enough headroom for deterministic CI captures without changing app runtime.
+tasks.withType<Test>().configureEach {
+    maxHeapSize = "2g"
 }
 
 compose.desktop {

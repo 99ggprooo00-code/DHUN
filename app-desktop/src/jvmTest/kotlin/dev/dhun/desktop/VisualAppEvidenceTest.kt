@@ -254,7 +254,8 @@ class VisualAppEvidenceTest {
                     onAllNodesWithContentDescription("Playlist name").assertCountEquals(0)
 
                     onNodeWithContentDescription("Manage Visual QA").performScrollTo().performClick()
-                    mainClock.advanceTimeBy(300)
+                    mainClock.advanceTimeBy(500)
+                    onNodeWithText("Rename").assertIsDisplayed()
                     onNodeWithText("Rename").performClick()
                     mainClock.advanceTimeBy(500)
                     onNodeWithText("Rename playlist").assertIsDisplayed()
@@ -299,6 +300,8 @@ class VisualAppEvidenceTest {
                     onNodeWithText("Cancel").performClick()
                     mainClock.advanceTimeBy(350)
                     onNodeWithContentDescription("Manage Renamed QA").performScrollTo().performClick()
+                    mainClock.advanceTimeBy(500)
+                    onNodeWithText("Rename").assertIsDisplayed()
                     onNodeWithText("Rename").performClick()
                     mainClock.advanceTimeBy(500)
                     onNodeWithContentDescription("New playlist name").assertIsDisplayed()
@@ -850,6 +853,7 @@ class VisualAppEvidenceTest {
                     onNodeWithText("United States · US").assertIsDisplayed()
                     onNodeWithContentDescription("Search country or region by name or code")
                         .performTextInput("Nepal")
+                    mainClock.advanceTimeBy(300)
                     onNodeWithContentDescription("Nepal (NP)").assertIsDisplayed()
                     onNodeWithText("United States · US").assertIsDisplayed()
                     captureUiImage(
