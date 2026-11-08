@@ -45,6 +45,8 @@ import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.runSkikoComposeUiTest
 import androidx.compose.ui.use
 import androidx.compose.ui.unit.Density
@@ -823,7 +825,15 @@ class VisualAppEvidenceTest {
                     )
                     onNodeWithText("Show diagnostics").performClick()
                     mainClock.advanceTimeBy(250)
-                    onNodeWithText("Retry").performScrollTo()
+                    // Retry lives in the dialog's outer scroll column below the
+                    // bounded diagnostics scroller. A semantics bring-into-view
+                    // request waits on its animation with this manual Compose
+                    // clock, so exercise the real scroll gesture and advance it.
+                    onNodeWithText("Hide diagnostics").assertIsDisplayed()
+                    onNodeWithText("Hide diagnostics").performTouchInput {
+                        swipeUp(startY = centerY, endY = centerY - 500f, durationMillis = 500)
+                    }
+                    mainClock.advanceTimeBy(400)
                     onNodeWithText("Retry").assertIsDisplayed()
                     captureUiImage(
                         "popup-after-playback-error-narrow-large-text-${mode.id}.png",
