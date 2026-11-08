@@ -39,7 +39,6 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithContentDescription
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -454,7 +453,7 @@ class VisualAppEvidenceTest {
                         "popup-before-lyrics-provider-${mode.id}.png",
                         renderCurrentFrame(this, 412, 915),
                     )
-                    onAllNodesWithText("Auto (synced first)").onLast().performClick()
+                    onNodeWithContentDescription("Lyrics provider: Auto (synced first)").performClick()
                     mainClock.advanceTimeBy(300)
 
                     onNodeWithContentDescription("Romanization mode: Auto (conservative)").performClick()
@@ -463,7 +462,7 @@ class VisualAppEvidenceTest {
                         "popup-before-romanization-mode-${mode.id}.png",
                         renderCurrentFrame(this, 412, 915),
                     )
-                    onAllNodesWithText("Auto (conservative)").onLast().performClick()
+                    onNodeWithContentDescription("Romanization mode: Auto (conservative)").performClick()
                     mainClock.advanceTimeBy(300)
 
                     captureUiImage(
