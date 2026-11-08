@@ -703,7 +703,7 @@ private fun PlaylistRow(
 }
 
 @Composable
-private fun CreatePlaylistDialog(
+internal fun CreatePlaylistDialog(
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
     onCreate: suspend (String) -> LocalPlaylist,

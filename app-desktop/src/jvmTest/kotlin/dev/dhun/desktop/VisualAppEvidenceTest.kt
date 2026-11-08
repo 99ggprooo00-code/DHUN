@@ -93,8 +93,11 @@ import dev.dhun.presentation.search.SearchViewModel
 import dev.dhun.presentation.settings.SettingsCategory
 import dev.dhun.provider.MusicProvider
 import dev.dhun.ui.components.AddToPlaylistDialog
+import dev.dhun.ui.components.PlaylistRenameDialog
 import dev.dhun.ui.components.TrackOverflowDialog
 import dev.dhun.ui.home.HomeScreen
+import dev.dhun.ui.library.CreatePlaylistDialog
+import dev.dhun.ui.player.PlaybackErrorDialog
 import dev.dhun.ui.shell.AppNavState
 import dev.dhun.ui.shell.AppTab
 import dev.dhun.ui.shell.DetailRoute
@@ -195,6 +198,57 @@ class VisualAppEvidenceTest {
                     assertTrue(!queueFrame.contentEquals(relatedFrame), "Related input did not visibly change the player")
                     assertEquals(RECORDED_TRACKS.first(), fixture.player.currentTrack.value)
                     assertIs<PlaybackState.Playing>(fixture.player.state.value)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `capture pre-redesign playlist form and playback error baselines`() {
+        for (mode in listOf(DhunThemeMode.DARK, DhunThemeMode.LIGHT)) {
+            withFixture(mode) { _ ->
+                val error = PlaybackState.Error(
+                    track = RECORDED_TRACKS.first(),
+                    message = "Could not start playback. Check the connection and try again.",
+                    detail = "web_embedded=AUTH_REQUIRED(provider returned no playable stream); " +
+                        "resolver=UNAVAILABLE(network request timed out)",
+                )
+                val createScene = scene(width = 412, height = 915) {
+                    DhunTheme(mode = mode) {
+                        Box(Modifier.fillMaxSize().background(DhunColors.background))
+                        CreatePlaylistDialog(
+                            onDismiss = {},
+                            onConfirm = {},
+                            onCreate = { error("Baseline capture does not submit the form") },
+                        )
+                    }
+                }
+                createScene.use {
+                    SceneDriver(it).capture("popup-before-playlist-create-${mode.id}.png", settleFrames = 24)
+                }
+
+                val renameScene = scene(width = 412, height = 915) {
+                    DhunTheme(mode = mode) {
+                        Box(Modifier.fillMaxSize().background(DhunColors.background))
+                        PlaylistRenameDialog(
+                            current = "Visual QA",
+                            onDismiss = {},
+                            onConfirm = {},
+                        )
+                    }
+                }
+                renameScene.use {
+                    SceneDriver(it).capture("popup-before-playlist-rename-${mode.id}.png", settleFrames = 24)
+                }
+
+                val errorScene = scene(width = 412, height = 915) {
+                    DhunTheme(mode = mode) {
+                        Box(Modifier.fillMaxSize().background(DhunColors.background))
+                        PlaybackErrorDialog(error = error, onDismiss = {}, onRetry = {})
+                    }
+                }
+                errorScene.use {
+                    SceneDriver(it).capture("popup-before-playback-error-${mode.id}.png", settleFrames = 24)
                 }
             }
         }
